@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useEditor, EditorContent } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
 import Underline from '@tiptap/extension-underline';
@@ -9,11 +9,9 @@ import TaskList from '@tiptap/extension-task-list';
 import TaskItem from '@tiptap/extension-task-item';
 import Link from '@tiptap/extension-link';
 import type { Document } from '@/types/database';
-import { useAutoSave, type SaveStatus } from '@/hooks/use-auto-save';
-import {
-  updateDocumentContent,
-  updateDocumentTitle,
-} from '@/lib/actions/documents';
+import type { SaveStatus } from '@/hooks/use-auto-save';
+import type { ConnectionStatus } from '@/hooks/use-realtime-sync';
+import { useDocumentSync } from '@/hooks/use-document-sync';
 import { AutoDirection } from '@/lib/editor/rtl-extension';
 import { EditorToolbar } from './editor-toolbar';
 
@@ -43,8 +41,41 @@ function SaveIndicator({ status }: { status: SaveStatus }) {
   return <span className={`text-sm ${colors[status]}`}>{labels[status]}</span>;
 }
 
+function ConnectionIndicator({
+  status,
+  isLockedByRemote,
+}: {
+  status: ConnectionStatus;
+  isLockedByRemote: boolean;
+}) {
+  if (isLockedByRemote) {
+    return (
+      <span className="flex items-center gap-1.5 text-sm text-muted-foreground">
+        <span className="inline-block h-2 w-2 rounded-full bg-yellow-500" />
+        Editing elsewhere
+      </span>
+    );
+  }
+
+  const config: Record<ConnectionStatus, { color: string; label: string }> = {
+    connected: { color: 'bg-green-500', label: 'Synced' },
+    connecting: { color: 'bg-yellow-500', label: 'Connecting' },
+    disconnected: { color: 'bg-red-500', label: 'Disconnected' },
+  };
+
+  const { color, label } = config[status];
+
+  return (
+    <span className="flex items-center gap-1.5 text-sm text-muted-foreground">
+      <span className={`inline-block h-2 w-2 rounded-full ${color}`} />
+      {label}
+    </span>
+  );
+}
+
 export function TiptapEditor({ document }: TiptapEditorProps) {
   const [title, setTitle] = useState(document.title);
+  const skipNextUpdateRef = useRef(false);
 
   const editor = useEditor({
     immediatelyRender: false,
@@ -76,23 +107,48 @@ export function TiptapEditor({ document }: TiptapEditorProps) {
       },
     },
     onUpdate: () => {
-      trigger();
+      if (skipNextUpdateRef.current) {
+        skipNextUpdateRef.current = false;
+        return;
+      }
+      triggerSave();
     },
   });
 
-  const saveFn = useCallback(async () => {
-    if (!editor) return;
-    const content = editor.getJSON() as Record<string, unknown>;
-    await updateDocumentContent(document.id, content);
-  }, [editor, document.id]);
+  const onRemoteTitleUpdate = useCallback((remoteTitle: string) => {
+    setTitle(remoteTitle);
+  }, []);
 
-  const { status, trigger } = useAutoSave(saveFn);
+  const {
+    saveStatus,
+    connectionStatus,
+    isLockedByRemote,
+    unlockEditor,
+    triggerSave,
+    saveTitle,
+  } = useDocumentSync({
+    documentId: document.id,
+    editor,
+    onRemoteTitleUpdate,
+  });
 
   const handleTitleBlur = async () => {
     if (title !== document.title) {
-      await updateDocumentTitle(document.id, title);
+      await saveTitle(title);
     }
   };
+
+  const handleTakeOver = () => {
+    unlockEditor();
+    editor?.setEditable(true);
+    editor?.commands.focus();
+  };
+
+  // Toggle editor editability based on remote lock
+  useEffect(() => {
+    if (!editor) return;
+    editor.setEditable(!isLockedByRemote);
+  }, [editor, isLockedByRemote]);
 
   if (!editor) return null;
 
@@ -110,8 +166,27 @@ export function TiptapEditor({ document }: TiptapEditorProps) {
           className="text-xl font-semibold bg-transparent border-none outline-none flex-1"
           placeholder="Untitled"
         />
-        <SaveIndicator status={status} />
+        <div className="flex items-center gap-3">
+          <ConnectionIndicator
+            status={connectionStatus}
+            isLockedByRemote={isLockedByRemote}
+          />
+          <SaveIndicator status={saveStatus} />
+        </div>
       </div>
+
+      {/* Remote editing lock banner */}
+      {isLockedByRemote && (
+        <div className="flex items-center justify-between bg-yellow-50 border-b border-yellow-200 px-4 py-2 text-sm text-yellow-800">
+          <span>This document is being edited on another device.</span>
+          <button
+            onClick={handleTakeOver}
+            className="font-medium underline hover:text-yellow-900"
+          >
+            Take over editing
+          </button>
+        </div>
+      )}
 
       {/* Toolbar */}
       <EditorToolbar editor={editor} />

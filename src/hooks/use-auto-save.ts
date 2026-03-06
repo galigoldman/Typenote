@@ -2,31 +2,41 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 
 export type SaveStatus = 'saved' | 'saving' | 'unsaved';
 
+export interface SaveResult {
+  updated_at: string;
+}
+
 export function useAutoSave(
-  saveFn: () => Promise<void>,
+  saveFn: () => Promise<SaveResult | void>,
   debounceMs: number = 800,
 ) {
   const [status, setStatus] = useState<SaveStatus>('saved');
   const timeoutRef = useRef<NodeJS.Timeout | null>(null);
   const saveFnRef = useRef(saveFn);
+  const lastSaveTimestampRef = useRef<string | null>(null);
 
   useEffect(() => {
     saveFnRef.current = saveFn;
   }, [saveFn]);
 
+  const performSave = useCallback(async () => {
+    setStatus('saving');
+    try {
+      const result = await saveFnRef.current();
+      if (result?.updated_at) {
+        lastSaveTimestampRef.current = result.updated_at;
+      }
+      setStatus('saved');
+    } catch {
+      setStatus('unsaved');
+    }
+  }, []);
+
   const trigger = useCallback(() => {
     setStatus('unsaved');
     if (timeoutRef.current) clearTimeout(timeoutRef.current);
-    timeoutRef.current = setTimeout(async () => {
-      setStatus('saving');
-      try {
-        await saveFnRef.current();
-        setStatus('saved');
-      } catch {
-        setStatus('unsaved');
-      }
-    }, debounceMs);
-  }, [debounceMs]);
+    timeoutRef.current = setTimeout(performSave, debounceMs);
+  }, [debounceMs, performSave]);
 
   const flush = useCallback(async () => {
     if (timeoutRef.current) {
@@ -34,15 +44,9 @@ export function useAutoSave(
       timeoutRef.current = null;
     }
     if (status === 'unsaved') {
-      setStatus('saving');
-      try {
-        await saveFnRef.current();
-        setStatus('saved');
-      } catch {
-        setStatus('unsaved');
-      }
+      await performSave();
     }
-  }, [status]);
+  }, [status, performSave]);
 
   // beforeunload handler
   useEffect(() => {
@@ -60,5 +64,5 @@ export function useAutoSave(
     };
   }, []);
 
-  return { status, trigger, flush };
+  return { status, trigger, flush, lastSaveTimestampRef };
 }

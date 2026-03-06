@@ -99,20 +99,29 @@ export async function moveDocument(id: string, folderId: string | null) {
 export async function updateDocumentContent(
   id: string,
   content: Record<string, unknown>,
-) {
+): Promise<{ updated_at: string }> {
   const supabase = await createClient();
-  const { error } = await supabase
+  const { data, error } = await supabase
     .from('documents')
     .update({ content })
-    .eq('id', id);
+    .eq('id', id)
+    .select('updated_at')
+    .single();
   if (error) throw new Error(error.message);
+  return { updated_at: data.updated_at };
 }
 
-export async function updateDocumentTitle(id: string, title: string) {
+export async function updateDocumentTitle(
+  id: string,
+  title: string,
+): Promise<{ updated_at: string }> {
   const supabase = await createClient();
-  const { error } = await supabase
+  const { data, error } = await supabase
     .from('documents')
     .update({ title })
-    .eq('id', id);
+    .eq('id', id)
+    .select('updated_at')
+    .single();
   if (error) throw new Error(error.message);
+  return { updated_at: data.updated_at };
 }
