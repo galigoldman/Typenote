@@ -103,6 +103,42 @@ describe('useAutoSave', () => {
     expect(result.current.status).toBe('saved');
   });
 
+  it('updates lastSaveTimestampRef when saveFn returns updated_at', async () => {
+    const saveFn = vi
+      .fn()
+      .mockResolvedValue({ updated_at: '2026-01-01T00:00:00Z' });
+    const { result } = renderHook(() => useAutoSave(saveFn, 500));
+
+    act(() => {
+      result.current.trigger();
+    });
+
+    await act(async () => {
+      vi.advanceTimersByTime(500);
+      await Promise.resolve();
+    });
+
+    expect(result.current.lastSaveTimestampRef.current).toBe(
+      '2026-01-01T00:00:00Z',
+    );
+  });
+
+  it('keeps lastSaveTimestampRef null when saveFn returns void', async () => {
+    const saveFn = vi.fn().mockResolvedValue(undefined);
+    const { result } = renderHook(() => useAutoSave(saveFn, 500));
+
+    act(() => {
+      result.current.trigger();
+    });
+
+    await act(async () => {
+      vi.advanceTimersByTime(500);
+      await Promise.resolve();
+    });
+
+    expect(result.current.lastSaveTimestampRef.current).toBeNull();
+  });
+
   it('sets status back to "unsaved" when save fails', async () => {
     const saveFn = vi.fn().mockRejectedValue(new Error('Save failed'));
     const { result } = renderHook(() => useAutoSave(saveFn, 500));
