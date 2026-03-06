@@ -41,6 +41,7 @@ export function TiptapEditor({ document }: TiptapEditorProps) {
   const [title, setTitle] = useState(document.title);
 
   const editor = useEditor({
+    immediatelyRender: false,
     extensions: [
       StarterKit.configure({
         heading: {

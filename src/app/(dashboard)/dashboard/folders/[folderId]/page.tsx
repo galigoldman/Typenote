@@ -3,6 +3,10 @@ import Link from 'next/link';
 import { createClient } from '@/lib/supabase/server';
 import { FolderCard } from '@/components/dashboard/folder-card';
 import { FolderDialog } from '@/components/dashboard/folder-dialog';
+import { DocumentCard } from '@/components/dashboard/document-card';
+import { CreateDocumentDialog } from '@/components/dashboard/create-document-dialog';
+import { EmptyState } from '@/components/dashboard/empty-state';
+import { Button } from '@/components/ui/button';
 import {
   Breadcrumb,
   BreadcrumbItem,
@@ -45,6 +49,10 @@ export default async function FolderPage({
     .eq('folder_id', folderId)
     .order('position', { ascending: true });
 
+  const typedSubfolders = (subfolders as Folder[] | null) ?? [];
+  const typedDocuments = (documents as Document[] | null) ?? [];
+  const isEmpty = typedSubfolders.length === 0 && typedDocuments.length === 0;
+
   return (
     <div className="p-6">
       <div className="mb-6 flex items-center justify-between">
@@ -61,32 +69,44 @@ export default async function FolderPage({
             </BreadcrumbItem>
           </BreadcrumbList>
         </Breadcrumb>
-        <FolderDialog parentId={folderId} />
-      </div>
-
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
-        {(subfolders as Folder[] | null)?.map((subfolder) => (
-          <FolderCard key={subfolder.id} folder={subfolder} />
-        ))}
-      </div>
-
-      {documents && (documents as Document[]).length > 0 && (
-        <div className="mt-6">
-          <h2 className="mb-3 text-sm font-medium text-muted-foreground">
-            Documents
-          </h2>
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
-            {(documents as Document[]).map((doc) => (
-              <div
-                key={doc.id}
-                className="rounded-lg border p-4 transition-colors hover:bg-muted/50"
-              >
-                <p className="font-medium">{doc.title}</p>
-                <p className="text-sm text-muted-foreground">{doc.subject}</p>
-              </div>
-            ))}
-          </div>
+        <div className="flex items-center gap-2">
+          <CreateDocumentDialog folderId={folderId}>
+            <Button variant="outline" size="sm">
+              New Document
+            </Button>
+          </CreateDocumentDialog>
+          <FolderDialog parentId={folderId} />
         </div>
+      </div>
+
+      {isEmpty ? (
+        <EmptyState
+          title="This folder is empty"
+          description="Create a subfolder or start a new document."
+        />
+      ) : (
+        <>
+          {typedSubfolders.length > 0 && (
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
+              {typedSubfolders.map((subfolder) => (
+                <FolderCard key={subfolder.id} folder={subfolder} />
+              ))}
+            </div>
+          )}
+
+          {typedDocuments.length > 0 && (
+            <div className="mt-6">
+              <h2 className="mb-3 text-sm font-medium text-muted-foreground">
+                Documents
+              </h2>
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
+                {typedDocuments.map((doc) => (
+                  <DocumentCard key={doc.id} document={doc} />
+                ))}
+              </div>
+            </div>
+          )}
+        </>
       )}
     </div>
   );

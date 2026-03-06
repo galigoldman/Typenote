@@ -4,6 +4,7 @@ import { useRouter } from 'next/navigation';
 import { MoreHorizontal, Pencil, FolderInput, Trash2 } from 'lucide-react';
 import type { Document } from '@/types/database';
 import { SUBJECTS } from '@/lib/constants/subjects';
+import { deleteDocument } from '@/lib/actions/documents';
 import { cn } from '@/lib/utils';
 import {
   Card,
@@ -74,6 +75,14 @@ export function DocumentCard({
 
   const subjectColor = SUBJECT_COLORS[document.subject] ?? SUBJECT_COLORS.other;
 
+  async function handleDelete() {
+    if (onDelete) {
+      onDelete(document.id);
+    } else {
+      await deleteDocument(document.id);
+    }
+  }
+
   return (
     <Card
       className="cursor-pointer transition-shadow hover:shadow-md"
@@ -108,7 +117,7 @@ export function DocumentCard({
               </DropdownMenuItem>
               <DropdownMenuItem
                 className="text-destructive focus:text-destructive"
-                onClick={() => onDelete?.(document.id)}
+                onClick={handleDelete}
               >
                 <Trash2 className="mr-2 size-4" />
                 Delete
