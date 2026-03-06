@@ -36,7 +36,12 @@ export function HeadingDropdown({ editor }: HeadingDropdownProps) {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button variant="ghost" size="sm" className="gap-1 text-xs w-[130px] justify-between" onMouseDown={(e) => e.preventDefault()}>
+        <Button
+          variant="ghost"
+          size="sm"
+          className="gap-1 text-xs w-[130px] justify-between"
+          onMouseDown={(e) => e.preventDefault()}
+        >
           <span className="truncate">{getCurrentLabel(editor)}</span>
           <ChevronDown className="size-3" />
         </Button>
@@ -48,7 +53,11 @@ export function HeadingDropdown({ editor }: HeadingDropdownProps) {
             className={opt.className}
             onSelect={() => {
               if (opt.level) {
-                editor.chain().focus().toggleHeading({ level: opt.level }).run();
+                editor
+                  .chain()
+                  .focus()
+                  .toggleHeading({ level: opt.level })
+                  .run();
               } else {
                 editor.chain().focus().setParagraph().run();
               }

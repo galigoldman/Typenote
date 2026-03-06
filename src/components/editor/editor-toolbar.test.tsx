@@ -71,9 +71,7 @@ describe('EditorToolbar', () => {
       ];
 
       for (const label of expectedLabels) {
-        expect(
-          screen.getByRole('button', { name: label }),
-        ).toBeInTheDocument();
+        expect(screen.getByRole('button', { name: label })).toBeInTheDocument();
       }
     });
 
@@ -180,12 +178,12 @@ describe('EditorToolbar', () => {
       renderToolbar(editor);
 
       editor.commands.focus();
-      await user.click(
-        screen.getByRole('button', { name: 'Horizontal rule' }),
-      );
+      await user.click(screen.getByRole('button', { name: 'Horizontal rule' }));
 
       const json = editor.getJSON();
-      const hasHr = json.content?.some((node) => node.type === 'horizontalRule');
+      const hasHr = json.content?.some(
+        (node) => node.type === 'horizontalRule',
+      );
       expect(hasHr).toBe(true);
     });
   });

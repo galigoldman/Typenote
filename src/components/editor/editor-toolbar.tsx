@@ -71,9 +71,7 @@ function ToolbarButton({
       <TooltipContent side="bottom" sideOffset={5}>
         <p>
           {label}
-          {shortcut && (
-            <span className="ml-2 opacity-60">{shortcut}</span>
-          )}
+          {shortcut && <span className="ml-2 opacity-60">{shortcut}</span>}
         </p>
       </TooltipContent>
     </Tooltip>
@@ -93,12 +91,7 @@ export function EditorToolbar({ editor }: EditorToolbarProps) {
       editor.chain().focus().extendMarkRange('link').unsetLink().run();
       return;
     }
-    editor
-      .chain()
-      .focus()
-      .extendMarkRange('link')
-      .setLink({ href: url })
-      .run();
+    editor.chain().focus().extendMarkRange('link').setLink({ href: url }).run();
   }, [editor]);
 
   return (

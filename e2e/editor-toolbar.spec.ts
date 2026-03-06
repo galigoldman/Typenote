@@ -224,9 +224,7 @@ test.describe('Editor Toolbar', () => {
       await expect(editor.locator('ul[data-type="taskList"]')).toBeVisible();
 
       await clickToolbarButton(page, 'Task list');
-      await expect(
-        editor.locator('ul[data-type="taskList"]'),
-      ).toHaveCount(0);
+      await expect(editor.locator('ul[data-type="taskList"]')).toHaveCount(0);
     });
 
     test('switch from bullet list to numbered list', async ({ page }) => {
@@ -456,9 +454,7 @@ test.describe('Editor Toolbar', () => {
   });
 
   test.describe('focus preservation (regression)', () => {
-    test('toolbar buttons do not steal focus from editor', async ({
-      page,
-    }) => {
+    test('toolbar buttons do not steal focus from editor', async ({ page }) => {
       const editor = getEditor(page);
 
       // Type in the editor to establish cursor position
