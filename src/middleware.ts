@@ -13,7 +13,8 @@ export const config = {
      * - _next/image (image optimization)
      * - favicon.ico (favicon)
      * - public files (svg, png, jpg, etc.)
+     * - /test routes (dev/test only pages)
      */
-    '/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
+    '/((?!_next/static|_next/image|favicon.ico|test/|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
   ],
 };
