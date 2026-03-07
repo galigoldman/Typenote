@@ -1,4 +1,6 @@
 import { Node, mergeAttributes } from '@tiptap/core';
+import { ReactNodeViewRenderer } from '@tiptap/react';
+import { MathNodeView } from '@/components/editor/math-node-view';
 
 // Module augmentation so editor.commands.insertMath() is type-safe
 declare module '@tiptap/core' {
@@ -58,6 +60,10 @@ export const InlineMath = Node.create({
           });
         },
     };
+  },
+
+  addNodeView() {
+    return ReactNodeViewRenderer(MathNodeView as any);
   },
 
   addKeyboardShortcuts() {
