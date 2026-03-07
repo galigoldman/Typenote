@@ -38,7 +38,7 @@ export async function POST(request: Request) {
     if (!text || typeof text !== 'string' || text.trim().length === 0) {
       return NextResponse.json(
         { error: 'Missing or empty "text" field' },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -60,7 +60,7 @@ export async function POST(request: Request) {
     console.error('Math translation error:', error);
     return NextResponse.json(
       { error: 'Failed to translate math expression' },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

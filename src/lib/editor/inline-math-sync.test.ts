@@ -19,7 +19,10 @@ describe('InlineMath persistence (save/load simulation)', () => {
         { type: 'text', text: 'Energy formula: ' },
         {
           type: 'inlineMath',
-          attrs: { latex: 'E = mc^2', naturalLanguage: 'energy equals mass times speed of light squared' },
+          attrs: {
+            latex: 'E = mc^2',
+            naturalLanguage: 'energy equals mass times speed of light squared',
+          },
         },
         { type: 'text', text: ' is famous.' },
       ],
@@ -37,7 +40,9 @@ describe('InlineMath persistence (save/load simulation)', () => {
 
     expect(mathNode).toBeDefined();
     expect(mathNode?.attrs?.latex).toBe('E = mc^2');
-    expect(mathNode?.attrs?.naturalLanguage).toBe('energy equals mass times speed of light squared');
+    expect(mathNode?.attrs?.naturalLanguage).toBe(
+      'energy equals mass times speed of light squared',
+    );
 
     const textNodes = paragraph?.content?.filter(
       (n: { type: string }) => n.type === 'text',
@@ -87,12 +92,18 @@ describe('InlineMath persistence (save/load simulation)', () => {
           content: [
             {
               type: 'inlineMath',
-              attrs: { latex: 'a^2 + b^2 = c^2', naturalLanguage: 'pythagorean theorem' },
+              attrs: {
+                latex: 'a^2 + b^2 = c^2',
+                naturalLanguage: 'pythagorean theorem',
+              },
             },
             { type: 'text', text: ' and ' },
             {
               type: 'inlineMath',
-              attrs: { latex: 'e^{i\\pi} + 1 = 0', naturalLanguage: 'euler identity' },
+              attrs: {
+                latex: 'e^{i\\pi} + 1 = 0',
+                naturalLanguage: 'euler identity',
+              },
             },
           ],
         },

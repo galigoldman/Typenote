@@ -131,9 +131,7 @@ export function MathNodeView({
           {isLoading && (
             <span className="text-xs text-muted-foreground">...</span>
           )}
-          {error && (
-            <span className="text-xs text-destructive">{error}</span>
-          )}
+          {error && <span className="text-xs text-destructive">{error}</span>}
           {!isNewNode && (
             <button
               type="button"

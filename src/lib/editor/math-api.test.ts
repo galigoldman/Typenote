@@ -32,7 +32,7 @@ describe('translateMathToLatex', () => {
     });
 
     await expect(translateMathToLatex('')).rejects.toThrow(
-      'Missing or empty "text" field'
+      'Missing or empty "text" field',
     );
   });
 
@@ -40,7 +40,7 @@ describe('translateMathToLatex', () => {
     mockFetch.mockRejectedValue(new Error('Network error'));
 
     await expect(translateMathToLatex('x squared')).rejects.toThrow(
-      'Network error'
+      'Network error',
     );
   });
 });

@@ -34,7 +34,7 @@ describe('InlineMath JSON roundtrip', () => {
     // Verify JSON contains the attrs
     const paragraph = json.content?.[0];
     const mathNode = paragraph?.content?.find(
-      (n: { type: string }) => n.type === 'inlineMath'
+      (n: { type: string }) => n.type === 'inlineMath',
     );
     expect(mathNode).toBeDefined();
     expect(mathNode?.attrs?.latex).toBe('x^2 + 1');
@@ -47,7 +47,7 @@ describe('InlineMath JSON roundtrip', () => {
     // Verify the roundtrip preserved attrs
     const paragraph2 = json2.content?.[0];
     const mathNode2 = paragraph2?.content?.find(
-      (n: { type: string }) => n.type === 'inlineMath'
+      (n: { type: string }) => n.type === 'inlineMath',
     );
     expect(mathNode2).toBeDefined();
     expect(mathNode2?.attrs?.latex).toBe('x^2 + 1');
@@ -60,7 +60,7 @@ describe('InlineMath JSON roundtrip', () => {
 
     const paragraph3 = json3.content?.[0];
     const mathNode3 = paragraph3?.content?.find(
-      (n: { type: string }) => n.type === 'inlineMath'
+      (n: { type: string }) => n.type === 'inlineMath',
     );
     expect(mathNode3).toBeDefined();
     expect(mathNode3?.attrs?.latex).toBe('x^2 + 1');
@@ -80,7 +80,11 @@ describe('InlineMath JSON roundtrip', () => {
           content: [
             {
               type: 'inlineMath',
-              attrs: { latex: 'E = mc^2', naturalLanguage: 'energy equals mass times speed of light squared' },
+              attrs: {
+                latex: 'E = mc^2',
+                naturalLanguage:
+                  'energy equals mass times speed of light squared',
+              },
             },
           ],
         },

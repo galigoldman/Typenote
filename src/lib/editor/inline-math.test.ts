@@ -43,7 +43,10 @@ describe('InlineMath node extension', () => {
         { type: 'text', text: 'Before ' },
         {
           type: 'inlineMath',
-          attrs: { latex: 'a^2 + b^2 = c^2', naturalLanguage: 'Pythagorean theorem' },
+          attrs: {
+            latex: 'a^2 + b^2 = c^2',
+            naturalLanguage: 'Pythagorean theorem',
+          },
         },
         { type: 'text', text: ' after' },
       ],
@@ -52,7 +55,7 @@ describe('InlineMath node extension', () => {
     const json = editor.getJSON();
     const paragraph = json.content?.[0];
     const mathNode = paragraph?.content?.find(
-      (n: { type: string }) => n.type === 'inlineMath'
+      (n: { type: string }) => n.type === 'inlineMath',
     );
 
     expect(mathNode).toBeDefined();

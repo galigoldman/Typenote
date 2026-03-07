@@ -25,7 +25,7 @@ vi.mock('@tiptap/react', () => ({
   }) => <span {...props}>{children}</span>,
 }));
 
-import { MathNodeView } from './math-node-view';
+import { MathNodeView, type MathNodeViewProps } from './math-node-view';
 import { translateMathToLatex } from '@/lib/editor/math-api';
 
 const mockedTranslate = vi.mocked(translateMathToLatex);
@@ -49,7 +49,9 @@ function renderMathNodeView(
     selected: overrides.selected ?? false,
   };
 
-  const result = render(<MathNodeView {...(props as any)} />);
+  const result = render(
+    <MathNodeView {...(props as unknown as MathNodeViewProps)} />,
+  );
   return { ...result, props };
 }
 
@@ -79,7 +81,7 @@ describe('MathNodeView', () => {
     const user = userEvent.setup();
     const { props } = renderMathNodeView({ latex: '' });
 
-    const input = screen.getByRole('textbox');
+    expect(screen.getByRole('textbox')).toBeInTheDocument();
     await user.keyboard('{Escape}');
 
     expect(props.deleteNode).toHaveBeenCalled();

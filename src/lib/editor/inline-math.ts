@@ -1,3 +1,4 @@
+import type React from 'react';
 import { Node, mergeAttributes } from '@tiptap/core';
 import { ReactNodeViewRenderer } from '@tiptap/react';
 import { MathNodeView } from '@/components/editor/math-node-view';
@@ -63,7 +64,9 @@ export const InlineMath = Node.create({
   },
 
   addNodeView() {
-    return ReactNodeViewRenderer(MathNodeView as any);
+    return ReactNodeViewRenderer(
+      MathNodeView as unknown as React.ComponentType,
+    );
   },
 
   addKeyboardShortcuts() {
