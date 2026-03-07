@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { NodeViewWrapper } from '@tiptap/react';
+import type { Editor } from '@tiptap/core';
 import katex from 'katex';
 import { translateMathToLatex } from '@/lib/editor/math-api';
 
@@ -12,6 +13,7 @@ export interface MathNodeViewProps {
   ) => void;
   deleteNode: () => void;
   selected: boolean;
+  editor: Editor;
 }
 
 export function MathNodeView({
@@ -19,6 +21,7 @@ export function MathNodeView({
   updateAttributes,
   deleteNode,
   selected,
+  editor,
 }: MathNodeViewProps) {
   const { latex, naturalLanguage } = node.attrs;
   const isNewNode = latex === '';
@@ -34,6 +37,17 @@ export function MathNodeView({
   const inputRef = useRef<HTMLInputElement>(null);
   const originalNL = useRef(naturalLanguage);
 
+  // Track whether the user explicitly entered editing mode
+  const userInitiatedEdit = useRef(false);
+
+  // Sync isEditing with latex prop on mount — when document reloads with
+  // saved latex, ensure we show display mode, not editing mode
+  useEffect(() => {
+    if (latex && isEditing && !userInitiatedEdit.current) {
+      setIsEditing(false);
+    }
+  }, [latex]); // eslint-disable-line react-hooks/exhaustive-deps
+
   useEffect(() => {
     if (isEditing && inputRef.current) {
       inputRef.current.focus();
@@ -41,6 +55,7 @@ export function MathNodeView({
   }, [isEditing]);
 
   const handleEnterEdit = useCallback(() => {
+    userInitiatedEdit.current = true;
     originalNL.current = naturalLanguage;
     setIsEditing(true);
     setInputValue(naturalLanguage || '');
@@ -58,6 +73,9 @@ export function MathNodeView({
         latex: value,
         naturalLanguage: originalNL.current,
       });
+      // Force editor to emit update so auto-save triggers
+      editor.commands.focus();
+      userInitiatedEdit.current = false;
       setIsEditing(false);
       setError(null);
       return;
@@ -65,6 +83,7 @@ export function MathNodeView({
 
     // NL mode: skip AI if text hasn't changed
     if (value === originalNL.current && latex !== '') {
+      userInitiatedEdit.current = false;
       setIsEditing(false);
       setError(null);
       return;
@@ -79,13 +98,16 @@ export function MathNodeView({
         latex: result,
         naturalLanguage: value,
       });
+      // Force editor to emit update so auto-save triggers
+      editor.commands.focus();
+      userInitiatedEdit.current = false;
       setIsEditing(false);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Translation failed');
     } finally {
       setIsLoading(false);
     }
-  }, [inputValue, isLatexMode, latex, originalNL, updateAttributes]);
+  }, [inputValue, isLatexMode, latex, originalNL, updateAttributes, editor]);
 
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent) => {
@@ -99,6 +121,7 @@ export function MathNodeView({
         if (isNewNode && latex === '') {
           deleteNode();
         } else {
+          userInitiatedEdit.current = false;
           setIsEditing(false);
           setError(null);
         }

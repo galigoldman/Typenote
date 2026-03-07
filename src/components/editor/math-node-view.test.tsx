@@ -47,6 +47,7 @@ function renderMathNodeView(
     updateAttributes: vi.fn(),
     deleteNode: vi.fn(),
     selected: overrides.selected ?? false,
+    editor: { commands: { focus: vi.fn() } },
   };
 
   const result = render(
