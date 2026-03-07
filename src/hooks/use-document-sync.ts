@@ -22,6 +22,7 @@ interface UseDocumentSyncReturn {
   unlockEditor: () => void;
   triggerSave: () => void;
   flushSave: () => Promise<void>;
+  flushNow: () => Promise<void>;
   lastSaveTimestampRef: React.RefObject<string | null>;
   saveTitle: (title: string) => Promise<void>;
 }
@@ -43,6 +44,7 @@ export function useDocumentSync({
     status: saveStatus,
     trigger: triggerSave,
     flush: flushSave,
+    flushNow,
     lastSaveTimestampRef,
   } = useAutoSave(saveFn);
 
@@ -81,6 +83,7 @@ export function useDocumentSync({
     unlockEditor,
     triggerSave,
     flushSave,
+    flushNow,
     lastSaveTimestampRef,
     saveTitle,
   };

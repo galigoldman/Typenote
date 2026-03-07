@@ -77,6 +77,7 @@ function ConnectionIndicator({
 export function TiptapEditor({ document }: TiptapEditorProps) {
   const [title, setTitle] = useState(document.title);
   const skipNextUpdateRef = useRef(false);
+  const isEditorReadyRef = useRef(false);
 
   const editor = useEditor({
     immediatelyRender: false,
@@ -108,7 +109,16 @@ export function TiptapEditor({ document }: TiptapEditorProps) {
           'prose prose-sm sm:prose-base max-w-none focus:outline-none min-h-[500px] p-4',
       },
     },
+    onCreate: () => {
+      // Mark the editor as ready after initial content is loaded.
+      // This prevents AutoDirection's appendTransaction (and other
+      // extensions) from triggering a save during initialization.
+      requestAnimationFrame(() => {
+        isEditorReadyRef.current = true;
+      });
+    },
     onUpdate: () => {
+      if (!isEditorReadyRef.current) return;
       if (skipNextUpdateRef.current) {
         skipNextUpdateRef.current = false;
         return;
@@ -127,12 +137,23 @@ export function TiptapEditor({ document }: TiptapEditorProps) {
     isLockedByRemote,
     unlockEditor,
     triggerSave,
+    flushNow,
     saveTitle,
   } = useDocumentSync({
     documentId: document.id,
     editor,
     onRemoteTitleUpdate,
   });
+
+  // Expose flushNow to NodeViews (e.g. MathNodeView) via editor storage
+  useEffect(() => {
+    if (editor) {
+      editor.storage.inlineMath = {
+        ...editor.storage.inlineMath,
+        flushSave: flushNow,
+      };
+    }
+  }, [editor, flushNow]);
 
   const handleTitleBlur = async () => {
     if (title !== document.title) {

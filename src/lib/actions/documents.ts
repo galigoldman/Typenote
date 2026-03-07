@@ -108,6 +108,7 @@ export async function updateDocumentContent(
     .select('updated_at')
     .single();
   if (error) throw new Error(error.message);
+  revalidatePath(`/dashboard/documents/${id}`);
   return { updated_at: data.updated_at };
 }
 

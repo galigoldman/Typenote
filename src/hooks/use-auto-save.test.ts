@@ -139,6 +139,47 @@ describe('useAutoSave', () => {
     expect(result.current.lastSaveTimestampRef.current).toBeNull();
   });
 
+  it('flushNow saves immediately and cancels pending debounce', async () => {
+    const saveFn = vi.fn().mockResolvedValue(undefined);
+    const { result } = renderHook(() => useAutoSave(saveFn, 500));
+
+    // Trigger debounced save
+    act(() => {
+      result.current.trigger();
+    });
+
+    expect(result.current.status).toBe('unsaved');
+
+    // flushNow should save immediately without waiting for debounce
+    await act(async () => {
+      await result.current.flushNow();
+    });
+
+    expect(saveFn).toHaveBeenCalledOnce();
+    expect(result.current.status).toBe('saved');
+
+    // The debounce timer should be cancelled — no duplicate save
+    await act(async () => {
+      vi.advanceTimersByTime(500);
+      await Promise.resolve();
+    });
+
+    expect(saveFn).toHaveBeenCalledOnce();
+  });
+
+  it('flushNow works even without prior trigger call', async () => {
+    const saveFn = vi.fn().mockResolvedValue({ updated_at: '2026-03-01T00:00:00Z' });
+    const { result } = renderHook(() => useAutoSave(saveFn, 500));
+
+    await act(async () => {
+      await result.current.flushNow();
+    });
+
+    expect(saveFn).toHaveBeenCalledOnce();
+    expect(result.current.status).toBe('saved');
+    expect(result.current.lastSaveTimestampRef.current).toBe('2026-03-01T00:00:00Z');
+  });
+
   it('sets status back to "unsaved" when save fails', async () => {
     const saveFn = vi.fn().mockRejectedValue(new Error('Save failed'));
     const { result } = renderHook(() => useAutoSave(saveFn, 500));

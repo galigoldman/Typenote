@@ -27,7 +27,7 @@ export function useAutoSave(
         lastSaveTimestampRef.current = result.updated_at;
       }
       setStatus('saved');
-    } catch {
+    } catch (err) {
       setStatus('unsaved');
     }
   }, []);
@@ -64,5 +64,16 @@ export function useAutoSave(
     };
   }, []);
 
-  return { status, trigger, flush, lastSaveTimestampRef };
+  // Stable immediate save — bypasses debounce, always saves current content.
+  // Unlike `flush` (which depends on `status`), this has no reactive deps
+  // so it's safe to store in long-lived refs like editor.storage.
+  const flushNow = useCallback(async () => {
+    if (timeoutRef.current) {
+      clearTimeout(timeoutRef.current);
+      timeoutRef.current = null;
+    }
+    await performSave();
+  }, [performSave]);
+
+  return { status, trigger, flush, flushNow, lastSaveTimestampRef };
 }

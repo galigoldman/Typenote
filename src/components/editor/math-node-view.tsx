@@ -37,8 +37,8 @@ export function MathNodeView({ node, updateAttributes, deleteNode, selected, edi
 
     if (inputMode === 'latex') {
       updateAttributes({ latex: value, naturalLanguage: naturalLanguage || '' });
-      // Dispatch an empty transaction to ensure onUpdate fires for auto-save
-      editor.view.dispatch(editor.state.tr);
+      // Flush save immediately so content persists through page refresh
+      editor.storage?.inlineMath?.flushSave?.();
       setEditing(false);
       setError(null);
       return;
@@ -50,7 +50,8 @@ export function MathNodeView({ node, updateAttributes, deleteNode, selected, edi
     try {
       const result = await translateMathToLatex(value);
       updateAttributes({ latex: result, naturalLanguage: value });
-      editor.view.dispatch(editor.state.tr);
+      // Flush save immediately so content persists through page refresh
+      editor.storage?.inlineMath?.flushSave?.();
       setEditing(false);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Translation failed');
