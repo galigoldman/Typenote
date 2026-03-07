@@ -13,6 +13,7 @@ import type { SaveStatus } from '@/hooks/use-auto-save';
 import type { ConnectionStatus } from '@/hooks/use-realtime-sync';
 import { useDocumentSync } from '@/hooks/use-document-sync';
 import { AutoDirection } from '@/lib/editor/rtl-extension';
+import { InlineMath } from '@/lib/editor/inline-math';
 import { EditorToolbar } from './editor-toolbar';
 
 interface TiptapEditorProps {
@@ -98,6 +99,7 @@ export function TiptapEditor({ document }: TiptapEditorProps) {
         },
       }),
       AutoDirection,
+      InlineMath,
     ],
     content: document.content as Record<string, unknown>,
     editorProps: {

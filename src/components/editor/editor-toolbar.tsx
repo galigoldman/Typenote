@@ -20,6 +20,7 @@ import {
   Code,
   Minus,
   Quote,
+  Sigma,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
@@ -233,6 +234,12 @@ export function EditorToolbar({ editor }: EditorToolbarProps) {
         isActive={editor.isActive('blockquote')}
         icon={<Quote />}
         label="Blockquote"
+      />
+      <ToolbarButton
+        onClick={() => editor.chain().focus().insertMath().run()}
+        icon={<Sigma />}
+        label="Math expression"
+        shortcut="$"
       />
     </div>
   );
