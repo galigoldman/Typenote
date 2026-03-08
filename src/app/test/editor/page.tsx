@@ -18,6 +18,7 @@ const mockDocument: Document = {
       },
     ],
   },
+  pages: null,
   subject: 'other',
   subject_custom: 'Testing',
   canvas_type: 'blank',

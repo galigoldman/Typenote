@@ -13,6 +13,8 @@ interface UseDocumentSyncOptions {
   documentId: string;
   editor: Editor | null;
   onRemoteTitleUpdate: (title: string) => void;
+  getPagesData?: () => Record<string, unknown> | undefined;
+  onRemotePagesUpdate?: (pages: Record<string, unknown>) => void;
 }
 
 interface UseDocumentSyncReturn {
@@ -30,14 +32,18 @@ export function useDocumentSync({
   documentId,
   editor,
   onRemoteTitleUpdate,
+  getPagesData,
+  onRemotePagesUpdate,
 }: UseDocumentSyncOptions): UseDocumentSyncReturn {
   const [isLockedByRemote, setIsLockedByRemote] = useState(false);
 
   const saveFn = useCallback(async () => {
-    if (!editor) return;
-    const content = editor.getJSON() as Record<string, unknown>;
-    return updateDocumentContent(documentId, content);
-  }, [editor, documentId]);
+    const content = editor
+      ? (editor.getJSON() as Record<string, unknown>)
+      : ({} as Record<string, unknown>);
+    const pages = getPagesData?.();
+    return updateDocumentContent(documentId, content, pages);
+  }, [editor, documentId, getPagesData]);
 
   const {
     status: saveStatus,
@@ -60,6 +66,7 @@ export function useDocumentSync({
     lastSaveTimestampRef,
     onRemoteContentUpdate,
     onRemoteTitleUpdate,
+    onRemotePagesUpdate,
   });
 
   const saveTitle = useCallback(

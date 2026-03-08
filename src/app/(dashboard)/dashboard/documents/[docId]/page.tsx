@@ -1,6 +1,6 @@
 import { redirect } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
-import { TiptapEditor } from '@/components/editor/tiptap-editor';
+import { CanvasEditor } from '@/components/canvas/canvas-editor';
 import type { Document } from '@/types/database';
 
 interface DocumentPageProps {
@@ -21,5 +21,5 @@ export default async function DocumentPage({ params }: DocumentPageProps) {
     redirect('/dashboard');
   }
 
-  return <TiptapEditor document={document as Document} />;
+  return <CanvasEditor document={document as Document} />;
 }

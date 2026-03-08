@@ -11,6 +11,7 @@ interface UseRealtimeSyncOptions {
   lastSaveTimestampRef: React.RefObject<string | null>;
   onRemoteContentUpdate: (content: Record<string, unknown>) => void;
   onRemoteTitleUpdate: (title: string) => void;
+  onRemotePagesUpdate?: (pages: Record<string, unknown>) => void;
 }
 
 export function useRealtimeSync({
@@ -18,6 +19,7 @@ export function useRealtimeSync({
   lastSaveTimestampRef,
   onRemoteContentUpdate,
   onRemoteTitleUpdate,
+  onRemotePagesUpdate,
 }: UseRealtimeSyncOptions) {
   const [connectionStatus, setConnectionStatus] =
     useState<ConnectionStatus>('connecting');
@@ -26,6 +28,7 @@ export function useRealtimeSync({
   // Keep callbacks in refs to avoid re-subscribing
   const onRemoteContentRef = useRef(onRemoteContentUpdate);
   const onRemoteTitleRef = useRef(onRemoteTitleUpdate);
+  const onRemotePagesRef = useRef(onRemotePagesUpdate);
 
   useEffect(() => {
     onRemoteContentRef.current = onRemoteContentUpdate;
@@ -34,6 +37,10 @@ export function useRealtimeSync({
   useEffect(() => {
     onRemoteTitleRef.current = onRemoteTitleUpdate;
   }, [onRemoteTitleUpdate]);
+
+  useEffect(() => {
+    onRemotePagesRef.current = onRemotePagesUpdate;
+  }, [onRemotePagesUpdate]);
 
   useEffect(() => {
     const supabase = createClient();
@@ -53,6 +60,7 @@ export function useRealtimeSync({
             updated_at: string;
             content: Record<string, unknown>;
             title: string;
+            pages?: Record<string, unknown>;
           };
 
           // Echo guard: if this update came from our own save, ignore it
@@ -62,6 +70,9 @@ export function useRealtimeSync({
 
           onRemoteContentRef.current(newRecord.content);
           onRemoteTitleRef.current(newRecord.title);
+          if (newRecord.pages && onRemotePagesRef.current) {
+            onRemotePagesRef.current(newRecord.pages);
+          }
         },
       )
       .subscribe((status) => {

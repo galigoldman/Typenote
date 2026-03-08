@@ -16,6 +16,7 @@ const mockDocument: Document = {
   folder_id: null,
   title: 'Integration by Parts',
   content: {},
+  pages: null,
   subject: 'calculus',
   subject_custom: null,
   canvas_type: 'lined',
