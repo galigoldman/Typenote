@@ -27,6 +27,7 @@ export function CanvasPage({
 }: CanvasPageProps) {
   const committedCanvasRef = useRef<HTMLCanvasElement>(null);
   const workingCanvasRef = useRef<HTMLCanvasElement>(null);
+  const interactionLayerRef = useRef<HTMLDivElement>(null);
   const committedCtxRef = useRef<CanvasRenderingContext2D | null>(null);
   const workingCtxRef = useRef<CanvasRenderingContext2D | null>(null);
 
@@ -46,6 +47,40 @@ export function CanvasPage({
         PAGE_HEIGHT,
       );
     }
+  }, []);
+
+  // Native event listeners to prevent browser text selection for pen/touch
+  // React synthetic events can't reliably preventDefault on passive touch listeners
+  useEffect(() => {
+    const el = interactionLayerRef.current;
+    if (!el) return;
+
+    const preventForPen = (e: PointerEvent) => {
+      if (e.pointerType === 'pen') {
+        e.preventDefault();
+      }
+    };
+
+    const preventTouch = (e: TouchEvent) => {
+      // Prevent default touch behavior (text selection, scroll) on the canvas
+      e.preventDefault();
+    };
+
+    el.addEventListener('pointerdown', preventForPen, { passive: false });
+    el.addEventListener('pointermove', preventForPen, { passive: false });
+    el.addEventListener('pointerup', preventForPen, { passive: false });
+    el.addEventListener('touchstart', preventTouch, { passive: false });
+    el.addEventListener('touchmove', preventTouch, { passive: false });
+    el.addEventListener('touchend', preventTouch, { passive: false });
+
+    return () => {
+      el.removeEventListener('pointerdown', preventForPen);
+      el.removeEventListener('pointermove', preventForPen);
+      el.removeEventListener('pointerup', preventForPen);
+      el.removeEventListener('touchstart', preventTouch);
+      el.removeEventListener('touchmove', preventTouch);
+      el.removeEventListener('touchend', preventTouch);
+    };
   }, []);
 
   // Re-render committed strokes when page.strokes changes
@@ -88,6 +123,8 @@ export function CanvasPage({
         width: PAGE_WIDTH,
         height: PAGE_HEIGHT,
         marginBottom: 20,
+        userSelect: 'none',
+        WebkitUserSelect: 'none',
       }}
     >
       {/* Layer 1: Page background (canvas styles like lined/grid) */}
@@ -121,8 +158,13 @@ export function CanvasPage({
 
       {/* Layer 5: Interaction layer (captures pointer events) */}
       <div
+        ref={interactionLayerRef}
         className="absolute inset-0"
-        style={{ touchAction: 'none' }}
+        style={{
+          touchAction: 'none',
+          userSelect: 'none',
+          WebkitUserSelect: 'none',
+        }}
         onPointerDown={handlePointerDown}
         onPointerMove={handlePointerMove}
         onPointerUp={handlePointerUp}
