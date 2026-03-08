@@ -43,8 +43,11 @@ Every step of development must follow this git workflow:
 - TypeScript 5 / Node.js 18+ + Next.js 16.1.6, TipTap 3.20.1, KaTeX, Supabase SSR 0.9.0 (002-fix-latex-math-ux)
 - TypeScript 5 / Node.js 18+ + Next.js 16.1.6, Supabase SSR 0.9.0, Supabase Storage (new), shadcn/ui (003-course-materials)
 - PostgreSQL via Supabase — new tables: courses, course_weeks, course_materials + modified documents (003-course-materials)
+- TypeScript 5.x, React 19, Next.js 16 + TipTap 3 (text editing), `perfect-freehand` (stroke geometry), Pointer Events API (input), Canvas 2D API (rendering) (001-canvas-editor)
+- Supabase PostgreSQL — new `pages` JSONB column on `documents` table (001-canvas-editor)
 
 ## Recent Changes
 
 - 001-latex-math-input: Added TypeScript 5 / Node.js 18+ + Next.js 16.1.6, TipTap 3.20.1, Supabase SSR 0.9.0, KaTeX (new), Vercel AI SDK (new), @ai-sdk/google (new)
 - 003-course-materials: Added Supabase Storage for PDF uploads, 3 new DB tables (courses, course_weeks, course_materials), course_id on documents
+- 001-canvas-editor: Added TypeScript 5.x, React 19, Next.js 16 + TipTap 3 (text editing), `perfect-freehand` (stroke geometry), Pointer Events API (input), Canvas 2D API (rendering)
