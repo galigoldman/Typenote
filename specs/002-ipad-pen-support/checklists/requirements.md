@@ -1,7 +1,7 @@
-# Specification Quality Checklist: iPad Optimization & Apple Pencil Support
+# Specification Quality Checklist: Infinite Canvas with Moveable Elements & iPad Drawing
 
 **Purpose**: Validate specification completeness and quality before proceeding to planning
-**Created**: 2026-03-08
+**Created**: 2026-03-08 (updated after clarification)
 **Feature**: [spec.md](../spec.md)
 
 ## Content Quality
@@ -31,5 +31,5 @@
 
 ## Notes
 
-- Spec references "Pointer Events API", "Canvas 2D or SVG", "service worker", and "cache-first strategy" in functional requirements — these are acceptable as they describe capability categories rather than specific framework/library choices. The spec intentionally stays at the "what capability is needed" level without prescribing specific npm packages or implementation patterns.
-- All items pass validation. Spec is ready for `/speckit.clarify` or `/speckit.plan`.
+- 5 clarifications resolved in session 2026-03-08: multi-select, undo/redo scope, canvas backgrounds, copy/paste, scale targets
+- All items pass validation. Spec is ready for `/speckit.plan`.

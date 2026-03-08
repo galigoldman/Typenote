@@ -9,6 +9,7 @@ export async function createDocument(data: {
   subject_custom?: string;
   canvas_type: string;
   folder_id: string | null;
+  content?: Record<string, unknown>;
 }) {
   const supabase = await createClient();
   const {

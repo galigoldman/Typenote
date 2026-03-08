@@ -48,11 +48,12 @@ export function useRealtimeSync({
           table: 'documents',
           filter: `id=eq.${documentId}`,
         },
-        (payload) => {
+        async (payload) => {
           const newRecord = payload.new as {
             updated_at: string;
-            content: Record<string, unknown>;
-            title: string;
+            // content may be truncated by Supabase Realtime (>64 bytes)
+            // so we use notification-then-fetch pattern instead
+            title?: string;
           };
 
           // Echo guard: if this update came from our own save, ignore it
@@ -60,8 +61,22 @@ export function useRealtimeSync({
             return;
           }
 
-          onRemoteContentRef.current(newRecord.content);
-          onRemoteTitleRef.current(newRecord.title);
+          // Notification-then-fetch: fetch the full document since
+          // Supabase Realtime truncates fields >64 bytes
+          try {
+            const { data, error } = await supabase
+              .from('documents')
+              .select('content, title')
+              .eq('id', documentId)
+              .single();
+
+            if (error || !data) return;
+
+            onRemoteContentRef.current(data.content as Record<string, unknown>);
+            onRemoteTitleRef.current(data.title as string);
+          } catch {
+            // If fetch fails, ignore — we'll get the next update
+          }
         },
       )
       .subscribe((status) => {

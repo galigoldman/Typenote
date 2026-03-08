@@ -26,7 +26,7 @@ export async function createFolder(data: {
 
 export async function updateFolder(
   id: string,
-  data: { name: string; color: string },
+  data: { name: string; color: string; default_background?: string },
 ) {
   const supabase = await createClient();
   const {
@@ -34,13 +34,18 @@ export async function updateFolder(
   } = await supabase.auth.getUser();
   if (!user) throw new Error('Not authenticated');
 
+  const updateData: Record<string, unknown> = {
+    name: data.name,
+    color: data.color,
+    updated_at: new Date().toISOString(),
+  };
+  if (data.default_background !== undefined) {
+    updateData.default_background = data.default_background;
+  }
+
   const { error } = await supabase
     .from('folders')
-    .update({
-      name: data.name,
-      color: data.color,
-      updated_at: new Date().toISOString(),
-    })
+    .update(updateData)
     .eq('id', id)
     .eq('user_id', user.id);
   if (error) throw new Error(error.message);

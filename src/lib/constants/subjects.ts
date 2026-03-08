@@ -15,4 +15,6 @@ export const CANVAS_TYPES = [
   { value: 'blank', label: 'Blank' },
   { value: 'lined', label: 'Lined' },
   { value: 'grid', label: 'Grid' },
+  { value: 'dotted', label: 'Dotted' },
 ] as const;
+

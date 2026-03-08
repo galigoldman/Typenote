@@ -1,233 +1,191 @@
-# Tasks: iPad Optimization & Apple Pencil Support
+# Tasks: Infinite Canvas with Moveable Elements & iPad Drawing
 
-**Feature**: Transform Typenote into an iPad-optimized PWA with Apple Pencil drawing support
+**Feature**: Transform Typenote into a freeform infinite canvas with moveable text blocks, Apple Pencil drawing, and cross-device sync
 **Branch**: `002-ipad-pen-support`
-**Total Tasks**: 38
+**Total Tasks**: 45
 **Spec**: [spec.md](spec.md) | **Plan**: [plan.md](plan.md)
 
 ---
 
 ## Phase 1: Setup
 
-**Goal**: Install dependencies and create shared foundation files.
+**Purpose**: Install dependencies, define shared types, create database migration
 
-- [x] T001 Install PWA dependencies (`@serwist/next`, `serwist`) in `package.json`
-- [x] T002 [P] Install drawing dependencies (`perfect-freehand`, `uuid`, `@types/uuid`) in `package.json`
-- [x] T003 [P] Install offline dependencies (`idb-keyval`) in `package.json`
-- [x] T004 Create drawing type definitions (Stroke, Point, DrawingBlockAttrs, DrawingTool) in `src/lib/drawing/types.ts`
-
----
-
-## Phase 2: Foundational
-
-**Goal**: Add touch-responsive CSS infrastructure used by multiple user stories.
-
-- [x] T005 Add `@custom-variant` for `pointer: coarse` touch detection in `src/app/globals.css` — enables `touch:` Tailwind variant for conditional touch-device styling
-- [x] T006 Add safe-area-inset CSS custom properties and utility classes for iPad notch/home indicator in `src/app/globals.css`
+- [ ] T001 Install `@use-gesture/react` dependency via `pnpm add @use-gesture/react`
+- [ ] T002 Create canvas TypeScript types (CanvasDocument, CanvasElement, TextBlock, DrawingLayer, Viewport, Stroke) in `src/lib/canvas/types.ts` per `specs/002-ipad-pen-support/data-model.md` and `specs/002-ipad-pen-support/contracts/canvas-document-format.md`
+- [ ] T003 [P] Extend `Document` and `Folder` interfaces in `src/types/database.ts` to include canvas format types and `default_background` field on Folder
+- [ ] T004 [P] Create Supabase migration `supabase/migrations/00003_add_folder_default_background.sql` adding `default_background TEXT NOT NULL DEFAULT 'blank'` to `folders` table
 
 ---
 
-## Phase 3: US1 — PWA Installation
+## Phase 2: Foundational (Blocking Prerequisites)
 
-**Goal**: Make Typenote installable on iPad home screen as a standalone app.
+**Purpose**: Core infrastructure that MUST be complete before user stories can start
 
-**Story**: As a student, I want to install Typenote on my iPad home screen, so that it feels like a native app.
+**CRITICAL**: No user story work can begin until this phase is complete
 
-**Independent Test Criteria**: App can be added to home screen, launches in standalone mode, shows correct icon and name.
+- [ ] T005 Create global history manager (`HistoryManager` class with Command interface, undo/redo stacks, time-based grouping at 500ms) in `src/lib/canvas/history-manager.ts` — supports TextEditCommand, StrokeCommand, and CanvasCommand types per research.md Decision 2
+- [ ] T006 [P] Create canvas viewport state store (pan x/y, zoom level, min/max zoom 0.25–4.0) in `src/lib/canvas/viewport-store.ts` using React context or Zustand
+- [ ] T007 [P] Create EditorManager class (registry of active TipTap editor instances keyed by element ID, lazy create/destroy, get focused editor) in `src/lib/canvas/editor-manager.ts`
+- [ ] T008 [P] Create element operations module (createElement, deleteElement, moveElement, resizeElement, updateZOrder) in `src/lib/canvas/element-operations.ts` — all operations create Command objects and push to HistoryManager
+- [ ] T009 [P] Create viewport culling utility (given viewport bounds + zoom, return list of element IDs whose bounding box intersects viewport) in `src/lib/canvas/viewport-culling.ts`
+- [ ] T010 [P] Create input router module (route PointerEvents based on `pointerType`: pen→draw, touch→pan/interact, mouse→tool-dependent) in `src/lib/canvas/input-router.ts`
+- [ ] T011 Add canvas format discrimination to document page `src/app/(dashboard)/documents/[id]/page.tsx` — check `content.format === 'canvas'` and render canvas editor vs. existing linear TipTap editor
+- [ ] T012 Add "Canvas Document" option to create document dialog `src/components/dashboard/create-document-dialog.tsx` — new documents with canvas format include `format: "canvas"`, `version: 1`, viewport at origin, background from folder default, one empty text block per `specs/002-ipad-pen-support/contracts/canvas-document-format.md`
+- [ ] T013 Create canvas-aware save helper in `src/lib/actions/documents.ts` — serialize canvas state to JSONB, handle both canvas and linear formats on load
 
-- [x] T007 [US1] Create PWA web app manifest with app name, icons, standalone display, and theme color at `public/manifest.json` (per contract in `contracts/pwa-manifest.md`)
-- [x] T008 [P] [US1] Generate placeholder app icons (192x192, 512x512, apple-touch-icon) at `public/icons/`
-- [x] T009 [US1] Add PWA meta tags (viewport, apple-mobile-web-app-capable, apple-mobile-web-app-status-bar-style, theme-color, manifest link, apple-touch-icon) to `src/app/layout.tsx` via Next.js Metadata API
-- [x] T010 [US1] Create Serwist service worker entry point with precache manifest and cache-first strategy for static assets at `src/app/sw.ts`
-- [x] T011 [US1] Wrap Next.js config with `withSerwist()` for automatic service worker generation in `next.config.ts`
-- [x] T012 [US1] Write unit test validating manifest.json structure (required fields, icon sizes, display mode) in `src/__tests__/pwa-manifest.test.ts`
-- [x] T013 [US1] Write E2E test verifying service worker registration, manifest link in HTML head, and viewport meta tag in `e2e/pwa-install.spec.ts`
-
----
-
-## Phase 4: US2 — Touch-Optimized Interface
-
-**Goal**: Make all UI elements comfortable for iPad touch interaction with 44pt minimum targets.
-
-**Story**: As a student using an iPad, I want the interface comfortable for touch interaction, so I can navigate without a keyboard or mouse.
-
-**Independent Test Criteria**: All interactive elements meet 44x44pt minimum on touch devices, toolbar is usable via touch, sidebar is collapsible, card actions visible without hover.
-
-- [x] T014 [US2] Add touch-responsive size overrides to button variants — increase `icon-xs` (24px) and `icon-sm` (32px) to 44px on `pointer: coarse` devices in `src/components/ui/button.tsx`
-- [x] T015 [US2] Optimize editor toolbar for touch — increase gap between button groups, ensure heading dropdown has 44pt target, make toolbar horizontally scrollable on narrow widths in `src/components/editor/editor-toolbar.tsx`
-- [x] T016 [P] [US2] Fix hover-dependent action menus on folder cards — make action buttons always visible on touch devices via `pointer: coarse` override in `src/components/dashboard/folder-card.tsx`
-- [x] T017 [P] [US2] Fix hover-dependent action menus on document cards — same `pointer: coarse` override for always-visible actions in `src/components/dashboard/document-card.tsx`
-- [x] T018 [US2] Make sidebar collapsible — add toggle button visible on tablet widths, sidebar starts collapsed on `md` breakpoint (768px), overlay mode on expand in `src/app/(dashboard)/layout.tsx`
-- [x] T019 [US2] Write E2E tests verifying 44px minimum button dimensions on touch viewport, card action visibility without hover, sidebar toggle, and no horizontal scrolling at 768px in `e2e/touch-optimization.spec.ts`
+**Checkpoint**: Foundation ready — canvas types defined, history manager available, format routing in place, canvas documents can be created and saved
 
 ---
 
-## Phase 5: US3 — Drawing with Apple Pencil
+## Phase 3: User Story 1 — Freeform Canvas Navigation (Priority: P1) MVP
 
-**Goal**: Add inline drawing blocks to the editor with pressure-sensitive Apple Pencil strokes.
+**Goal**: User opens a canvas document and sees an infinite canvas they can pan and zoom
 
-**Story**: As a student with an Apple Pencil, I want to draw diagrams and annotations directly in my notes.
+**Independent Test**: Open a canvas document, verify canvas renders, pan in all directions, zoom in/out, close and reopen to verify viewport persists
 
-**Independent Test Criteria**: Drawing blocks can be inserted inline, Apple Pencil strokes render with pressure sensitivity, pen/eraser/color tools work, drawings persist on save and reload.
+### Implementation for User Story 1
 
-- [x] T020 [US3] Create stroke renderer that uses `perfect-freehand` to convert pressure-sensitive points into Canvas 2D Path2D outlines in `src/lib/drawing/stroke-renderer.ts`
-- [x] T021 [US3] Create drawing canvas React component — captures pointer events (pen/touch/mouse), reads pressure, renders strokes in real-time via requestAnimationFrame, sets `touch-action: none` in `src/components/drawing/drawing-canvas.tsx`
-- [x] T022 [US3] Create drawing toolbar component — pen tool, eraser tool, 3 color buttons (black/blue/red), 3 stroke widths (thin/medium/thick), clear all with confirmation in `src/components/drawing/drawing-toolbar.tsx`
-- [x] T023 [US3] Create Tiptap `drawingBlock` Node extension — block group, atom, attrs (id/width/height/background/strokes), commands (insertDrawingBlock, updateDrawingStrokes) in `src/lib/editor/drawing-block-extension.ts` (per contract in `contracts/tiptap-drawing-node.md`)
-- [x] T024 [US3] Create drawing block NodeView React wrapper — renders DrawingCanvas inside NodeViewWrapper, passes strokes from node attrs, calls updateAttributes on stroke change, shows delete button when selected in `src/components/editor/drawing-block-view.tsx`
-- [x] T025 [US3] Register DrawingBlockExtension in editor's useEditor extensions array in `src/components/editor/tiptap-editor.tsx`
-- [x] T026 [US3] Add "Insert Drawing" button (pencil icon) to the editor toolbar insert section that calls `insertDrawingBlock` command in `src/components/editor/editor-toolbar.tsx`
-- [x] T027 [US3] Write unit tests for stroke renderer — verify points + pressure convert to valid Path2D paths in `src/__tests__/stroke-renderer.test.ts`
-- [x] T028 [US3] Write unit test for drawing block extension — verify JSON serialization round-trip (getJSON/setContent) preserves all stroke data in `src/__tests__/drawing-block-extension.test.ts`
-- [x] T029 [US3] Write E2E tests — insert drawing block via toolbar, simulate pointer events with pressure on canvas, verify drawing persists after reload, delete drawing block in `e2e/drawing.spec.ts`
+- [ ] T014 [US1] Create canvas viewport component with CSS `transform: translate3d(x, y, 0) scale(zoom)` for pan/zoom in `src/components/canvas/canvas-viewport.tsx` — uses `@use-gesture/react` for pinch-zoom (touch), wheel-zoom (mouse), two-finger-drag pan (touch), middle-click-drag pan (mouse), spacebar+drag pan — reads/writes viewport store from T006
+- [ ] T015 [US1] Create background renderer component in `src/components/canvas/background-renderer.tsx` — renders CSS repeating-linear-gradient (lined), repeating-linear-gradient grid (grid), repeating-radial-gradient (dotted), or transparent (blank) based on document background setting — scales with zoom level
+- [ ] T016 [US1] Create canvas state management hook `useCanvasState` in `src/hooks/use-canvas-state.ts` — loads canvas document from Supabase, initializes viewport store with saved viewport, exposes elements map, provides addElement/updateElement/removeElement dispatchers, auto-saves viewport position on pan/zoom changes (debounced)
+- [ ] T017 [US1] Wire canvas viewport into document page `src/app/(dashboard)/documents/[id]/page.tsx` — when `content.format === 'canvas'`, render CanvasViewport with BackgroundRenderer, pass canvas state from useCanvasState hook
+- [ ] T018 [US1] Add zoom controls UI (zoom in/out buttons, zoom percentage display, fit-to-content button) to `src/components/canvas/canvas-toolbar.tsx`
+
+**Checkpoint**: Canvas viewport renders, pan/zoom works on desktop and touch, viewport persists across sessions, background types display correctly
 
 ---
 
-## Phase 6: US4 — Switching Between Typing and Drawing
+## Phase 4: User Story 2 — Moveable Rich-Text Blocks (Priority: P1)
 
-**Goal**: Add a text/draw mode toggle so users can seamlessly switch between typing and drawing.
+**Goal**: Users create text blocks anywhere on canvas by double-clicking, edit with full TipTap formatting, drag to reposition, resize
 
-**Story**: As a student, I want to seamlessly switch between typing text and drawing, so I can mix typed notes with hand-drawn content.
+**Independent Test**: Double-click canvas to create text block, type formatted text (bold, headings, math), drag to new position, resize, reload — verify content and position persist
 
-**Independent Test Criteria**: Toggle switches between text and draw modes, drawing blocks respond to mode (editable in draw, static in text), mode indicator always visible, switching doesn't corrupt content.
+### Implementation for User Story 2
 
-- [x] T030 [US4] Add `editorMode` state ("text" | "draw") and a toggle button in the editor header area — pen icon that visually indicates the active mode in `src/components/editor/tiptap-editor.tsx`
-- [x] T031 [US4] Connect editor mode to drawing block views — in Draw Mode pointer events are enabled on canvas, in Text Mode canvas renders as static (pointer-events: none) in `src/components/editor/drawing-block-view.tsx`
-- [x] T032 [US4] Write E2E tests — verify mode toggle switches states, drawing works only in draw mode, text editing works only in text mode, content preserved across mode switches in `e2e/drawing.spec.ts` (extend existing)
+- [ ] T019 [US2] Create canvas element wrapper component in `src/components/canvas/canvas-element.tsx` — absolutely positioned div with `left/top` from element x/y, drag handle on border for repositioning (pointer events), resize handles on edges/corners, selected state styling, click-outside to deselect — emits move/resize via element-operations (T008) which pushes to history
+- [ ] T020 [US2] Create text block component in `src/components/canvas/text-block.tsx` — renders an independent TipTap editor instance (StarterKit with undoRedo disabled per research.md, plus existing extensions: Underline, TextAlign, TaskList, Link, MathExpression) inside CanvasElement wrapper — registers/unregisters with EditorManager (T007) — intercepts ProseMirror transactions via `dispatchTransaction` and wraps as TextEditCommands pushed to HistoryManager (T005)
+- [ ] T021 [US2] Add double-click/double-tap handler on canvas viewport `src/components/canvas/canvas-viewport.tsx` — on double-click/tap on empty canvas area (no element hit), create a new text block element at the clicked canvas position via element-operations, focus the new editor
+- [ ] T022 [US2] Connect editor toolbar to focused TipTap instance — modify `src/components/editor/editor-toolbar.tsx` (or create `src/components/canvas/canvas-editor-toolbar.tsx`) to read the currently focused editor from EditorManager and bind toolbar buttons to its commands (bold, italic, heading, list, math, etc.)
+- [ ] T023 [US2] Integrate viewport culling for text blocks in `src/components/canvas/canvas-viewport.tsx` — only mount TextBlock components for elements whose bounding box is visible in current viewport (use viewport-culling from T009) — create/destroy TipTap editor instances as elements enter/leave viewport
+- [ ] T024 [US2] Add element deletion — when a text block is selected (not in edit mode), pressing Delete/Backspace removes it via element-operations, pushable to undo
 
----
-
-## Phase 7: US5 — Cross-Device Real-Time Sync with Drawings
-
-**Goal**: Ensure drawing data syncs between devices through existing realtime infrastructure.
-
-**Story**: As a student, I want my drawings to sync in real-time between iPad and desktop.
-
-**Independent Test Criteria**: Drawing created on one device appears on another within 3 seconds, editing lock works for drawing changes, no data loss on device switch.
-
-- [x] T033 [US5] Verify and adjust auto-save flow to handle drawing data — confirm `editor.getJSON()` includes drawingBlock attrs, confirm `setContent()` restores drawings, tune `skipNextUpdateRef` if drawing updates fire too frequently in `src/hooks/use-realtime-sync.ts`
-- [x] T034 [US5] Create stroke compressor — Ramer-Douglas-Peucker point reduction + coordinate rounding (1 decimal place) on stroke completion for 30-50% payload size reduction in `src/lib/drawing/stroke-compressor.ts`
-- [x] T035 [US5] Write unit tests for stroke compressor — verify point reduction preserves shape, compressed strokes are smaller, round-trip fidelity in `src/__tests__/stroke-compressor.test.ts`
-- [x] T036 [US5] Write E2E tests — draw on one tab and verify drawing appears on second tab, verify editing lock triggers on remote drawing change in `e2e/drawing-sync.spec.ts`
+**Checkpoint**: Text blocks can be created, edited with full rich-text, moved, resized, and deleted. All actions are undoable. Content and positions persist across sessions.
 
 ---
 
-## Phase 8: US6 — Offline Access on iPad
+## Phase 5: User Story 3 — Apple Pencil Drawing on Canvas (Priority: P1)
 
-**Goal**: Enable offline document access, editing, and sync-on-reconnect.
+**Goal**: Users draw freeform strokes on the canvas with Apple Pencil (or mouse), with pressure sensitivity and real-time rendering
 
-**Story**: As a student, I want Typenote to work when my iPad loses internet connection.
+**Independent Test**: On iPad, draw strokes with Apple Pencil on canvas — verify pressure sensitivity, color/width changes, eraser works, strokes persist after save
 
-**Independent Test Criteria**: Previously opened documents available offline, edits possible without connection, changes sync on reconnect, clear online/offline indicator visible.
+**Note**: Can be worked on in parallel with US2 (different files)
 
-- [x] T037 [US6] Create document cache module — uses `idb-keyval` for IndexedDB storage, cacheDocument/getCachedDocument/listCachedDocuments/removeCachedDocument functions, 50-document LRU eviction in `src/lib/offline/document-cache.ts`
-- [x] T038 [US6] Create offline sync queue — queues edits as {documentId, field, value, timestamp}, processes queue on reconnect via existing server actions, handles timestamp conflicts in `src/lib/offline/sync-queue.ts`
-- [x] T039 [US6] Integrate document cache with editor — cache on successful save in `src/hooks/use-auto-save.ts`, queue edits on save failure in `src/hooks/use-document-sync.ts`, fall back to cached document when offline in `src/app/(dashboard)/dashboard/documents/[docId]/page.tsx`
-- [x] T040 [US6] Add online/offline status indicator — show banner when offline in editor header (alongside save/connection status) and dashboard layout, use existing `useNetworkStatus` hook in `src/components/editor/tiptap-editor.tsx` and `src/app/(dashboard)/layout.tsx`
-- [x] T041 [US6] Write unit tests for document cache (store/retrieve/LRU eviction) and sync queue (ordering/conflict detection) in `src/__tests__/document-cache.test.ts` and `src/__tests__/sync-queue.test.ts`
-- [x] T042 [US6] Write E2E tests — document loads from cache when offline, edits sync on reconnect, offline indicator appears on network drop in `e2e/offline.spec.ts`
+### Implementation for User Story 3
 
----
+- [ ] T025 [P] [US3] Create drawing layer component in `src/components/canvas/drawing-layer.tsx` — HTML5 Canvas element sized to viewport, renders strokes using existing `src/lib/drawing/stroke-renderer.ts` with canvas coordinate transforms (`ctx.setTransform(zoom, 0, 0, zoom, offsetX, offsetY)`), supports pen/eraser tools — new strokes create StrokeCommands pushed to HistoryManager
+- [ ] T026 [P] [US3] Adapt stroke renderer for canvas coordinate system in `src/lib/drawing/stroke-renderer.ts` — add support for rendering strokes at arbitrary canvas positions with zoom/pan transforms, maintain existing perfect-freehand integration
+- [ ] T027 [US3] Extend drawing toolbar in `src/components/drawing/drawing-toolbar.tsx` (or create `src/components/canvas/drawing-toolbar.tsx`) — expand from 3 colors to minimum 5 (black, blue, red, green, purple), add more stroke widths (1, 2, 4, 8px), add eraser size options
+- [ ] T028 [US3] Wire drawing layer into canvas viewport `src/components/canvas/canvas-viewport.tsx` — render DrawingLayer as a canvas overlay, route pen pointer events from input-router (T010) to drawing layer, route touch events to pan/zoom gesture handler
+- [ ] T029 [US3] Implement eraser tool in `src/components/canvas/drawing-layer.tsx` — on eraser stroke, find and remove strokes whose paths intersect the eraser path, push removal as StrokeCommand to history
+- [ ] T030 [US3] Serialize drawing strokes into canvas document format — when strokes change, update the drawing-layer element's `strokes` array in canvas state, trigger auto-save
+- [ ] T031 [US3] Implement automatic input mode detection in `src/lib/canvas/input-router.ts` — pen on empty canvas→draw, pen on element→interact/edit, finger/touch→pan or interact, mouse→tool-dependent — handle edge case of pen near text block borders with hit-test threshold
+- [ ] T032 [US3] Add manual mode toggle button to `src/components/canvas/canvas-toolbar.tsx` — toggle between "Draw Mode" and "Select Mode", visual indicator, overrides automatic detection when toggled
 
-## Phase 9: Polish & Cross-Cutting Concerns
-
-**Goal**: Final quality checks and cross-cutting optimizations.
-
-- [x] T043 Add safe-area-inset padding to dashboard layout and editor for iPad home indicator and rounded corners in `src/app/(dashboard)/layout.tsx` and `src/components/editor/tiptap-editor.tsx`
-- [x] T044 Run Lighthouse PWA audit and fix any issues to achieve 90+ score — verify manifest, service worker, HTTPS, viewport, icons all pass
+**Checkpoint**: Freeform drawing works with Apple Pencil (pressure sensitivity), mouse fallback, eraser, seamless pen/touch mode switching, manual toggle available, strokes persist
 
 ---
 
-## Dependencies
+## Phase 6: User Story 5 — Save & Real-Time Sync (Priority: P1)
+
+**Goal**: All canvas content syncs between devices within 3 seconds — positions, text, drawings
+
+**Independent Test**: Open same canvas document on two devices, create/move/draw on one — verify changes appear on the other within 3 seconds
+
+### Implementation for User Story 5
+
+- [ ] T033 [US5] Refactor realtime sync to notification-then-fetch pattern in `src/hooks/use-realtime-sync.ts` — listen for `postgres_changes` UPDATE events, use only `updated_at` field as change signal (survives Supabase payload truncation), on change signal fetch full document via `supabase.from('documents').select('content').eq('id', docId).single()`, apply fetched content per `specs/002-ipad-pen-support/contracts/canvas-sync-protocol.md`
+- [ ] T034 [US5] Create canvas-specific content diffing and application in `src/hooks/use-canvas-state.ts` — when remote content is received, diff against local canvas state, update only changed elements (positions, text content, strokes) without full re-render, preserve local viewport state
+- [ ] T035 [US5] Integrate canvas auto-save into document sync hook `src/hooks/use-document-sync.ts` — serialize full canvas state (elements map, z-order, background, viewport) to JSONB on each change, use existing 800ms debounce auto-save, handle both canvas and linear document formats
+- [ ] T036 [US5] Ensure editing lock works for canvas documents in `src/hooks/use-document-sync.ts` — when another device is editing, show "Editing elsewhere" banner and set canvas to read-only (disable element creation, movement, drawing)
+- [ ] T037 [US5] Ensure offline cache works with canvas format in `src/lib/offline/document-cache.ts` and `src/lib/offline/sync-queue.ts` — canvas JSONB cached in IndexedDB same as linear, offline edits queued and replayed on reconnect
+
+**Checkpoint**: Canvas content syncs between devices in real-time, editing lock prevents conflicts, offline changes queue and replay on reconnect
+
+---
+
+## Phase 7: Polish & Cross-Cutting Concerns
+
+**Purpose**: Multi-select, copy/paste, performance, PWA touch optimization, and quality improvements
+
+- [ ] T038 Create selection manager component in `src/components/canvas/selection-manager.tsx` — lasso selection (draw rectangle to select multiple elements), shift-click to add/remove from selection, visual selection indicators, batch move/delete of selected elements via element-operations
+- [ ] T039 Implement copy/paste/duplicate of canvas elements in `src/lib/canvas/element-operations.ts` — Ctrl+C/V for copy/paste within document, Ctrl+D for duplicate, cross-document paste (store serialized elements in clipboard), pasted elements placed at viewport center with preserved relative positions
+- [ ] T040 Implement z-order management UI — right-click context menu or keyboard shortcuts (Ctrl+] bring forward, Ctrl+[ send backward) to reorder element layers in `src/lib/canvas/element-operations.ts` and `src/components/canvas/canvas-element.tsx`
+- [ ] T041 Add background type selector to canvas toolbar `src/components/canvas/canvas-toolbar.tsx` — dropdown to change document background (blank/grid/dotted/lined), persist via auto-save
+- [ ] T042 Add folder default background setting in `src/components/dashboard/folder-card.tsx` or folder settings — dropdown to set `default_background` on folder, new documents in folder inherit this setting
+- [ ] T043 Ensure touch targets meet 44x44pt minimum on canvas and drawing toolbars — audit `src/components/canvas/canvas-toolbar.tsx` and drawing toolbar button sizes using `@media (pointer: coarse)`, adapt canvas UI for tablet safe area insets
+- [ ] T044 Verify PWA manifest and service worker work with canvas pages — ensure canvas route cached, offline launch shows cached canvas documents
+- [ ] T045 Performance: viewport culling for drawing strokes in `src/components/canvas/drawing-layer.tsx` — only render visible strokes, batch Canvas 2D draw calls
+- [ ] T046 Performance: verify 60fps rendering with 100 elements and 1,000 visible strokes — stress test, profile, optimize
+- [ ] T047 Ensure existing linear documents continue to work — no regressions in text editing, math, auto-save, or sync
+- [ ] T048 Keyboard shortcuts for canvas — Ctrl+Z/Cmd+Z undo, Ctrl+Shift+Z/Cmd+Shift+Z redo, Delete selected, Escape deselect, Ctrl+A select all
+- [ ] T049 Run full test suite and fix any regressions — `pnpm test` and `pnpm test:e2e`, verify CI passes
+
+---
+
+## Dependencies & Execution Order
+
+### Phase Dependencies
+
+- **Setup (Phase 1)**: No dependencies — start immediately
+- **Foundational (Phase 2)**: Depends on Phase 1 (types must exist)
+- **US1 Canvas Navigation (Phase 3)**: Depends on Phase 2
+- **US2 Text Blocks (Phase 4)**: Depends on Phase 3 (US1)
+- **US3 Drawing + Mode Switching (Phase 5)**: Depends on Phase 3 (US1). **Can run in parallel with US2**
+- **US5 Sync (Phase 6)**: Depends on Phase 2 + at least Phase 3
+- **Polish (Phase 7)**: Depends on Phases 3–6 minimum
+
+### Execution Flow
 
 ```
-Phase 1: Setup (T001-T004)
-  └── No external dependencies
-
-Phase 2: Foundational (T005-T006)
-  └── No dependencies on Phase 1
-
-Phase 3: US1 - PWA Install (T007-T013)
-  ├── T007 → T010 (manifest before service worker)
-  ├── T010 → T011 (sw.ts before next.config.ts wrapping)
-  └── T012-T013 depend on T007-T011
-
-Phase 4: US2 - Touch (T014-T019)
-  ├── Depends on T005 (touch CSS variant)
-  ├── T015 depends on T014 (button sizes before toolbar)
-  └── T016, T017 are parallel (different files)
-
-Phase 5: US3 - Drawing (T020-T029)
-  ├── Depends on T004 (drawing types)
-  ├── T020 → T021 (renderer before canvas)
-  ├── T022 parallel with T020-T021 (toolbar is independent)
-  ├── T023 → T024 (extension before node view)
-  ├── T024 depends on T021 (canvas component)
-  ├── T025-T026 depend on T023-T024
-  └── T027-T029 depend on T020-T026
-
-Phase 6: US4 - Mode Toggle (T030-T032)
-  └── Depends on Phase 5 (US3 complete)
-
-Phase 7: US5 - Drawing Sync (T033-T036)
-  └── Depends on Phase 5 (US3 complete)
-
-Phase 8: US6 - Offline (T037-T042)
-  ├── T037-T038 depend on T003 (idb-keyval installed)
-  ├── T039 depends on T037-T038
-  ├── T040 is parallel (status indicator is independent)
-  └── T041-T042 depend on T037-T040
-
-Phase 9: Polish (T043-T044)
-  └── Depends on all previous phases
+Phase 1: Setup
+    ↓
+Phase 2: Foundational
+    ↓
+Phase 3: US1 (Canvas Navigation)  ←── MVP
+    ↓          ↓
+Phase 4: US2   Phase 5: US3    ←── Can be parallel
+    ↓              ↓
+Phase 6: US5 (Sync)
+    ↓
+Phase 7: Polish (multi-select, copy/paste, PWA touch, perf)
 ```
 
-## Parallel Execution Opportunities
+### Parallel Opportunities
 
-### Within Phase 1 (Setup):
+**Phase 2**: T006, T007, T008, T009, T010 (different files)
+**Phase 4+5**: US2 and US3 are independent — can be parallel
 
-- T001, T002, T003 can all run in parallel (independent package installs)
-
-### Within Phase 3 (US1):
-
-- T007 and T008 can run in parallel (manifest + icons are independent files)
-
-### Within Phase 4 (US2):
-
-- T016 and T017 can run in parallel (folder-card.tsx and document-card.tsx are different files)
-- T018 is independent of T016-T017
-
-### Within Phase 5 (US3):
-
-- T020 and T022 can run in parallel (stroke renderer and drawing toolbar are independent)
-- T027 and T028 can run in parallel (different test files)
-
-### Within Phase 7 (US5):
-
-- T033 and T034 can run in parallel (sync verification and compressor are independent)
-
-### Within Phase 8 (US6):
-
-- T037 and T038 can run in parallel (document cache and sync queue are independent files)
-- T040 is independent of T037-T039
-
-### Cross-Phase:
-
-- Phase 3 (US1) and Phase 4 (US2) can run in parallel (no dependencies between them)
-- Phase 6 (US4) and Phase 7 (US5) can run in parallel after Phase 5 (US3) completes
+---
 
 ## Implementation Strategy
 
-### MVP Scope (Suggested)
-
-**US1 (PWA Installation) + US3 (Drawing)** — This gives the core value proposition: install on iPad and draw with Apple Pencil. Touch optimization (US2) and offline (US6) are quality-of-life improvements that can follow.
-
 ### Incremental Delivery
 
-1. **Increment 1**: Phases 1-3 (Setup + Foundation + PWA) — installable app
-2. **Increment 2**: Phase 4 (Touch) — comfortable to use on iPad
-3. **Increment 3**: Phases 5-6 (Drawing + Mode Toggle) — core drawing feature
-4. **Increment 4**: Phase 7 (Drawing Sync) — drawings sync across devices
-5. **Increment 5**: Phases 8-9 (Offline + Polish) — full offline experience
+1. Setup + Foundational → Foundation ready
+2. US1 (Canvas Navigation) → navigable canvas (MVP)
+3. US2 (Text Blocks) + US3 (Drawing) → moveable text + Apple Pencil drawing
+4. US5 (Sync) → canvas syncs between devices
+5. Polish → multi-select, copy/paste, PWA touch, performance
 
-Each increment is independently deployable and testable.
+---
+
+## Notes
+
+- [P] tasks = different files, no dependencies
+- [Story] label maps task to specific user story
+- All operations push to HistoryManager for undo/redo
+- TipTap editors must have built-in history disabled (`StarterKit.configure({ undoRedo: false })`)
+- Notification-then-fetch sync (US5) also fixes likely existing bug in linear editor sync

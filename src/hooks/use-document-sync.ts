@@ -95,7 +95,7 @@ export function useDocumentSync({
               if (edit.field === 'content') {
                 const result = await updateDocumentContent(
                   edit.document_id,
-                  edit.value as Record<string, unknown>,
+                  JSON.stringify(edit.value),
                 );
                 lastSaveTimestampRef.current = result.updated_at;
 

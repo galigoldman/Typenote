@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { SUBJECTS, CANVAS_TYPES } from '@/lib/constants/subjects';
 import { createDocument } from '@/lib/actions/documents';
+import { createCanvasDocument } from '@/lib/canvas/types';
 import {
   Dialog,
   DialogContent,
@@ -57,6 +58,9 @@ export function CreateDocumentDialog({
         subject_custom: subject === 'other' ? subjectCustom : undefined,
         canvas_type: canvasType,
         folder_id: folderId,
+        content: createCanvasDocument(
+          canvasType as 'blank' | 'grid' | 'dotted' | 'lined',
+        ) as unknown as Record<string, unknown>,
       });
 
       setOpen(false);
@@ -93,7 +97,7 @@ export function CreateDocumentDialog({
           <DialogHeader>
             <DialogTitle>Create New Document</DialogTitle>
             <DialogDescription>
-              Set up your new document with a title, subject, and canvas type.
+              Set up your new document with a title, subject, and background.
             </DialogDescription>
           </DialogHeader>
 
@@ -137,7 +141,7 @@ export function CreateDocumentDialog({
             )}
 
             <div className="grid gap-2">
-              <Label>Canvas Type</Label>
+              <Label>Background</Label>
               <RadioGroup
                 value={canvasType}
                 onValueChange={setCanvasType}

@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { renderHook, act } from '@testing-library/react';
+import { renderHook, act, waitFor } from '@testing-library/react';
 import { useRealtimeSync } from './use-realtime-sync';
 
 // Track the postgres_changes callback and subscribe callback
@@ -22,10 +22,23 @@ const mockChannel = {
   subscribe: mockSubscribe,
 };
 
+// Mock for the fetch query (notification-then-fetch pattern)
+const mockSingle = vi.fn().mockResolvedValue({
+  data: {
+    content: { type: 'doc', content: [] },
+    title: 'Remote Title',
+  },
+  error: null,
+});
+const mockEq = vi.fn(() => ({ single: mockSingle }));
+const mockSelect = vi.fn(() => ({ eq: mockEq }));
+const mockFrom = vi.fn(() => ({ select: mockSelect }));
+
 vi.mock('@/lib/supabase/client', () => ({
   createClient: () => ({
     channel: () => mockChannel,
     removeChannel: mockRemoveChannel,
+    from: mockFrom,
   }),
 }));
 
@@ -39,6 +52,13 @@ describe('useRealtimeSync', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    mockSingle.mockResolvedValue({
+      data: {
+        content: { type: 'doc', content: [] },
+        title: 'Remote Title',
+      },
+      error: null,
+    });
   });
 
   it('starts with "connecting" status', () => {
@@ -66,7 +86,7 @@ describe('useRealtimeSync', () => {
     expect(result.current.connectionStatus).toBe('disconnected');
   });
 
-  it('calls onRemoteContentUpdate and onRemoteTitleUpdate on remote change', () => {
+  it('fetches full document and calls callbacks on remote change', async () => {
     const onContent = vi.fn();
     const onTitle = vi.fn();
 
@@ -78,21 +98,21 @@ describe('useRealtimeSync', () => {
       }),
     );
 
-    act(() => {
+    await act(async () => {
       postgresChangesCallback({
         new: {
           updated_at: '2026-01-01T00:00:01Z',
-          content: { type: 'doc', content: [] },
-          title: 'Remote Title',
         },
       });
     });
 
-    expect(onContent).toHaveBeenCalledWith({ type: 'doc', content: [] });
-    expect(onTitle).toHaveBeenCalledWith('Remote Title');
+    await waitFor(() => {
+      expect(onContent).toHaveBeenCalledWith({ type: 'doc', content: [] });
+      expect(onTitle).toHaveBeenCalledWith('Remote Title');
+    });
   });
 
-  it('ignores echo: skips update when updated_at matches lastSaveTimestamp', () => {
+  it('ignores echo: skips update when updated_at matches lastSaveTimestamp', async () => {
     const onContent = vi.fn();
     const onTitle = vi.fn();
     const lastSaveRef = { current: '2026-01-01T00:00:01Z' };
@@ -106,12 +126,10 @@ describe('useRealtimeSync', () => {
       }),
     );
 
-    act(() => {
+    await act(async () => {
       postgresChangesCallback({
         new: {
           updated_at: '2026-01-01T00:00:01Z',
-          content: { type: 'doc' },
-          title: 'Same',
         },
       });
     });

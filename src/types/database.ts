@@ -8,7 +8,7 @@ export type Subject =
   | 'physics'
   | 'other';
 
-export type CanvasType = 'blank' | 'lined' | 'grid';
+export type CanvasType = 'blank' | 'lined' | 'grid' | 'dotted';
 
 export interface Profile {
   id: string;
@@ -25,6 +25,7 @@ export interface Folder {
   parent_id: string | null;
   name: string;
   color: string;
+  default_background: CanvasType;
   position: number;
   created_at: string;
   updated_at: string;

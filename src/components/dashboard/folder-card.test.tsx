@@ -23,6 +23,7 @@ const mockFolder: Folder = {
   parent_id: null,
   name: 'My Test Folder',
   color: '#3B82F6',
+  default_background: 'blank',
   position: 0,
   created_at: '2026-01-01T00:00:00Z',
   updated_at: '2026-01-01T00:00:00Z',

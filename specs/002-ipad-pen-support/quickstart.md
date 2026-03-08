@@ -1,18 +1,17 @@
-# Quickstart: iPad Optimization & Apple Pencil Support
+# Quickstart: Infinite Canvas with Moveable Elements & iPad Drawing
 
 ## Prerequisites
 
 - Node.js 20+, pnpm 10+
 - Supabase CLI (local development)
 - iPad with Apple Pencil (for manual testing)
-- Both devices on the same network (for iPad testing against local dev server)
+- Both devices on same network (for iPad testing against local dev server)
 
 ## Setup
 
 ```bash
-# Install new dependencies
-pnpm add perfect-freehand @serwist/next serwist idb-keyval uuid
-pnpm add -D @types/uuid
+# Install new dependency (gesture handling)
+pnpm add @use-gesture/react
 
 # Start local dev
 pnpm dev
@@ -20,26 +19,51 @@ pnpm dev
 
 ## Testing on iPad
 
-1. Find your computer's local IP: `hostname -I` (Linux) or `ipconfig getifaddr en0` (Mac)
+1. Find your Mac's local IP: `ipconfig getifaddr en0`
 2. Start dev server: `pnpm dev --hostname 0.0.0.0`
 3. On iPad Safari, navigate to `http://<your-ip>:3000`
 4. For PWA install: Tap Share → "Add to Home Screen"
 
-**Note**: Service workers require HTTPS. For local testing, PWA install won't work over HTTP. Use `ngrok` or deploy to a staging environment for full PWA testing.
+**Note**: Service workers require HTTPS. Use `ngrok` or deploy to staging for full PWA testing.
 
-## Key Files to Know
+## Key Files
 
-| Area             | File                                           | Purpose                               |
-| ---------------- | ---------------------------------------------- | ------------------------------------- |
-| Drawing types    | `src/lib/drawing/types.ts`                     | Stroke, Point, DrawingTool interfaces |
-| Stroke rendering | `src/lib/drawing/stroke-renderer.ts`           | perfect-freehand → Canvas 2D          |
-| Drawing canvas   | `src/components/drawing/drawing-canvas.tsx`    | Pointer event handling + rendering    |
-| Drawing toolbar  | `src/components/drawing/drawing-toolbar.tsx`   | Pen/eraser/color/width controls       |
-| Tiptap extension | `src/lib/editor/drawing-block-extension.ts`    | Custom node definition                |
-| Node view        | `src/components/editor/drawing-block-view.tsx` | React wrapper for canvas in editor    |
-| Offline cache    | `src/lib/offline/document-cache.ts`            | IndexedDB document storage            |
-| Service worker   | `src/app/sw.ts`                                | Serwist service worker entry          |
-| PWA manifest     | `public/manifest.json`                         | App name, icons, display mode         |
+### Canvas System (new)
+
+| Area | File | Purpose |
+|------|------|---------|
+| Canvas container | `src/components/canvas/canvas-viewport.tsx` | Pan/zoom viewport with CSS transforms |
+| Canvas element | `src/components/canvas/canvas-element.tsx` | Positioned, draggable element wrapper |
+| Text block | `src/components/canvas/text-block.tsx` | TipTap editor inside a canvas element |
+| Drawing layer | `src/components/canvas/drawing-layer.tsx` | Canvas 2D drawing surface |
+| Canvas toolbar | `src/components/canvas/canvas-toolbar.tsx` | Drawing tools, background, mode toggle |
+| Selection | `src/components/canvas/selection-manager.tsx` | Multi-select, lasso, shift-click |
+| Viewport state | `src/lib/canvas/viewport-store.ts` | Zustand store for pan/zoom state |
+| Element types | `src/lib/canvas/types.ts` | CanvasElement, TextBlock, DrawingLayer |
+| History manager | `src/lib/canvas/history-manager.ts` | Global undo/redo command stack |
+| Editor manager | `src/lib/canvas/editor-manager.ts` | Registry of active TipTap instances |
+
+### Existing Files (modified)
+
+| Area | File | Change |
+|------|------|--------|
+| Document page | `src/app/(dashboard)/documents/[id]/page.tsx` | Route to canvas or linear editor based on `content.format` |
+| Document sync | `src/hooks/use-document-sync.ts` | Switch to notification-then-fetch sync |
+| Realtime sync | `src/hooks/use-realtime-sync.ts` | Use `updated_at` signal, fetch full doc |
+| Drawing types | `src/lib/drawing/types.ts` | Extend for canvas element model |
+| Stroke renderer | `src/lib/drawing/stroke-renderer.ts` | Adapt for canvas coordinate system |
+| Document actions | `src/lib/actions/documents.ts` | Canvas-aware save/load helpers |
+| Database types | `src/types/database.ts` | Add canvas format types |
+| Create dialog | `src/components/dashboard/create-document-dialog.tsx` | Add canvas document option |
+
+### Existing Files (unchanged)
+
+| Area | File | Purpose |
+|------|------|---------|
+| Offline cache | `src/lib/offline/document-cache.ts` | Works with canvas JSONB as-is |
+| Sync queue | `src/lib/offline/sync-queue.ts` | Works with canvas JSONB as-is |
+| Service worker | `src/app/sw.ts` | PWA caching unchanged |
+| PWA manifest | `public/manifest.json` | Already configured |
 
 ## Running Tests
 
@@ -51,21 +75,50 @@ pnpm test
 pnpm test:e2e
 
 # Specific test files
-pnpm test src/__tests__/stroke-renderer.test.ts
-pnpm test:e2e e2e/drawing.spec.ts
+pnpm test src/lib/canvas/history-manager.test.ts
+pnpm test:e2e e2e/canvas.spec.ts
 ```
 
 ## Architecture Quick Reference
 
 ```
-User draws on iPad
-  → Pointer Events API captures pressure + coordinates
-  → perfect-freehand generates smooth path outline
-  → Canvas 2D renders path in real-time
-  → On pointerup: stroke compressed + added to Tiptap node attrs
-  → Tiptap transaction triggers onUpdate
-  → Auto-save debounce (800ms) → updateDocumentContent server action
-  → Supabase stores updated JSONB content
-  → Supabase Realtime broadcasts to other devices
-  → Desktop browser receives update, re-renders drawing block
+Canvas Document Architecture
+─────────────────────────────
+┌─────────────────────────────────────────────┐
+│  Viewport Container                         │
+│  (handles pan/zoom via CSS transform)       │
+│                                             │
+│  ┌──────────────────────────────────────┐   │
+│  │  DOM Layer (transformed div)         │   │
+│  │  ┌──────────┐  ┌──────────┐         │   │
+│  │  │Text Block│  │Text Block│  ...     │   │
+│  │  │(TipTap)  │  │(TipTap)  │         │   │
+│  │  └──────────┘  └──────────┘         │   │
+│  └──────────────────────────────────────┘   │
+│                                             │
+│  ┌──────────────────────────────────────┐   │
+│  │  Canvas Layer (HTML5 Canvas)         │   │
+│  │  Strokes rendered with               │   │
+│  │  perfect-freehand + Canvas 2D        │   │
+│  └──────────────────────────────────────┘   │
+│                                             │
+│  ┌──────────────────────────────────────┐   │
+│  │  Interaction Layer                   │   │
+│  │  Pointer events → route by type:     │   │
+│  │  pen → draw | touch → pan/zoom       │   │
+│  │  mouse → tool-dependent              │   │
+│  └──────────────────────────────────────┘   │
+└─────────────────────────────────────────────┘
+
+Data Flow
+─────────
+User action
+  → Command created (TextEdit / Stroke / CanvasOp)
+  → Pushed to HistoryManager (global undo stack)
+  → Canvas state updated
+  → Auto-save debounce (800ms)
+  → Save canvas JSONB to Supabase
+  → Supabase Realtime sends updated_at signal
+  → Other device fetches full document
+  → Diffs and applies canvas changes
 ```

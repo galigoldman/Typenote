@@ -23,8 +23,8 @@ describe('SUBJECTS', () => {
 });
 
 describe('CANVAS_TYPES', () => {
-  it('contains blank, lined, and grid', () => {
+  it('contains blank, lined, grid, and dotted', () => {
     const values = CANVAS_TYPES.map((c) => c.value);
-    expect(values).toEqual(['blank', 'lined', 'grid']);
+    expect(values).toEqual(['blank', 'lined', 'grid', 'dotted']);
   });
 });

@@ -15,6 +15,7 @@ import {
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { createFolder, updateFolder } from '@/lib/actions/folders';
+import { CANVAS_TYPES } from '@/lib/constants/subjects';
 import type { Folder } from '@/types/database';
 import { cn } from '@/lib/utils';
 
@@ -46,6 +47,7 @@ export function FolderDialog({
   const [internalOpen, setInternalOpen] = useState(false);
   const [name, setName] = useState(folder?.name ?? '');
   const [color, setColor] = useState(folder?.color ?? PRESET_COLORS[4]);
+  const [defaultBg, setDefaultBg] = useState(folder?.default_background ?? 'blank');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
@@ -58,6 +60,7 @@ export function FolderDialog({
     if (value) {
       setName(folder?.name ?? '');
       setColor(folder?.color ?? PRESET_COLORS[4]);
+      setDefaultBg(folder?.default_background ?? 'blank');
       setError('');
     }
   }
@@ -74,7 +77,7 @@ export function FolderDialog({
 
     try {
       if (isEditing) {
-        await updateFolder(folder.id, { name: name.trim(), color });
+        await updateFolder(folder.id, { name: name.trim(), color, default_background: defaultBg });
       } else {
         await createFolder({
           name: name.trim(),
@@ -141,6 +144,26 @@ export function FolderDialog({
                   style={{ backgroundColor: presetColor }}
                   aria-label={`Select color ${presetColor}`}
                 />
+              ))}
+            </div>
+          </div>
+          <div className="space-y-2">
+            <Label>Default Canvas Background</Label>
+            <div className="flex flex-wrap gap-2">
+              {CANVAS_TYPES.map((ct) => (
+                <button
+                  key={ct.value}
+                  type="button"
+                  onClick={() => setDefaultBg(ct.value)}
+                  className={cn(
+                    'rounded-md border px-3 py-1.5 text-sm transition-all',
+                    defaultBg === ct.value
+                      ? 'border-primary bg-primary/10 font-medium'
+                      : 'border-border hover:bg-muted',
+                  )}
+                >
+                  {ct.label}
+                </button>
               ))}
             </div>
           </div>
