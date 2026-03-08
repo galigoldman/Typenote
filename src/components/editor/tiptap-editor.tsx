@@ -13,7 +13,11 @@ import type { SaveStatus } from '@/hooks/use-auto-save';
 import type { ConnectionStatus } from '@/hooks/use-realtime-sync';
 import { useDocumentSync } from '@/hooks/use-document-sync';
 import { AutoDirection } from '@/lib/editor/rtl-extension';
+import { MathExpression } from '@/lib/editor/math-extension';
+import { MathInputBox } from '@/lib/editor/math-input-box';
 import { EditorToolbar } from './editor-toolbar';
+import { toast } from 'sonner';
+import 'katex/dist/katex.min.css';
 
 interface TiptapEditorProps {
   document: Document;
@@ -75,6 +79,10 @@ function ConnectionIndicator({
 
 export function TiptapEditor({ document }: TiptapEditorProps) {
   const [title, setTitle] = useState(document.title);
+  const [mathInputPosition, setMathInputPosition] = useState<{
+    x: number;
+    y: number;
+  } | null>(null);
   const skipNextUpdateRef = useRef(false);
 
   const editor = useEditor({
@@ -98,6 +106,7 @@ export function TiptapEditor({ document }: TiptapEditorProps) {
         },
       }),
       AutoDirection,
+      MathExpression,
     ],
     content: document.content as Record<string, unknown>,
     editorProps: {
@@ -125,6 +134,7 @@ export function TiptapEditor({ document }: TiptapEditorProps) {
     isLockedByRemote,
     unlockEditor,
     triggerSave,
+    flushSave,
     saveTitle,
   } = useDocumentSync({
     documentId: document.id,
@@ -143,6 +153,48 @@ export function TiptapEditor({ document }: TiptapEditorProps) {
     editor?.setEditable(true);
     editor?.commands.focus();
   };
+
+  // Listen for math input trigger from ProseMirror plugin
+  useEffect(() => {
+    const handleMathTrigger = (e: Event) => {
+      const detail = (e as CustomEvent).detail as { x: number; y: number };
+      setMathInputPosition(detail);
+    };
+    window.addEventListener('math-input-trigger', handleMathTrigger);
+    return () => {
+      window.removeEventListener('math-input-trigger', handleMathTrigger);
+    };
+  }, []);
+
+  const handleMathSubmit = useCallback(
+    async (text: string) => {
+      if (!editor) return;
+      try {
+        const res = await fetch('/api/ai/latex', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ text }),
+        });
+        if (!res.ok) {
+          throw new Error('Conversion failed');
+        }
+        const data = await res.json();
+        editor.chain().focus().insertMath(data.latex).run();
+        setMathInputPosition(null);
+        // Flush save immediately so the LaTeX is persisted and synced right away
+        await flushSave();
+      } catch {
+        toast.error('Failed to convert math expression');
+        setMathInputPosition(null);
+      }
+    },
+    [editor, flushSave],
+  );
+
+  const handleMathCancel = useCallback(() => {
+    setMathInputPosition(null);
+    editor?.commands.focus();
+  }, [editor]);
 
   // Toggle editor editability based on remote lock
   useEffect(() => {
@@ -195,6 +247,15 @@ export function TiptapEditor({ document }: TiptapEditorProps) {
       <div className={`flex-1 overflow-y-auto ${canvasClass}`}>
         <EditorContent editor={editor} />
       </div>
+
+      {/* Math Input Box */}
+      {mathInputPosition && (
+        <MathInputBox
+          position={mathInputPosition}
+          onSubmit={handleMathSubmit}
+          onCancel={handleMathCancel}
+        />
+      )}
 
       {/* Canvas background styles */}
       <style jsx global>{`
