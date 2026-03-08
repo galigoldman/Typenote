@@ -44,15 +44,15 @@ function createProps(overrides: Record<string, unknown> = {}) {
     },
     updateAttributes: vi.fn(),
     // Other NodeViewProps that aren't used
-    editor: {} as any,
+    editor: {} as unknown,
     getPos: vi.fn(),
-    decorations: [] as any,
-    extension: {} as any,
+    decorations: [] as unknown,
+    extension: {} as unknown,
     selected: false,
     deleteNode: vi.fn(),
     HTMLAttributes: {},
     ...overrides,
-  } as any;
+  } as unknown as Parameters<typeof MathNodeView>[0];
 }
 
 describe('MathNodeView', () => {

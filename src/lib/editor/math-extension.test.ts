@@ -76,8 +76,8 @@ describe('MathExpression Node', () => {
       // HTMLAttributes passed to renderHTML are already transformed by addAttributes().renderHTML
       const result = renderFn.call(MathExpression, {
         HTMLAttributes: { 'data-latex': '\\frac{1}{2}', 'data-original-text': '' },
-        node: { attrs: { latex: '\\frac{1}{2}', originalText: '' } } as any,
-      } as any);
+        node: { attrs: { latex: '\\frac{1}{2}', originalText: '' } } as unknown,
+      } as Parameters<typeof renderFn>[0]);
       expect(result[0]).toBe('span');
       expect(result[1]).toHaveProperty('data-type', 'math-expression');
       expect(result[1]).toHaveProperty('data-latex', '\\frac{1}{2}');
