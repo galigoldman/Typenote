@@ -35,3 +35,10 @@ Every step of development must follow this git workflow:
 - CI runs automatically on every push and pull request to `main`.
 - The CI pipeline must at minimum: install dependencies, run linting, and run the full test suite.
 - PRs cannot be merged unless CI passes. This is enforced via GitHub branch protection rules on `main`.
+
+## Active Technologies
+- TypeScript 5.x, React 19, Next.js 16 + TipTap 3 (text editing), `perfect-freehand` (stroke geometry), Pointer Events API (input), Canvas 2D API (rendering) (001-canvas-editor)
+- Supabase PostgreSQL — new `pages` JSONB column on `documents` table (001-canvas-editor)
+
+## Recent Changes
+- 001-canvas-editor: Added TypeScript 5.x, React 19, Next.js 16 + TipTap 3 (text editing), `perfect-freehand` (stroke geometry), Pointer Events API (input), Canvas 2D API (rendering)
