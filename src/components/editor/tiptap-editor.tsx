@@ -179,7 +179,7 @@ export function TiptapEditor({ document }: TiptapEditorProps) {
           throw new Error('Conversion failed');
         }
         const data = await res.json();
-        editor.chain().focus().insertMath(data.latex).run();
+        editor.chain().focus().insertMath(data.latex, text).run();
         setMathInputPosition(null);
         // Flush save immediately so the LaTeX is persisted and synced right away
         await flushSave();

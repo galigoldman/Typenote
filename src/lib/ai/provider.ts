@@ -1,5 +1,5 @@
 import { google } from '@ai-sdk/google';
-import type { LanguageModelV2 } from 'ai';
+import type { LanguageModel } from 'ai';
 
 // Mock model that always returns a fixed LaTeX expression
 // Used for initial development and testing
@@ -27,9 +27,9 @@ class MockLatexModel {
   }
 }
 
-export function getModel(): LanguageModelV2 {
+export function getModel(): LanguageModel {
   if (process.env.USE_MOCK_AI !== 'false') {
-    return new MockLatexModel() as unknown as LanguageModelV2;
+    return new MockLatexModel() as unknown as LanguageModel;
   }
 
   return google('gemini-2.5-flash');

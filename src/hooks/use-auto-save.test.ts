@@ -139,6 +139,46 @@ describe('useAutoSave', () => {
     expect(result.current.lastSaveTimestampRef.current).toBeNull();
   });
 
+  it('flush triggers save even when status is "saved" (race condition fix)', async () => {
+    const saveFn = vi.fn().mockResolvedValue(undefined);
+    const { result } = renderHook(() => useAutoSave(saveFn, 500));
+
+    // Status starts as 'saved'
+    expect(result.current.status).toBe('saved');
+
+    // Flush without calling trigger first — should still save
+    await act(async () => {
+      await result.current.flush();
+    });
+
+    expect(saveFn).toHaveBeenCalledOnce();
+    expect(result.current.status).toBe('saved');
+  });
+
+  it('flush cancels pending debounced save', async () => {
+    const saveFn = vi.fn().mockResolvedValue(undefined);
+    const { result } = renderHook(() => useAutoSave(saveFn, 500));
+
+    act(() => {
+      result.current.trigger();
+    });
+
+    // Flush immediately (cancels pending debounce)
+    await act(async () => {
+      await result.current.flush();
+    });
+
+    expect(saveFn).toHaveBeenCalledOnce();
+
+    // Advance past the original debounce — should NOT trigger a second save
+    await act(async () => {
+      vi.advanceTimersByTime(500);
+      await Promise.resolve();
+    });
+
+    expect(saveFn).toHaveBeenCalledOnce();
+  });
+
   it('sets status back to "unsaved" when save fails', async () => {
     const saveFn = vi.fn().mockRejectedValue(new Error('Save failed'));
     const { result } = renderHook(() => useAutoSave(saveFn, 500));
