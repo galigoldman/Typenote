@@ -13,20 +13,22 @@ describe('MathInputBox', () => {
   it('should render an input element', () => {
     render(<MathInputBox {...defaultProps} />);
     expect(
-      screen.getByPlaceholderText('Describe math in plain English...')
+      screen.getByPlaceholderText('Describe math in plain English...'),
     ).toBeInTheDocument();
   });
 
   it('should auto-focus the input on mount via requestAnimationFrame', async () => {
     // Mock requestAnimationFrame to execute callback synchronously
-    const rafSpy = vi.spyOn(window, 'requestAnimationFrame').mockImplementation((cb) => {
-      cb(0);
-      return 0;
-    });
+    const rafSpy = vi
+      .spyOn(window, 'requestAnimationFrame')
+      .mockImplementation((cb) => {
+        cb(0);
+        return 0;
+      });
 
     render(<MathInputBox {...defaultProps} />);
     const input = screen.getByPlaceholderText(
-      'Describe math in plain English...'
+      'Describe math in plain English...',
     );
     expect(rafSpy).toHaveBeenCalled();
     expect(input).toHaveFocus();
@@ -45,7 +47,7 @@ describe('MathInputBox', () => {
     const onCancel = vi.fn();
     render(<MathInputBox {...defaultProps} onCancel={onCancel} />);
     const input = screen.getByPlaceholderText(
-      'Describe math in plain English...'
+      'Describe math in plain English...',
     );
     await userEvent.type(input, '{Escape}');
     expect(onCancel).toHaveBeenCalledOnce();
@@ -55,7 +57,7 @@ describe('MathInputBox', () => {
     const onSubmit = vi.fn().mockResolvedValue(undefined);
     render(<MathInputBox {...defaultProps} onSubmit={onSubmit} />);
     const input = screen.getByPlaceholderText(
-      'Describe math in plain English...'
+      'Describe math in plain English...',
     );
     await userEvent.type(input, 'one half times five');
     await userEvent.keyboard('{Enter}');
@@ -66,7 +68,7 @@ describe('MathInputBox', () => {
     const onCancel = vi.fn();
     render(<MathInputBox {...defaultProps} onCancel={onCancel} />);
     const input = screen.getByPlaceholderText(
-      'Describe math in plain English...'
+      'Describe math in plain English...',
     );
     await userEvent.click(input);
     await userEvent.keyboard('{Enter}');

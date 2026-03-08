@@ -3,13 +3,7 @@
 import { NodeViewWrapper } from '@tiptap/react';
 import type { NodeViewProps } from '@tiptap/react';
 import katex from 'katex';
-import {
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-} from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 type EditMode = 'expression' | 'latex';
 
@@ -75,10 +69,7 @@ export function MathNodeView({ node, updateAttributes }: NodeViewProps) {
   useEffect(() => {
     if (!isEditing) return;
     const handleClickOutside = (e: MouseEvent) => {
-      if (
-        panelRef.current &&
-        !panelRef.current.contains(e.target as Node)
-      ) {
+      if (panelRef.current && !panelRef.current.contains(e.target as Node)) {
         closeEditor();
       }
     };
@@ -137,7 +128,15 @@ export function MathNodeView({ node, updateAttributes }: NodeViewProps) {
         }
       }
     },
-    [editValue, editMode, isLoading, latex, originalText, updateAttributes, closeEditor],
+    [
+      editValue,
+      editMode,
+      isLoading,
+      latex,
+      originalText,
+      updateAttributes,
+      closeEditor,
+    ],
   );
 
   return (
@@ -152,10 +151,7 @@ export function MathNodeView({ node, updateAttributes }: NodeViewProps) {
         cursor: 'pointer',
       }}
     >
-      <span
-        dangerouslySetInnerHTML={{ __html: html }}
-        onClick={openEditor}
-      />
+      <span dangerouslySetInnerHTML={{ __html: html }} onClick={openEditor} />
       {isEditing && (
         <div
           ref={panelRef}
@@ -214,9 +210,7 @@ export function MathNodeView({ node, updateAttributes }: NodeViewProps) {
             )}
           </div>
           {/* Error message */}
-          {error && (
-            <span className="text-xs text-red-500">{error}</span>
-          )}
+          {error && <span className="text-xs text-red-500">{error}</span>}
         </div>
       )}
     </NodeViewWrapper>

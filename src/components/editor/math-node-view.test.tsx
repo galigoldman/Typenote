@@ -77,7 +77,10 @@ describe('MathNodeView', () => {
       render(<MathNodeView {...props} />);
 
       // Click the rendered math span (contains the katex output)
-      const mathSpan = screen.getByTestId('node-view-wrapper').querySelector('span[dangerouslysetinnerhtml]') ||
+      const mathSpan =
+        screen
+          .getByTestId('node-view-wrapper')
+          .querySelector('span[dangerouslysetinnerhtml]') ||
         screen.getByTestId('node-view-wrapper').querySelector('span > span');
       fireEvent.click(mathSpan!);
 
@@ -89,7 +92,9 @@ describe('MathNodeView', () => {
       const props = createProps();
       render(<MathNodeView {...props} />);
 
-      const mathContent = screen.getByTestId('node-view-wrapper').querySelectorAll('span');
+      const mathContent = screen
+        .getByTestId('node-view-wrapper')
+        .querySelectorAll('span');
       fireEvent.click(mathContent[mathContent.length - 1]);
 
       expect(screen.getByText('Edit Expression')).toBeInTheDocument();
@@ -100,10 +105,14 @@ describe('MathNodeView', () => {
       const props = createProps();
       render(<MathNodeView {...props} />);
 
-      const mathContent = screen.getByTestId('node-view-wrapper').querySelectorAll('span');
+      const mathContent = screen
+        .getByTestId('node-view-wrapper')
+        .querySelectorAll('span');
       fireEvent.click(mathContent[mathContent.length - 1]);
 
-      const input = screen.getByPlaceholderText('Describe math in plain English...');
+      const input = screen.getByPlaceholderText(
+        'Describe math in plain English...',
+      );
       expect(input).toHaveValue('one half');
     });
 
@@ -111,7 +120,9 @@ describe('MathNodeView', () => {
       const props = createProps();
       render(<MathNodeView {...props} />);
 
-      const mathContent = screen.getByTestId('node-view-wrapper').querySelectorAll('span');
+      const mathContent = screen
+        .getByTestId('node-view-wrapper')
+        .querySelectorAll('span');
       fireEvent.click(mathContent[mathContent.length - 1]);
 
       // Switch to LaTeX mode
@@ -122,13 +133,19 @@ describe('MathNodeView', () => {
     });
 
     it('shows empty input in expression mode for legacy nodes without originalText', async () => {
-      const props = createProps({ attrs: { latex: '\\frac{1}{2}', originalText: '' } });
+      const props = createProps({
+        attrs: { latex: '\\frac{1}{2}', originalText: '' },
+      });
       render(<MathNodeView {...props} />);
 
-      const mathContent = screen.getByTestId('node-view-wrapper').querySelectorAll('span');
+      const mathContent = screen
+        .getByTestId('node-view-wrapper')
+        .querySelectorAll('span');
       fireEvent.click(mathContent[mathContent.length - 1]);
 
-      const input = screen.getByPlaceholderText('Describe math in plain English...');
+      const input = screen.getByPlaceholderText(
+        'Describe math in plain English...',
+      );
       expect(input).toHaveValue('');
     });
   });
@@ -138,12 +155,16 @@ describe('MathNodeView', () => {
       const props = createProps();
       render(<MathNodeView {...props} />);
 
-      const mathContent = screen.getByTestId('node-view-wrapper').querySelectorAll('span');
+      const mathContent = screen
+        .getByTestId('node-view-wrapper')
+        .querySelectorAll('span');
       fireEvent.click(mathContent[mathContent.length - 1]);
 
       expect(screen.getByText('Edit Expression')).toBeInTheDocument();
 
-      const input = screen.getByPlaceholderText('Describe math in plain English...');
+      const input = screen.getByPlaceholderText(
+        'Describe math in plain English...',
+      );
       fireEvent.keyDown(input, { key: 'Escape' });
 
       expect(screen.queryByText('Edit Expression')).not.toBeInTheDocument();
@@ -157,10 +178,14 @@ describe('MathNodeView', () => {
       const props = createProps();
       render(<MathNodeView {...props} />);
 
-      const mathContent = screen.getByTestId('node-view-wrapper').querySelectorAll('span');
+      const mathContent = screen
+        .getByTestId('node-view-wrapper')
+        .querySelectorAll('span');
       fireEvent.click(mathContent[mathContent.length - 1]);
 
-      const input = screen.getByPlaceholderText('Describe math in plain English...');
+      const input = screen.getByPlaceholderText(
+        'Describe math in plain English...',
+      );
       // Text is already 'one half' (originalText) — press Enter without changing
       fireEvent.keyDown(input, { key: 'Enter' });
 
@@ -178,10 +203,14 @@ describe('MathNodeView', () => {
       const props = createProps();
       render(<MathNodeView {...props} />);
 
-      const mathContent = screen.getByTestId('node-view-wrapper').querySelectorAll('span');
+      const mathContent = screen
+        .getByTestId('node-view-wrapper')
+        .querySelectorAll('span');
       fireEvent.click(mathContent[mathContent.length - 1]);
 
-      const input = screen.getByPlaceholderText('Describe math in plain English...');
+      const input = screen.getByPlaceholderText(
+        'Describe math in plain English...',
+      );
       await userEvent.clear(input);
       await userEvent.type(input, 'one third');
       fireEvent.keyDown(input, { key: 'Enter' });
@@ -212,16 +241,22 @@ describe('MathNodeView', () => {
       const props = createProps();
       render(<MathNodeView {...props} />);
 
-      const mathContent = screen.getByTestId('node-view-wrapper').querySelectorAll('span');
+      const mathContent = screen
+        .getByTestId('node-view-wrapper')
+        .querySelectorAll('span');
       fireEvent.click(mathContent[mathContent.length - 1]);
 
-      const input = screen.getByPlaceholderText('Describe math in plain English...');
+      const input = screen.getByPlaceholderText(
+        'Describe math in plain English...',
+      );
       await userEvent.clear(input);
       await userEvent.type(input, 'something new');
       fireEvent.keyDown(input, { key: 'Enter' });
 
       await waitFor(() => {
-        expect(screen.getByText('Failed to convert expression')).toBeInTheDocument();
+        expect(
+          screen.getByText('Failed to convert expression'),
+        ).toBeInTheDocument();
       });
 
       // Panel should still be open
@@ -237,7 +272,9 @@ describe('MathNodeView', () => {
       const props = createProps();
       render(<MathNodeView {...props} />);
 
-      const mathContent = screen.getByTestId('node-view-wrapper').querySelectorAll('span');
+      const mathContent = screen
+        .getByTestId('node-view-wrapper')
+        .querySelectorAll('span');
       fireEvent.click(mathContent[mathContent.length - 1]);
 
       // Switch to LaTeX mode
@@ -249,7 +286,9 @@ describe('MathNodeView', () => {
       fireEvent.keyDown(input, { key: 'Enter' });
 
       expect(fetchSpy).not.toHaveBeenCalled();
-      expect(props.updateAttributes).toHaveBeenCalledWith({ latex: '\\frac{1}{3}' });
+      expect(props.updateAttributes).toHaveBeenCalledWith({
+        latex: '\\frac{1}{3}',
+      });
 
       fetchSpy.mockRestore();
     });
