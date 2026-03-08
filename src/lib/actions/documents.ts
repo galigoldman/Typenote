@@ -98,8 +98,9 @@ export async function moveDocument(id: string, folderId: string | null) {
 
 export async function updateDocumentContent(
   id: string,
-  content: Record<string, unknown>,
+  contentJson: string,
 ): Promise<{ updated_at: string }> {
+  const content = JSON.parse(contentJson);
   const supabase = await createClient();
   const { data, error } = await supabase
     .from('documents')

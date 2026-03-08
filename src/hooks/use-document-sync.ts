@@ -36,7 +36,8 @@ export function useDocumentSync({
   const saveFn = useCallback(async () => {
     if (!editor) return;
     const content = editor.getJSON() as Record<string, unknown>;
-    return updateDocumentContent(documentId, content);
+    // Send as JSON string to prevent Next.js Server Actions from stripping nested attrs
+    return updateDocumentContent(documentId, JSON.stringify(content));
   }, [editor, documentId]);
 
   const {

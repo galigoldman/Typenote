@@ -35,3 +35,10 @@ Every step of development must follow this git workflow:
 - CI runs automatically on every push and pull request to `main`.
 - The CI pipeline must at minimum: install dependencies, run linting, and run the full test suite.
 - PRs cannot be merged unless CI passes. This is enforced via GitHub branch protection rules on `main`.
+
+## Active Technologies
+- TypeScript 5 / Node.js 18+ + Next.js 16.1.6, TipTap 3.20.1, Supabase SSR 0.9.0, KaTeX (new), Vercel AI SDK (new), @ai-sdk/google (new) (001-latex-math-input)
+- PostgreSQL via Supabase — existing `documents.content` JSONB column (no migration) (001-latex-math-input)
+
+## Recent Changes
+- 001-latex-math-input: Added TypeScript 5 / Node.js 18+ + Next.js 16.1.6, TipTap 3.20.1, Supabase SSR 0.9.0, KaTeX (new), Vercel AI SDK (new), @ai-sdk/google (new)
