@@ -33,15 +33,16 @@ Content-Type: application/json
 
 ### Error Responses
 
-| Status | Body | Condition |
-|--------|------|-----------|
-| 400 | `{ "error": "Text is required" }` | Empty or missing `text` |
-| 400 | `{ "error": "Text too long (max 500 characters)" }` | `text.length > 500` |
-| 500 | `{ "error": "Conversion failed" }` | AI service error |
+| Status | Body                                                | Condition               |
+| ------ | --------------------------------------------------- | ----------------------- |
+| 400    | `{ "error": "Text is required" }`                   | Empty or missing `text` |
+| 400    | `{ "error": "Text too long (max 500 characters)" }` | `text.length > 500`     |
+| 500    | `{ "error": "Conversion failed" }`                  | AI service error        |
 
 ## Usage in 002
 
 The existing endpoint is called in two scenarios:
+
 1. **New math creation** (same as 001): User types `$`, enters text, presses Enter
 2. **Expression edit** (new in 002): User clicks existing math, edits natural language text, presses Enter — only if text differs from `originalText`
 

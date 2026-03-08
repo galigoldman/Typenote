@@ -24,13 +24,13 @@ npm run dev   # Start Next.js dev server
 
 ## Key Files to Modify
 
-| File | Change |
-|------|--------|
-| `src/lib/editor/math-extension.ts` | Add `originalText` attribute to MathExpression node |
+| File                                       | Change                                                      |
+| ------------------------------------------ | ----------------------------------------------------------- |
+| `src/lib/editor/math-extension.ts`         | Add `originalText` attribute to MathExpression node         |
 | `src/components/editor/math-node-view.tsx` | Remove background styles, add click handler, add edit panel |
-| `src/lib/editor/math-input-box.tsx` | Fix auto-focus timing |
-| `src/components/editor/tiptap-editor.tsx` | Pass `originalText` through `insertMath`, fix save timing |
-| `src/hooks/use-auto-save.ts` | Fix `flush()` race condition with status check |
+| `src/lib/editor/math-input-box.tsx`        | Fix auto-focus timing                                       |
+| `src/components/editor/tiptap-editor.tsx`  | Pass `originalText` through `insertMath`, fix save timing   |
+| `src/hooks/use-auto-save.ts`               | Fix `flush()` race condition with status check              |
 
 ## Testing
 

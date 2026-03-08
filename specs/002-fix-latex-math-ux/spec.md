@@ -5,7 +5,7 @@
 **Status**: Draft
 **Input**: User description: "Fix LaTeX math input UX issues: auto-save on Enter, cursor placement in math box, remove blue color overlay, add click-to-edit with original language and LaTeX editing options"
 
-## User Scenarios & Testing *(mandatory)*
+## User Scenarios & Testing _(mandatory)_
 
 ### User Story 1 - Auto-Save Math on Enter (Priority: P1)
 
@@ -78,7 +78,7 @@ When a user clicks on a rendered LaTeX expression, an edit interface should appe
 - What happens when the user rapidly clicks between different math expressions? The previous edit interface should close before the new one opens.
 - What happens when a math expression is edited while another device has the document open (real-time sync)? The edit should be saved and synced normally through the existing sync mechanism.
 
-## Requirements *(mandatory)*
+## Requirements _(mandatory)_
 
 ### Functional Requirements
 
@@ -98,7 +98,7 @@ When a user clicks on a rendered LaTeX expression, an edit interface should appe
 
 - **MathExpression Node**: Represents a rendered LaTeX math expression in the document. Key attributes: LaTeX code, original natural language text (new attribute), display mode.
 
-## Success Criteria *(mandatory)*
+## Success Criteria _(mandatory)_
 
 ### Measurable Outcomes
 

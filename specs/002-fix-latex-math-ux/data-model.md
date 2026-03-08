@@ -11,14 +11,15 @@ The existing `mathExpression` TipTap node gains one new attribute: `originalText
 
 #### Attributes
 
-| Attribute | Type | Default | Description |
-|-----------|------|---------|-------------|
-| `latex` | `string` | `''` | The LaTeX code rendered by KaTeX (existing) |
-| `originalText` | `string` | `''` | The natural language text originally submitted by the user (new) |
+| Attribute      | Type     | Default | Description                                                      |
+| -------------- | -------- | ------- | ---------------------------------------------------------------- |
+| `latex`        | `string` | `''`    | The LaTeX code rendered by KaTeX (existing)                      |
+| `originalText` | `string` | `''`    | The natural language text originally submitted by the user (new) |
 
 #### Serialized Format (within `documents.content` JSONB)
 
 **Before (001)**:
+
 ```json
 {
   "type": "mathExpression",
@@ -29,6 +30,7 @@ The existing `mathExpression` TipTap node gains one new attribute: `originalText
 ```
 
 **After (002)**:
+
 ```json
 {
   "type": "mathExpression",
@@ -46,7 +48,11 @@ The existing `mathExpression` TipTap node gains one new attribute: `originalText
 <span data-type="math-expression" data-latex="\frac{1}{2} \times 5"></span>
 
 <!-- After -->
-<span data-type="math-expression" data-latex="\frac{1}{2} \times 5" data-original-text="one half times five"></span>
+<span
+  data-type="math-expression"
+  data-latex="\frac{1}{2} \times 5"
+  data-original-text="one half times five"
+></span>
 ```
 
 ### Backward Compatibility

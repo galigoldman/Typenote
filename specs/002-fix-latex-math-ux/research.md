@@ -14,6 +14,7 @@
 **Decision**: Fix the race condition by ensuring `flushSave()` always performs a save when called from `handleMathSubmit`, regardless of current status. This can be done by calling `performSave()` directly or by adding a `forceFlush` option.
 
 **Alternatives Considered**:
+
 - Adding a separate `setTimeout` before flush — fragile, timing-dependent
 - Using `triggerSave()` with 0ms debounce — changes existing behavior for all saves
 
@@ -30,6 +31,7 @@
 **Decision**: Add a small `requestAnimationFrame` or `setTimeout(0)` wrapper around the `focus()` call in the `useEffect` to ensure it runs after ProseMirror's focus cycle completes. Additionally, explicitly call `editor.commands.blur()` before showing the input box.
 
 **Alternatives Considered**:
+
 - Using `autoFocus` prop on the input element — does not solve the ProseMirror focus reclaim
 - Using `e.stopPropagation()` in the ProseMirror plugin — doesn't prevent editor focus restoration
 
@@ -42,6 +44,7 @@
 **Decision**: Remove the `background` and `border` inline styles entirely. Math expressions should render with no visual container, blending with surrounding text. A subtle cursor change (`cursor: 'pointer'`) can indicate clickability for the new edit feature.
 
 **Alternatives Considered**:
+
 - Adding a hover-only background — user specifically said no colored overlay
 - Using a lighter tint — still a colored overlay, doesn't meet requirements
 
@@ -54,6 +57,7 @@
 **Finding**: TipTap NodeViews can handle click events and maintain their own React state. The NodeView can detect clicks, show an edit UI (popover/floating panel), and update the node's attributes via `updateAttributes()` from `NodeViewProps`.
 
 **Decision**: Extend `MathNodeView` to:
+
 1. Accept click events → toggle an edit popover
 2. Show two tabs/buttons: "Edit Expression" and "Edit LaTeX"
 3. Store `originalText` as a new node attribute for pre-filling the expression editor
@@ -63,11 +67,13 @@
 **Data Model Change**: Add `originalText` attribute to `MathExpression` node. Default: `''`. This stores the natural language input used to generate the LaTeX. Stored in the JSONB content column alongside `latex` — no migration needed.
 
 **UI Pattern**: Use a small floating panel (similar to `MathInputBox`) positioned relative to the clicked node. Two modes:
+
 - **Expression mode**: Text input pre-filled with `originalText`, Enter submits (with AI call only if changed)
 - **LaTeX mode**: Text input pre-filled with `latex`, Enter submits (no AI call, direct update)
 - Mode selector via two clickable labels/buttons at the top of the panel
 
 **Alternatives Considered**:
+
 - Modal dialog — too heavy for inline edits
 - Inline editing within the node — incompatible with `atom: true`
 - Context menu — less discoverable, requires right-click

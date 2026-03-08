@@ -21,7 +21,7 @@ Fix four UX issues in the LaTeX math input feature: (1) ensure math expressions 
 
 ## Constitution Check
 
-*Constitution not configured for this project (template placeholder). No gates to evaluate.*
+_Constitution not configured for this project (template placeholder). No gates to evaluate._
 
 **Post-design re-check**: N/A — no constitution constraints defined.
 
@@ -71,13 +71,13 @@ src/
 
 All research documented in [research.md](./research.md). Key findings:
 
-| Topic | Finding | Decision |
-|-------|---------|----------|
+| Topic                    | Finding                                                                                                | Decision                                                                                         |
+| ------------------------ | ------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------ |
 | Auto-save race condition | `flush()` checks `status === 'unsaved'` but React state may not have updated yet after `triggerSave()` | Make `flush()` always save when explicitly called (remove status guard) or add a force parameter |
-| Input focus timing | ProseMirror may reclaim focus after `handleKeyDown` returns | Wrap `focus()` in `requestAnimationFrame` and blur editor before showing input |
-| Background removal | Inline styles in `MathNodeView`: purple background + border | Remove `background` and `border` styles, add `cursor: pointer` for edit affordance |
-| Click-to-edit UI | TipTap NodeView can handle clicks + maintain React state | Extend `MathNodeView` with local state for edit panel, two-mode input, `updateAttributes()` |
-| Original text storage | Need `originalText` to pre-fill expression editor and detect changes | Add attribute to MathExpression node, default `''` for backward compat |
+| Input focus timing       | ProseMirror may reclaim focus after `handleKeyDown` returns                                            | Wrap `focus()` in `requestAnimationFrame` and blur editor before showing input                   |
+| Background removal       | Inline styles in `MathNodeView`: purple background + border                                            | Remove `background` and `border` styles, add `cursor: pointer` for edit affordance               |
+| Click-to-edit UI         | TipTap NodeView can handle clicks + maintain React state                                               | Extend `MathNodeView` with local state for edit panel, two-mode input, `updateAttributes()`      |
+| Original text storage    | Need `originalText` to pre-fill expression editor and detect changes                                   | Add attribute to MathExpression node, default `''` for backward compat                           |
 
 ## Phase 1: Design
 
@@ -191,6 +191,7 @@ handleMathSubmit(text):
 ## Complexity Tracking
 
 No constitution violations. Changes are minimal and focused:
+
 - 0 new dependencies
 - 0 new API routes
 - 0 database migrations
