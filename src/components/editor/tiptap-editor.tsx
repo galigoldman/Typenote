@@ -12,6 +12,7 @@ import type { Document } from '@/types/database';
 import type { SaveStatus } from '@/hooks/use-auto-save';
 import type { ConnectionStatus } from '@/hooks/use-realtime-sync';
 import { useDocumentSync } from '@/hooks/use-document-sync';
+import { updateDocumentContent } from '@/lib/actions/documents';
 import { AutoDirection } from '@/lib/editor/rtl-extension';
 import { InlineMath } from '@/lib/editor/inline-math';
 import { EditorToolbar } from './editor-toolbar';
@@ -77,6 +78,8 @@ function ConnectionIndicator({
 export function TiptapEditor({ document }: TiptapEditorProps) {
   const [title, setTitle] = useState(document.title);
   const skipNextUpdateRef = useRef(false);
+  const triggerSaveRef = useRef<(() => void) | null>(null);
+  const isLockedByRemoteRef = useRef(false);
 
   const editor = useEditor({
     immediatelyRender: false,
@@ -108,12 +111,23 @@ export function TiptapEditor({ document }: TiptapEditorProps) {
           'prose prose-sm sm:prose-base max-w-none focus:outline-none min-h-[500px] p-4',
       },
     },
-    onUpdate: () => {
+    onUpdate: ({ editor: e }) => {
       if (skipNextUpdateRef.current) {
         skipNextUpdateRef.current = false;
         return;
       }
-      triggerSave();
+      // Don't save content that was just set by a remote update
+      if (isLockedByRemoteRef.current) return;
+      // Don't save while an inlineMath node is being edited (empty latex)
+      let hasEmptyMath = false;
+      e.state.doc.descendants((node) => {
+        if (node.type.name === 'inlineMath' && node.attrs.latex === '') {
+          hasEmptyMath = true;
+        }
+      });
+      if (hasEmptyMath) return;
+
+      triggerSaveRef.current?.();
     },
   });
 
@@ -127,12 +141,29 @@ export function TiptapEditor({ document }: TiptapEditorProps) {
     isLockedByRemote,
     unlockEditor,
     triggerSave,
+    lastSaveTimestampRef,
     saveTitle,
   } = useDocumentSync({
     documentId: document.id,
     editor,
     onRemoteTitleUpdate,
+    isLockedByRemoteRef,
   });
+
+  // Keep triggerSave ref in sync so the onUpdate closure always calls the latest function
+  useEffect(() => {
+    triggerSaveRef.current = triggerSave;
+  }, [triggerSave]);
+
+  // Give the InlineMath extension a direct save function that also updates
+  // lastSaveTimestampRef so the realtime echo guard recognises our own save.
+  useEffect(() => {
+    if (!editor) return;
+    editor.storage.inlineMath.saveFn = async (content: Record<string, unknown>) => {
+      const result = await updateDocumentContent(document.id, content);
+      lastSaveTimestampRef.current = result.updated_at;
+    };
+  }, [editor, document.id, lastSaveTimestampRef]);
 
   const handleTitleBlur = async () => {
     if (title !== document.title) {

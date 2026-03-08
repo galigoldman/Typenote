@@ -30,6 +30,21 @@ import { translateMathToLatex } from '@/lib/editor/math-api';
 
 const mockedTranslate = vi.mocked(translateMathToLatex);
 
+function createMockEditor() {
+  return {
+    commands: {
+      focus: vi.fn(),
+      setMathResult: vi.fn(),
+    },
+    getJSON: vi.fn().mockReturnValue({ type: 'doc', content: [] }),
+    storage: {
+      inlineMath: {
+        saveFn: vi.fn().mockResolvedValue(undefined),
+      },
+    },
+  };
+}
+
 function renderMathNodeView(
   overrides: Partial<{
     latex: string;
@@ -37,23 +52,24 @@ function renderMathNodeView(
     selected: boolean;
   }> = {},
 ) {
+  const latex = overrides.latex ?? '';
+  const nl = overrides.naturalLanguage ?? '';
+  const mockEditor = createMockEditor();
+
   const props = {
     node: {
-      attrs: {
-        latex: overrides.latex ?? '',
-        naturalLanguage: overrides.naturalLanguage ?? '',
-      },
+      attrs: { latex, naturalLanguage: nl },
     },
     updateAttributes: vi.fn(),
     deleteNode: vi.fn(),
     selected: overrides.selected ?? false,
-    editor: { commands: { focus: vi.fn() } },
+    editor: mockEditor,
   };
 
   const result = render(
     <MathNodeView {...(props as unknown as MathNodeViewProps)} />,
   );
-  return { ...result, props };
+  return { ...result, props, mockEditor };
 }
 
 describe('MathNodeView', () => {
@@ -104,11 +120,11 @@ describe('MathNodeView', () => {
     expect(screen.getByText('rendered:x^2')).toBeInTheDocument();
   });
 
-  it('calls AI and updates attributes on Enter in NL mode', async () => {
+  it('calls AI and setMathResult on Enter in NL mode', async () => {
     const user = userEvent.setup();
     mockedTranslate.mockResolvedValue('\\frac{a}{b}');
 
-    const { props } = renderMathNodeView({ latex: '' });
+    const { mockEditor } = renderMathNodeView({ latex: '' });
 
     const input = screen.getByRole('textbox');
     await user.type(input, 'a divided by b');
@@ -119,10 +135,10 @@ describe('MathNodeView', () => {
     });
 
     await waitFor(() => {
-      expect(props.updateAttributes).toHaveBeenCalledWith({
-        latex: '\\frac{a}{b}',
-        naturalLanguage: 'a divided by b',
-      });
+      expect(mockEditor.commands.setMathResult).toHaveBeenCalledWith(
+        '\\frac{a}{b}',
+        'a divided by b',
+      );
     });
   });
 
@@ -164,7 +180,7 @@ describe('MathNodeView', () => {
 
   it('toggles to LaTeX mode and submits without AI call', async () => {
     const user = userEvent.setup();
-    const { props } = renderMathNodeView({
+    const { mockEditor } = renderMathNodeView({
       latex: 'x^2',
       naturalLanguage: 'x squared',
     });
@@ -188,10 +204,10 @@ describe('MathNodeView', () => {
     // Should NOT call AI
     expect(mockedTranslate).not.toHaveBeenCalled();
 
-    // Should update attributes directly
-    expect(props.updateAttributes).toHaveBeenCalledWith({
-      latex: 'y^3',
-      naturalLanguage: 'x squared',
-    });
+    // Should call setMathResult directly
+    expect(mockEditor.commands.setMathResult).toHaveBeenCalledWith(
+      'y^3',
+      'x squared',
+    );
   });
 });

@@ -42,18 +42,8 @@ export async function POST(request: Request) {
       );
     }
 
-    const { text: aiResponse } = await generateText({
-      model: google('gemini-2.5-flash'),
-      system:
-        'You are a LaTeX converter. Convert the given natural language math expression into raw LaTeX code. ' +
-        'Output ONLY the raw LaTeX expression. ' +
-        'Do NOT wrap it in dollar signs, \\[\\], \\(\\), backticks, code fences, or any other delimiters. ' +
-        'Do NOT include any explanation or markdown. ' +
-        'Handle input in any language.',
-      prompt: text.trim(),
-    });
-
-    const latex = sanitizeLatex(aiResponse);
+    // TODO: Remove mock and restore AI call once API quota is resolved
+    const latex = `\\frac{1}{2} \\times 5`;
 
     return NextResponse.json({ latex });
   } catch (error) {

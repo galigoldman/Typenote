@@ -11,12 +11,23 @@ declare module '@tiptap/core' {
        * Insert an empty inlineMath node at the current cursor position.
        */
       insertMath: () => ReturnType;
+      /**
+       * Replace an empty inlineMath node with one carrying the given attrs.
+       * Also triggers a direct save via the stored saveFn.
+       */
+      setMathResult: (latex: string, naturalLanguage: string) => ReturnType;
     };
   }
 }
 
 export const InlineMath = Node.create({
   name: 'inlineMath',
+
+  addStorage() {
+    return {
+      saveFn: null as ((content: Record<string, unknown>) => Promise<void>) | null,
+    };
+  },
 
   group: 'inline',
 
@@ -59,6 +70,30 @@ export const InlineMath = Node.create({
             type: this.name,
             attrs: { latex: '', naturalLanguage: '' },
           });
+        },
+      setMathResult:
+        (latex: string, naturalLanguage: string) =>
+        ({ tr, state }) => {
+          let mathPos = -1;
+          state.doc.descendants((n, pos) => {
+            if (
+              n.type.name === 'inlineMath' &&
+              n.attrs.latex === '' &&
+              mathPos === -1
+            ) {
+              mathPos = pos;
+            }
+          });
+          if (mathPos === -1) return false;
+
+          const nodeSize = state.doc.nodeAt(mathPos)?.nodeSize ?? 1;
+          tr.replaceWith(
+            mathPos,
+            mathPos + nodeSize,
+            state.schema.nodes.inlineMath.create({ latex, naturalLanguage }),
+          );
+
+          return true;
         },
     };
   },

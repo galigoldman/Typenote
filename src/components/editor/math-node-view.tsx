@@ -18,7 +18,6 @@ export interface MathNodeViewProps {
 
 export function MathNodeView({
   node,
-  updateAttributes,
   deleteNode,
   selected,
   editor,
@@ -67,17 +66,15 @@ export function MathNodeView({
     const value = inputValue.trim();
     if (!value) return;
 
+    // Save through the storage saveFn so lastSaveTimestampRef is updated
+    // and the realtime echo guard recognises our own save.
+    const saveFn = editor.storage.inlineMath?.saveFn;
+
     if (isLatexMode) {
-      // In LaTeX mode, update directly without AI call
-      updateAttributes({
-        latex: value,
-        naturalLanguage: originalNL.current,
-      });
-      // Force editor to emit update so auto-save triggers
-      editor.commands.focus();
+      editor.commands.setMathResult(value, originalNL.current);
+      if (saveFn) await saveFn(editor.getJSON() as Record<string, unknown>);
       userInitiatedEdit.current = false;
       setIsEditing(false);
-      setError(null);
       return;
     }
 
@@ -89,17 +86,13 @@ export function MathNodeView({
       return;
     }
 
-    // NL mode: call AI
+    // NL mode: call AI, then replace node and save via storage saveFn
     setIsLoading(true);
     setError(null);
     try {
       const result = await translateMathToLatex(value);
-      updateAttributes({
-        latex: result,
-        naturalLanguage: value,
-      });
-      // Force editor to emit update so auto-save triggers
-      editor.commands.focus();
+      editor.commands.setMathResult(result, value);
+      if (saveFn) await saveFn(editor.getJSON() as Record<string, unknown>);
       userInitiatedEdit.current = false;
       setIsEditing(false);
     } catch (err) {
@@ -107,7 +100,7 @@ export function MathNodeView({
     } finally {
       setIsLoading(false);
     }
-  }, [inputValue, isLatexMode, latex, originalNL, updateAttributes, editor]);
+  }, [inputValue, isLatexMode, latex, originalNL, editor]);
 
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent) => {
@@ -151,6 +144,14 @@ export function MathNodeView({
             onChange={(e) => setInputValue(e.target.value)}
             onKeyDown={handleKeyDown}
           />
+          <button
+            type="button"
+            aria-label="Submit math"
+            className="rounded px-1 text-xs text-muted-foreground hover:text-foreground"
+            onClick={handleSubmit}
+          >
+            ✓
+          </button>
           {isLoading && (
             <span className="text-xs text-muted-foreground">...</span>
           )}
