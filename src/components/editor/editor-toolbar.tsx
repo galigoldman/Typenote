@@ -20,6 +20,7 @@ import {
   Code,
   Minus,
   Quote,
+  PenLine,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
@@ -95,7 +96,7 @@ export function EditorToolbar({ editor }: EditorToolbarProps) {
   }, [editor]);
 
   return (
-    <div className="flex items-center gap-0.5 border-b px-2 py-1 flex-wrap">
+    <div className="flex items-center gap-0.5 border-b px-2 py-1 flex-wrap overflow-x-auto touch:overflow-x-auto touch:flex-nowrap touch:gap-1 touch:py-2">
       {/* History */}
       <ToolbarButton
         onClick={() => editor.chain().focus().undo().run()}
@@ -233,6 +234,11 @@ export function EditorToolbar({ editor }: EditorToolbarProps) {
         isActive={editor.isActive('blockquote')}
         icon={<Quote />}
         label="Blockquote"
+      />
+      <ToolbarButton
+        onClick={() => editor.chain().focus().insertDrawingBlock({}).run()}
+        icon={<PenLine />}
+        label="Insert drawing"
       />
     </div>
   );

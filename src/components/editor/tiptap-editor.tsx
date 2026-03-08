@@ -8,14 +8,21 @@ import TextAlign from '@tiptap/extension-text-align';
 import TaskList from '@tiptap/extension-task-list';
 import TaskItem from '@tiptap/extension-task-item';
 import Link from '@tiptap/extension-link';
+import { Pencil, Type, WifiOff } from 'lucide-react';
 import type { Document } from '@/types/database';
 import type { SaveStatus } from '@/hooks/use-auto-save';
 import type { ConnectionStatus } from '@/hooks/use-realtime-sync';
 import { useDocumentSync } from '@/hooks/use-document-sync';
+import { useNetworkStatus } from '@/hooks/use-network-status';
+import { cacheDocument } from '@/lib/offline/document-cache';
 import { AutoDirection } from '@/lib/editor/rtl-extension';
 import { MathExpression } from '@/lib/editor/math-extension';
 import { MathInputBox } from '@/lib/editor/math-input-box';
+import { createDrawingBlockExtension } from '@/lib/editor/drawing-block-extension';
+import { DrawingModeExtension } from '@/lib/editor/drawing-mode-extension';
+import { DrawingBlockView } from './drawing-block-view';
 import { EditorToolbar } from './editor-toolbar';
+import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 import 'katex/dist/katex.min.css';
 
@@ -83,7 +90,10 @@ export function TiptapEditor({ document }: TiptapEditorProps) {
     x: number;
     y: number;
   } | null>(null);
+  const [drawMode, setDrawMode] = useState(false);
   const skipNextUpdateRef = useRef(false);
+  const drawingModeStorageRef = useRef<{ active: boolean } | null>(null);
+  const { isOnline } = useNetworkStatus();
 
   const editor = useEditor({
     immediatelyRender: false,
@@ -107,6 +117,8 @@ export function TiptapEditor({ document }: TiptapEditorProps) {
       }),
       AutoDirection,
       MathExpression,
+      DrawingModeExtension,
+      createDrawingBlockExtension(DrawingBlockView),
     ],
     content: document.content as Record<string, unknown>,
     editorProps: {
@@ -139,6 +151,7 @@ export function TiptapEditor({ document }: TiptapEditorProps) {
   } = useDocumentSync({
     documentId: document.id,
     editor,
+    title,
     onRemoteTitleUpdate,
   });
 
@@ -202,12 +215,48 @@ export function TiptapEditor({ document }: TiptapEditorProps) {
     editor.setEditable(!isLockedByRemote);
   }, [editor, isLockedByRemote]);
 
+  // Cache document on initial load
+  useEffect(() => {
+    if (!editor) return;
+    cacheDocument({
+      id: document.id,
+      title: document.title,
+      content: document.content,
+      updated_at: document.updated_at,
+    }).catch(() => {
+      // Silently ignore cache write failures
+    });
+  }, [
+    editor,
+    document.id,
+    document.title,
+    document.content,
+    document.updated_at,
+  ]);
+
+  // Capture a reference to the drawingMode storage created by DrawingModeExtension.
+  // We use a ref so that subsequent updates mutate the storage object directly
+  // without triggering the hooks immutability lint rule on `editor`.
+  useEffect(() => {
+    if (!editor) return;
+    drawingModeStorageRef.current = editor.storage
+      .drawingMode as typeof drawingModeStorageRef.current;
+  }, [editor]);
+
+  // Sync draw mode state into the extension storage so DrawingBlockView can
+  // read `editor.storage.drawingMode.active` reactively.
+  useEffect(() => {
+    if (drawingModeStorageRef.current) {
+      drawingModeStorageRef.current.active = drawMode;
+    }
+  }, [drawMode]);
+
   if (!editor) return null;
 
   const canvasClass = CANVAS_CLASSES[document.canvas_type] ?? '';
 
   return (
-    <div className="flex flex-col h-full">
+    <div className="flex flex-col h-full pb-[env(safe-area-inset-bottom)]">
       {/* Header */}
       <div className="flex items-center justify-between border-b px-4 py-2">
         <input
@@ -219,6 +268,21 @@ export function TiptapEditor({ document }: TiptapEditorProps) {
           placeholder="Untitled"
         />
         <div className="flex items-center gap-3">
+          <Button
+            size="sm"
+            variant={drawMode ? 'default' : 'outline'}
+            onClick={() => setDrawMode((prev) => !prev)}
+            aria-label={
+              drawMode ? 'Switch to text mode' : 'Switch to draw mode'
+            }
+          >
+            {drawMode ? (
+              <Type className="size-4" />
+            ) : (
+              <Pencil className="size-4" />
+            )}
+            {drawMode ? 'Text' : 'Draw'}
+          </Button>
           <ConnectionIndicator
             status={connectionStatus}
             isLockedByRemote={isLockedByRemote}
@@ -226,6 +290,17 @@ export function TiptapEditor({ document }: TiptapEditorProps) {
           <SaveIndicator status={saveStatus} />
         </div>
       </div>
+
+      {/* Offline banner */}
+      {!isOnline && (
+        <div
+          className="flex items-center gap-2 bg-blue-50 border-b border-blue-200 px-4 py-2 text-sm text-blue-800"
+          data-testid="offline-banner"
+        >
+          <WifiOff className="size-4 shrink-0" />
+          <span>You&apos;re offline — changes will sync when reconnected</span>
+        </div>
+      )}
 
       {/* Remote editing lock banner */}
       {isLockedByRemote && (

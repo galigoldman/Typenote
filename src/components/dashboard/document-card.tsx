@@ -85,7 +85,7 @@ export function DocumentCard({
 
   return (
     <Card
-      className="cursor-pointer transition-shadow hover:shadow-md"
+      className="group cursor-pointer transition-shadow hover:shadow-md"
       onClick={() => router.push(`/dashboard/documents/${document.id}`)}
       data-testid="document-card"
     >
@@ -97,6 +97,7 @@ export function DocumentCard({
               <Button
                 variant="ghost"
                 size="icon-xs"
+                className="opacity-0 group-hover:opacity-100 touch:opacity-100"
                 onClick={(e) => e.stopPropagation()}
                 aria-label="Document options"
               >
