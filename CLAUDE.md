@@ -39,6 +39,7 @@ Every step of development must follow this git workflow:
 ## Active Technologies
 - TypeScript 5 / Node.js 18+ + Next.js 16.1.6, TipTap 3.20.1, Supabase SSR 0.9.0, KaTeX (new), Vercel AI SDK (new), @ai-sdk/google (new) (001-latex-math-input)
 - PostgreSQL via Supabase — existing `documents.content` JSONB column (no migration) (001-latex-math-input)
+- TypeScript 5 / Node.js 18+ + Next.js 16.1.6, TipTap 3.20.1, KaTeX, Supabase SSR 0.9.0 (002-fix-latex-math-ux)
 
 ## Recent Changes
 - 001-latex-math-input: Added TypeScript 5 / Node.js 18+ + Next.js 16.1.6, TipTap 3.20.1, Supabase SSR 0.9.0, KaTeX (new), Vercel AI SDK (new), @ai-sdk/google (new)

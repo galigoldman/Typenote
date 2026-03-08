@@ -43,10 +43,8 @@ export function useAutoSave(
       clearTimeout(timeoutRef.current);
       timeoutRef.current = null;
     }
-    if (status === 'unsaved') {
-      await performSave();
-    }
-  }, [status, performSave]);
+    await performSave();
+  }, [performSave]);
 
   // beforeunload handler
   useEffect(() => {

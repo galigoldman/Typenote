@@ -17,12 +17,21 @@ describe('MathInputBox', () => {
     ).toBeInTheDocument();
   });
 
-  it('should auto-focus the input on mount', () => {
+  it('should auto-focus the input on mount via requestAnimationFrame', async () => {
+    // Mock requestAnimationFrame to execute callback synchronously
+    const rafSpy = vi.spyOn(window, 'requestAnimationFrame').mockImplementation((cb) => {
+      cb(0);
+      return 0;
+    });
+
     render(<MathInputBox {...defaultProps} />);
     const input = screen.getByPlaceholderText(
       'Describe math in plain English...'
     );
+    expect(rafSpy).toHaveBeenCalled();
     expect(input).toHaveFocus();
+
+    rafSpy.mockRestore();
   });
 
   it('should position at the given coordinates', () => {

@@ -18,8 +18,10 @@ export function MathInputBox({
   const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    // Auto-focus the input on mount
-    inputRef.current?.focus();
+    // Auto-focus the input on mount, delayed to ensure ProseMirror's focus cycle completes
+    requestAnimationFrame(() => {
+      inputRef.current?.focus();
+    });
   }, []);
 
   const handleKeyDown = useCallback(

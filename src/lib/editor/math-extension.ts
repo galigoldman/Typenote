@@ -8,7 +8,7 @@ export const MATH_INPUT_PLUGIN_KEY = new PluginKey('mathInput');
 declare module '@tiptap/core' {
   interface Commands<ReturnType> {
     mathExpression: {
-      insertMath: (latex: string) => ReturnType;
+      insertMath: (latex: string, originalText?: string) => ReturnType;
     };
   }
 }
@@ -29,11 +29,19 @@ export const MathExpression = Node.create({
   addAttributes() {
     return {
       latex: {
-        default: null,
+        default: '',
         parseHTML: (element: HTMLElement) =>
           element.getAttribute('data-latex') || '',
         renderHTML: (attributes: Record<string, string>) => ({
           'data-latex': attributes.latex,
+        }),
+      },
+      originalText: {
+        default: '',
+        parseHTML: (element: HTMLElement) =>
+          element.getAttribute('data-original-text') || '',
+        renderHTML: (attributes: Record<string, string>) => ({
+          'data-original-text': attributes.originalText,
         }),
       },
     };
@@ -59,9 +67,12 @@ export const MathExpression = Node.create({
   addCommands() {
     return {
       insertMath:
-        (latex: string) =>
+        (latex: string, originalText?: string) =>
         ({ tr, dispatch, state }) => {
-          const node = state.schema.nodes.mathExpression.create({ latex });
+          const node = state.schema.nodes.mathExpression.create({
+            latex,
+            originalText: originalText ?? '',
+          });
           if (dispatch) {
             tr.replaceSelectionWith(node);
             dispatch(tr);
