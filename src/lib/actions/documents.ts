@@ -102,12 +102,17 @@ export async function moveDocument(id: string, folderId: string | null) {
 export async function updateDocumentContent(
   id: string,
   contentJson: string,
+  pages?: Record<string, unknown>,
 ): Promise<{ updated_at: string }> {
   const content = JSON.parse(contentJson);
   const supabase = await createClient();
+  const updateData: Record<string, unknown> = { content };
+  if (pages !== undefined) {
+    updateData.pages = pages;
+  }
   const { data, error } = await supabase
     .from('documents')
-    .update({ content })
+    .update(updateData)
     .eq('id', id)
     .select('updated_at')
     .single();

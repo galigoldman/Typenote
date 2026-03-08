@@ -76,6 +76,7 @@ export interface Document {
   purpose: 'homework' | 'summary' | 'notes' | null;
   title: string;
   content: Record<string, unknown>;
+  pages: Record<string, unknown> | null;
   subject: Subject;
   subject_custom: string | null;
   canvas_type: CanvasType;

@@ -13,6 +13,8 @@ interface UseDocumentSyncOptions {
   documentId: string;
   editor: Editor | null;
   onRemoteTitleUpdate: (title: string) => void;
+  getPagesData?: () => Record<string, unknown> | undefined;
+  onRemotePagesUpdate?: (pages: Record<string, unknown>) => void;
 }
 
 interface UseDocumentSyncReturn {
@@ -30,15 +32,19 @@ export function useDocumentSync({
   documentId,
   editor,
   onRemoteTitleUpdate,
+  getPagesData,
+  onRemotePagesUpdate,
 }: UseDocumentSyncOptions): UseDocumentSyncReturn {
   const [isLockedByRemote, setIsLockedByRemote] = useState(false);
 
   const saveFn = useCallback(async () => {
-    if (!editor) return;
-    const content = editor.getJSON() as Record<string, unknown>;
+    const content = editor
+      ? (editor.getJSON() as Record<string, unknown>)
+      : ({} as Record<string, unknown>);
+    const pages = getPagesData?.();
     // Send as JSON string to prevent Next.js Server Actions from stripping nested attrs
-    return updateDocumentContent(documentId, JSON.stringify(content));
-  }, [editor, documentId]);
+    return updateDocumentContent(documentId, JSON.stringify(content), pages);
+  }, [editor, documentId, getPagesData]);
 
   const {
     status: saveStatus,
@@ -61,6 +67,7 @@ export function useDocumentSync({
     lastSaveTimestampRef,
     onRemoteContentUpdate,
     onRemoteTitleUpdate,
+    onRemotePagesUpdate,
   });
 
   const saveTitle = useCallback(

@@ -15,10 +15,10 @@
 
 **Purpose**: Install dependency, define types, create database migration
 
-- [ ] T001 Install `perfect-freehand` dependency via `pnpm add perfect-freehand`
-- [ ] T002 [P] Create canvas TypeScript types in `src/types/canvas.ts` — copy interfaces from `specs/001-canvas-editor/contracts/canvas-data-contract.ts` (StrokePoint, BBox, Stroke, TextBox, CanvasPage, CanvasDocument, CanvasTool, ViewTransform, PAGE_WIDTH, PAGE_HEIGHT)
-- [ ] T003 [P] Create database migration `supabase/migrations/00003_add_pages_column.sql` — add `pages` JSONB column with default `'{"pages":[]}'` to the `documents` table
-- [ ] T004 [P] Update `src/types/database.ts` — add `pages` field (type `Record<string, unknown> | null`) to the Document interface
+- [x] T001 Install `perfect-freehand` dependency via `pnpm add perfect-freehand`
+- [x] T002 [P] Create canvas TypeScript types in `src/types/canvas.ts` — copy interfaces from `specs/001-canvas-editor/contracts/canvas-data-contract.ts` (StrokePoint, BBox, Stroke, TextBox, CanvasPage, CanvasDocument, CanvasTool, ViewTransform, PAGE_WIDTH, PAGE_HEIGHT)
+- [x] T003 [P] Create database migration `supabase/migrations/00003_add_pages_column.sql` — add `pages` JSONB column with default `'{"pages":[]}'` to the `documents` table
+- [x] T004 [P] Update `src/types/database.ts` — add `pages` field (type `Record<string, unknown> | null`) to the Document interface
 
 ---
 
@@ -28,15 +28,15 @@
 
 **CRITICAL**: No user story work can begin until this phase is complete
 
-- [ ] T005 [P] Create coordinate transform utilities in `src/lib/canvas/coordinate-utils.ts` — implement `screenToPage(screenX, screenY, viewTransform)` and `pageToScreen(pageX, pageY, viewTransform)` functions, plus high-DPI canvas setup function (`setupHighDPICanvas` that scales canvas by `devicePixelRatio`)
-- [ ] T006 [P] Create stroke rendering utilities in `src/lib/canvas/stroke-utils.ts` — implement `getSvgPathFromStroke(points)` helper, `renderStroke(ctx, inputPoints, options)` using `getStroke()` from `perfect-freehand` + `Path2D`, and `computeBBox(points)` to precompute bounding boxes
-- [ ] T007 Update server actions in `src/lib/actions/documents.ts` — modify `updateDocumentContent` to accept and persist `pages` JSONB alongside `content`, update `createDocument` to initialize `pages` with one empty page
-- [ ] T008 Update `src/hooks/use-auto-save.ts` — extend the save callback to include `pages` data when saving
-- [ ] T009 Update `src/hooks/use-document-sync.ts` — handle loading `pages` from database on document open, pass `pages` to auto-save alongside content
-- [ ] T010 Update `src/hooks/use-realtime-sync.ts` — sync `pages` field in Realtime update events, apply remote page changes to local state
-- [ ] T011 Create `src/components/canvas/canvas-page.tsx` — single A4 page component (794×1123px) with the 5-layer architecture: page background div, `<canvas>` element for strokes (with high-DPI setup), text content layer, selection overlay placeholder, and transparent interaction layer div. Set `touch-action: none` on interaction layer. Accept `page` data, `activeTool`, and event handler props
-- [ ] T012 Create `src/components/canvas/canvas-editor.tsx` — document-level container component. Scrollable div wrapping a list of `CanvasPage` components. Manages `pages` state array, zoom `ViewTransform` (CSS transform on viewport wrapper), and `activeTool` state. Accepts document data and sync callbacks. Renders canvas-toolbar
-- [ ] T013 Integrate canvas-editor into the document page — modify `src/components/editor/tiptap-editor.tsx` (or the document page at `src/app/(dashboard)/dashboard/documents/[docId]/page.tsx`) to render `CanvasEditor` instead of/alongside the current TipTap editor, passing document data and save callbacks
+- [x] T005 [P] Create coordinate transform utilities in `src/lib/canvas/coordinate-utils.ts` — implement `screenToPage(screenX, screenY, viewTransform)` and `pageToScreen(pageX, pageY, viewTransform)` functions, plus high-DPI canvas setup function (`setupHighDPICanvas` that scales canvas by `devicePixelRatio`)
+- [x] T006 [P] Create stroke rendering utilities in `src/lib/canvas/stroke-utils.ts` — implement `getSvgPathFromStroke(points)` helper, `renderStroke(ctx, inputPoints, options)` using `getStroke()` from `perfect-freehand` + `Path2D`, and `computeBBox(points)` to precompute bounding boxes
+- [x] T007 Update server actions in `src/lib/actions/documents.ts` — modify `updateDocumentContent` to accept and persist `pages` JSONB alongside `content`, update `createDocument` to initialize `pages` with one empty page
+- [x] T008 Update `src/hooks/use-auto-save.ts` — extend the save callback to include `pages` data when saving
+- [x] T009 Update `src/hooks/use-document-sync.ts` — handle loading `pages` from database on document open, pass `pages` to auto-save alongside content
+- [x] T010 Update `src/hooks/use-realtime-sync.ts` — sync `pages` field in Realtime update events, apply remote page changes to local state
+- [x] T011 Create `src/components/canvas/canvas-page.tsx` — single A4 page component (794×1123px) with the 5-layer architecture: page background div, `<canvas>` element for strokes (with high-DPI setup), text content layer, selection overlay placeholder, and transparent interaction layer div. Set `touch-action: none` on interaction layer. Accept `page` data, `activeTool`, and event handler props
+- [x] T012 Create `src/components/canvas/canvas-editor.tsx` — document-level container component. Scrollable div wrapping a list of `CanvasPage` components. Manages `pages` state array, zoom `ViewTransform` (CSS transform on viewport wrapper), and `activeTool` state. Accepts document data and sync callbacks. Renders canvas-toolbar
+- [x] T013 Integrate canvas-editor into the document page — modify `src/components/editor/tiptap-editor.tsx` (or the document page at `src/app/(dashboard)/dashboard/documents/[docId]/page.tsx`) to render `CanvasEditor` instead of/alongside the current TipTap editor, passing document data and save callbacks
 
 **Checkpoint**: Foundation ready — basic empty A4 pages render, document saves/loads the `pages` JSONB, realtime sync works for page data
 
@@ -50,10 +50,10 @@
 
 ### Implementation for User Story 1
 
-- [ ] T014 [US1] Create `src/hooks/use-drawing.ts` — hook that captures pointer events from the interaction layer, filters for `pointerType === "pen"`, collects `[x, y, pressure]` points (converted to page coordinates), calls `getStroke()` from `perfect-freehand` with `simulatePressure: false`, and renders the in-progress stroke on the working canvas layer via `Path2D` + `ctx.fill()`. On `pointerup`, finalize the stroke (compute bbox, assign UUID), add to page's strokes array, and render onto the committed canvas
-- [ ] T015 [US1] Integrate `useDrawing` with `canvas-page.tsx` — wire pointer event handlers (`onPointerDown`, `onPointerMove`, `onPointerUp`) from the interaction layer to the drawing hook when `activeTool === 'pen'`. Implement the two-canvas rendering strategy: committed canvas (all finalized strokes) + working canvas (current in-progress stroke)
-- [ ] T016 [US1] Implement stroke persistence — when a stroke is finalized, update the `pages` state in `canvas-editor.tsx`, triggering the existing auto-save debounce to persist to Supabase. On document load, re-render all stored strokes onto each page's committed canvas
-- [ ] T017 [US1] Implement stylus-only guard — in `use-drawing.ts`, reject `pointerType !== "pen"` events. Ensure mouse and touch input do NOT create strokes
+- [x] T014 [US1] Create `src/hooks/use-drawing.ts` — hook that captures pointer events from the interaction layer, filters for `pointerType === "pen"`, collects `[x, y, pressure]` points (converted to page coordinates), calls `getStroke()` from `perfect-freehand` with `simulatePressure: false`, and renders the in-progress stroke on the working canvas layer via `Path2D` + `ctx.fill()`. On `pointerup`, finalize the stroke (compute bbox, assign UUID), add to page's strokes array, and render onto the committed canvas
+- [x] T015 [US1] Integrate `useDrawing` with `canvas-page.tsx` — wire pointer event handlers (`onPointerDown`, `onPointerMove`, `onPointerUp`) from the interaction layer to the drawing hook when `activeTool === 'pen'`. Implement the two-canvas rendering strategy: committed canvas (all finalized strokes) + working canvas (current in-progress stroke)
+- [x] T016 [US1] Implement stroke persistence — when a stroke is finalized, update the `pages` state in `canvas-editor.tsx`, triggering the existing auto-save debounce to persist to Supabase. On document load, re-render all stored strokes onto each page's committed canvas
+- [x] T017 [US1] Implement stylus-only guard — in `use-drawing.ts`, reject `pointerType !== "pen"` events. Ensure mouse and touch input do NOT create strokes
 
 **Checkpoint**: Pen drawing works end-to-end — draw with stylus, strokes appear in real time, persist after reload. Mouse/touch are ignored. This is the MVP
 

@@ -2,7 +2,7 @@ import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { GraduationCap } from 'lucide-react';
 import { createClient } from '@/lib/supabase/server';
-import { TiptapEditor } from '@/components/editor/tiptap-editor';
+import { CanvasEditor } from '@/components/canvas/canvas-editor';
 import type { Course, Document } from '@/types/database';
 
 interface DocumentPageProps {
@@ -48,7 +48,7 @@ export default async function DocumentPage({ params }: DocumentPageProps) {
           </Link>
         </div>
       )}
-      <TiptapEditor document={typedDocument} />
+      <CanvasEditor document={typedDocument} />
     </div>
   );
 }
