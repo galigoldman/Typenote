@@ -84,6 +84,9 @@ export function useDrawing({ activeTool, onStrokeComplete }: UseDrawingOptions) 
       if (e.pointerType !== 'pen') return;
       if (activeTool !== 'pen') return;
 
+      // Prevent browser text selection and default touch behavior
+      e.preventDefault();
+
       isDrawingRef.current = true;
       activePageIdRef.current = pageId;
 
@@ -106,6 +109,8 @@ export function useDrawing({ activeTool, onStrokeComplete }: UseDrawingOptions) 
       if (e.pointerType !== 'pen') return;
       if (activeTool !== 'pen') return;
 
+      e.preventDefault();
+
       const { x, y } = screenToPageCoords(e, e.target);
       const pressure = Math.round(e.pressure * 100) / 100;
       currentPointsRef.current.push([x, y, pressure]);
@@ -123,6 +128,7 @@ export function useDrawing({ activeTool, onStrokeComplete }: UseDrawingOptions) 
       if (!isDrawingRef.current) return;
       if (e.pointerType !== 'pen') return;
 
+      e.preventDefault();
       isDrawingRef.current = false;
       const points = currentPointsRef.current;
 
@@ -133,7 +139,7 @@ export function useDrawing({ activeTool, onStrokeComplete }: UseDrawingOptions) 
 
       // Finalize the stroke
       const stroke: Stroke = {
-        id: crypto.randomUUID(),
+        id: Math.random().toString(36).slice(2) + Date.now().toString(36),
         points: points as StrokePoint[],
         color: '#000000',
         width: 3,

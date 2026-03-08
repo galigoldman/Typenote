@@ -71,7 +71,7 @@ function ConnectionIndicator({
 
 function createEmptyPage(order: number): CanvasPageData {
   return {
-    id: crypto.randomUUID(),
+    id: Math.random().toString(36).slice(2) + Date.now().toString(36),
     order,
     strokes: [],
     textBoxes: [],
@@ -217,7 +217,10 @@ export function CanvasEditor({ document }: CanvasEditorProps) {
       )}
 
       {/* Canvas area */}
-      <div className="flex-1 overflow-y-auto bg-gray-100">
+      <div
+        className="flex-1 overflow-y-auto bg-gray-100"
+        style={{ userSelect: 'none', WebkitUserSelect: 'none' }}
+      >
         <div className="py-8">
           {pages.map((page) => (
             <CanvasPage
