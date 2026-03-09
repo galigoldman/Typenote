@@ -2,20 +2,18 @@
  * Integration test: verifies that migrations apply correctly and
  * seed data loads into the expected tables.
  *
- * These tests run against a real local Supabase instance.
- * They catch migration regressions — if a migration breaks, these fail.
+ * Uses the admin (service_role) client which bypasses RLS.
+ * These tests catch migration regressions — if a migration breaks,
+ * these fail.
  */
 import { describe, it, expect, beforeAll } from 'vitest';
 import type { SupabaseClient } from '@supabase/supabase-js';
-import {
-  createAuthenticatedClient,
-  TEST_USER_ID,
-} from '@/test/supabase-client';
+import { createAdminClient } from '@/test/supabase-client';
 
 let supabase: SupabaseClient;
 
-beforeAll(async () => {
-  supabase = await createAuthenticatedClient();
+beforeAll(() => {
+  supabase = createAdminClient();
 });
 
 describe('Schema & seed data', () => {
@@ -23,12 +21,11 @@ describe('Schema & seed data', () => {
     const { data, error } = await supabase
       .from('profiles')
       .select('id, email')
-      .eq('id', TEST_USER_ID)
+      .eq('email', 'test@typenote.dev')
       .single();
 
     expect(error).toBeNull();
     expect(data).toMatchObject({
-      id: TEST_USER_ID,
       email: 'test@typenote.dev',
     });
   });

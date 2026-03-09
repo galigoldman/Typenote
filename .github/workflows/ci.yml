@@ -46,20 +46,13 @@ jobs:
       - name: Extract Supabase keys
         id: supabase
         run: |
-          supabase status --output json
           echo "SUPABASE_URL=$(supabase status --output json | jq -r '.API_URL')" >> "$GITHUB_OUTPUT"
-          echo "SUPABASE_ANON_KEY=$(supabase status --output json | jq -r '.ANON_KEY')" >> "$GITHUB_OUTPUT"
           echo "SUPABASE_SERVICE_ROLE_KEY=$(supabase status --output json | jq -r '.SERVICE_ROLE_KEY')" >> "$GITHUB_OUTPUT"
 
       - name: Integration tests
-        run: |
-          echo "URL=$SUPABASE_URL"
-          echo "ANON_KEY length=${#SUPABASE_ANON_KEY}"
-          echo "SERVICE_KEY length=${#SUPABASE_SERVICE_ROLE_KEY}"
-          pnpm test:integration
+        run: pnpm test:integration
         env:
           SUPABASE_URL: ${{ steps.supabase.outputs.SUPABASE_URL }}
-          SUPABASE_ANON_KEY: ${{ steps.supabase.outputs.SUPABASE_ANON_KEY }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ steps.supabase.outputs.SUPABASE_SERVICE_ROLE_KEY }}
 
       - name: Build
