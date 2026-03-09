@@ -38,7 +38,10 @@ jobs:
           version: latest
 
       - name: Start Supabase local
-        run: supabase start -x realtime,storage-api,imgproxy,inbucket,postgrest-caller-id,edge-runtime,logflare,vector,supavisor
+        run: supabase start -x realtime,imgproxy,inbucket,edge-runtime,logflare,vector,supavisor
+
+      - name: Seed database
+        run: supabase db reset --no-confirm
 
       - name: Integration tests
         run: pnpm test:integration
