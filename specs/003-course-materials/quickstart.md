@@ -26,32 +26,32 @@ pnpm dev             # Start Next.js dev server
 
 ## Key Files — New
 
-| File                                                  | Purpose                                           |
-| ----------------------------------------------------- | ------------------------------------------------- |
-| `supabase/migrations/00003_create_courses.sql`        | New tables: courses, course_weeks, course_materials |
-| `supabase/migrations/00004_add_document_course_id.sql`| Add course_id column to documents table           |
-| `supabase/migrations/00005_create_storage_bucket.sql` | Storage bucket + RLS policies for course materials |
-| `src/types/database.ts`                               | New interfaces: Course, CourseWeek, CourseMaterial |
-| `src/lib/actions/courses.ts`                          | Server actions: CRUD for courses                  |
-| `src/lib/actions/course-weeks.ts`                     | Server actions: CRUD for weeks                    |
-| `src/lib/actions/course-materials.ts`                 | Server actions: CRUD for materials + storage      |
-| `src/lib/queries/courses.ts`                          | Query functions for courses                       |
-| `src/lib/queries/course-weeks.ts`                     | Query functions for weeks                         |
-| `src/lib/queries/course-materials.ts`                 | Query functions for materials                     |
-| `src/components/dashboard/course-card.tsx`            | Course card for dashboard grid                    |
-| `src/components/dashboard/course-dialog.tsx`          | Create/edit course dialog                         |
-| `src/components/dashboard/week-section.tsx`           | Week display with materials/homework sections     |
-| `src/components/dashboard/material-upload.tsx`        | Drag-and-drop PDF upload component                |
-| `src/components/dashboard/material-item.tsx`          | Material list item with view/delete actions       |
-| `src/app/(dashboard)/dashboard/courses/[courseId]/page.tsx` | Course view page                            |
+| File                                                        | Purpose                                             |
+| ----------------------------------------------------------- | --------------------------------------------------- |
+| `supabase/migrations/00003_create_courses.sql`              | New tables: courses, course_weeks, course_materials |
+| `supabase/migrations/00004_add_document_course_id.sql`      | Add course_id column to documents table             |
+| `supabase/migrations/00005_create_storage_bucket.sql`       | Storage bucket + RLS policies for course materials  |
+| `src/types/database.ts`                                     | New interfaces: Course, CourseWeek, CourseMaterial  |
+| `src/lib/actions/courses.ts`                                | Server actions: CRUD for courses                    |
+| `src/lib/actions/course-weeks.ts`                           | Server actions: CRUD for weeks                      |
+| `src/lib/actions/course-materials.ts`                       | Server actions: CRUD for materials + storage        |
+| `src/lib/queries/courses.ts`                                | Query functions for courses                         |
+| `src/lib/queries/course-weeks.ts`                           | Query functions for weeks                           |
+| `src/lib/queries/course-materials.ts`                       | Query functions for materials                       |
+| `src/components/dashboard/course-card.tsx`                  | Course card for dashboard grid                      |
+| `src/components/dashboard/course-dialog.tsx`                | Create/edit course dialog                           |
+| `src/components/dashboard/week-section.tsx`                 | Week display with materials/homework sections       |
+| `src/components/dashboard/material-upload.tsx`              | Drag-and-drop PDF upload component                  |
+| `src/components/dashboard/material-item.tsx`                | Material list item with view/delete actions         |
+| `src/app/(dashboard)/dashboard/courses/[courseId]/page.tsx` | Course view page                                    |
 
 ## Key Files — Modified
 
-| File                                                  | Change                                            |
-| ----------------------------------------------------- | ------------------------------------------------- |
-| `src/app/(dashboard)/dashboard/page.tsx`              | Add courses query + course cards to grid          |
-| `src/components/dashboard/sidebar-folder-tree.tsx`    | Add course nodes to sidebar tree                  |
-| `src/components/dashboard/create-document-dialog.tsx` | Support course_id when creating from course view  |
+| File                                                  | Change                                           |
+| ----------------------------------------------------- | ------------------------------------------------ |
+| `src/app/(dashboard)/dashboard/page.tsx`              | Add courses query + course cards to grid         |
+| `src/components/dashboard/sidebar-folder-tree.tsx`    | Add course nodes to sidebar tree                 |
+| `src/components/dashboard/create-document-dialog.tsx` | Support course_id when creating from course view |
 
 ## Testing
 

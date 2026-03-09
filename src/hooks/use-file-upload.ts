@@ -53,8 +53,7 @@ export function useFileUpload(bucketName: string) {
         setState({ uploading: false, progress: 100, error: null });
         return path;
       } catch (err) {
-        const message =
-          err instanceof Error ? err.message : 'Upload failed';
+        const message = err instanceof Error ? err.message : 'Upload failed';
         setState({ uploading: false, progress: 0, error: message });
         throw new Error(message);
       }

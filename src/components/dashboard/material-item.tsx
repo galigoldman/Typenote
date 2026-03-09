@@ -53,9 +53,7 @@ export function MaterialItem({ material }: MaterialItemProps) {
         className="flex min-w-0 flex-1 items-center gap-2 text-left text-sm"
       >
         <FileText className="size-4 shrink-0 text-muted-foreground" />
-        <span className="truncate">
-          {material.label || material.file_name}
-        </span>
+        <span className="truncate">{material.label || material.file_name}</span>
         <span className="shrink-0 text-xs text-muted-foreground">
           {formatFileSize(material.file_size)}
         </span>
