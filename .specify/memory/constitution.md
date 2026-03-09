@@ -1,25 +1,19 @@
 <!--
 Sync Impact Report
 ==================
-- Version change: (none) -> 1.0.0
-- This is the initial constitution creation (no prior version)
-- Principles added:
-  1. Incremental Development
-  2. Test-Driven Quality
-  3. Protected Main Branch
-  4. Migrations as Code (Supabase)
-  5. Interview-Ready Architecture
-- Sections added:
-  - Technology Stack
-  - Development Workflow (Supabase + Git)
+- Version change: 1.0.0 -> 1.1.0
+- Bump rationale: MINOR — expanded Principle II with integration
+  testing requirements and updated CI Pipeline section
+- Modified principles:
+  - II. Test-Driven Quality — added integration test requirements
+    (Supabase in CI, test levels, file conventions)
+- Modified sections:
+  - CI Pipeline — updated to reflect two-phase test execution
+    (unit tests + integration tests with Supabase)
 - Templates requiring updates:
-  - .specify/templates/plan-template.md — Constitution Check section
-    references generic gates; aligns with principles (no update needed,
-    gates are filled per-feature) ✅
-  - .specify/templates/spec-template.md — User stories and requirements
-    structure is principle-agnostic ✅
-  - .specify/templates/tasks-template.md — Phase 2 "Setup database schema
-    and migrations" aligns with Principle IV ✅
+  - .specify/templates/plan-template.md ✅ (no change needed)
+  - .specify/templates/spec-template.md ✅ (no change needed)
+  - .specify/templates/tasks-template.md ✅ (no change needed)
 - Follow-up TODOs: none
 -->
 
@@ -49,18 +43,30 @@ Every new feature or change MUST include tests that verify it works.
 Tests MUST pass locally before a step is considered "done."
 
 - Test at multiple levels: unit tests (Vitest) for individual
-  functions, integration tests for API endpoints and database
-  operations, and end-to-end tests (Playwright) for critical
-  user flows.
+  functions, integration tests for database operations, and
+  end-to-end tests (Playwright) for critical user flows.
 - When fixing a bug, MUST write a failing test that reproduces
   the bug first, then fix the code, then confirm the test passes
   (regression testing).
 - After writing code, MUST run the full test suite (`pnpm test`)
   to confirm nothing is broken.
+- **Database integration tests** (`pnpm test:integration`) run
+  against a real local Supabase instance. CI starts Supabase
+  automatically and runs these after unit tests.
+- Any change to migrations, seed data, RLS policies, or database
+  queries MUST be covered by an integration test to prevent
+  regressions.
+- File naming convention: `*.test.ts` for unit tests,
+  `*.integration.test.ts` for database integration tests.
+- Integration tests use `src/test/supabase-client.ts` to create
+  authenticated and admin clients — never import the Next.js
+  server client (`@/lib/supabase/server`) in integration tests.
 
 **Rationale**: Multi-level testing catches bugs at different
-granularities. Regression tests prevent the same bug from recurring.
-Running the full suite prevents unintended side-effects.
+granularities. Unit tests verify logic in isolation; integration
+tests verify that migrations, RLS policies, and queries work
+against a real Postgres. Running both in CI ensures the database
+layer is never silently broken by a schema change.
 
 ### III. Protected Main Branch
 
@@ -175,8 +181,14 @@ interviews.
 ### CI Pipeline
 
 - Triggered on every push and PR to `main`
-- Steps: install dependencies, run linting (`pnpm lint`), run tests
-  (`pnpm test`)
+- Steps:
+  1. Install dependencies (`pnpm install --frozen-lockfile`)
+  2. Lint (`pnpm lint`) + format check (`pnpm format:check`)
+  3. Unit tests (`pnpm test`) — jsdom environment, no DB needed
+  4. Start local Supabase (`supabase start`)
+  5. Integration tests (`pnpm test:integration`) — real Postgres,
+     validates migrations + seed + RLS + queries
+  6. Build (`pnpm build`)
 - PRs MUST NOT be merged until CI passes (enforced via GitHub
   branch protection)
 
@@ -194,4 +206,4 @@ code reviews MUST verify compliance with these principles.
 - For runtime development guidance, refer to `CLAUDE.md` at the
   repository root.
 
-**Version**: 1.0.0 | **Ratified**: 2026-03-09 | **Last Amended**: 2026-03-09
+**Version**: 1.1.0 | **Ratified**: 2026-03-09 | **Last Amended**: 2026-03-09
