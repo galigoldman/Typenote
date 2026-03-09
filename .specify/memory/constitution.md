@@ -102,6 +102,7 @@ instance is the development database.
   after migrations pass review in a PR.
 
 **Key files tracked in git**:
+
 - `supabase/config.toml` — local Supabase config
 - `supabase/migrations/*.sql` — ordered migration files
 - `supabase/seed.sql` — development seed data
