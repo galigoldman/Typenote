@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
+import type { Editor } from '@tiptap/core';
 import type {
   CanvasDocument,
   CanvasPage as CanvasPageData,
@@ -12,8 +13,10 @@ import { PAGE_WIDTH, PAGE_HEIGHT } from '@/types/canvas';
 import type { Document } from '@/types/database';
 import type { SaveStatus } from '@/hooks/use-auto-save';
 import type { ConnectionStatus } from '@/hooks/use-realtime-sync';
+import { Pen, Type } from 'lucide-react';
 import { useDocumentSync } from '@/hooks/use-document-sync';
 import { useDrawing } from '@/hooks/use-drawing';
+import { EditorToolbar } from '@/components/editor/editor-toolbar';
 import { CanvasPage } from './canvas-page';
 
 interface CanvasEditorProps {
@@ -75,7 +78,7 @@ function createEmptyPage(order: number): CanvasPageData {
     order,
     strokes: [],
     textBoxes: [],
-    flowContent: { type: 'doc', content: [] },
+    flowContent: null,
   };
 }
 
@@ -93,16 +96,13 @@ export function CanvasEditor({ document }: CanvasEditorProps) {
   const [pages, setPages] = useState<CanvasPageData[]>(() =>
     initializePagesFromDocument(document),
   );
-  const [activeTool] = useState<CanvasTool>('pen');
+  const [activeTool, setActiveTool] = useState<CanvasTool>('selection');
+  const [activeEditor, setActiveEditor] = useState<Editor | null>(null);
   const pagesRef = useRef(pages);
-  const skipNextUpdateRef = useRef(false);
 
   useEffect(() => {
     pagesRef.current = pages;
   }, [pages]);
-
-  // Dummy editor for useDocumentSync compatibility (will be replaced in US2)
-  const dummyEditorRef = useRef<null>(null);
 
   const getPagesData = useCallback((): Record<string, unknown> => {
     return { pages: pagesRef.current } as unknown as Record<string, unknown>;
@@ -131,7 +131,7 @@ export function CanvasEditor({ document }: CanvasEditorProps) {
     saveTitle,
   } = useDocumentSync({
     documentId: document.id,
-    editor: dummyEditorRef.current,
+    editor: null,
     onRemoteTitleUpdate,
     getPagesData,
     onRemotePagesUpdate,
@@ -163,6 +163,24 @@ export function CanvasEditor({ document }: CanvasEditorProps) {
     },
     [triggerSave],
   );
+
+  // Flow content update handler (T021)
+  const handleFlowContentUpdate = useCallback(
+    (pageId: string, content: Record<string, unknown>) => {
+      setPages((prev) =>
+        prev.map((p) =>
+          p.id === pageId ? { ...p, flowContent: content } : p,
+        ),
+      );
+      triggerSave();
+    },
+    [triggerSave],
+  );
+
+  // Editor focus handler (T020)
+  const handleEditorFocus = useCallback((editor: Editor) => {
+    setActiveEditor(editor);
+  }, []);
 
   // Drawing hook
   const { handlePointerDown, handlePointerMove, handlePointerUp } = useDrawing({
@@ -216,10 +234,46 @@ export function CanvasEditor({ document }: CanvasEditorProps) {
         </div>
       )}
 
+      {/* Mode toggle + toolbar */}
+      <div className="flex items-center border-b">
+        <div className="flex items-center gap-1 px-2 py-1 border-r">
+          <button
+            onClick={() => setActiveTool('pen')}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
+              activeTool === 'pen'
+                ? 'bg-primary text-primary-foreground'
+                : 'hover:bg-accent'
+            }`}
+          >
+            <Pen className="h-4 w-4" />
+            Draw
+          </button>
+          <button
+            onClick={() => setActiveTool('selection')}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
+              activeTool === 'selection'
+                ? 'bg-primary text-primary-foreground'
+                : 'hover:bg-accent'
+            }`}
+          >
+            <Type className="h-4 w-4" />
+            Type
+          </button>
+        </div>
+        {activeTool === 'selection' && activeEditor && (
+          <div className="flex-1">
+            <EditorToolbar editor={activeEditor} />
+          </div>
+        )}
+      </div>
+
       {/* Canvas area */}
       <div
         className="flex-1 overflow-y-auto bg-gray-100"
-        style={{ userSelect: 'none', WebkitUserSelect: 'none' }}
+        style={{
+          userSelect: activeTool === 'pen' ? 'none' : 'auto',
+          WebkitUserSelect: activeTool === 'pen' ? 'none' : 'auto',
+        }}
       >
         <div className="py-8">
           {pages.map((page) => (
@@ -227,11 +281,14 @@ export function CanvasEditor({ document }: CanvasEditorProps) {
               key={page.id}
               page={page}
               activeTool={activeTool}
+              canvasType={document.canvas_type}
               onStrokeAdd={handleStrokeAdd}
               onStrokeRemove={handleStrokeRemove}
               onPointerDown={(e) => handlePointerDown(e, page.id)}
               onPointerMove={(e) => handlePointerMove(e, page.id)}
               onPointerUp={(e) => handlePointerUp(e, page.id)}
+              onFlowContentUpdate={handleFlowContentUpdate}
+              onEditorReady={handleEditorFocus}
               canvasClass={canvasClass}
             />
           ))}
