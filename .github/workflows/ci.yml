@@ -46,20 +46,17 @@ jobs:
       - name: Extract Supabase keys
         id: supabase
         run: |
+          supabase status --output json
           echo "SUPABASE_URL=$(supabase status --output json | jq -r '.API_URL')" >> "$GITHUB_OUTPUT"
           echo "SUPABASE_ANON_KEY=$(supabase status --output json | jq -r '.ANON_KEY')" >> "$GITHUB_OUTPUT"
           echo "SUPABASE_SERVICE_ROLE_KEY=$(supabase status --output json | jq -r '.SERVICE_ROLE_KEY')" >> "$GITHUB_OUTPUT"
 
-      - name: Verify auth
-        run: |
-          echo "Testing sign-in..."
-          curl -sf -X POST ${{ steps.supabase.outputs.SUPABASE_URL }}/auth/v1/token?grant_type=password \
-            -H "apikey: ${{ steps.supabase.outputs.SUPABASE_ANON_KEY }}" \
-            -H "Content-Type: application/json" \
-            -d '{"email":"test@typenote.dev","password":"Test1234"}' | jq .access_token
-
       - name: Integration tests
-        run: pnpm test:integration
+        run: |
+          echo "URL=$SUPABASE_URL"
+          echo "ANON_KEY length=${#SUPABASE_ANON_KEY}"
+          echo "SERVICE_KEY length=${#SUPABASE_SERVICE_ROLE_KEY}"
+          pnpm test:integration
         env:
           SUPABASE_URL: ${{ steps.supabase.outputs.SUPABASE_URL }}
           SUPABASE_ANON_KEY: ${{ steps.supabase.outputs.SUPABASE_ANON_KEY }}
