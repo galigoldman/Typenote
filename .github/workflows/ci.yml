@@ -41,7 +41,7 @@ jobs:
         run: supabase start -x realtime,imgproxy,inbucket,edge-runtime,logflare,vector,supavisor
 
       - name: Seed database
-        run: supabase db reset --no-confirm
+        run: supabase db reset --yes
 
       - name: Integration tests
         run: pnpm test:integration
