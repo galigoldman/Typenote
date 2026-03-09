@@ -10,6 +10,8 @@ export async function createDocument(data: {
   canvas_type: string;
   folder_id: string | null;
   course_id?: string | null;
+  week_id?: string | null;
+  purpose?: 'homework' | 'summary' | 'notes' | null;
 }) {
   const supabase = await createClient();
   const {
@@ -126,4 +128,47 @@ export async function updateDocumentTitle(
     .single();
   if (error) throw new Error(error.message);
   return { updated_at: data.updated_at };
+}
+
+export async function createWeekDocument(data: {
+  course_id: string;
+  week_id: string;
+  week_number: number;
+  purpose: 'homework' | 'summary' | 'notes';
+}) {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) throw new Error('Not authenticated');
+
+  // Auto-generate title based on purpose
+  const purposeTitles: Record<string, string> = {
+    homework: 'Homework',
+    summary: 'Summary',
+    notes: 'Notes',
+  };
+  const title = `Week ${data.week_number} — ${purposeTitles[data.purpose]}`;
+
+  const { data: document, error } = await supabase
+    .from('documents')
+    .insert({
+      user_id: user.id,
+      title,
+      content: {},
+      subject: 'general',
+      canvas_type: 'blank',
+      folder_id: null,
+      course_id: data.course_id,
+      week_id: data.week_id,
+      purpose: data.purpose,
+      position: 0,
+    })
+    .select()
+    .single();
+
+  if (error) throw error;
+
+  revalidatePath('/dashboard');
+  return document;
 }
