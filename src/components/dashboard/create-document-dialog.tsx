@@ -27,12 +27,14 @@ import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 
 interface CreateDocumentDialogProps {
   folderId?: string | null;
+  courseId?: string | null;
   children: React.ReactNode;
   defaultOpen?: boolean;
 }
 
 export function CreateDocumentDialog({
   folderId = null,
+  courseId = null,
   children,
   defaultOpen = false,
 }: CreateDocumentDialogProps) {
@@ -56,7 +58,8 @@ export function CreateDocumentDialog({
         subject,
         subject_custom: subject === 'other' ? subjectCustom : undefined,
         canvas_type: canvasType,
-        folder_id: folderId,
+        folder_id: courseId ? null : folderId,
+        course_id: courseId,
       });
 
       setOpen(false);

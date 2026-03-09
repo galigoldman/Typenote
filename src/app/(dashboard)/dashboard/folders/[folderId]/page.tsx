@@ -3,6 +3,8 @@ import Link from 'next/link';
 import { createClient } from '@/lib/supabase/server';
 import { FolderCard } from '@/components/dashboard/folder-card';
 import { FolderDialog } from '@/components/dashboard/folder-dialog';
+import { CourseCard } from '@/components/dashboard/course-card';
+import { CourseDialog } from '@/components/dashboard/course-dialog';
 import { DocumentCard } from '@/components/dashboard/document-card';
 import { CreateDocumentDialog } from '@/components/dashboard/create-document-dialog';
 import { EmptyState } from '@/components/dashboard/empty-state';
@@ -15,7 +17,7 @@ import {
   BreadcrumbPage,
   BreadcrumbSeparator,
 } from '@/components/ui/breadcrumb';
-import type { Folder, Document } from '@/types/database';
+import type { Folder, Document, Course } from '@/types/database';
 
 export default async function FolderPage({
   params,
@@ -43,6 +45,12 @@ export default async function FolderPage({
     .eq('parent_id', folderId)
     .order('position', { ascending: true });
 
+  const { data: courses } = await supabase
+    .from('courses')
+    .select('*')
+    .eq('folder_id', folderId)
+    .order('position', { ascending: true });
+
   const { data: documents } = await supabase
     .from('documents')
     .select('*')
@@ -50,8 +58,9 @@ export default async function FolderPage({
     .order('position', { ascending: true });
 
   const typedSubfolders = (subfolders as Folder[] | null) ?? [];
+  const typedCourses = (courses as Course[] | null) ?? [];
   const typedDocuments = (documents as Document[] | null) ?? [];
-  const isEmpty = typedSubfolders.length === 0 && typedDocuments.length === 0;
+  const isEmpty = typedSubfolders.length === 0 && typedCourses.length === 0 && typedDocuments.length === 0;
 
   return (
     <div className="p-6">
@@ -75,6 +84,7 @@ export default async function FolderPage({
               New Document
             </Button>
           </CreateDocumentDialog>
+          <CourseDialog folderId={folderId} />
           <FolderDialog parentId={folderId} />
         </div>
       </div>
@@ -94,8 +104,21 @@ export default async function FolderPage({
             </div>
           )}
 
+          {typedCourses.length > 0 && (
+            <div className={typedSubfolders.length > 0 ? 'mt-6' : ''}>
+              <h2 className="mb-3 text-sm font-medium text-muted-foreground">
+                Courses
+              </h2>
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
+                {typedCourses.map((course) => (
+                  <CourseCard key={course.id} course={course} />
+                ))}
+              </div>
+            </div>
+          )}
+
           {typedDocuments.length > 0 && (
-            <div className="mt-6">
+            <div className={typedSubfolders.length > 0 || typedCourses.length > 0 ? 'mt-6' : ''}>
               <h2 className="mb-3 text-sm font-medium text-muted-foreground">
                 Documents
               </h2>

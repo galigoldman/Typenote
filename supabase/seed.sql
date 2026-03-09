@@ -157,3 +157,50 @@ VALUES (
   'blank',
   0
 ) ON CONFLICT (id) DO NOTHING;
+
+-- ============================================
+-- COURSES
+-- ============================================
+
+-- Calculus I (as a course)
+INSERT INTO public.courses (id, user_id, folder_id, name, code, semester, color, position)
+VALUES ('30000000-0000-0000-0000-000000000001', 'ac3be77d-4566-406c-9ac0-7c410634ad41', NULL, 'Introduction to CS', 'CS101', 'Spring 2026', '#10B981', 0)
+ON CONFLICT (id) DO NOTHING;
+
+-- Linear Algebra (inside a folder)
+INSERT INTO public.courses (id, user_id, folder_id, name, code, semester, color, position)
+VALUES ('30000000-0000-0000-0000-000000000002', 'ac3be77d-4566-406c-9ac0-7c410634ad41', '10000000-0000-0000-0000-000000000003', 'Linear Algebra', 'MATH202', 'Spring 2026', '#8B5CF6', 0)
+ON CONFLICT (id) DO NOTHING;
+
+-- ============================================
+-- COURSE WEEKS
+-- ============================================
+
+-- CS101 weeks
+INSERT INTO public.course_weeks (id, course_id, user_id, week_number, topic, start_date, end_date)
+VALUES ('40000000-0000-0000-0000-000000000001', '30000000-0000-0000-0000-000000000001', 'ac3be77d-4566-406c-9ac0-7c410634ad41', 1, 'Variables and Data Types', '2026-01-12', '2026-01-18')
+ON CONFLICT (id) DO NOTHING;
+
+INSERT INTO public.course_weeks (id, course_id, user_id, week_number, topic, start_date, end_date)
+VALUES ('40000000-0000-0000-0000-000000000002', '30000000-0000-0000-0000-000000000001', 'ac3be77d-4566-406c-9ac0-7c410634ad41', 2, 'Control Flow', '2026-01-19', '2026-01-25')
+ON CONFLICT (id) DO NOTHING;
+
+INSERT INTO public.course_weeks (id, course_id, user_id, week_number, topic, start_date, end_date)
+VALUES ('40000000-0000-0000-0000-000000000003', '30000000-0000-0000-0000-000000000001', 'ac3be77d-4566-406c-9ac0-7c410634ad41', 3, 'Functions and Scope', '2026-01-26', '2026-02-01')
+ON CONFLICT (id) DO NOTHING;
+
+-- ============================================
+-- COURSE MATERIALS (no actual files, just DB references for testing)
+-- ============================================
+
+INSERT INTO public.course_materials (id, week_id, user_id, category, storage_path, file_name, label, file_size, mime_type)
+VALUES ('50000000-0000-0000-0000-000000000001', '40000000-0000-0000-0000-000000000001', 'ac3be77d-4566-406c-9ac0-7c410634ad41', 'material', 'ac3be77d-4566-406c-9ac0-7c410634ad41/30000000-0000-0000-0000-000000000001/40000000-0000-0000-0000-000000000001/lecture-1-slides.pdf', 'lecture-1-slides.pdf', 'Lecture 1: Intro to Programming', 2048000, 'application/pdf')
+ON CONFLICT (id) DO NOTHING;
+
+INSERT INTO public.course_materials (id, week_id, user_id, category, storage_path, file_name, label, file_size, mime_type)
+VALUES ('50000000-0000-0000-0000-000000000002', '40000000-0000-0000-0000-000000000001', 'ac3be77d-4566-406c-9ac0-7c410634ad41', 'homework', 'ac3be77d-4566-406c-9ac0-7c410634ad41/30000000-0000-0000-0000-000000000001/40000000-0000-0000-0000-000000000001/homework-1.pdf', 'homework-1.pdf', 'Problem Set 1', 512000, 'application/pdf')
+ON CONFLICT (id) DO NOTHING;
+
+INSERT INTO public.course_materials (id, week_id, user_id, category, storage_path, file_name, label, file_size, mime_type)
+VALUES ('50000000-0000-0000-0000-000000000003', '40000000-0000-0000-0000-000000000002', 'ac3be77d-4566-406c-9ac0-7c410634ad41', 'material', 'ac3be77d-4566-406c-9ac0-7c410634ad41/30000000-0000-0000-0000-000000000001/40000000-0000-0000-0000-000000000002/lecture-2-slides.pdf', 'lecture-2-slides.pdf', 'Lecture 2: If/Else and Loops', 3072000, 'application/pdf')
+ON CONFLICT (id) DO NOTHING;
