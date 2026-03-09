@@ -40,8 +40,30 @@ jobs:
       - name: Start Supabase local
         run: supabase start
 
+      - name: Wait for Supabase health
+        run: |
+          echo "Waiting for GoTrue (auth) to be ready..."
+          for i in $(seq 1 30); do
+            if curl -sf http://127.0.0.1:54321/auth/v1/health > /dev/null 2>&1; then
+              echo "GoTrue is ready after ${i}s"
+              break
+            fi
+            sleep 1
+          done
+          curl -sf http://127.0.0.1:54321/auth/v1/health || (echo "GoTrue failed to start" && exit 1)
+
       - name: Seed database
         run: psql postgresql://postgres:postgres@127.0.0.1:54322/postgres -f supabase/seed.sql
+
+      - name: Verify auth works
+        run: |
+          curl -sf http://127.0.0.1:54321/auth/v1/health
+          echo ""
+          curl -s -X POST http://127.0.0.1:54321/auth/v1/token?grant_type=password \
+            -H "apikey: $SUPABASE_ANON_KEY" \
+            -H "Content-Type: application/json" \
+            -d '{"email":"test@typenote.dev","password":"Test1234"}' | head -c 200
+          echo ""
 
       - name: Integration tests
         run: pnpm test:integration
