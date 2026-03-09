@@ -15,7 +15,12 @@ import {
   BreadcrumbPage,
   BreadcrumbSeparator,
 } from '@/components/ui/breadcrumb';
-import type { Course, CourseWeek, CourseMaterial, Document } from '@/types/database';
+import type {
+  Course,
+  CourseWeek,
+  CourseMaterial,
+  Document,
+} from '@/types/database';
 
 export default async function CoursePage({
   params,
