@@ -1,28 +1,43 @@
 'use client';
 
 import { useRef, useEffect, useCallback } from 'react';
+import { useEditor, EditorContent } from '@tiptap/react';
+import StarterKit from '@tiptap/starter-kit';
+import UnderlineExt from '@tiptap/extension-underline';
+import TextAlign from '@tiptap/extension-text-align';
+import TaskList from '@tiptap/extension-task-list';
+import TaskItem from '@tiptap/extension-task-item';
+import LinkExt from '@tiptap/extension-link';
+import { AutoDirection } from '@/lib/editor/rtl-extension';
 import type { CanvasPage as CanvasPageData, CanvasTool } from '@/types/canvas';
 import { PAGE_WIDTH, PAGE_HEIGHT } from '@/types/canvas';
 import { setupHighDPICanvas } from '@/lib/canvas/coordinate-utils';
 import { renderStroke } from '@/lib/canvas/stroke-utils';
+import type { Editor } from '@tiptap/core';
 
 interface CanvasPageProps {
   page: CanvasPageData;
   activeTool: CanvasTool;
+  canvasType?: string;
   onStrokeAdd: (pageId: string, stroke: CanvasPageData['strokes'][0]) => void;
   onStrokeRemove?: (pageId: string, strokeId: string) => void;
   onPointerDown?: (e: React.PointerEvent, pageId: string) => void;
   onPointerMove?: (e: React.PointerEvent, pageId: string) => void;
   onPointerUp?: (e: React.PointerEvent, pageId: string) => void;
+  onFlowContentUpdate?: (pageId: string, content: Record<string, unknown>) => void;
+  onEditorReady?: (editor: Editor) => void;
   canvasClass?: string;
 }
 
 export function CanvasPage({
   page,
   activeTool,
+  canvasType,
   onPointerDown,
   onPointerMove,
   onPointerUp,
+  onFlowContentUpdate,
+  onEditorReady,
   canvasClass,
 }: CanvasPageProps) {
   const committedCanvasRef = useRef<HTMLCanvasElement>(null);
@@ -30,6 +45,8 @@ export function CanvasPage({
   const interactionLayerRef = useRef<HTMLDivElement>(null);
   const committedCtxRef = useRef<CanvasRenderingContext2D | null>(null);
   const workingCtxRef = useRef<CanvasRenderingContext2D | null>(null);
+
+  const isDrawMode = activeTool === 'pen' || activeTool === 'eraser';
 
   // Setup canvases for high-DPI on mount
   useEffect(() => {
@@ -49,8 +66,8 @@ export function CanvasPage({
     }
   }, []);
 
-  // Native event listeners to prevent browser text selection for pen/touch
-  // React synthetic events can't reliably preventDefault on passive touch listeners
+  // Native event listeners — exact same approach as working commit
+  // ALWAYS on the interaction layer, prevents text selection and touch defaults
   useEffect(() => {
     const el = interactionLayerRef.current;
     if (!el) return;
@@ -62,7 +79,6 @@ export function CanvasPage({
     };
 
     const preventTouch = (e: TouchEvent) => {
-      // Prevent default touch behavior (text selection, scroll) on the canvas
       e.preventDefault();
     };
 
@@ -82,6 +98,61 @@ export function CanvasPage({
       el.removeEventListener('touchend', preventTouch);
     };
   }, []);
+
+  // TipTap editor for flow content
+  const onFlowContentUpdateRef = useRef(onFlowContentUpdate);
+  onFlowContentUpdateRef.current = onFlowContentUpdate;
+  const onEditorReadyRef = useRef(onEditorReady);
+  onEditorReadyRef.current = onEditorReady;
+  const pageIdRef = useRef(page.id);
+  pageIdRef.current = page.id;
+
+  const editorPaddingTop = canvasType === 'lined' ? 'pt-8' : 'pt-4';
+
+  // Sanitize content: ProseMirror crashes on { type: 'doc', content: [] }
+  const safeContent = (() => {
+    const fc = page.flowContent as { type?: string; content?: unknown[] } | null;
+    if (!fc || !fc.content || fc.content.length === 0) return undefined;
+    return fc as Record<string, unknown>;
+  })();
+
+  const editor = useEditor({
+    immediatelyRender: false,
+    extensions: [
+      StarterKit.configure({ heading: { levels: [1, 2, 3] } }),
+      UnderlineExt,
+      TextAlign.configure({ types: ['heading', 'paragraph'] }),
+      TaskList,
+      TaskItem.configure({ nested: true }),
+      LinkExt.configure({
+        openOnClick: false,
+        HTMLAttributes: { class: 'text-primary underline cursor-pointer' },
+      }),
+      AutoDirection,
+    ],
+    content: safeContent,
+    editorProps: {
+      attributes: {
+        class: `prose prose-sm sm:prose-base max-w-none focus:outline-none min-h-full ${editorPaddingTop} pb-4 px-4`,
+      },
+    },
+    onUpdate: ({ editor: ed }) => {
+      onFlowContentUpdateRef.current?.(
+        pageIdRef.current,
+        ed.getJSON() as Record<string, unknown>,
+      );
+    },
+    onFocus: ({ editor: ed }) => {
+      onEditorReadyRef.current?.(ed);
+    },
+  });
+
+  // Notify parent when editor is created
+  useEffect(() => {
+    if (editor) {
+      onEditorReadyRef.current?.(editor);
+    }
+  }, [editor]);
 
   // Re-render committed strokes when page.strokes changes
   const renderCommittedStrokes = useCallback(() => {
@@ -112,10 +183,6 @@ export function CanvasPage({
     onPointerUp?.(e, page.id);
   };
 
-  // Determine pointer-events on text layer based on active tool
-  const textLayerPointerEvents =
-    activeTool === 'pen' || activeTool === 'eraser' ? 'none' : 'auto';
-
   return (
     <div
       className="relative bg-white shadow-md mx-auto"
@@ -127,36 +194,37 @@ export function CanvasPage({
         WebkitUserSelect: 'none',
       }}
     >
-      {/* Layer 1: Page background (canvas styles like lined/grid) */}
+      {/* Layer 1: Page background */}
       <div
         className={`absolute inset-0 ${canvasClass ?? ''}`}
         style={{ pointerEvents: 'none' }}
       />
 
-      {/* Layer 2: Committed canvas (finalized strokes) */}
+      {/* Layer 2: Committed canvas */}
       <canvas
         ref={committedCanvasRef}
         className="absolute inset-0"
         style={{ pointerEvents: 'none' }}
       />
 
-      {/* Layer 3: Working canvas (in-progress stroke) */}
+      {/* Layer 3: Working canvas */}
       <canvas
         ref={workingCanvasRef}
         className="absolute inset-0"
         style={{ pointerEvents: 'none' }}
       />
 
-      {/* Layer 4: Text content layer */}
+      {/* Layer 4: Text content layer — only interactive in type mode */}
       <div
-        className="absolute inset-0"
-        style={{ pointerEvents: textLayerPointerEvents }}
+        className="absolute inset-0 overflow-hidden"
+        style={{ pointerEvents: isDrawMode ? 'none' : 'auto' }}
       >
-        {/* Flow content TipTap editor will be rendered here in US2 */}
-        {/* Text boxes will be rendered here in US5 */}
+        {editor && <EditorContent editor={editor} />}
       </div>
 
-      {/* Layer 5: Interaction layer (captures pointer events) */}
+      {/* Layer 5: Interaction layer — ALWAYS present
+          In draw mode: captures all events (pointer-events: auto)
+          In type mode: transparent (pointer-events: none), lets clicks reach editor */}
       <div
         ref={interactionLayerRef}
         className="absolute inset-0"
@@ -164,6 +232,7 @@ export function CanvasPage({
           touchAction: 'none',
           userSelect: 'none',
           WebkitUserSelect: 'none',
+          pointerEvents: isDrawMode ? 'auto' : 'none',
         }}
         onPointerDown={handlePointerDown}
         onPointerMove={handlePointerMove}
@@ -172,13 +241,3 @@ export function CanvasPage({
     </div>
   );
 }
-
-/**
- * Exposes canvas refs for the drawing hook to render into.
- * This is accessed via a ref from the parent.
- */
-export type CanvasPageHandle = {
-  getWorkingCtx: () => CanvasRenderingContext2D | null;
-  getCommittedCtx: () => CanvasRenderingContext2D | null;
-  redrawCommitted: () => void;
-};

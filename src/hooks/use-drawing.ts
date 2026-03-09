@@ -23,17 +23,8 @@ export function useDrawing({ activeTool, onStrokeComplete }: UseDrawingOptions) 
     const interactionLayer = target as HTMLElement;
     const pageContainer = interactionLayer.parentElement;
     if (!pageContainer) return null;
-    // Working canvas is the third child (index 2): bg, committed, working, text, interaction
     const canvases = pageContainer.querySelectorAll('canvas');
     return canvases[1] as HTMLCanvasElement | null; // second canvas = working
-  };
-
-  const getCommittedCanvas = (target: EventTarget) => {
-    const interactionLayer = target as HTMLElement;
-    const pageContainer = interactionLayer.parentElement;
-    if (!pageContainer) return null;
-    const canvases = pageContainer.querySelectorAll('canvas');
-    return canvases[0] as HTMLCanvasElement | null; // first canvas = committed
   };
 
   const screenToPageCoords = (
@@ -42,7 +33,6 @@ export function useDrawing({ activeTool, onStrokeComplete }: UseDrawingOptions) 
   ): { x: number; y: number } => {
     const interactionLayer = target as HTMLElement;
     const rect = interactionLayer.getBoundingClientRect();
-    // Map screen position to page coordinates based on element size vs page size
     const scaleX = PAGE_WIDTH / rect.width;
     const scaleY = PAGE_HEIGHT / rect.height;
     return {
@@ -52,7 +42,6 @@ export function useDrawing({ activeTool, onStrokeComplete }: UseDrawingOptions) 
   };
 
   const renderInProgressStroke = useCallback((canvas: HTMLCanvasElement, points: StrokePoint[]) => {
-    const dpr = window.devicePixelRatio || 1;
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
@@ -80,11 +69,10 @@ export function useDrawing({ activeTool, onStrokeComplete }: UseDrawingOptions) 
 
   const handlePointerDown = useCallback(
     (e: React.PointerEvent, pageId: string) => {
-      // T017: Stylus-only guard
+      // Stylus-only guard
       if (e.pointerType !== 'pen') return;
       if (activeTool !== 'pen') return;
 
-      // Prevent browser text selection and default touch behavior
       e.preventDefault();
 
       isDrawingRef.current = true;
@@ -115,7 +103,6 @@ export function useDrawing({ activeTool, onStrokeComplete }: UseDrawingOptions) 
       const pressure = Math.round(e.pressure * 100) / 100;
       currentPointsRef.current.push([x, y, pressure]);
 
-      // Render in-progress stroke on working canvas
       if (workingCanvasRef.current) {
         renderInProgressStroke(workingCanvasRef.current, currentPointsRef.current);
       }
@@ -137,7 +124,6 @@ export function useDrawing({ activeTool, onStrokeComplete }: UseDrawingOptions) 
         return;
       }
 
-      // Finalize the stroke
       const stroke: Stroke = {
         id: Math.random().toString(36).slice(2) + Date.now().toString(36),
         points: points as StrokePoint[],
@@ -147,7 +133,6 @@ export function useDrawing({ activeTool, onStrokeComplete }: UseDrawingOptions) 
         createdAt: Date.now(),
       };
 
-      // Clear working canvas
       if (workingCanvasRef.current) {
         const ctx = workingCanvasRef.current.getContext('2d');
         if (ctx) {
@@ -158,7 +143,6 @@ export function useDrawing({ activeTool, onStrokeComplete }: UseDrawingOptions) 
         }
       }
 
-      // Notify parent to add stroke and trigger save
       const targetPageId = activePageIdRef.current ?? pageId;
       onStrokeComplete(targetPageId, stroke);
 

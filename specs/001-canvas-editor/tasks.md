@@ -67,10 +67,10 @@
 
 ### Implementation for User Story 2
 
-- [ ] T018 [US2] Implement flow content editor in `canvas-page.tsx` — render a TipTap editor instance inside the text content layer, initialized with the page's `flowContent` data. The editor should fill the page width and grow vertically with content. Apply existing canvas background styles (lined, grid, blank)
-- [ ] T019 [US2] Wire keyboard input routing — ensure keyboard events always reach the flowContent TipTap editor regardless of `activeTool`. When pen/eraser tool is active, set `pointer-events: none` on the text layer (so stylus touches pass through to canvas) but keep the editor focusable via keyboard
-- [ ] T020 [US2] Integrate existing text formatting toolbar — connect the existing `EditorToolbar` component (from `src/components/editor/editor-toolbar.tsx`) to the active page's flowContent TipTap editor, preserving all formatting: bold, italic, underline, headings, lists, task lists, code blocks, links, math expressions, and auto-direction (RTL/LTR)
-- [ ] T021 [US2] Persist flow content — on TipTap editor `onUpdate`, update the page's `flowContent` in the `pages` state, triggering auto-save. On load, initialize the editor from stored `flowContent` JSON
+- [x] T018 [US2] Implement flow content editor in `canvas-page.tsx` — render a TipTap editor instance inside the text content layer, initialized with the page's `flowContent` data. The editor should fill the page width and grow vertically with content. Apply existing canvas background styles (lined, grid, blank)
+- [x] T019 [US2] Wire keyboard input routing — ensure keyboard events always reach the flowContent TipTap editor regardless of `activeTool`. When pen/eraser tool is active, set `pointer-events: none` on the text layer (so stylus touches pass through to canvas) but keep the editor focusable via keyboard
+- [x] T020 [US2] Integrate existing text formatting toolbar — connect the existing `EditorToolbar` component (from `src/components/editor/editor-toolbar.tsx`) to the active page's flowContent TipTap editor, preserving all formatting: bold, italic, underline, headings, lists, task lists, code blocks, links, math expressions, and auto-direction (RTL/LTR)
+- [x] T021 [US2] Persist flow content — on TipTap editor `onUpdate`, update the page's `flowContent` in the `pages` state, triggering auto-save. On load, initialize the editor from stored `flowContent` JSON
 
 **Checkpoint**: Typing works exactly like the current editor. Text flows, formatting works, content saves and loads. No visual difference when canvas tools are not used
 

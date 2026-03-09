@@ -35,7 +35,7 @@ export interface CanvasPage {
   order: number;
   strokes: Stroke[];
   textBoxes: TextBox[];
-  flowContent: Record<string, unknown>;
+  flowContent: Record<string, unknown> | null;
 }
 
 /** The complete canvas data for a document (stored in `pages` JSONB column) */
