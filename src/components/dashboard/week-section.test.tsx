@@ -4,10 +4,19 @@ import { describe, it, expect, vi } from 'vitest';
 import { WeekSection } from './week-section';
 import type { CourseWeek, CourseMaterial } from '@/types/database';
 
+vi.mock('next/navigation', () => ({
+  useRouter: () => ({ push: vi.fn() }),
+}));
+
 vi.mock('@/lib/actions/course-weeks', () => ({
   createCourseWeek: vi.fn(),
   updateCourseWeek: vi.fn(),
   deleteCourseWeek: vi.fn(),
+}));
+
+vi.mock('@/lib/actions/documents', () => ({
+  createWeekDocument: vi.fn().mockResolvedValue({ id: 'new-doc-1' }),
+  deleteDocument: vi.fn(),
 }));
 
 vi.mock('@/lib/actions/course-materials', () => ({
@@ -23,6 +32,7 @@ vi.mock('@/hooks/use-file-upload', () => ({
     error: null,
     upload: vi.fn(),
     reset: vi.fn(),
+    validateFile: vi.fn().mockReturnValue(null),
   }),
 }));
 
@@ -100,6 +110,7 @@ describe('WeekSection', () => {
     userId: 'user-1',
     materials: [],
     homework: [],
+    documents: [],
   };
 
   it('renders week number in header', () => {
@@ -113,10 +124,10 @@ describe('WeekSection', () => {
     expect(screen.getByText('Week 3: Derivatives')).toBeInTheDocument();
   });
 
-  it('shows "Materials" and "Homework" section headings when expanded (default)', () => {
+  it('shows "Materials" and "Assignment" section headings when expanded (default)', () => {
     render(<WeekSection {...defaultProps} />);
     expect(screen.getByText('Materials')).toBeInTheDocument();
-    expect(screen.getByText('Homework')).toBeInTheDocument();
+    expect(screen.getByText('Assignment')).toBeInTheDocument();
   });
 
   it('collapses content when toggle is clicked', async () => {
@@ -125,7 +136,7 @@ describe('WeekSection', () => {
 
     // Sections should be visible by default
     expect(screen.getByText('Materials')).toBeInTheDocument();
-    expect(screen.getByText('Homework')).toBeInTheDocument();
+    expect(screen.getByText('Assignment')).toBeInTheDocument();
 
     // Click the toggle button (the button containing the week number heading)
     const toggle = screen.getByText('Week 3').closest('button')!;
@@ -133,7 +144,7 @@ describe('WeekSection', () => {
 
     // Sections should be hidden after collapse
     expect(screen.queryByText('Materials')).not.toBeInTheDocument();
-    expect(screen.queryByText('Homework')).not.toBeInTheDocument();
+    expect(screen.queryByText('Assignment')).not.toBeInTheDocument();
   });
 
   it('has dropdown with Edit and Delete options', async () => {

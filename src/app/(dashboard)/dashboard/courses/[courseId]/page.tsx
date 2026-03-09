@@ -60,6 +60,10 @@ export default async function CoursePage({
   const typedWeeks = (weeks as CourseWeek[] | null) ?? [];
   const typedDocuments = (documents as Document[] | null) ?? [];
 
+  // Split documents: course-level (no week) vs week-level
+  const courseDocuments = typedDocuments.filter((d) => !d.week_id);
+  const weekDocuments = typedDocuments.filter((d) => d.week_id);
+
   // Fetch materials for all weeks
   const weekIds = typedWeeks.map((w) => w.id);
   let allMaterials: CourseMaterial[] = [];
@@ -83,7 +87,7 @@ export default async function CoursePage({
     parentFolder = folder;
   }
 
-  const isEmpty = typedWeeks.length === 0 && typedDocuments.length === 0;
+  const isEmpty = typedWeeks.length === 0 && courseDocuments.length === 0;
 
   return (
     <div className="p-6">
@@ -137,14 +141,14 @@ export default async function CoursePage({
         />
       ) : (
         <>
-          {/* Documents section */}
-          {typedDocuments.length > 0 && (
+          {/* Course-level documents (not assigned to a week) */}
+          {courseDocuments.length > 0 && (
             <div className="mb-6">
               <h2 className="mb-3 text-sm font-medium text-muted-foreground">
                 Documents
               </h2>
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
-                {typedDocuments.map((doc) => (
+                {courseDocuments.map((doc) => (
                   <DocumentCard key={doc.id} document={doc} />
                 ))}
               </div>
@@ -169,6 +173,9 @@ export default async function CoursePage({
                     )}
                     homework={allMaterials.filter(
                       (m) => m.week_id === week.id && m.category === 'homework',
+                    )}
+                    documents={weekDocuments.filter(
+                      (d) => d.week_id === week.id,
                     )}
                   />
                 ))}

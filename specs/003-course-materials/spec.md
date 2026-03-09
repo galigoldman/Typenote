@@ -107,7 +107,7 @@ A student wants to see and navigate their courses from the main dashboard and si
 
 - What happens when a student deletes a course? All weeks, uploaded materials (files in storage), homework, and associated documents are deleted. A confirmation dialog warns about this destructive action.
 - What happens when a student moves a course into a folder or out of a folder? The course retains its internal structure (weeks, materials, homework) and only its parent reference changes.
-- What happens when a student creates a document inside a course and also assigns it to a week? For MVP, documents belong to the course level, not to specific weeks. Week-level document association is a future enhancement.
+- What happens when a student creates a document inside a course and also assigns it to a week? Documents can optionally belong to a specific week via week_id. When created from a week's quick-action buttons, the week_id is set automatically.
 - What happens when upload fails mid-way (network error)? The partially uploaded file is cleaned up, and the student sees an error with the option to retry.
 - What happens when a student has no courses? The dashboard shows an empty state with a prominent "Create your first course" call-to-action.
 
@@ -128,7 +128,10 @@ A student wants to see and navigate their courses from the main dashboard and si
 - **FR-011**: System MUST store uploaded files in object storage with the original file preserved.
 - **FR-012**: Users MUST be able to view uploaded PDFs (inline preview or new tab).
 - **FR-013**: Users MUST be able to delete uploaded materials and homework, with confirmation dialogs.
-- **FR-014**: System MUST allow creating Typenote documents associated with a course.
+- **FR-014**: System MUST allow creating Typenote documents associated with a course, and optionally with a specific week.
+- **FR-020**: Each week MUST display quick-action buttons ("Start Homework", "Summarise") that instantly create a document linked to that week with an auto-generated title (e.g., "Week 3 — Homework"), and open the editor immediately with no dialog.
+- **FR-021**: System MUST allow attaching existing documents to a specific week.
+- **FR-022**: Documents MUST support a `purpose` field (values: "homework", "summary", "notes") to categorize their intent within a week. Week views MUST group documents by purpose.
 - **FR-015**: Courses MUST be visually distinct from folders on the dashboard and in the sidebar.
 - **FR-016**: Weeks MUST display in sequential order within a course view.
 - **FR-017**: Deleting a course MUST cascade-delete all weeks, uploaded files (from storage), and associated documents, with a confirmation warning.
@@ -138,7 +141,7 @@ A student wants to see and navigate their courses from the main dashboard and si
 ### Key Entities
 
 - **Course**: A structured container representing an academic course. Key attributes: name, color, parent folder (nullable), user ownership.
-- **CourseWeek**: A sequential unit within a course representing a week of study. Key attributes: week number, topic/title, parent course.
+- **CourseWeek**: A sequential unit within a course representing a week of study. Key attributes: week number, topic/title, parent course. Weeks can have documents linked via the document's optional week_id.
 - **CourseMaterial**: A reference to an uploaded file attached to a week. Key attributes: file path in storage, original file name, user-provided label, file size, category (material or homework), parent week.
 
 ## Success Criteria _(mandatory)_
@@ -177,11 +180,17 @@ A student wants to see and navigate their courses from the main dashboard and si
 - Auto-sync with LMS platforms
 - OCR on scanned documents
 - AI-powered syllabus parsing to auto-generate weeks
-- Week-level document association (documents belong to course, not specific weeks)
+- AI-generated summaries (the "Summarise" button creates a blank notebook for manual notes)
 - Practice exam generation from course materials
 - Bulk week creation
 
 ## Clarifications
+
+### Session 2026-03-09
+
+- Q: When creating a document from a week, what UX flow? → A: Instant creation with auto-title (e.g., "Week 3 — Homework"), opens editor immediately with no dialog. General document creation (outside week context) uses the full CreateDocumentDialog.
+- Q: Should documents created from a week be categorized by intent? → A: Yes, add a `purpose` field (e.g., "homework", "summary", "notes") for grouping and AI context.
+- Q: What quick-action buttons should appear in each week section? → A: Three buttons: "Start Homework", "Summarise", and "Notes" — each instantly creates a document with the corresponding purpose.
 
 ### Session 2026-03-08
 
@@ -196,4 +205,4 @@ A student wants to see and navigate their courses from the main dashboard and si
 - The existing folder hierarchy system can accommodate course objects as a new entity type without breaking the current folder/document navigation.
 - PDF viewing can be handled by the browser's native PDF viewer (opening in a new tab) for MVP, without requiring an embedded viewer.
 - The 50MB file size limit is sufficient for typical lecture slides and homework PDFs.
-- The existing `documents` table can be extended with a `course_id` foreign key to associate documents with courses.
+- The existing `documents` table can be extended with `course_id`, `week_id`, and `purpose` fields to associate documents with courses, weeks, and categorize their intent.

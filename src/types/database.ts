@@ -72,6 +72,8 @@ export interface Document {
   user_id: string;
   folder_id: string | null;
   course_id: string | null;
+  week_id: string | null;
+  purpose: 'homework' | 'summary' | 'notes' | null;
   title: string;
   content: Record<string, unknown>;
   subject: Subject;
