@@ -93,14 +93,14 @@ src/
 
 All research documented in [research.md](./research.md). Key findings:
 
-| Topic                  | Finding                                                                           | Decision                                                                   |
-| ---------------------- | --------------------------------------------------------------------------------- | -------------------------------------------------------------------------- |
-| Database schema        | Existing pattern: UUID PKs, user_id FK, RLS, updated_at triggers                 | Follow exact same pattern for 3 new tables                                 |
-| Supabase Storage       | Enabled in config.toml, no buckets configured, 50MiB limit already set            | Create `course-materials` bucket with PDF-only MIME restriction            |
-| File upload            | Supabase browser client supports direct upload with auth                          | Client-side upload directly to storage, server action for metadata record  |
-| Course placement       | Dashboard uses card grid + sidebar tree, both filter by parent_id                 | Add courses to both, visually distinct from folders                        |
-| Document association   | Existing nullable folder_id pattern works for optional course_id                  | Add course_id to documents table, mutual exclusion with folder_id          |
-| Cascade deletes        | DB cascades handle records, but storage files need explicit cleanup                | Server actions remove storage files before DB delete                       |
+| Topic                | Finding                                                                | Decision                                                                  |
+| -------------------- | ---------------------------------------------------------------------- | ------------------------------------------------------------------------- |
+| Database schema      | Existing pattern: UUID PKs, user_id FK, RLS, updated_at triggers       | Follow exact same pattern for 3 new tables                                |
+| Supabase Storage     | Enabled in config.toml, no buckets configured, 50MiB limit already set | Create `course-materials` bucket with PDF-only MIME restriction           |
+| File upload          | Supabase browser client supports direct upload with auth               | Client-side upload directly to storage, server action for metadata record |
+| Course placement     | Dashboard uses card grid + sidebar tree, both filter by parent_id      | Add courses to both, visually distinct from folders                       |
+| Document association | Existing nullable folder_id pattern works for optional course_id       | Add course_id to documents table, mutual exclusion with folder_id         |
+| Cascade deletes      | DB cascades handle records, but storage files need explicit cleanup    | Server actions remove storage files before DB delete                      |
 
 ## Phase 1: Design
 
@@ -109,14 +109,17 @@ All research documented in [research.md](./research.md). Key findings:
 Documented in [data-model.md](./data-model.md).
 
 **New tables**:
+
 - `courses` — name, code, semester, color, optional folder_id
 - `course_weeks` — week_number, topic, dates, belongs to course
 - `course_materials` — storage_path, file_name, category (material/homework), belongs to week
 
 **Modified tables**:
+
 - `documents` — add nullable `course_id` with cascade delete, mutual exclusion constraint with `folder_id`
 
 **Storage**:
+
 - `course-materials` bucket — private, PDF only, 50MiB limit, path-based RLS
 
 ### 1.2 Interface Contracts

@@ -24,6 +24,7 @@ Phase 1 (Setup) ──→ Phase 2 (Foundational) ──→ Phase 3 (US1+US6) ─
 ```
 
 **Notes**:
+
 - US3 and US4 share 95% of infrastructure (same upload component, same material-item). US4 is US3 with `category: 'homework'`. They are combined into one phase.
 - US6 (navigation) is inseparable from US1 (create course) — you need the card to see the course. Combined into one phase.
 - US5 (document in course) only depends on US1 (course exists), not on US2 (weeks).
@@ -158,14 +159,14 @@ Phase 1 (Setup) ──→ Phase 2 (Foundational) ──→ Phase 3 (US1+US6) ─
 
 ### Task Count by User Story
 
-| Story | Description                     | Tasks | Phase |
-| ----- | ------------------------------- | ----- | ----- |
-| —     | Setup                           | 5     | 1     |
-| —     | Foundational (data layer)       | 8     | 2     |
-| US1   | Create a Course                 | 2     | 3     |
-| US6   | Navigate Courses on Dashboard   | 4     | 3     |
-| US2   | Add Weeks to a Course           | 3     | 4     |
-| US3   | Upload Materials to a Week      | 3     | 5     |
-| US4   | Upload Homework to a Week       | (combined with US3) | 5 |
-| US5   | Create Document in Course       | 4     | 6     |
-| —     | Polish & Testing                | 6     | 7     |
+| Story | Description                   | Tasks               | Phase |
+| ----- | ----------------------------- | ------------------- | ----- |
+| —     | Setup                         | 5                   | 1     |
+| —     | Foundational (data layer)     | 8                   | 2     |
+| US1   | Create a Course               | 2                   | 3     |
+| US6   | Navigate Courses on Dashboard | 4                   | 3     |
+| US2   | Add Weeks to a Course         | 3                   | 4     |
+| US3   | Upload Materials to a Week    | 3                   | 5     |
+| US4   | Upload Homework to a Week     | (combined with US3) | 5     |
+| US5   | Create Document in Course     | 4                   | 6     |
+| —     | Polish & Testing              | 6                   | 7     |

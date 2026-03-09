@@ -52,9 +52,7 @@ export function CourseCard({ course }: CourseCardProps) {
           <GraduationCap className="size-5" style={{ color: course.color }} />
         </div>
         <div className="min-w-0 flex-1">
-          <p className="truncate font-medium">
-            {course.name}
-          </p>
+          <p className="truncate font-medium">{course.name}</p>
           <p className="text-sm text-muted-foreground">Course</p>
         </div>
         <DropdownMenu>

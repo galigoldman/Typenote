@@ -60,7 +60,10 @@ export default async function FolderPage({
   const typedSubfolders = (subfolders as Folder[] | null) ?? [];
   const typedCourses = (courses as Course[] | null) ?? [];
   const typedDocuments = (documents as Document[] | null) ?? [];
-  const isEmpty = typedSubfolders.length === 0 && typedCourses.length === 0 && typedDocuments.length === 0;
+  const isEmpty =
+    typedSubfolders.length === 0 &&
+    typedCourses.length === 0 &&
+    typedDocuments.length === 0;
 
   return (
     <div className="p-6">
@@ -118,7 +121,13 @@ export default async function FolderPage({
           )}
 
           {typedDocuments.length > 0 && (
-            <div className={typedSubfolders.length > 0 || typedCourses.length > 0 ? 'mt-6' : ''}>
+            <div
+              className={
+                typedSubfolders.length > 0 || typedCourses.length > 0
+                  ? 'mt-6'
+                  : ''
+              }
+            >
               <h2 className="mb-3 text-sm font-medium text-muted-foreground">
                 Documents
               </h2>

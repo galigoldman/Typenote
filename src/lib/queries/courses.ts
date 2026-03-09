@@ -32,7 +32,8 @@ export async function getCourseBreadcrumbs(
   courseId: string,
 ): Promise<{ id: string; name: string; type: 'course' | 'folder' }[]> {
   const supabase = await createClient();
-  const breadcrumbs: { id: string; name: string; type: 'course' | 'folder' }[] = [];
+  const breadcrumbs: { id: string; name: string; type: 'course' | 'folder' }[] =
+    [];
 
   const courseResult = await supabase
     .from('courses')

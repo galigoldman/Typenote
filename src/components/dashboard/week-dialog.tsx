@@ -14,10 +14,7 @@ import {
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import {
-  createCourseWeek,
-  updateCourseWeek,
-} from '@/lib/actions/course-weeks';
+import { createCourseWeek, updateCourseWeek } from '@/lib/actions/course-weeks';
 import type { CourseWeek } from '@/types/database';
 
 interface WeekDialogProps {
