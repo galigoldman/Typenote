@@ -26,3 +26,14 @@ export async function getDocument(id: string) {
   if (error) throw new Error(error.message);
   return data;
 }
+
+export async function getDocumentsByCourse(courseId: string) {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from('documents')
+    .select('*')
+    .eq('course_id', courseId)
+    .order('position');
+  if (error) throw new Error(error.message);
+  return data;
+}

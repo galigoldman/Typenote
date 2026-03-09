@@ -8,6 +8,7 @@ const mockDocument: Document = {
   id: 'test-doc-1',
   user_id: 'test-user-1',
   folder_id: null,
+  course_id: null,
   title: 'Test Document',
   content: {
     type: 'doc',
