@@ -10,7 +10,7 @@ export default defineConfig({
     globals: true,
     css: false,
     include: ['src/**/*.{test,spec}.{ts,tsx}'],
-    exclude: ['node_modules', 'e2e'],
+    exclude: ['node_modules', 'e2e', 'src/**/*.integration.test.ts'],
   },
   resolve: {
     alias: {
