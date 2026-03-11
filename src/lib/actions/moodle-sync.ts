@@ -124,3 +124,68 @@ export async function syncMoodleCourses(
     courses: syncResult.courses,
   };
 }
+
+/**
+ * Record file imports for a Moodle course.
+ *
+ * Called after the client-side extension has downloaded and uploaded files.
+ * This server action creates the user_course_syncs + user_file_imports records.
+ *
+ * @param moodleCourseId - Our moodle_courses UUID (registry ID)
+ * @param fileIds - Array of moodle_files UUIDs to mark as imported
+ * @param courseId - Optional Typenote course to link to
+ * @returns The sync record ID and count of files imported
+ */
+export async function recordFileImports(
+  moodleCourseId: string,
+  fileIds: string[],
+  courseId?: string,
+): Promise<{ syncId: string; importedCount: number }> {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error('Not authenticated');
+
+  const admin = createAdminClient();
+
+  // Upsert user_course_syncs record
+  const { data: sync, error: syncError } = await admin
+    .from('user_course_syncs')
+    .upsert(
+      {
+        user_id: user.id,
+        moodle_course_id: moodleCourseId,
+        course_id: courseId ?? null,
+        last_synced_at: new Date().toISOString(),
+      },
+      { onConflict: 'user_id,moodle_course_id' },
+    )
+    .select()
+    .single();
+
+  if (syncError) throw new Error(`Sync record failed: ${syncError.message}`);
+
+  // Insert user_file_imports for each file ID
+  if (fileIds.length > 0) {
+    const imports = fileIds.map((fileId) => ({
+      user_id: user.id,
+      moodle_file_id: fileId,
+      sync_id: sync.id,
+      status: 'imported' as const,
+    }));
+
+    const { error: importError } = await admin
+      .from('user_file_imports')
+      .upsert(imports, { onConflict: 'user_id,moodle_file_id' });
+
+    if (importError) {
+      throw new Error(`Import record failed: ${importError.message}`);
+    }
+  }
+
+  revalidatePath('/dashboard');
+
+  return {
+    syncId: sync.id,
+    importedCount: fileIds.length,
+  };
+}
