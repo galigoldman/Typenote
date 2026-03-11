@@ -84,3 +84,78 @@ export interface Document {
   created_at: string;
   updated_at: string;
 }
+
+export type MoodleFileType = 'file' | 'link';
+export type FileImportStatus = 'imported' | 'removed_from_moodle';
+
+export interface MoodleInstance {
+  id: string;
+  domain: string;
+  name: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface MoodleCourse {
+  id: string;
+  instance_id: string;
+  moodle_course_id: string;
+  name: string;
+  moodle_url: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface MoodleSection {
+  id: string;
+  course_id: string;
+  moodle_section_id: string | null;
+  title: string | null;
+  position: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface MoodleFile {
+  id: string;
+  section_id: string;
+  type: MoodleFileType;
+  moodle_url: string;
+  file_name: string;
+  content_hash: string | null;
+  storage_path: string | null;
+  external_url: string | null;
+  file_size: number | null;
+  mime_type: string | null;
+  position: number;
+  is_removed: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface UserMoodleConnection {
+  id: string;
+  user_id: string;
+  instance_id: string;
+  created_at: string;
+}
+
+export interface UserCourseSync {
+  id: string;
+  user_id: string;
+  moodle_course_id: string;
+  course_id: string | null;
+  last_synced_at: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface UserFileImport {
+  id: string;
+  user_id: string;
+  moodle_file_id: string;
+  sync_id: string;
+  status: FileImportStatus;
+  created_at: string;
+  updated_at: string;
+}
