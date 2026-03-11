@@ -116,13 +116,13 @@
 
 ### Implementation for User Story 4
 
-- [ ] T034 [P] [US4] Implement SCRAPE_COURSES handler in extension — inject content script or fetch Moodle dashboard, extract enrolled course list (id, name, url) from DOM. Implement in `extension/src/content/moodle-scraper.ts` and wire to service worker
-- [ ] T035 [US4] Add `scrapeCourses(moodleUrl)` to `src/hooks/use-moodle-extension.ts` — sends SCRAPE_COURSES message, returns course list
-- [ ] T036 [US4] Implement course comparison logic in `src/lib/moodle/sync-service.ts` — `compareCourses(instanceDomain, scrapedCourses)` that checks shared registry and returns status per course (new_to_system, synced_by_others, synced_by_user, has_new_items)
-- [ ] T037 [US4] Create sync dialog component at `src/components/dashboard/moodle-sync-dialog.tsx` — modal showing course list with checkboxes, sync status indicators, "Sync Selected" button
-- [ ] T038 [US4] Implement server action in `src/lib/actions/moodle-sync.ts` — `syncCourses(instanceDomain, courses)` that calls the /api/moodle/sync route and creates/updates `user_course_syncs` records
-- [ ] T039 [US4] Add query to `src/lib/queries/moodle.ts` — `getUserCourseSyncs(userId)` to fetch all synced courses with last sync timestamps
-- [ ] T040 [US4] Wire sync dialog to the sync prompt button from US3 — clicking "Sync with Moodle" opens the dialog, triggers course scraping
+- [x] T034 [P] [US4] Implement SCRAPE_COURSES handler in extension — inject content script or fetch Moodle dashboard, extract enrolled course list (id, name, url) from DOM. Implement in `extension/src/content/moodle-scraper.ts` and wire to service worker
+- [x] T035 [US4] Add `scrapeCourses(moodleUrl)` to `src/hooks/use-moodle-extension.ts` — sends SCRAPE_COURSES message, returns course list
+- [x] T036 [US4] Implement course comparison logic in `src/lib/moodle/sync-service.ts` — `compareCourses(instanceDomain, scrapedCourses)` that checks shared registry and returns status per course (new_to_system, synced_by_others, synced_by_user, has_new_items)
+- [x] T037 [US4] Create sync dialog component at `src/components/dashboard/moodle-sync-dialog.tsx` — modal showing course list with checkboxes, sync status indicators, "Sync Selected" button
+- [x] T038 [US4] Implement server action in `src/lib/actions/moodle-sync.ts` — `syncCourses(instanceDomain, courses)` that calls the /api/moodle/sync route and creates/updates `user_course_syncs` records
+- [x] T039 [US4] Add query to `src/lib/queries/moodle.ts` — `getUserCourseSyncs(userId)` to fetch all synced courses with last sync timestamps
+- [x] T040 [US4] Wire sync dialog to the sync prompt button from US3 — clicking "Sync with Moodle" opens the dialog, triggers course scraping
 
 **Checkpoint**: Students can see their Moodle courses, compare against shared registry, and select courses for sync.
 
