@@ -33,10 +33,11 @@ export function getSvgPathFromStroke(points: number[][], closed = true): string 
 export function renderStroke(
   ctx: CanvasRenderingContext2D,
   inputPoints: StrokePoint[],
-  options?: { color?: string; size?: number },
+  options?: { color?: string; size?: number; opacity?: number },
 ): void {
   const color = options?.color ?? '#000000';
   const size = options?.size ?? 3;
+  const opacity = options?.opacity ?? 1;
 
   const outlinePoints = getStroke(inputPoints, {
     size,
@@ -47,8 +48,10 @@ export function renderStroke(
   if (!pathData) return;
 
   const path = new Path2D(pathData);
+  ctx.globalAlpha = opacity;
   ctx.fillStyle = color;
   ctx.fill(path);
+  ctx.globalAlpha = 1;
 }
 
 /**

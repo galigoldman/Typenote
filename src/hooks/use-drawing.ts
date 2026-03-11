@@ -8,18 +8,21 @@ import { getSvgPathFromStroke, computeBBox } from '@/lib/canvas/stroke-utils';
 
 interface UseDrawingOptions {
   activeTool: CanvasTool;
+  penColor: string;
+  penSize: number;
+  penOpacity: number;
   onStrokeComplete: (pageId: string, stroke: Stroke) => void;
 }
 
-export function useDrawing({ activeTool, onStrokeComplete }: UseDrawingOptions) {
+export function useDrawing({ activeTool, penColor, penSize, penOpacity, onStrokeComplete }: UseDrawingOptions) {
   const currentPointsRef = useRef<StrokePoint[]>([]);
   const isDrawingRef = useRef(false);
   const activePageIdRef = useRef<string | null>(null);
   const workingCanvasRef = useRef<HTMLCanvasElement | null>(null);
 
+  const isDrawTool = activeTool === 'pen' || activeTool === 'highlighter';
+
   const getWorkingCanvas = (pageId: string, target: EventTarget) => {
-    // The interaction layer is a sibling of the working canvas.
-    // Navigate: interaction layer → parent (page container) → find working canvas
     const interactionLayer = target as HTMLElement;
     const pageContainer = interactionLayer.parentElement;
     if (!pageContainer) return null;
@@ -54,7 +57,7 @@ export function useDrawing({ activeTool, onStrokeComplete }: UseDrawingOptions) 
     if (points.length < 2) return;
 
     const outlinePoints = getStroke(points, {
-      size: 3,
+      size: penSize,
       simulatePressure: false,
       last: false,
     });
@@ -63,15 +66,16 @@ export function useDrawing({ activeTool, onStrokeComplete }: UseDrawingOptions) 
     if (!pathData) return;
 
     const path = new Path2D(pathData);
-    ctx.fillStyle = '#000000';
+    ctx.globalAlpha = penOpacity;
+    ctx.fillStyle = penColor;
     ctx.fill(path);
-  }, []);
+    ctx.globalAlpha = 1;
+  }, [penColor, penSize, penOpacity]);
 
   const handlePointerDown = useCallback(
     (e: React.PointerEvent, pageId: string) => {
-      // Stylus-only guard
       if (e.pointerType !== 'pen') return;
-      if (activeTool !== 'pen') return;
+      if (!isDrawTool) return;
 
       e.preventDefault();
 
@@ -81,21 +85,20 @@ export function useDrawing({ activeTool, onStrokeComplete }: UseDrawingOptions) 
       const canvas = getWorkingCanvas(pageId, e.target);
       workingCanvasRef.current = canvas;
 
-      // Capture pointer for reliable tracking
       (e.target as HTMLElement).setPointerCapture(e.pointerId);
 
       const { x, y } = screenToPageCoords(e, e.target);
       const pressure = Math.round(e.pressure * 100) / 100;
       currentPointsRef.current = [[x, y, pressure]];
     },
-    [activeTool],
+    [isDrawTool],
   );
 
   const handlePointerMove = useCallback(
     (e: React.PointerEvent, pageId: string) => {
       if (!isDrawingRef.current) return;
       if (e.pointerType !== 'pen') return;
-      if (activeTool !== 'pen') return;
+      if (!isDrawTool) return;
 
       e.preventDefault();
 
@@ -107,7 +110,7 @@ export function useDrawing({ activeTool, onStrokeComplete }: UseDrawingOptions) 
         renderInProgressStroke(workingCanvasRef.current, currentPointsRef.current);
       }
     },
-    [activeTool, renderInProgressStroke],
+    [isDrawTool, renderInProgressStroke],
   );
 
   const handlePointerUp = useCallback(
@@ -127,8 +130,9 @@ export function useDrawing({ activeTool, onStrokeComplete }: UseDrawingOptions) 
       const stroke: Stroke = {
         id: Math.random().toString(36).slice(2) + Date.now().toString(36),
         points: points as StrokePoint[],
-        color: '#000000',
-        width: 3,
+        color: penColor,
+        width: penSize,
+        opacity: penOpacity,
         bbox: computeBBox(points as StrokePoint[]),
         createdAt: Date.now(),
       };
@@ -150,7 +154,7 @@ export function useDrawing({ activeTool, onStrokeComplete }: UseDrawingOptions) 
       activePageIdRef.current = null;
       workingCanvasRef.current = null;
     },
-    [onStrokeComplete],
+    [onStrokeComplete, penColor, penSize, penOpacity],
   );
 
   return {
