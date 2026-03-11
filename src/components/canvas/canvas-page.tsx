@@ -8,12 +8,13 @@ import TextAlign from '@tiptap/extension-text-align';
 import TaskList from '@tiptap/extension-task-list';
 import TaskItem from '@tiptap/extension-task-item';
 import LinkExt from '@tiptap/extension-link';
+import HighlightExt from '@tiptap/extension-highlight';
 import { AutoDirection } from '@/lib/editor/rtl-extension';
 import type { CanvasPage as CanvasPageData, CanvasTool } from '@/types/canvas';
 import { PAGE_WIDTH, PAGE_HEIGHT } from '@/types/canvas';
 import { setupHighDPICanvas } from '@/lib/canvas/coordinate-utils';
 import { renderStroke } from '@/lib/canvas/stroke-utils';
-import { ERASER_RADIUS } from '@/hooks/use-eraser';
+import { DEFAULT_ERASER_RADIUS } from '@/hooks/use-eraser';
 import type { Editor } from '@tiptap/core';
 
 interface CanvasPageProps {
@@ -29,6 +30,7 @@ interface CanvasPageProps {
   onEditorReady?: (editor: Editor) => void;
   canvasClass?: string;
   eraserPosition?: { x: number; y: number } | null;
+  eraserRadius?: number;
   remoteUpdateCounter?: number;
 }
 
@@ -43,6 +45,7 @@ export function CanvasPage({
   onEditorReady,
   canvasClass,
   eraserPosition = null,
+  eraserRadius = DEFAULT_ERASER_RADIUS,
   remoteUpdateCounter = 0,
 }: CanvasPageProps) {
   const committedCanvasRef = useRef<HTMLCanvasElement>(null);
@@ -132,6 +135,7 @@ export function CanvasPage({
         openOnClick: false,
         HTMLAttributes: { class: 'text-primary underline cursor-pointer' },
       }),
+      HighlightExt.configure({ multicolor: true }),
       AutoDirection,
     ],
     content: safeContent,
@@ -251,7 +255,7 @@ export function CanvasPage({
           <circle
             cx={eraserPosition.x}
             cy={eraserPosition.y}
-            r={ERASER_RADIUS}
+            r={eraserRadius}
             fill="rgba(255, 255, 255, 0.5)"
             stroke="#888888"
             strokeWidth={1}
