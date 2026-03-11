@@ -51,7 +51,7 @@ export function CanvasPage({
   const committedCtxRef = useRef<CanvasRenderingContext2D | null>(null);
   const workingCtxRef = useRef<CanvasRenderingContext2D | null>(null);
 
-  const isInteractionMode = activeTool === 'pen' || activeTool === 'eraser';
+  const isInteractionMode = activeTool === 'pen' || activeTool === 'highlighter' || activeTool === 'eraser';
 
   // Setup canvases for high-DPI on mount
   useEffect(() => {
@@ -181,6 +181,7 @@ export function CanvasPage({
       renderStroke(ctx, stroke.points, {
         color: stroke.color,
         size: stroke.width,
+        opacity: stroke.opacity ?? 1,
       });
     }
   }, [page.strokes]);
