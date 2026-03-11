@@ -15,6 +15,7 @@ export interface Stroke {
   points: StrokePoint[];
   color: string;
   width: number;
+  opacity: number;
   bbox: BBox;
   createdAt: number;
 }
@@ -47,7 +48,7 @@ export interface CanvasDocument {
 export const PAGE_WIDTH = 794;
 export const PAGE_HEIGHT = 1123;
 
-export type CanvasTool = 'pen' | 'eraser' | 'text';
+export type CanvasTool = 'pen' | 'highlighter' | 'eraser' | 'text';
 
 /** Current zoom and pan state (view-only, not persisted) */
 export interface ViewTransform {

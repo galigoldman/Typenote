@@ -13,7 +13,7 @@ import { PAGE_WIDTH, PAGE_HEIGHT } from '@/types/canvas';
 import type { Document } from '@/types/database';
 import type { SaveStatus } from '@/hooks/use-auto-save';
 import type { ConnectionStatus } from '@/hooks/use-realtime-sync';
-import { Pen, Type, Eraser } from 'lucide-react';
+import { Pen, Type, Eraser, Highlighter, Minus } from 'lucide-react';
 import { useDocumentSync } from '@/hooks/use-document-sync';
 import { useDrawing } from '@/hooks/use-drawing';
 import { useEraser } from '@/hooks/use-eraser';
@@ -29,6 +29,28 @@ const CANVAS_CLASSES: Record<string, string> = {
   lined: 'canvas-lined',
   grid: 'canvas-grid',
 };
+
+const PEN_COLORS = [
+  '#000000', '#374151', '#DC2626', '#EA580C', '#CA8A04',
+  '#16A34A', '#2563EB', '#7C3AED', '#DB2777', '#FFFFFF',
+];
+
+const HIGHLIGHTER_COLORS = [
+  '#FBBF24', '#34D399', '#60A5FA', '#F472B6', '#A78BFA',
+];
+
+const PEN_SIZES = [
+  { label: 'S', value: 1.5 },
+  { label: 'M', value: 3 },
+  { label: 'L', value: 5 },
+  { label: 'XL', value: 8 },
+];
+
+const HIGHLIGHTER_SIZES = [
+  { label: 'S', value: 8 },
+  { label: 'M', value: 14 },
+  { label: 'L', value: 20 },
+];
 
 function SaveIndicator({ status }: { status: SaveStatus }) {
   const labels: Record<SaveStatus, string> = {
@@ -73,6 +95,117 @@ function ConnectionIndicator({
   );
 }
 
+function ColorPicker({
+  colors,
+  activeColor,
+  onSelect,
+}: {
+  colors: string[];
+  activeColor: string;
+  onSelect: (color: string) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  // Close on outside click/touch
+  useEffect(() => {
+    if (!open) return;
+    const handler = (e: PointerEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) {
+        setOpen(false);
+      }
+    };
+    window.addEventListener('pointerdown', handler);
+    return () => window.removeEventListener('pointerdown', handler);
+  }, [open]);
+
+  return (
+    <div className="relative" ref={ref}>
+      {/* Active color swatch */}
+      <button
+        onPointerDown={(e) => {
+          e.stopPropagation();
+          setOpen((o) => !o);
+        }}
+        className="flex items-center gap-1.5 px-1.5 py-1 rounded-md hover:bg-accent transition-colors"
+        title="Pick color"
+      >
+        <div
+          style={{
+            width: 28,
+            height: 28,
+            minWidth: 28,
+            minHeight: 28,
+            borderRadius: '50%',
+            backgroundColor: activeColor,
+            border: '2px solid #d1d5db',
+            display: 'block',
+          }}
+        />
+        <svg width="12" height="12" viewBox="0 0 12 12" fill="none" style={{ flexShrink: 0 }}>
+          <path d="M3 5L6 8L9 5" stroke="#888" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
+      </button>
+
+      {/* Dropdown palette */}
+      {open && (
+        <div
+          className="absolute top-full left-0 mt-1 p-2.5 bg-popover border rounded-lg shadow-lg z-50"
+          style={{ width: colors.length <= 5 ? 'auto' : 200 }}
+        >
+          <div className="flex flex-wrap gap-2">
+            {colors.map((color) => (
+              <button
+                key={color}
+                onPointerDown={(e) => {
+                  e.stopPropagation();
+                  onSelect(color);
+                  setOpen(false);
+                }}
+                className={`h-8 w-8 rounded-full border-2 shrink-0 transition-transform hover:scale-110 ${
+                  activeColor === color ? 'scale-110 border-primary ring-2 ring-primary/30' : 'border-gray-200'
+                }`}
+                style={{ backgroundColor: color }}
+              />
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function SizePicker({
+  sizes,
+  activeSize,
+  onSelect,
+  color,
+}: {
+  sizes: { label: string; value: number }[];
+  activeSize: number;
+  onSelect: (size: number) => void;
+  color: string;
+}) {
+  return (
+    <div className="flex items-center gap-1">
+      {sizes.map((s) => (
+        <button
+          key={s.label}
+          onClick={() => onSelect(s.value)}
+          className={`flex items-center justify-center h-7 w-7 rounded-md text-xs font-medium transition-colors ${
+            activeSize === s.value
+              ? 'bg-primary text-primary-foreground'
+              : 'hover:bg-accent'
+          }`}
+          title={`${s.label} (${s.value}px)`}
+        >
+          <Minus style={{ color: activeSize === s.value ? undefined : color }} strokeWidth={s.value} className="h-4 w-4" />
+        </button>
+      ))}
+    </div>
+  );
+}
+
 function createEmptyPage(order: number): CanvasPageData {
   return {
     id: Math.random().toString(36).slice(2) + Date.now().toString(36),
@@ -99,6 +232,18 @@ export function CanvasEditor({ document }: CanvasEditorProps) {
   const [activeTool, setActiveTool] = useState<CanvasTool>('text');
   const [activeEditor, setActiveEditor] = useState<Editor | null>(null);
   const [remoteUpdateCounter, setRemoteUpdateCounter] = useState(0);
+
+  // Drawing tool settings
+  const [penColor, setPenColor] = useState('#000000');
+  const [penSize, setPenSize] = useState(3);
+  const [highlighterColor, setHighlighterColor] = useState('#FBBF24');
+  const [highlighterSize, setHighlighterSize] = useState(14);
+
+  // Derived values based on active tool
+  const currentColor = activeTool === 'highlighter' ? highlighterColor : penColor;
+  const currentSize = activeTool === 'highlighter' ? highlighterSize : penSize;
+  const currentOpacity = activeTool === 'highlighter' ? 0.4 : 1;
+
   const pagesRef = useRef(pages);
 
   useEffect(() => {
@@ -195,6 +340,9 @@ export function CanvasEditor({ document }: CanvasEditorProps) {
   // Drawing hook
   const { handlePointerDown: drawDown, handlePointerMove: drawMove, handlePointerUp: drawUp } = useDrawing({
     activeTool,
+    penColor: currentColor,
+    penSize: currentSize,
+    penOpacity: currentOpacity,
     onStrokeComplete: handleStrokeAdd,
   });
 
@@ -239,6 +387,7 @@ export function CanvasEditor({ document }: CanvasEditorProps) {
   };
 
   const canvasClass = CANVAS_CLASSES[document.canvas_type] ?? '';
+  const showDrawingTools = activeTool === 'pen' || activeTool === 'highlighter';
 
   return (
     <div className="flex flex-col h-full">
@@ -274,8 +423,9 @@ export function CanvasEditor({ document }: CanvasEditorProps) {
         </div>
       )}
 
-      {/* Mode toggle + toolbar */}
+      {/* Tool buttons + drawing settings */}
       <div className="flex items-center border-b">
+        {/* Tool selector */}
         <div className="flex items-center gap-1 px-2 py-1 border-r">
           <button
             onClick={() => setActiveTool('pen')}
@@ -287,6 +437,17 @@ export function CanvasEditor({ document }: CanvasEditorProps) {
           >
             <Pen className="h-4 w-4" />
             Draw
+          </button>
+          <button
+            onClick={() => setActiveTool('highlighter')}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
+              activeTool === 'highlighter'
+                ? 'bg-primary text-primary-foreground'
+                : 'hover:bg-accent'
+            }`}
+          >
+            <Highlighter className="h-4 w-4" />
+            Highlight
           </button>
           <button
             onClick={() => setActiveTool('eraser')}
@@ -311,6 +472,26 @@ export function CanvasEditor({ document }: CanvasEditorProps) {
             Type
           </button>
         </div>
+
+        {/* Pen/highlighter settings */}
+        {showDrawingTools && (
+          <div className="flex items-center gap-3 px-3 py-1">
+            <ColorPicker
+              colors={activeTool === 'highlighter' ? HIGHLIGHTER_COLORS : PEN_COLORS}
+              activeColor={activeTool === 'highlighter' ? highlighterColor : penColor}
+              onSelect={activeTool === 'highlighter' ? setHighlighterColor : setPenColor}
+            />
+            <div className="h-5 w-px bg-border" />
+            <SizePicker
+              sizes={activeTool === 'highlighter' ? HIGHLIGHTER_SIZES : PEN_SIZES}
+              activeSize={activeTool === 'highlighter' ? highlighterSize : penSize}
+              onSelect={activeTool === 'highlighter' ? setHighlighterSize : setPenSize}
+              color={activeTool === 'highlighter' ? highlighterColor : penColor}
+            />
+          </div>
+        )}
+
+        {/* Text formatting toolbar */}
         {activeTool === 'text' && activeEditor && (
           <div className="flex-1">
             <EditorToolbar editor={activeEditor} />
