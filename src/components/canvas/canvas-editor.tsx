@@ -98,6 +98,7 @@ export function CanvasEditor({ document }: CanvasEditorProps) {
   );
   const [activeTool, setActiveTool] = useState<CanvasTool>('text');
   const [activeEditor, setActiveEditor] = useState<Editor | null>(null);
+  const [remoteUpdateCounter, setRemoteUpdateCounter] = useState(0);
   const pagesRef = useRef(pages);
 
   useEffect(() => {
@@ -117,6 +118,7 @@ export function CanvasEditor({ document }: CanvasEditorProps) {
       const remote = remotePagesData as unknown as CanvasDocument;
       if (remote?.pages) {
         setPages(remote.pages);
+        setRemoteUpdateCounter((c) => c + 1);
       }
     },
     [],
@@ -340,6 +342,7 @@ export function CanvasEditor({ document }: CanvasEditorProps) {
               onEditorReady={handleEditorFocus}
               canvasClass={canvasClass}
               eraserPosition={activeTool === 'eraser' ? eraserPosition : null}
+              remoteUpdateCounter={remoteUpdateCounter}
             />
           ))}
         </div>
