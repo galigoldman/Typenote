@@ -61,8 +61,11 @@ export function MoodleFilePicker({
   const [phase, setPhase] = useState<PickerPhase>('loading');
   const [sections, setSections] = useState<ScrapedSection[]>([]);
   const [importedFileIds, setImportedFileIds] = useState<Set<string>>(new Set());
+  const [removedFileIds, setRemovedFileIds] = useState<Set<string>>(new Set());
+  const [modifiedFileIds, setModifiedFileIds] = useState<Set<string>>(new Set());
   const [selectedUrls, setSelectedUrls] = useState<Set<string>>(new Set());
   const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set());
+  const [showOnlyActionable, setShowOnlyActionable] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [importProgress, setImportProgress] = useState<string | null>(null);
   const [importedCount, setImportedCount] = useState(0);
@@ -91,6 +94,7 @@ export function MoodleFilePicker({
         lastSyncedAt: null,
         importedFileIds: [],
         removedFileIds: [],
+        modifiedFileIds: [],
       };
       if (statusResponse.ok) {
         status = await statusResponse.json();
@@ -98,6 +102,10 @@ export function MoodleFilePicker({
 
       const alreadyImported = new Set(status.importedFileIds);
       setImportedFileIds(alreadyImported);
+      const removed = new Set(status.removedFileIds);
+      setRemovedFileIds(removed);
+      const modified = new Set(status.modifiedFileIds);
+      setModifiedFileIds(modified);
 
       const scrapedSections = scrapeResult?.sections ?? [];
       setSections(scrapedSections);
@@ -105,7 +113,7 @@ export function MoodleFilePicker({
       // Expand all sections by default
       setExpandedSections(new Set(scrapedSections.map((s) => s.moodleSectionId)));
 
-      // Pre-select items that are NOT already imported
+      // Pre-select items that are NOT already imported and NOT removed
       const preSelected = new Set<string>();
       for (const section of scrapedSections) {
         for (const item of section.items) {
@@ -115,7 +123,8 @@ export function MoodleFilePicker({
           // only if their moodleUrl matches one already tracked.
           // For now, we select all items — the status API returns file IDs
           // not URLs, so matching happens post-registry-sync.
-          if (!alreadyImported.has(key)) {
+          // Removed files should never be pre-selected.
+          if (!alreadyImported.has(key) && !removed.has(key)) {
             preSelected.add(key);
           }
         }
@@ -258,6 +267,18 @@ export function MoodleFilePicker({
       {/* Section list */}
       {phase === 'ready' && sections.length > 0 && (
         <>
+          {/* Filter toggle */}
+          <label className="flex items-center gap-2 text-sm">
+            <Checkbox
+              checked={showOnlyActionable}
+              onCheckedChange={(checked) =>
+                setShowOnlyActionable(checked === true)
+              }
+              aria-label="Show only actionable items"
+            />
+            Show only actionable items
+          </label>
+
           <div className="space-y-2">
             {sections
               .sort((a, b) => a.position - b.position)
@@ -304,21 +325,40 @@ export function MoodleFilePicker({
                       <>
                         <Separator />
                         <div className="space-y-1 p-2">
-                          {section.items.map((item) => {
+                          {section.items
+                            .filter((item) => {
+                              if (!showOnlyActionable) return true;
+                              const key = itemKey(
+                                section.moodleSectionId,
+                                item.moodleUrl,
+                              );
+                              const isImported = importedFileIds.has(key);
+                              const isRemoved = removedFileIds.has(key);
+                              // Actionable: not already imported and not removed
+                              return !isImported && !isRemoved;
+                            })
+                            .map((item) => {
                             const key = itemKey(
                               section.moodleSectionId,
                               item.moodleUrl,
                             );
                             const isImported = importedFileIds.has(key);
+                            const isRemoved = removedFileIds.has(key);
+                            const isModified = modifiedFileIds.has(key);
                             const isSelected = selectedUrls.has(key);
 
                             return (
                               <label
                                 key={item.moodleUrl}
-                                className="flex cursor-pointer items-center gap-3 rounded px-2 py-1.5 hover:bg-accent/30"
+                                className={`flex items-center gap-3 rounded px-2 py-1.5 ${
+                                  isRemoved
+                                    ? 'cursor-not-allowed opacity-60'
+                                    : 'cursor-pointer hover:bg-accent/30'
+                                }`}
                               >
                                 <Checkbox
                                   checked={isSelected}
+                                  disabled={isRemoved}
                                   onCheckedChange={() =>
                                     toggleItem(
                                       section.moodleSectionId,
@@ -336,7 +376,11 @@ export function MoodleFilePicker({
                                 >
                                   {item.type === 'file' ? '\uD83D\uDCC4' : '\uD83D\uDD17'}
                                 </span>
-                                <span className="flex-1 truncate text-sm">
+                                <span
+                                  className={`flex-1 truncate text-sm ${
+                                    isRemoved ? 'line-through text-muted-foreground' : ''
+                                  }`}
+                                >
                                   {item.name}
                                 </span>
                                 {item.fileSize != null && item.fileSize > 0 && (
@@ -344,7 +388,13 @@ export function MoodleFilePicker({
                                     {formatFileSize(item.fileSize)}
                                   </span>
                                 )}
-                                {isImported && (
+                                {isRemoved && (
+                                  <Badge variant="destructive">Removed from Moodle</Badge>
+                                )}
+                                {isModified && !isRemoved && (
+                                  <Badge variant="secondary">Modified</Badge>
+                                )}
+                                {isImported && !isRemoved && !isModified && (
                                   <Badge variant="outline">Already imported</Badge>
                                 )}
                               </label>

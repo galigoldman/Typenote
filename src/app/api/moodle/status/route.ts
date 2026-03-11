@@ -37,6 +37,7 @@ export async function GET(request: NextRequest) {
       lastSyncedAt: sync?.last_synced_at ?? null,
       importedFileIds,
       removedFileIds,
+      modifiedFileIds: [], // Populated by change detection during re-sync
     });
   } catch (error) {
     console.error('Status check failed:', error);
