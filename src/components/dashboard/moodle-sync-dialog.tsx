@@ -12,15 +12,18 @@ import {
 } from '@/components/ui/dialog';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Badge } from '@/components/ui/badge';
+import { Separator } from '@/components/ui/separator';
 import { useMoodleExtension } from '@/hooks/use-moodle-extension';
 import {
   compareScrapedCourses,
   syncMoodleCourses,
 } from '@/lib/actions/moodle-sync';
+import { MoodleFilePicker } from './moodle-file-picker';
 import type {
   CourseComparison,
   CourseComparisonStatus,
 } from '@/lib/moodle/sync-service';
+import type { SyncCourseResult } from '@/lib/moodle/types';
 
 interface MoodleSyncDialogProps {
   open: boolean;
@@ -52,6 +55,8 @@ export function MoodleSyncDialog({
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [error, setError] = useState<string | null>(null);
   const [syncedCount, setSyncedCount] = useState(0);
+  const [syncedCourses, setSyncedCourses] = useState<SyncCourseResult[]>([]);
+  const [expandedFilePicker, setExpandedFilePicker] = useState<string | null>(null);
 
   const loadCourses = useCallback(async () => {
     setPhase('scraping');
@@ -150,6 +155,7 @@ export function MoodleSyncDialog({
       );
 
       setSyncedCount(result.syncedCount);
+      setSyncedCourses(result.courses);
       setPhase('done');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Sync failed');
@@ -236,11 +242,60 @@ export function MoodleSyncDialog({
 
         {/* Done phase */}
         {phase === 'done' && (
-          <div className="flex flex-col items-center justify-center gap-2 py-8">
-            <p className="text-sm font-medium">
+          <div className="flex flex-col gap-3 py-4">
+            <p className="text-center text-sm font-medium">
               Successfully synced {syncedCount}{' '}
               {syncedCount === 1 ? 'course' : 'courses'}
             </p>
+
+            {/* Per-course "View Files" buttons */}
+            {syncedCourses.length > 0 && (
+              <div className="space-y-2">
+                <Separator />
+                <p className="text-xs text-muted-foreground">
+                  Browse and import files from synced courses:
+                </p>
+                {syncedCourses.map((sc) => {
+                  const originalCourse = courses.find(
+                    (c) => c.moodleCourseId === sc.moodleCourseId,
+                  );
+                  const isExpanded = expandedFilePicker === sc.id;
+
+                  return (
+                    <div key={sc.id} className="space-y-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="w-full justify-between"
+                        onClick={() =>
+                          setExpandedFilePicker(isExpanded ? null : sc.id)
+                        }
+                        aria-label={`View files for ${originalCourse?.name ?? sc.moodleCourseId}`}
+                      >
+                        <span className="truncate">
+                          {originalCourse?.name ?? sc.moodleCourseId}
+                        </span>
+                        <span className="text-muted-foreground">
+                          {isExpanded ? 'Hide Files' : 'View Files'}
+                        </span>
+                      </Button>
+
+                      {isExpanded && originalCourse && (
+                        <MoodleFilePicker
+                          moodleCourseId={sc.id}
+                          moodleCourseMoodleId={sc.moodleCourseId}
+                          courseUrl={originalCourse.moodleUrl}
+                          instanceDomain={moodleConnection.domain}
+                          onImportComplete={() => {
+                            // Could refresh status or close
+                          }}
+                        />
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
           </div>
         )}
 
