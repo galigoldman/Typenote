@@ -6,6 +6,8 @@ import { CourseDialog } from '@/components/dashboard/course-dialog';
 import { DocumentCard } from '@/components/dashboard/document-card';
 import { CreateDocumentDialog } from '@/components/dashboard/create-document-dialog';
 import { EmptyState } from '@/components/dashboard/empty-state';
+import { MoodleSyncPromptWrapper } from '@/components/dashboard/moodle-sync-prompt-wrapper';
+import { getUserMoodleConnection } from '@/lib/queries/moodle';
 import { Button } from '@/components/ui/button';
 import {
   Breadcrumb,
@@ -17,6 +19,24 @@ import type { Folder, Document, Course } from '@/types/database';
 
 export default async function DashboardPage() {
   const supabase = await createClient();
+
+  // Fetch current user for Moodle connection lookup
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  // Fetch Moodle connection (returns null if none configured)
+  let moodleConnection: { domain: string; instanceId: string } | null = null;
+  if (user) {
+    const connection = await getUserMoodleConnection(user.id);
+    if (connection?.moodle_instances) {
+      const instance = connection.moodle_instances as { id: string; domain: string };
+      moodleConnection = {
+        domain: instance.domain,
+        instanceId: instance.id,
+      };
+    }
+  }
 
   const { data: folders } = await supabase
     .from('folders')
@@ -46,7 +66,9 @@ export default async function DashboardPage() {
 
   return (
     <div className="p-6">
-      <div className="mb-6 flex items-center justify-between">
+      <MoodleSyncPromptWrapper moodleConnection={moodleConnection} />
+
+      <div className="mb-6 mt-4 flex items-center justify-between">
         <Breadcrumb>
           <BreadcrumbList>
             <BreadcrumbItem>

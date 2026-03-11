@@ -19,10 +19,10 @@
 
 **Purpose**: Extension project scaffold and shared types between app and extension
 
-- [ ] T001 Create extension project structure at `extension/` with `package.json`, `tsconfig.json`, and build config (esbuild or vite for bundling)
-- [ ] T002 Create extension `extension/manifest.json` with Manifest V3: `externally_connectable` for Typenote domain, `optional_host_permissions`, `storage` permission, service worker registration
-- [ ] T003 [P] Create shared message types at `extension/src/types/messages.ts` matching the extension-messaging contract (PING, CHECK_LOGIN, SCRAPE_COURSES, SCRAPE_COURSE_CONTENT, DOWNLOAD_AND_UPLOAD, REQUEST_PERMISSION)
-- [ ] T004 [P] Create Moodle-specific TypeScript types at `src/lib/moodle/types.ts` for shared registry entities (MoodleInstance, MoodleCourse, MoodleSection, MoodleFile) and sync payloads matching API contracts
+- [x] T001 Create extension project structure at `extension/` with `package.json`, `tsconfig.json`, and build config (esbuild or vite for bundling)
+- [x] T002 Create extension `extension/manifest.json` with Manifest V3: `externally_connectable` for Typenote domain, `optional_host_permissions`, `storage` permission, service worker registration
+- [x] T003 [P] Create shared message types at `extension/src/types/messages.ts` matching the extension-messaging contract (PING, CHECK_LOGIN, SCRAPE_COURSES, SCRAPE_COURSE_CONTENT, DOWNLOAD_AND_UPLOAD, REQUEST_PERMISSION)
+- [x] T004 [P] Create Moodle-specific TypeScript types at `src/lib/moodle/types.ts` for shared registry entities (MoodleInstance, MoodleCourse, MoodleSection, MoodleFile) and sync payloads matching API contracts
 
 ---
 
@@ -32,14 +32,14 @@
 
 **CRITICAL**: No user story work can begin until this phase is complete
 
-- [ ] T005 Create migration `supabase/migrations/00007_create_moodle_shared_registry.sql` — `moodle_instances`, `moodle_courses`, `moodle_sections`, `moodle_files` tables with indexes, unique constraints, updated_at triggers, and RLS (SELECT for authenticated, no direct INSERT/UPDATE/DELETE)
-- [ ] T006 Create migration `supabase/migrations/00008_create_moodle_user_syncs.sql` — `user_moodle_connections`, `user_course_syncs`, `user_file_imports` tables with user_id-based RLS, indexes, unique constraints, updated_at triggers
-- [ ] T007 Create migration `supabase/migrations/00009_create_moodle_storage_bucket.sql` — `moodle-materials` shared storage bucket with expanded MIME types, SELECT for authenticated, INSERT/UPDATE/DELETE via service role
-- [ ] T008 Run `supabase db reset` to verify full migration chain replays cleanly
-- [ ] T009 Add new entity types to `src/types/database.ts` — MoodleInstance, MoodleCourse, MoodleSection, MoodleFile, UserMoodleConnection, UserCourseSync, UserFileImport
-- [ ] T010 Update `supabase/seed.sql` with sample Moodle data (test instance, courses, sections, files) for local development
-- [ ] T011 Write integration test for shared registry RLS in `src/lib/queries/moodle-registry.integration.test.ts` — verify authenticated users can SELECT shared tables, verify direct INSERT is blocked, verify service role can INSERT
-- [ ] T012 Write integration test for per-user sync RLS in `src/lib/queries/moodle-user-syncs.integration.test.ts` — verify users can only CRUD their own connections/syncs/imports
+- [x] T005 Create migration `supabase/migrations/00007_create_moodle_shared_registry.sql` — `moodle_instances`, `moodle_courses`, `moodle_sections`, `moodle_files` tables with indexes, unique constraints, updated_at triggers, and RLS (SELECT for authenticated, no direct INSERT/UPDATE/DELETE)
+- [x] T006 Create migration `supabase/migrations/00008_create_moodle_user_syncs.sql` — `user_moodle_connections`, `user_course_syncs`, `user_file_imports` tables with user_id-based RLS, indexes, unique constraints, updated_at triggers
+- [x] T007 Create migration `supabase/migrations/00009_create_moodle_storage_bucket.sql` — `moodle-materials` shared storage bucket with expanded MIME types, SELECT for authenticated, INSERT/UPDATE/DELETE via service role
+- [x] T008 Run `supabase db reset` to verify full migration chain replays cleanly
+- [x] T009 Add new entity types to `src/types/database.ts` — MoodleInstance, MoodleCourse, MoodleSection, MoodleFile, UserMoodleConnection, UserCourseSync, UserFileImport
+- [x] T010 Update `supabase/seed.sql` with sample Moodle data (test instance, courses, sections, files) for local development
+- [x] T011 Write integration test for shared registry RLS in `src/lib/queries/moodle-registry.integration.test.ts` — verify authenticated users can SELECT shared tables, verify direct INSERT is blocked, verify service role can INSERT
+- [x] T012 Write integration test for per-user sync RLS in `src/lib/queries/moodle-user-syncs.integration.test.ts` — verify users can only CRUD their own connections/syncs/imports
 
 **Checkpoint**: Database ready — all 7 new tables created, RLS verified, seed data available
 
@@ -53,17 +53,17 @@
 
 ### Tests for User Story 1
 
-- [ ] T013 [P] [US1] Write unit test for dedup logic in `src/lib/moodle/dedup.test.ts` — test URL match, hash match, new file, modified file (same URL different hash), and cross-course hash dedup scenarios
-- [ ] T014 [P] [US1] Write integration test for sync API in `src/lib/moodle/sync-service.integration.test.ts` — test upsert of instances/courses/sections/files, verify idempotent upserts, verify concurrent sync safety
+- [x] T013 [P] [US1] Write unit test for dedup logic in `src/lib/moodle/dedup.test.ts` — test URL match, hash match, new file, modified file (same URL different hash), and cross-course hash dedup scenarios
+- [x] T014 [P] [US1] Write integration test for sync API in `src/lib/moodle/sync-service.integration.test.ts` — test upsert of instances/courses/sections/files, verify idempotent upserts, verify concurrent sync safety
 
 ### Implementation for User Story 1
 
-- [ ] T015 [P] [US1] Implement dedup service in `src/lib/moodle/dedup.ts` — `checkFileExists(sectionId, moodleUrl, contentHash)` returning `{ exists: boolean, fileId?: string, status: 'exists' | 'new' | 'modified' }`
-- [ ] T016 [P] [US1] Implement shared registry queries in `src/lib/queries/moodle.ts` — `getMoodleInstance(domain)`, `getMoodleCourse(instanceId, moodleCourseId)`, `getMoodleSections(courseId)`, `getMoodleFiles(sectionId)`
-- [ ] T017 [US1] Implement sync service in `src/lib/moodle/sync-service.ts` — `upsertMoodleData(payload)` that takes scraped course data, upserts into shared tables using service role, returns status per file (exists/new/modified)
-- [ ] T018 [US1] Create API route `src/app/api/moodle/sync/route.ts` (POST) — receives scraped course data, calls sync service, returns registry comparison result per the api-routes contract
-- [ ] T019 [US1] Create API route `src/app/api/moodle/upload/route.ts` (POST) — receives multipart file upload + metadata, runs dedup check, stores in `moodle-materials` bucket if new, creates/updates `moodle_files` record
-- [ ] T020 [US1] Run all tests (`pnpm test` + `pnpm test:integration`) to verify dedup and sync logic
+- [x] T015 [P] [US1] Implement dedup service in `src/lib/moodle/dedup.ts` — `checkFileExists(sectionId, moodleUrl, contentHash)` returning `{ exists: boolean, fileId?: string, status: 'exists' | 'new' | 'modified' }`
+- [x] T016 [P] [US1] Implement shared registry queries in `src/lib/queries/moodle.ts` — `getMoodleInstance(domain)`, `getMoodleCourse(instanceId, moodleCourseId)`, `getMoodleSections(courseId)`, `getMoodleFiles(sectionId)`
+- [x] T017 [US1] Implement sync service in `src/lib/moodle/sync-service.ts` — `upsertMoodleData(payload)` that takes scraped course data, upserts into shared tables using service role, returns status per file (exists/new/modified)
+- [x] T018 [US1] Create API route `src/app/api/moodle/sync/route.ts` (POST) — receives scraped course data, calls sync service, returns registry comparison result per the api-routes contract
+- [x] T019 [US1] Create API route `src/app/api/moodle/upload/route.ts` (POST) — receives multipart file upload + metadata, runs dedup check, stores in `moodle-materials` bucket if new, creates/updates `moodle_files` record
+- [x] T020 [US1] Run all tests (`pnpm test` + `pnpm test:integration`) to verify dedup and sync logic
 
 **Checkpoint**: Shared registry and dedup fully functional. API routes accept course data and file uploads. Files are deduplicated.
 
@@ -77,15 +77,15 @@
 
 ### Implementation for User Story 2
 
-- [ ] T021 [P] [US2] Implement extension service worker at `extension/src/background/service-worker.ts` — listen for `onMessageExternal`, handle PING message (return version), route other messages
-- [ ] T022 [P] [US2] Implement Moodle detector at `extension/src/lib/moodle-detector.ts` — `validateMoodleUrl(url)` that makes a fetch to the URL and checks for Moodle page markers
-- [ ] T023 [P] [US2] Implement permission requester in `extension/src/lib/messaging.ts` — handle REQUEST_PERMISSION message, call `chrome.permissions.request()` for the Moodle domain
-- [ ] T024 [US2] Implement `use-moodle-extension` hook at `src/hooks/use-moodle-extension.ts` — `ping()` to detect extension, `requestPermission(url)`, `isExtensionInstalled` state. Uses `chrome.runtime.sendMessage` with extension ID from env
-- [ ] T025 [US2] Create Moodle connection setup component at `src/components/dashboard/moodle-connection-setup.tsx` — URL input field, validation feedback, save button. Shows "Extension not installed" prompt if ping fails
-- [ ] T026 [US2] Implement server action `src/lib/actions/moodle-sync.ts` — `saveMoodleConnection(domain)` that upserts `moodle_instances` (via service role) and creates `user_moodle_connections` record
-- [ ] T027 [US2] Implement query `src/lib/queries/moodle.ts` — add `getUserMoodleConnection(userId)` to fetch user's connected instance
-- [ ] T028 [US2] Add connection setup to dashboard settings page or onboarding flow — integrate the component where students configure their Moodle URL
-- [ ] T029 [US2] Write unit test for `use-moodle-extension` hook in `src/hooks/use-moodle-extension.test.ts` — test ping success/failure, extension detection
+- [x] T021 [P] [US2] Implement extension service worker at `extension/src/background/service-worker.ts` — listen for `onMessageExternal`, handle PING message (return version), route other messages
+- [x] T022 [P] [US2] Implement Moodle detector at `extension/src/lib/moodle-detector.ts` — `validateMoodleUrl(url)` that makes a fetch to the URL and checks for Moodle page markers
+- [x] T023 [P] [US2] Implement permission requester in `extension/src/lib/messaging.ts` — handle REQUEST_PERMISSION message, call `chrome.permissions.request()` for the Moodle domain
+- [x] T024 [US2] Implement `use-moodle-extension` hook at `src/hooks/use-moodle-extension.ts` — `ping()` to detect extension, `requestPermission(url)`, `isExtensionInstalled` state. Uses `chrome.runtime.sendMessage` with extension ID from env
+- [x] T025 [US2] Create Moodle connection setup component at `src/components/dashboard/moodle-connection-setup.tsx` — URL input field, validation feedback, save button. Shows "Extension not installed" prompt if ping fails
+- [x] T026 [US2] Implement server action `src/lib/actions/moodle-sync.ts` — `saveMoodleConnection(domain)` that upserts `moodle_instances` (via service role) and creates `user_moodle_connections` record
+- [x] T027 [US2] Implement query `src/lib/queries/moodle.ts` — add `getUserMoodleConnection(userId)` to fetch user's connected instance
+- [x] T028 [US2] Add connection setup to dashboard settings page or onboarding flow — integrate the component where students configure their Moodle URL
+- [x] T029 [US2] Write unit test for `use-moodle-extension` hook in `src/hooks/use-moodle-extension.test.ts` — test ping success/failure, extension detection
 
 **Checkpoint**: Student can enter Moodle URL, it validates, connection is saved. Extension responds to ping.
 
@@ -99,10 +99,10 @@
 
 ### Implementation for User Story 3
 
-- [ ] T030 [P] [US3] Implement CHECK_LOGIN handler in extension service worker `extension/src/background/service-worker.ts` — fetch Moodle dashboard URL, check if response is login page or logged-in content
-- [ ] T031 [US3] Add `checkMoodleLogin(moodleUrl)` to `src/hooks/use-moodle-extension.ts` — sends CHECK_LOGIN message, returns `{ loggedIn: boolean }`
-- [ ] T032 [US3] Create sync prompt component at `src/components/dashboard/moodle-sync-prompt.tsx` — shows "Sync with Moodle" button if logged in, "Log into Moodle" with link if not, "Install extension" if missing
-- [ ] T033 [US3] Integrate sync prompt into dashboard layout `src/app/(dashboard)/layout.tsx` or dashboard page — check login status on mount, show prompt accordingly
+- [x] T030 [P] [US3] Implement CHECK_LOGIN handler in extension service worker `extension/src/background/service-worker.ts` — fetch Moodle dashboard URL, check if response is login page or logged-in content
+- [x] T031 [US3] Add `checkMoodleLogin(moodleUrl)` to `src/hooks/use-moodle-extension.ts` — sends CHECK_LOGIN message, returns `{ loggedIn: boolean }`
+- [x] T032 [US3] Create sync prompt component at `src/components/dashboard/moodle-sync-prompt.tsx` — shows "Sync with Moodle" button if logged in, "Log into Moodle" with link if not, "Install extension" if missing
+- [x] T033 [US3] Integrate sync prompt into dashboard layout `src/app/(dashboard)/layout.tsx` or dashboard page — check login status on mount, show prompt accordingly
 
 **Checkpoint**: Login detection works. Dashboard shows contextual Moodle prompt.
 
