@@ -176,14 +176,14 @@
 
 **Purpose**: Error handling, edge cases, and production readiness
 
-- [ ] T056 [P] Handle extension not installed — show install prompt with link in sync prompt component `src/components/dashboard/moodle-sync-prompt.tsx`
-- [ ] T057 [P] Handle session expiry mid-sync — detect auth errors from extension, pause sync, show re-login prompt, resume after re-auth
-- [ ] T058 [P] Handle file download failures — mark failed items with retry option in sync dialog, continue other items
-- [ ] T059 [P] Handle file size limit — flag files > 50MB as "Too large" in file picker, prevent selection
-- [ ] T060 Add loading states and progress indicators throughout sync flow (course scraping, file downloading, upload progress)
-- [ ] T061 Implement linking synced Moodle course to personal Typenote course — add optional `course_id` selection in sync dialog, update `user_course_syncs.course_id`
-- [ ] T062 Run full lint, format check, and test suite (`pnpm lint && pnpm format:check && pnpm test && pnpm test:integration`)
-- [ ] T063 Run quickstart.md validation — verify dev setup flow works end to end
+- [x] T056 [P] Handle extension not installed — show install prompt with link in sync prompt component `src/components/dashboard/moodle-sync-prompt.tsx`
+- [x] T057 [P] Handle session expiry mid-sync — detect auth errors from extension, pause sync, show re-login prompt, resume after re-auth
+- [x] T058 [P] Handle file download failures — mark failed items with retry option in sync dialog, continue other items
+- [x] T059 [P] Handle file size limit — flag files > 50MB as "Too large" in file picker, prevent selection
+- [x] T060 Add loading states and progress indicators throughout sync flow (course scraping, file downloading, upload progress)
+- [x] T061 Implement linking synced Moodle course to personal Typenote course — add optional `course_id` selection in sync dialog, update `user_course_syncs.course_id`
+- [x] T062 Run full lint, format check, and test suite (`pnpm lint && pnpm format:check && pnpm test && pnpm test:integration`)
+- [x] T063 Run quickstart.md validation — verify dev setup flow works end to end
 
 ---
 
