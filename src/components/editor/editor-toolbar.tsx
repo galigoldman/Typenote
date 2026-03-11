@@ -8,6 +8,7 @@ import {
   Italic,
   Underline,
   Strikethrough,
+  Highlighter,
   AlignLeft,
   AlignCenter,
   AlignRight,
@@ -29,10 +30,11 @@ import {
   TooltipTrigger,
 } from '@/components/ui/tooltip';
 import { HeadingDropdown } from './heading-dropdown';
-import { useCallback } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
 interface EditorToolbarProps {
   editor: Editor;
+  hideUndoRedo?: boolean;
 }
 
 interface ToolbarButtonProps {
@@ -82,7 +84,92 @@ function VerticalSeparator() {
   return <Separator orientation="vertical" className="mx-1 h-6" />;
 }
 
-export function EditorToolbar({ editor }: EditorToolbarProps) {
+const TEXT_HIGHLIGHT_COLORS = [
+  { label: 'Yellow', value: '#fef08a' },
+  { label: 'Green', value: '#bbf7d0' },
+  { label: 'Blue', value: '#bfdbfe' },
+  { label: 'Pink', value: '#fbcfe8' },
+  { label: 'Purple', value: '#e9d5ff' },
+  { label: 'Orange', value: '#fed7aa' },
+  { label: 'None', value: '' },
+];
+
+function HighlightButton({ editor }: { editor: Editor }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const handler = (e: PointerEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) {
+        setOpen(false);
+      }
+    };
+    window.addEventListener('pointerdown', handler);
+    return () => window.removeEventListener('pointerdown', handler);
+  }, [open]);
+
+  const activeColor = (editor.getAttributes('highlight').color as string) || '';
+
+  return (
+    <div className="relative" ref={ref}>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon-xs"
+            onMouseDown={(e) => e.preventDefault()}
+            onClick={() => setOpen((o) => !o)}
+            className={editor.isActive('highlight') ? 'bg-accent text-accent-foreground' : ''}
+            aria-label="Highlight"
+          >
+            <Highlighter />
+            {activeColor && (
+              <span
+                className="absolute bottom-0.5 left-1/2 -translate-x-1/2 h-0.5 w-3.5 rounded-full"
+                style={{ backgroundColor: activeColor }}
+              />
+            )}
+          </Button>
+        </TooltipTrigger>
+        <TooltipContent side="bottom" sideOffset={5}>
+          <p>Highlight</p>
+        </TooltipContent>
+      </Tooltip>
+      {open && (
+        <div className="absolute top-full left-1/2 -translate-x-1/2 mt-1 p-2 bg-popover border rounded-lg shadow-lg z-50">
+          <div className="flex gap-1.5">
+            {TEXT_HIGHLIGHT_COLORS.map((c) => (
+              <button
+                key={c.label}
+                onMouseDown={(e) => e.preventDefault()}
+                onClick={() => {
+                  if (c.value === '') {
+                    editor.chain().focus().unsetHighlight().run();
+                  } else {
+                    editor.chain().focus().toggleHighlight({ color: c.value }).run();
+                  }
+                  setOpen(false);
+                }}
+                className={`h-6 w-6 rounded-full border-2 transition-transform hover:scale-110 ${
+                  activeColor === c.value ? 'border-primary ring-2 ring-primary/30' : 'border-gray-200'
+                }`}
+                style={{
+                  backgroundColor: c.value || '#ffffff',
+                  backgroundImage: c.value === '' ? 'linear-gradient(135deg, transparent 45%, #ef4444 45%, #ef4444 55%, transparent 55%)' : undefined,
+                }}
+                title={c.label}
+              />
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+export function EditorToolbar({ editor, hideUndoRedo }: EditorToolbarProps) {
   const setLink = useCallback(() => {
     const previousUrl = editor.getAttributes('link').href as string | undefined;
     const url = window.prompt('URL', previousUrl);
@@ -97,22 +184,25 @@ export function EditorToolbar({ editor }: EditorToolbarProps) {
   return (
     <div className="flex items-center gap-0.5 border-b px-2 py-1 flex-wrap">
       {/* History */}
-      <ToolbarButton
-        onClick={() => editor.chain().focus().undo().run()}
-        disabled={!editor.can().undo()}
-        icon={<Undo2 />}
-        label="Undo"
-        shortcut="Ctrl+Z"
-      />
-      <ToolbarButton
-        onClick={() => editor.chain().focus().redo().run()}
-        disabled={!editor.can().redo()}
-        icon={<Redo2 />}
-        label="Redo"
-        shortcut="Ctrl+Y"
-      />
-
-      <VerticalSeparator />
+      {!hideUndoRedo && (
+        <>
+          <ToolbarButton
+            onClick={() => editor.chain().focus().undo().run()}
+            disabled={!editor.can().undo()}
+            icon={<Undo2 />}
+            label="Undo"
+            shortcut="Ctrl+Z"
+          />
+          <ToolbarButton
+            onClick={() => editor.chain().focus().redo().run()}
+            disabled={!editor.can().redo()}
+            icon={<Redo2 />}
+            label="Redo"
+            shortcut="Ctrl+Y"
+          />
+          <VerticalSeparator />
+        </>
+      )}
 
       {/* Block type */}
       <HeadingDropdown editor={editor} />
@@ -147,6 +237,7 @@ export function EditorToolbar({ editor }: EditorToolbarProps) {
         icon={<Strikethrough />}
         label="Strikethrough"
       />
+      <HighlightButton editor={editor} />
 
       <VerticalSeparator />
 

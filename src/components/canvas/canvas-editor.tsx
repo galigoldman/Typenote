@@ -13,7 +13,7 @@ import { PAGE_WIDTH, PAGE_HEIGHT } from '@/types/canvas';
 import type { Document } from '@/types/database';
 import type { SaveStatus } from '@/hooks/use-auto-save';
 import type { ConnectionStatus } from '@/hooks/use-realtime-sync';
-import { Pen, Type, Eraser, Highlighter } from 'lucide-react';
+import { Pen, Type, Eraser, Highlighter, Undo2, Redo2 } from 'lucide-react';
 import { useDocumentSync } from '@/hooks/use-document-sync';
 import { useDrawing } from '@/hooks/use-drawing';
 import { useEraser } from '@/hooks/use-eraser';
@@ -140,6 +140,12 @@ export function CanvasEditor({ document }: CanvasEditorProps) {
   const currentSize = activeTool === 'highlighter' ? highlighterSize : penSize;
   const currentOpacity = activeTool === 'highlighter' ? 0.4 : 1;
 
+  // Stroke undo/redo history
+  type StrokeAction = { type: 'add' | 'remove'; pageId: string; stroke: Stroke };
+  const undoStackRef = useRef<StrokeAction[]>([]);
+  const redoStackRef = useRef<StrokeAction[]>([]);
+  const [historyVersion, setHistoryVersion] = useState(0);
+
   const pagesRef = useRef(pages);
 
   useEffect(() => {
@@ -180,9 +186,13 @@ export function CanvasEditor({ document }: CanvasEditorProps) {
     onRemotePagesUpdate,
   });
 
-  // Stroke management
+  // Stroke management (with undo history)
   const handleStrokeAdd = useCallback(
     (pageId: string, stroke: Stroke) => {
+      undoStackRef.current.push({ type: 'add', pageId, stroke });
+      redoStackRef.current = [];
+      if (undoStackRef.current.length > 100) undoStackRef.current.shift();
+      setHistoryVersion((v) => v + 1);
       setPages((prev) =>
         prev.map((p) =>
           p.id === pageId ? { ...p, strokes: [...p.strokes, stroke] } : p,
@@ -195,6 +205,13 @@ export function CanvasEditor({ document }: CanvasEditorProps) {
 
   const handleStrokeRemove = useCallback(
     (pageId: string, strokeId: string) => {
+      const stroke = pagesRef.current.find((p) => p.id === pageId)?.strokes.find((s) => s.id === strokeId);
+      if (stroke) {
+        undoStackRef.current.push({ type: 'remove', pageId, stroke });
+        redoStackRef.current = [];
+        if (undoStackRef.current.length > 100) undoStackRef.current.shift();
+        setHistoryVersion((v) => v + 1);
+      }
       setPages((prev) =>
         prev.map((p) =>
           p.id === pageId
@@ -273,6 +290,69 @@ export function CanvasEditor({ document }: CanvasEditorProps) {
     [drawUp, eraseUp],
   );
 
+  // Undo / Redo
+  const handleUndo = useCallback(() => {
+    if (activeTool === 'text' && activeEditor) {
+      activeEditor.chain().focus().undo().run();
+      return;
+    }
+    const action = undoStackRef.current.pop();
+    if (!action) return;
+    if (action.type === 'add') {
+      setPages((prev) =>
+        prev.map((p) =>
+          p.id === action.pageId
+            ? { ...p, strokes: p.strokes.filter((s) => s.id !== action.stroke.id) }
+            : p,
+        ),
+      );
+    } else {
+      setPages((prev) =>
+        prev.map((p) =>
+          p.id === action.pageId
+            ? { ...p, strokes: [...p.strokes, action.stroke] }
+            : p,
+        ),
+      );
+    }
+    redoStackRef.current.push(action);
+    setHistoryVersion((v) => v + 1);
+    triggerSave();
+  }, [activeTool, activeEditor, triggerSave]);
+
+  const handleRedo = useCallback(() => {
+    if (activeTool === 'text' && activeEditor) {
+      activeEditor.chain().focus().redo().run();
+      return;
+    }
+    const action = redoStackRef.current.pop();
+    if (!action) return;
+    if (action.type === 'add') {
+      setPages((prev) =>
+        prev.map((p) =>
+          p.id === action.pageId
+            ? { ...p, strokes: [...p.strokes, action.stroke] }
+            : p,
+        ),
+      );
+    } else {
+      setPages((prev) =>
+        prev.map((p) =>
+          p.id === action.pageId
+            ? { ...p, strokes: p.strokes.filter((s) => s.id !== action.stroke.id) }
+            : p,
+        ),
+      );
+    }
+    undoStackRef.current.push(action);
+    setHistoryVersion((v) => v + 1);
+    triggerSave();
+  }, [activeTool, activeEditor, triggerSave]);
+
+  // Compute disabled state (draw mode only — text mode always enabled)
+  const canUndoDraw = historyVersion >= 0 && undoStackRef.current.length > 0;
+  const canRedoDraw = historyVersion >= 0 && redoStackRef.current.length > 0;
+
   const handleTitleBlur = async () => {
     if (title !== document.title) {
       await saveTitle(title);
@@ -323,6 +403,28 @@ export function CanvasEditor({ document }: CanvasEditorProps) {
 
       {/* Toolbar */}
       <div className="flex items-center border-b px-2 py-1">
+        {/* Undo / Redo — always visible */}
+        <div className="flex items-center gap-0.5 mr-2">
+          <button
+            onPointerDown={(e) => { e.stopPropagation(); handleUndo(); }}
+            disabled={isDrawMode ? !canUndoDraw : false}
+            className="flex items-center justify-center h-8 w-8 rounded-lg transition-colors hover:bg-accent disabled:opacity-30 disabled:pointer-events-none text-muted-foreground"
+            title="Undo"
+          >
+            <Undo2 className="h-4 w-4" />
+          </button>
+          <button
+            onPointerDown={(e) => { e.stopPropagation(); handleRedo(); }}
+            disabled={isDrawMode ? !canRedoDraw : false}
+            className="flex items-center justify-center h-8 w-8 rounded-lg transition-colors hover:bg-accent disabled:opacity-30 disabled:pointer-events-none text-muted-foreground"
+            title="Redo"
+          >
+            <Redo2 className="h-4 w-4" />
+          </button>
+        </div>
+
+        <div className="h-6 w-px bg-border mr-2" />
+
         {/* Mode toggle: Draw / Type */}
         <div className="flex items-center gap-1">
           <button
@@ -396,7 +498,7 @@ export function CanvasEditor({ document }: CanvasEditorProps) {
           <>
             <div className="h-6 w-px bg-border mx-2" />
             <div className="flex-1">
-              <EditorToolbar editor={activeEditor} />
+              <EditorToolbar editor={activeEditor} hideUndoRedo />
             </div>
           </>
         )}
