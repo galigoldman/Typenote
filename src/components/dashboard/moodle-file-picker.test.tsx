@@ -640,4 +640,238 @@ describe('MoodleFilePicker', () => {
     // homework-1.pdf is neither imported nor removed — should still show
     expect(screen.getByText('homework-1.pdf')).toBeInTheDocument();
   });
+
+  it('shows "Too large" badge and disables checkbox for files over 50MB', async () => {
+    const oversizedContent = {
+      sections: [
+        {
+          moodleSectionId: 'sec-1',
+          title: 'Week 1',
+          position: 0,
+          items: [
+            {
+              type: 'file' as const,
+              name: 'huge-video.mp4',
+              moodleUrl: 'https://moodle.test.ac.il/mod/resource/view.php?id=10',
+              fileSize: 60 * 1024 * 1024, // 60 MB — exceeds 50 MB limit
+              mimeType: 'video/mp4',
+            },
+            {
+              type: 'file' as const,
+              name: 'small-file.pdf',
+              moodleUrl: 'https://moodle.test.ac.il/mod/resource/view.php?id=11',
+              fileSize: 1024 * 1024, // 1 MB
+              mimeType: 'application/pdf',
+            },
+          ],
+        },
+      ],
+    };
+
+    const mockScrape = vi.fn().mockResolvedValue(oversizedContent);
+    mockUseMoodleExtension.mockReturnValue({
+      scrapeCourseContent: mockScrape,
+      downloadAndUpload: vi.fn(),
+    });
+
+    render(<MoodleFilePicker {...defaultProps} />);
+
+    await waitFor(() => {
+      expect(screen.getByText('huge-video.mp4')).toBeInTheDocument();
+    });
+
+    // Should show "Too large" badge
+    expect(screen.getByText('Too large')).toBeInTheDocument();
+
+    // Checkbox for oversized file should be disabled
+    const oversizedCheckbox = screen.getByRole('checkbox', {
+      name: /select huge-video\.mp4/i,
+    });
+    expect(oversizedCheckbox).toBeDisabled();
+
+    // Normal file should not be disabled
+    const normalCheckbox = screen.getByRole('checkbox', {
+      name: /select small-file\.pdf/i,
+    });
+    expect(normalCheckbox).not.toBeDisabled();
+
+    // Only 1 item should be pre-selected (the small file)
+    expect(
+      screen.getByRole('button', { name: /import selected \(1\)/i }),
+    ).toBeInTheDocument();
+  });
+
+  it('shows failed items list and retry button after import with failures', async () => {
+    const user = userEvent.setup();
+
+    const mockScrape = vi.fn().mockResolvedValue({
+      sections: [
+        {
+          moodleSectionId: 'sec-1',
+          title: 'Week 1',
+          position: 0,
+          items: [
+            {
+              type: 'file' as const,
+              name: 'good-file.pdf',
+              moodleUrl: 'https://moodle.test.ac.il/mod/resource/view.php?id=20',
+            },
+            {
+              type: 'file' as const,
+              name: 'bad-file.pdf',
+              moodleUrl: 'https://moodle.test.ac.il/mod/resource/view.php?id=21',
+            },
+          ],
+        },
+      ],
+    });
+
+    // First call succeeds (returns data), second returns null (failure)
+    const mockDownload = vi
+      .fn()
+      .mockResolvedValueOnce({ contentHash: 'abc', fileSize: 100, mimeType: 'application/pdf', deduplicated: false })
+      .mockResolvedValueOnce(null);
+
+    mockUseMoodleExtension.mockReturnValue({
+      scrapeCourseContent: mockScrape,
+      downloadAndUpload: mockDownload,
+    });
+    mockRecordFileImports.mockResolvedValue({
+      syncId: 'sync-1',
+      importedCount: 1,
+    });
+
+    render(<MoodleFilePicker {...defaultProps} />);
+
+    await waitFor(() => {
+      expect(screen.getByText('good-file.pdf')).toBeInTheDocument();
+    });
+
+    const importButton = screen.getByRole('button', {
+      name: /import selected \(2\)/i,
+    });
+    await user.click(importButton);
+
+    await waitFor(() => {
+      expect(screen.getByText(/import complete/i)).toBeInTheDocument();
+    });
+
+    // Should show the failed item
+    expect(screen.getByText('1 file failed to download:')).toBeInTheDocument();
+    expect(screen.getByTestId('failed-items-list')).toBeInTheDocument();
+    expect(screen.getByText('bad-file.pdf')).toBeInTheDocument();
+
+    // Should show retry button
+    expect(screen.getByTestId('retry-failed-button')).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: /retry failed \(1\)/i }),
+    ).toBeInTheDocument();
+  });
+
+  it('shows auth error hint when download fails with 403', async () => {
+    const user = userEvent.setup();
+
+    const mockScrape = vi.fn().mockResolvedValue({
+      sections: [
+        {
+          moodleSectionId: 'sec-1',
+          title: 'Week 1',
+          position: 0,
+          items: [
+            {
+              type: 'file' as const,
+              name: 'protected-file.pdf',
+              moodleUrl: 'https://moodle.test.ac.il/mod/resource/view.php?id=30',
+            },
+          ],
+        },
+      ],
+    });
+
+    const mockDownload = vi
+      .fn()
+      .mockRejectedValue(new Error('403 Forbidden'));
+
+    mockUseMoodleExtension.mockReturnValue({
+      scrapeCourseContent: mockScrape,
+      downloadAndUpload: mockDownload,
+    });
+    mockRecordFileImports.mockResolvedValue({
+      syncId: 'sync-1',
+      importedCount: 0,
+    });
+
+    render(<MoodleFilePicker {...defaultProps} />);
+
+    await waitFor(() => {
+      expect(screen.getByText('protected-file.pdf')).toBeInTheDocument();
+    });
+
+    const importButton = screen.getByRole('button', {
+      name: /import selected \(1\)/i,
+    });
+    await user.click(importButton);
+
+    await waitFor(() => {
+      expect(screen.getByText(/import complete/i)).toBeInTheDocument();
+    });
+
+    // Should show auth error hint with Moodle login link
+    expect(
+      screen.getByText(/expired moodle session/i),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('link', { name: /re-log into moodle/i }),
+    ).toHaveAttribute('href', 'https://moodle.test.ac.il/login');
+  });
+
+  it('shows course linking note in done phase', async () => {
+    const user = userEvent.setup();
+
+    const mockScrape = vi.fn().mockResolvedValue({
+      sections: [
+        {
+          moodleSectionId: 'sec-1',
+          title: 'Week 1',
+          position: 0,
+          items: [
+            {
+              type: 'file' as const,
+              name: 'file.pdf',
+              moodleUrl: 'https://moodle.test.ac.il/mod/resource/view.php?id=40',
+            },
+          ],
+        },
+      ],
+    });
+
+    const mockDownload = vi.fn().mockResolvedValue(null);
+    mockUseMoodleExtension.mockReturnValue({
+      scrapeCourseContent: mockScrape,
+      downloadAndUpload: mockDownload,
+    });
+    mockRecordFileImports.mockResolvedValue({
+      syncId: 'sync-1',
+      importedCount: 0,
+    });
+
+    render(<MoodleFilePicker {...defaultProps} />);
+
+    await waitFor(() => {
+      expect(screen.getByText('file.pdf')).toBeInTheDocument();
+    });
+
+    const importButton = screen.getByRole('button', {
+      name: /import selected \(1\)/i,
+    });
+    await user.click(importButton);
+
+    await waitFor(() => {
+      expect(screen.getByText(/import complete/i)).toBeInTheDocument();
+    });
+
+    expect(
+      screen.getByText(/link this moodle course to a typenote course/i),
+    ).toBeInTheDocument();
+  });
 });

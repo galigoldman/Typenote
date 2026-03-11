@@ -33,6 +33,20 @@ interface MoodleSyncDialogProps {
 
 type DialogPhase = 'scraping' | 'comparing' | 'ready' | 'syncing' | 'done' | 'error';
 
+/** Error messages that suggest a Moodle session has expired */
+const AUTH_ERROR_PATTERNS = [
+  '403',
+  'forbidden',
+  'unauthorized',
+  'login required',
+  'session expired',
+];
+
+function isAuthError(message: string): boolean {
+  const lower = message.toLowerCase();
+  return AUTH_ERROR_PATTERNS.some((pattern) => lower.includes(pattern));
+}
+
 const STATUS_BADGE_MAP: Record<
   CourseComparisonStatus,
   { label: string; variant: 'default' | 'secondary' | 'outline' }
@@ -54,6 +68,7 @@ export function MoodleSyncDialog({
   const [courses, setCourses] = useState<CourseComparison[]>([]);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [error, setError] = useState<string | null>(null);
+  const [authError, setAuthError] = useState(false);
   const [syncedCount, setSyncedCount] = useState(0);
   const [syncedCourses, setSyncedCourses] = useState<SyncCourseResult[]>([]);
   const [expandedFilePicker, setExpandedFilePicker] = useState<string | null>(null);
@@ -61,6 +76,7 @@ export function MoodleSyncDialog({
   const loadCourses = useCallback(async () => {
     setPhase('scraping');
     setError(null);
+    setAuthError(false);
     setCourses([]);
     setSelectedIds(new Set());
 
@@ -96,7 +112,9 @@ export function MoodleSyncDialog({
       setSelectedIds(preSelected);
       setPhase('ready');
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load courses');
+      const message = err instanceof Error ? err.message : 'Failed to load courses';
+      setError(message);
+      setAuthError(isAuthError(message));
       setPhase('error');
     }
   }, [scrapeCourses, moodleConnection.domain]);
@@ -123,6 +141,7 @@ export function MoodleSyncDialog({
   async function handleSync() {
     setPhase('syncing');
     setError(null);
+    setAuthError(false);
 
     try {
       const selected = courses.filter((c) =>
@@ -158,7 +177,9 @@ export function MoodleSyncDialog({
       setSyncedCourses(result.courses);
       setPhase('done');
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Sync failed');
+      const message = err instanceof Error ? err.message : 'Sync failed';
+      setError(message);
+      setAuthError(isAuthError(message));
       setPhase('error');
     }
   }
@@ -301,9 +322,25 @@ export function MoodleSyncDialog({
 
         {/* Error phase */}
         {error && (
-          <p className="text-sm text-destructive" role="alert">
-            {error}
-          </p>
+          <div className="space-y-2">
+            <p className="text-sm text-destructive" role="alert">
+              {error}
+            </p>
+            {authError && (
+              <p className="text-xs text-muted-foreground">
+                Your Moodle session may have expired.{' '}
+                <a
+                  href={`https://${moodleConnection.domain}/login`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="underline"
+                >
+                  Re-log into Moodle
+                </a>{' '}
+                and try again.
+              </p>
+            )}
+          </div>
         )}
 
         <DialogFooter>

@@ -58,6 +58,7 @@ export function MoodleSyncPrompt({
           </CardDescription>
         </CardHeader>
         <CardContent>
+          {/* TODO: Replace with Chrome Web Store link when extension is published */}
           <Button variant="outline" size="sm" disabled>
             Install Extension
           </Button>
