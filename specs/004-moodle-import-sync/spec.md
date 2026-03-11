@@ -7,11 +7,28 @@
 
 ## User Scenarios & Testing *(mandatory)*
 
-### User Story 1 - First-Time Moodle Connection Setup (Priority: P1)
+### User Story 1 - Shared Moodle Registry & Deduplication (Priority: P1)
+
+Moodle courses, sections, and files exist as shared canonical entities in the system, identified by Moodle instance domain + course ID. When any student syncs a course, the system first checks what already exists in the shared registry (possibly from other students' earlier syncs). Files are deduplicated using a two-tier strategy: first by Moodle URL match, then by content hash. If a file already exists, only a reference is created — no duplicate storage. This is the data backbone that all other stories depend on.
+
+**Why this priority**: This is the foundation. Every sync — even a student's very first sync — must check the shared registry first. The DB schema, dedup logic, and shared storage are prerequisites for all other functionality. Without this, every student would store their own copy of everything.
+
+**Independent Test**: Can be tested by having two students sync the same Moodle course and verifying: (1) only one shared course entity exists, (2) files are stored once, (3) the second student's sync creates references not copies, (4) total storage is ~1x not 2x.
+
+**Acceptance Scenarios**:
+
+1. **Given** no one has synced "Intro to CS" before, **When** Student A syncs it, **Then** a shared Moodle course entity is created with its sections and files stored in the shared registry.
+2. **Given** Student A already synced "Intro to CS," **When** Student B syncs the same course, **Then** the system finds the existing shared course, skips files that already exist (by URL/hash), and creates references for Student B — no duplicate storage.
+3. **Given** a file exists at one Moodle URL but identical content (same hash) was already stored from a different URL, **When** it is imported, **Then** the system deduplicates by hash and creates a reference to the existing file.
+4. **Given** a Moodle instance is identified by its domain, **When** two students from the same university sync different courses, **Then** both courses are grouped under the same Moodle instance entity.
+
+---
+
+### User Story 2 - First-Time Moodle Connection Setup (Priority: P1)
 
 A student installs the Typenote browser extension and connects their Moodle instance. In Typenote's settings (or onboarding), they enter their university's Moodle URL (e.g., `moodle.tau.ac.il`). The app validates it's a real Moodle instance. The extension stores this URL and can now check login status.
 
-**Why this priority**: Without a valid Moodle connection, no other sync functionality works. This is the foundation.
+**Why this priority**: Without a valid Moodle connection, no sync functionality works. This is the user-facing entry point.
 
 **Independent Test**: Can be fully tested by entering a Moodle URL and confirming the extension recognizes the instance. Delivers value by establishing the connection pipeline.
 
@@ -23,7 +40,7 @@ A student installs the Typenote browser extension and connects their Moodle inst
 
 ---
 
-### User Story 2 - Moodle Login Detection & Sync Prompt (Priority: P1)
+### User Story 3 - Moodle Login Detection & Sync Prompt (Priority: P1)
 
 When the student opens the Typenote app, it asks the extension to check if the student is logged into their Moodle instance. If logged in, the app shows a prompt suggesting to sync. If not logged in, the app shows a message asking them to log into Moodle first (with a link to open Moodle login in a new tab).
 
@@ -39,25 +56,27 @@ When the student opens the Typenote app, it asks the extension to check if the s
 
 ---
 
-### User Story 3 - Course Discovery & Selection (Priority: P1)
+### User Story 4 - Course Discovery & Sync Against Shared Registry (Priority: P1)
 
-When the student clicks "Sync with Moodle," the extension scrapes the Moodle courses page in the background and returns a list of available courses. The Typenote app displays these courses with checkboxes. The student selects which courses they want to import. Courses already synced are marked as such and show what's new.
+When the student clicks "Sync with Moodle," the extension scrapes the Moodle courses page and returns the list. The app compares scraped courses against the shared registry to determine what's already known. For each course, it also compares sections and files against the registry to identify what's truly new (not yet in the system from any student) vs. what's already stored. The student sees their Moodle courses and can select which to sync. Already-synced courses show a count of new items found. This is always a "re-sync" — even a first-time sync checks the shared registry because another student may have already synced that course.
 
-**Why this priority**: Course discovery is the entry point to all material imports. Students must see and choose their courses before any files can be synced.
+**Why this priority**: Course discovery is the entry point to all material imports, and it must be registry-aware from day one. The distinction between "new to the system" and "new to this student" drives the entire sync UX and storage efficiency.
 
-**Independent Test**: Can be tested by triggering a sync, verifying the course list matches the student's actual Moodle enrollment, and selecting/deselecting courses.
+**Independent Test**: Can be tested by: (1) a first student syncing a course (everything is new to the system), (2) a second student syncing the same course (most files already in registry, only references needed), (3) re-syncing after professor adds new files (only new items shown).
 
 **Acceptance Scenarios**:
 
 1. **Given** a logged-in student clicks "Sync with Moodle," **When** the extension scrapes their Moodle dashboard, **Then** the app displays all enrolled courses with names and course codes.
-2. **Given** some courses were previously synced, **When** the course list appears, **Then** already-synced courses are clearly marked (e.g., "Synced - 3 new items") and new courses are unmarked.
-3. **Given** the extension cannot reach Moodle (network issue or session expired), **When** the scrape fails, **Then** the app shows a clear error message.
+2. **Given** a course has never been synced by anyone, **When** the student selects it, **Then** all sections and files are shown as new and available for import.
+3. **Given** a course was already synced by another student, **When** a new student selects it, **Then** the app shows the course structure but recognizes most files already exist in the shared registry — only references need to be created, no re-download needed for existing files.
+4. **Given** a student previously synced a course, **When** they re-sync and the professor added new files, **Then** only the new files (not yet in the registry or not yet imported by this student) are highlighted for selection.
+5. **Given** the extension cannot reach Moodle (network issue or session expired), **When** the scrape fails, **Then** the app shows a clear error message.
 
 ---
 
-### User Story 4 - Granular Material Selection & Import (Priority: P1)
+### User Story 5 - Granular Material Selection & Import (Priority: P1)
 
-After selecting a course, the student sees the course's internal structure (sections/topics as organized in Moodle). Under each section, they see files and links. They can cherry-pick exactly which items to import. The structure preserves Moodle's native ordering — sections are not auto-mapped to Typenote weeks. Selected files are downloaded by the extension and uploaded to the backend.
+After selecting a course, the student sees the course's internal structure (sections/topics as organized in Moodle). Under each section, they see files and links. They can cherry-pick exactly which items to import. The structure preserves Moodle's native ordering — sections are not auto-mapped to Typenote weeks. For files already in the shared registry, only a reference is created (instant). For truly new files, the extension downloads them from Moodle and uploads to the backend.
 
 **Why this priority**: Granular selection is core to the UX — students should never be forced to import everything. This is where actual materials enter the system.
 
@@ -67,30 +86,15 @@ After selecting a course, the student sees the course's internal structure (sect
 
 1. **Given** a student selected a course to sync, **When** the course structure loads, **Then** sections appear in Moodle's native order with their original titles.
 2. **Given** a course has files (PDFs, DOCX, PPTX, XLSX, etc.) and links under sections, **When** the structure is displayed, **Then** each item shows its name, type, and size (for files).
-3. **Given** the student selects specific items and clicks "Import," **When** the extension downloads and uploads them, **Then** each item is stored in the backend and associated with the correct course and section.
-4. **Given** some items were already imported in a previous sync, **When** the course structure loads, **Then** those items are shown as "Already imported" and are not presented for selection.
-
----
-
-### User Story 5 - Shared Storage & Deduplication (Priority: P2)
-
-When a file is uploaded, the system checks if the same file already exists (by Moodle URL first, then by content hash). If it exists, no duplicate is stored — instead, a reference is created linking the new student to the existing file. This saves storage and ensures files are ready for future AI retrieval across all students.
-
-**Why this priority**: Deduplication is an infrastructure concern that saves cost and enables AI retrieval. It doesn't affect the student-facing UX directly, but is essential for scalability.
-
-**Independent Test**: Can be tested by having two different students sync the same course and verifying that storage usage does not double — the second student's import creates references, not duplicate files.
-
-**Acceptance Scenarios**:
-
-1. **Given** Student A imported `lecture3.pdf` from "Intro to CS," **When** Student B syncs the same course and selects `lecture3.pdf`, **Then** no duplicate file is stored; Student B gets a reference to the existing file.
-2. **Given** a professor re-uploads a file with the same URL but different content, **When** a student syncs, **Then** the system detects the content change (via hash), stores the new version, and replaces the old reference.
-3. **Given** a file exists at a different Moodle URL but has identical content (same hash), **When** it is imported, **Then** the system deduplicates by hash and creates a reference to the existing file.
+3. **Given** the student selects items that already exist in the shared registry, **When** they click "Import," **Then** only references are created (no download needed) and import is near-instant.
+4. **Given** the student selects items not yet in the shared registry, **When** they click "Import," **Then** the extension downloads them from Moodle and uploads to the backend.
+5. **Given** some items were already imported by this student in a previous sync, **When** the course structure loads, **Then** those items are shown as "Already imported" and are not presented for selection.
 
 ---
 
 ### User Story 6 - Re-Sync & Change Detection (Priority: P2)
 
-When a student syncs a course they've already synced, the system compares the current Moodle state against what's already stored. It shows only new or changed items. Files removed by the professor are flagged as "Removed from Moodle" in Typenote but are kept (not deleted). Modified files (same URL, new content) are silently replaced with the updated version.
+When a student syncs a course they've already synced, the system compares the current Moodle state against the shared registry. It shows only items that are new (not in the registry from any student) or new to this student (in the registry but not yet imported by them). Files removed by the professor are flagged as "Removed from Moodle" in Typenote but are kept (not deleted). Modified files (same URL, new content) are silently replaced with the updated version.
 
 **Why this priority**: Ongoing sync is how students stay up-to-date throughout a semester. Without change detection, they'd have to manually track what's new.
 
@@ -101,22 +105,6 @@ When a student syncs a course they've already synced, the system compares the cu
 1. **Given** a student re-syncs a previously synced course, **When** the professor has added new files, **Then** only the new files are presented for selection.
 2. **Given** a professor removed a file from Moodle, **When** the student re-syncs, **Then** the file is flagged as "Removed from Moodle" in Typenote but remains accessible.
 3. **Given** a professor replaced a file (same URL, different content), **When** the student re-syncs, **Then** the updated file replaces the old version silently.
-
----
-
-### User Story 7 - Moodle Course as Shared Registry (Priority: P2)
-
-Moodle courses exist as shared canonical entities in the system, identified by Moodle instance domain + course ID. When any student syncs a course, the course entity and its structure are stored/updated centrally. Each student's personal Typenote course links to this shared Moodle course. This enables the system to know exactly what courses and files exist across all students.
-
-**Why this priority**: The shared registry is what makes deduplication and future AI features possible. It's the data backbone.
-
-**Independent Test**: Can be tested by verifying that after multiple students sync the same Moodle course, there is exactly one shared course entity with one set of sections and files, and multiple student references pointing to it.
-
-**Acceptance Scenarios**:
-
-1. **Given** Student A syncs "Intro to CS" from `moodle.tau.ac.il`, **When** Student B syncs the same course, **Then** both students reference the same shared Moodle course entity.
-2. **Given** a shared Moodle course exists, **When** any student syncs it and new files are found, **Then** the shared course structure is updated with the new files.
-3. **Given** a Moodle instance is identified by its domain, **When** two students from the same university sync, **Then** their courses are grouped under the same Moodle instance.
 
 ---
 
