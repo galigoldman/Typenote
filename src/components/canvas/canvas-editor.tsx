@@ -13,7 +13,7 @@ import { PAGE_WIDTH, PAGE_HEIGHT } from '@/types/canvas';
 import type { Document } from '@/types/database';
 import type { SaveStatus } from '@/hooks/use-auto-save';
 import type { ConnectionStatus } from '@/hooks/use-realtime-sync';
-import { Pen, Type, Eraser, Highlighter, Minus } from 'lucide-react';
+import { Pen, Type, Eraser, Highlighter } from 'lucide-react';
 import { useDocumentSync } from '@/hooks/use-document-sync';
 import { useDrawing } from '@/hooks/use-drawing';
 import { useEraser } from '@/hooks/use-eraser';
@@ -50,6 +50,12 @@ const HIGHLIGHTER_SIZES = [
   { label: 'S', value: 8 },
   { label: 'M', value: 20 },
   { label: 'L', value: 32 },
+];
+
+const ERASER_SIZES = [
+  { label: 'S', value: 6 },
+  { label: 'M', value: 14 },
+  { label: 'L', value: 24 },
 ];
 
 function SaveIndicator({ status }: { status: SaveStatus }) {
@@ -95,117 +101,6 @@ function ConnectionIndicator({
   );
 }
 
-function ColorPicker({
-  colors,
-  activeColor,
-  onSelect,
-}: {
-  colors: string[];
-  activeColor: string;
-  onSelect: (color: string) => void;
-}) {
-  const [open, setOpen] = useState(false);
-  const ref = useRef<HTMLDivElement>(null);
-
-  // Close on outside click/touch
-  useEffect(() => {
-    if (!open) return;
-    const handler = (e: PointerEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) {
-        setOpen(false);
-      }
-    };
-    window.addEventListener('pointerdown', handler);
-    return () => window.removeEventListener('pointerdown', handler);
-  }, [open]);
-
-  return (
-    <div className="relative" ref={ref}>
-      {/* Active color swatch */}
-      <button
-        onPointerDown={(e) => {
-          e.stopPropagation();
-          setOpen((o) => !o);
-        }}
-        className="flex items-center gap-1.5 px-1.5 py-1 rounded-md hover:bg-accent transition-colors"
-        title="Pick color"
-      >
-        <div
-          style={{
-            width: 28,
-            height: 28,
-            minWidth: 28,
-            minHeight: 28,
-            borderRadius: '50%',
-            backgroundColor: activeColor,
-            border: '2px solid #d1d5db',
-            display: 'block',
-          }}
-        />
-        <svg width="12" height="12" viewBox="0 0 12 12" fill="none" style={{ flexShrink: 0 }}>
-          <path d="M3 5L6 8L9 5" stroke="#888" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-        </svg>
-      </button>
-
-      {/* Dropdown palette */}
-      {open && (
-        <div
-          className="absolute top-full left-0 mt-1 p-2.5 bg-popover border rounded-lg shadow-lg z-50"
-          style={{ width: colors.length <= 5 ? 'auto' : 200 }}
-        >
-          <div className="flex flex-wrap gap-2">
-            {colors.map((color) => (
-              <button
-                key={color}
-                onPointerDown={(e) => {
-                  e.stopPropagation();
-                  onSelect(color);
-                  setOpen(false);
-                }}
-                className={`h-8 w-8 rounded-full border-2 shrink-0 transition-transform hover:scale-110 ${
-                  activeColor === color ? 'scale-110 border-primary ring-2 ring-primary/30' : 'border-gray-200'
-                }`}
-                style={{ backgroundColor: color }}
-              />
-            ))}
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}
-
-function SizePicker({
-  sizes,
-  activeSize,
-  onSelect,
-  color,
-}: {
-  sizes: { label: string; value: number }[];
-  activeSize: number;
-  onSelect: (size: number) => void;
-  color: string;
-}) {
-  return (
-    <div className="flex items-center gap-1">
-      {sizes.map((s) => (
-        <button
-          key={s.label}
-          onClick={() => onSelect(s.value)}
-          className={`flex items-center justify-center h-7 w-7 rounded-md text-xs font-medium transition-colors ${
-            activeSize === s.value
-              ? 'bg-primary text-primary-foreground'
-              : 'hover:bg-accent'
-          }`}
-          title={`${s.label} (${s.value}px)`}
-        >
-          <Minus style={{ color: activeSize === s.value ? undefined : color }} strokeWidth={s.value} className="h-4 w-4" />
-        </button>
-      ))}
-    </div>
-  );
-}
-
 function createEmptyPage(order: number): CanvasPageData {
   return {
     id: Math.random().toString(36).slice(2) + Date.now().toString(36),
@@ -237,7 +132,8 @@ export function CanvasEditor({ document }: CanvasEditorProps) {
   const [penColor, setPenColor] = useState('#000000');
   const [penSize, setPenSize] = useState(3);
   const [highlighterColor, setHighlighterColor] = useState('#FBBF24');
-  const [highlighterSize, setHighlighterSize] = useState(14);
+  const [highlighterSize, setHighlighterSize] = useState(20);
+  const [eraserSize, setEraserSize] = useState(14);
 
   // Derived values based on active tool
   const currentColor = activeTool === 'highlighter' ? highlighterColor : penColor;
@@ -349,6 +245,7 @@ export function CanvasEditor({ document }: CanvasEditorProps) {
   // Eraser hook
   const { handlePointerDown: eraseDown, handlePointerMove: eraseMove, handlePointerUp: eraseUp, eraserPosition } = useEraser({
     activeTool,
+    eraserRadius: eraserSize,
     onStrokeRemove: handleStrokeRemove,
     getPageStrokes,
   });
@@ -425,26 +322,26 @@ export function CanvasEditor({ document }: CanvasEditorProps) {
       )}
 
       {/* Toolbar */}
-      <div className="flex items-center border-b">
-        {/* Mode selector: Draw / Type */}
-        <div className="flex items-center gap-1 px-2 py-1 border-r">
+      <div className="flex items-center border-b px-2 py-1">
+        {/* Mode toggle: Draw / Type */}
+        <div className="flex items-center gap-1">
           <button
-            onClick={() => setActiveTool('pen')}
+            onPointerDown={(e) => { e.stopPropagation(); if (!isDrawMode) setActiveTool('pen'); }}
             className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
               isDrawMode
                 ? 'bg-primary text-primary-foreground'
-                : 'hover:bg-accent'
+                : 'hover:bg-accent text-muted-foreground'
             }`}
           >
             <Pen className="h-4 w-4" />
             Draw
           </button>
           <button
-            onClick={() => setActiveTool('text')}
+            onPointerDown={(e) => { e.stopPropagation(); setActiveTool('text'); }}
             className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
               activeTool === 'text'
                 ? 'bg-primary text-primary-foreground'
-                : 'hover:bg-accent'
+                : 'hover:bg-accent text-muted-foreground'
             }`}
           >
             <Type className="h-4 w-4" />
@@ -452,100 +349,194 @@ export function CanvasEditor({ document }: CanvasEditorProps) {
           </button>
         </div>
 
-        {/* Draw mode: sub-tools + color/size pickers */}
+        {/* Draw mode: sub-tool icons */}
         {isDrawMode && (
           <>
-            <div className="flex items-center gap-1 px-2 py-1 border-r">
+            <div className="h-6 w-px bg-border mx-2" />
+            <div className="flex items-center gap-1">
               <button
-                onClick={() => setActiveTool('pen')}
-                className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md text-sm transition-colors ${
+                onPointerDown={(e) => { e.stopPropagation(); setActiveTool('pen'); }}
+                className={`flex items-center justify-center h-8 w-8 rounded-lg transition-colors ${
                   activeTool === 'pen'
-                    ? 'bg-accent text-accent-foreground font-medium'
+                    ? 'bg-accent text-accent-foreground'
                     : 'hover:bg-accent/50 text-muted-foreground'
                 }`}
+                title="Pen"
               >
-                <Pen className="h-3.5 w-3.5" />
-                Pen
+                <Pen className="h-4 w-4" />
               </button>
               <button
-                onClick={() => setActiveTool('highlighter')}
-                className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md text-sm transition-colors ${
+                onPointerDown={(e) => { e.stopPropagation(); setActiveTool('highlighter'); }}
+                className={`flex items-center justify-center h-8 w-8 rounded-lg transition-colors ${
                   activeTool === 'highlighter'
-                    ? 'bg-accent text-accent-foreground font-medium'
+                    ? 'bg-accent text-accent-foreground'
                     : 'hover:bg-accent/50 text-muted-foreground'
                 }`}
+                title="Highlighter"
               >
-                <Highlighter className="h-3.5 w-3.5" />
-                Highlight
+                <Highlighter className="h-4 w-4" />
               </button>
               <button
-                onClick={() => setActiveTool('eraser')}
-                className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md text-sm transition-colors ${
+                onPointerDown={(e) => { e.stopPropagation(); setActiveTool('eraser'); }}
+                className={`flex items-center justify-center h-8 w-8 rounded-lg transition-colors ${
                   activeTool === 'eraser'
-                    ? 'bg-accent text-accent-foreground font-medium'
+                    ? 'bg-accent text-accent-foreground'
                     : 'hover:bg-accent/50 text-muted-foreground'
                 }`}
+                title="Eraser"
               >
-                <Eraser className="h-3.5 w-3.5" />
-                Eraser
+                <Eraser className="h-4 w-4" />
               </button>
             </div>
-
-            {showColorSize && (
-              <div className="flex items-center gap-3 px-3 py-1">
-                <ColorPicker
-                  colors={activeTool === 'highlighter' ? HIGHLIGHTER_COLORS : PEN_COLORS}
-                  activeColor={activeTool === 'highlighter' ? highlighterColor : penColor}
-                  onSelect={activeTool === 'highlighter' ? setHighlighterColor : setPenColor}
-                />
-                <div className="h-5 w-px bg-border" />
-                <SizePicker
-                  sizes={activeTool === 'highlighter' ? HIGHLIGHTER_SIZES : PEN_SIZES}
-                  activeSize={activeTool === 'highlighter' ? highlighterSize : penSize}
-                  onSelect={activeTool === 'highlighter' ? setHighlighterSize : setPenSize}
-                  color={activeTool === 'highlighter' ? highlighterColor : penColor}
-                />
-              </div>
-            )}
           </>
         )}
 
         {/* Type mode: text formatting toolbar */}
         {activeTool === 'text' && activeEditor && (
-          <div className="flex-1">
-            <EditorToolbar editor={activeEditor} />
-          </div>
+          <>
+            <div className="h-6 w-px bg-border mx-2" />
+            <div className="flex-1">
+              <EditorToolbar editor={activeEditor} />
+            </div>
+          </>
         )}
       </div>
 
-      {/* Canvas area */}
-      <div
-        className="flex-1 overflow-y-auto bg-gray-100"
-        style={{
-          userSelect: activeTool === 'text' ? 'auto' : 'none',
-          WebkitUserSelect: activeTool === 'text' ? 'auto' : 'none',
-        }}
-      >
-        <div className="py-8">
-          {pages.map((page) => (
-            <CanvasPage
-              key={page.id}
-              page={page}
-              activeTool={activeTool}
-              canvasType={document.canvas_type}
-              onStrokeAdd={handleStrokeAdd}
-              onStrokeRemove={handleStrokeRemove}
-              onPointerDown={(e) => handlePointerDown(e, page.id)}
-              onPointerMove={(e) => handlePointerMove(e, page.id)}
-              onPointerUp={(e) => handlePointerUp(e, page.id)}
-              onFlowContentUpdate={handleFlowContentUpdate}
-              onEditorReady={handleEditorFocus}
-              canvasClass={canvasClass}
-              eraserPosition={activeTool === 'eraser' ? eraserPosition : null}
-              remoteUpdateCounter={remoteUpdateCounter}
-            />
-          ))}
+      {/* Main content: canvas + optional right sidebar */}
+      <div className="flex flex-1 overflow-hidden">
+        {/* Canvas scroll area */}
+        <div
+          className="flex-1 overflow-y-auto bg-gray-100"
+          style={{
+            userSelect: activeTool === 'text' ? 'auto' : 'none',
+            WebkitUserSelect: activeTool === 'text' ? 'auto' : 'none',
+          }}
+        >
+          <div className="py-8">
+            {pages.map((page) => (
+              <CanvasPage
+                key={page.id}
+                page={page}
+                activeTool={activeTool}
+                canvasType={document.canvas_type}
+                onStrokeAdd={handleStrokeAdd}
+                onStrokeRemove={handleStrokeRemove}
+                onPointerDown={(e) => handlePointerDown(e, page.id)}
+                onPointerMove={(e) => handlePointerMove(e, page.id)}
+                onPointerUp={(e) => handlePointerUp(e, page.id)}
+                onFlowContentUpdate={handleFlowContentUpdate}
+                onEditorReady={handleEditorFocus}
+                canvasClass={canvasClass}
+                eraserPosition={activeTool === 'eraser' ? eraserPosition : null}
+                eraserRadius={eraserSize}
+                remoteUpdateCounter={remoteUpdateCounter}
+              />
+            ))}
+          </div>
         </div>
+
+        {/* Right sidebar — draw mode settings */}
+        {isDrawMode && (
+          <div className="flex flex-col items-center gap-1 border-l bg-background py-3 overflow-y-auto" style={{ width: 48 }}>
+            {/* Pen: thickness + colors */}
+            {activeTool === 'pen' && (
+              <>
+                {/* Thickness dots */}
+                {PEN_SIZES.map((s) => (
+                  <button
+                    key={s.label}
+                    onPointerDown={(e) => { e.stopPropagation(); setPenSize(s.value); }}
+                    className={`flex items-center justify-center h-8 w-8 rounded-lg transition-colors ${
+                      penSize === s.value ? 'bg-accent ring-1 ring-primary/50' : 'hover:bg-accent/50'
+                    }`}
+                    title={`${s.label} (${s.value}px)`}
+                  >
+                    <span
+                      className="rounded-full"
+                      style={{
+                        width: Math.max(Math.min(s.value * 2, 18), 4),
+                        height: Math.max(Math.min(s.value * 2, 18), 4),
+                        backgroundColor: penColor,
+                      }}
+                    />
+                  </button>
+                ))}
+
+                <div className="w-6 h-px bg-border my-1" />
+
+                {/* Color swatches */}
+                {PEN_COLORS.map((c) => (
+                  <button
+                    key={c}
+                    onPointerDown={(e) => { e.stopPropagation(); setPenColor(c); }}
+                    className={`flex items-center justify-center rounded-full transition-transform hover:scale-110 ${
+                      penColor === c ? 'ring-2 ring-primary ring-offset-1 scale-110' : ''
+                    }`}
+                    style={{ width: 28, height: 28 }}
+                    title={c}
+                  >
+                    <span
+                      className="rounded-full"
+                      style={{
+                        width: 22,
+                        height: 22,
+                        backgroundColor: c,
+                        border: c === '#FFFFFF' ? '1px solid #d1d5db' : undefined,
+                      }}
+                    />
+                  </button>
+                ))}
+              </>
+            )}
+
+            {/* Highlighter: colors only */}
+            {activeTool === 'highlighter' && (
+              <>
+                {HIGHLIGHTER_COLORS.map((c) => (
+                  <button
+                    key={c}
+                    onPointerDown={(e) => { e.stopPropagation(); setHighlighterColor(c); }}
+                    className={`flex items-center justify-center rounded-full transition-transform hover:scale-110 ${
+                      highlighterColor === c ? 'ring-2 ring-primary ring-offset-1 scale-110' : ''
+                    }`}
+                    style={{ width: 28, height: 28 }}
+                    title={c}
+                  >
+                    <span
+                      className="rounded-full"
+                      style={{ width: 22, height: 22, backgroundColor: c }}
+                    />
+                  </button>
+                ))}
+              </>
+            )}
+
+            {/* Eraser: 3 sizes */}
+            {activeTool === 'eraser' && (
+              <>
+                {ERASER_SIZES.map((s) => (
+                  <button
+                    key={s.label}
+                    onPointerDown={(e) => { e.stopPropagation(); setEraserSize(s.value); }}
+                    className={`flex items-center justify-center h-8 w-8 rounded-lg transition-colors ${
+                      eraserSize === s.value ? 'bg-accent ring-1 ring-primary/50' : 'hover:bg-accent/50'
+                    }`}
+                    title={`${s.label} eraser`}
+                  >
+                    <span
+                      className="rounded-full border border-gray-300"
+                      style={{
+                        width: Math.max(s.value * 1.2, 8),
+                        height: Math.max(s.value * 1.2, 8),
+                        backgroundColor: '#ffffff',
+                      }}
+                    />
+                  </button>
+                ))}
+              </>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Canvas background styles */}

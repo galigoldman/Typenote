@@ -5,16 +5,18 @@ import type { CanvasTool, Stroke } from '@/types/canvas';
 import { PAGE_WIDTH, PAGE_HEIGHT } from '@/types/canvas';
 import { isStrokeHit } from '@/lib/canvas/stroke-utils';
 
-export const ERASER_RADIUS = 10;
+export const DEFAULT_ERASER_RADIUS = 10;
 
 interface UseEraserOptions {
   activeTool: CanvasTool;
+  eraserRadius?: number;
   onStrokeRemove: (pageId: string, strokeId: string) => void;
   getPageStrokes: (pageId: string) => Stroke[];
 }
 
 export function useEraser({
   activeTool,
+  eraserRadius = DEFAULT_ERASER_RADIUS,
   onStrokeRemove,
   getPageStrokes,
 }: UseEraserOptions) {
@@ -42,7 +44,7 @@ export function useEraser({
   const checkHits = (pageId: string, x: number, y: number) => {
     const strokes = getPageStrokes(pageId);
     for (const stroke of strokes) {
-      if (isStrokeHit(stroke, x, y, ERASER_RADIUS)) {
+      if (isStrokeHit(stroke, x, y, eraserRadius)) {
         onStrokeRemove(pageId, stroke.id);
       }
     }
@@ -60,7 +62,7 @@ export function useEraser({
       setEraserPosition({ x, y });
       checkHits(pageId, x, y);
     },
-    [activeTool, onStrokeRemove, getPageStrokes],
+    [activeTool, eraserRadius, onStrokeRemove, getPageStrokes],
   );
 
   const handlePointerMove = useCallback(
@@ -77,7 +79,7 @@ export function useEraser({
 
       checkHits(pageId, x, y);
     },
-    [activeTool, onStrokeRemove, getPageStrokes],
+    [activeTool, eraserRadius, onStrokeRemove, getPageStrokes],
   );
 
   const handlePointerUp = useCallback(
