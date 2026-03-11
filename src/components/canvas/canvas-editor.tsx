@@ -48,8 +48,8 @@ const PEN_SIZES = [
 
 const HIGHLIGHTER_SIZES = [
   { label: 'S', value: 8 },
-  { label: 'M', value: 14 },
-  { label: 'L', value: 20 },
+  { label: 'M', value: 20 },
+  { label: 'L', value: 32 },
 ];
 
 function SaveIndicator({ status }: { status: SaveStatus }) {
@@ -387,7 +387,8 @@ export function CanvasEditor({ document }: CanvasEditorProps) {
   };
 
   const canvasClass = CANVAS_CLASSES[document.canvas_type] ?? '';
-  const showDrawingTools = activeTool === 'pen' || activeTool === 'highlighter';
+  const isDrawMode = activeTool === 'pen' || activeTool === 'highlighter' || activeTool === 'eraser';
+  const showColorSize = activeTool === 'pen' || activeTool === 'highlighter';
 
   return (
     <div className="flex flex-col h-full">
@@ -423,42 +424,20 @@ export function CanvasEditor({ document }: CanvasEditorProps) {
         </div>
       )}
 
-      {/* Tool buttons + drawing settings */}
+      {/* Toolbar */}
       <div className="flex items-center border-b">
-        {/* Tool selector */}
+        {/* Mode selector: Draw / Type */}
         <div className="flex items-center gap-1 px-2 py-1 border-r">
           <button
             onClick={() => setActiveTool('pen')}
             className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
-              activeTool === 'pen'
+              isDrawMode
                 ? 'bg-primary text-primary-foreground'
                 : 'hover:bg-accent'
             }`}
           >
             <Pen className="h-4 w-4" />
             Draw
-          </button>
-          <button
-            onClick={() => setActiveTool('highlighter')}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
-              activeTool === 'highlighter'
-                ? 'bg-primary text-primary-foreground'
-                : 'hover:bg-accent'
-            }`}
-          >
-            <Highlighter className="h-4 w-4" />
-            Highlight
-          </button>
-          <button
-            onClick={() => setActiveTool('eraser')}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
-              activeTool === 'eraser'
-                ? 'bg-primary text-primary-foreground'
-                : 'hover:bg-accent'
-            }`}
-          >
-            <Eraser className="h-4 w-4" />
-            Erase
           </button>
           <button
             onClick={() => setActiveTool('text')}
@@ -473,25 +452,65 @@ export function CanvasEditor({ document }: CanvasEditorProps) {
           </button>
         </div>
 
-        {/* Pen/highlighter settings */}
-        {showDrawingTools && (
-          <div className="flex items-center gap-3 px-3 py-1">
-            <ColorPicker
-              colors={activeTool === 'highlighter' ? HIGHLIGHTER_COLORS : PEN_COLORS}
-              activeColor={activeTool === 'highlighter' ? highlighterColor : penColor}
-              onSelect={activeTool === 'highlighter' ? setHighlighterColor : setPenColor}
-            />
-            <div className="h-5 w-px bg-border" />
-            <SizePicker
-              sizes={activeTool === 'highlighter' ? HIGHLIGHTER_SIZES : PEN_SIZES}
-              activeSize={activeTool === 'highlighter' ? highlighterSize : penSize}
-              onSelect={activeTool === 'highlighter' ? setHighlighterSize : setPenSize}
-              color={activeTool === 'highlighter' ? highlighterColor : penColor}
-            />
-          </div>
+        {/* Draw mode: sub-tools + color/size pickers */}
+        {isDrawMode && (
+          <>
+            <div className="flex items-center gap-1 px-2 py-1 border-r">
+              <button
+                onClick={() => setActiveTool('pen')}
+                className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md text-sm transition-colors ${
+                  activeTool === 'pen'
+                    ? 'bg-accent text-accent-foreground font-medium'
+                    : 'hover:bg-accent/50 text-muted-foreground'
+                }`}
+              >
+                <Pen className="h-3.5 w-3.5" />
+                Pen
+              </button>
+              <button
+                onClick={() => setActiveTool('highlighter')}
+                className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md text-sm transition-colors ${
+                  activeTool === 'highlighter'
+                    ? 'bg-accent text-accent-foreground font-medium'
+                    : 'hover:bg-accent/50 text-muted-foreground'
+                }`}
+              >
+                <Highlighter className="h-3.5 w-3.5" />
+                Highlight
+              </button>
+              <button
+                onClick={() => setActiveTool('eraser')}
+                className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md text-sm transition-colors ${
+                  activeTool === 'eraser'
+                    ? 'bg-accent text-accent-foreground font-medium'
+                    : 'hover:bg-accent/50 text-muted-foreground'
+                }`}
+              >
+                <Eraser className="h-3.5 w-3.5" />
+                Eraser
+              </button>
+            </div>
+
+            {showColorSize && (
+              <div className="flex items-center gap-3 px-3 py-1">
+                <ColorPicker
+                  colors={activeTool === 'highlighter' ? HIGHLIGHTER_COLORS : PEN_COLORS}
+                  activeColor={activeTool === 'highlighter' ? highlighterColor : penColor}
+                  onSelect={activeTool === 'highlighter' ? setHighlighterColor : setPenColor}
+                />
+                <div className="h-5 w-px bg-border" />
+                <SizePicker
+                  sizes={activeTool === 'highlighter' ? HIGHLIGHTER_SIZES : PEN_SIZES}
+                  activeSize={activeTool === 'highlighter' ? highlighterSize : penSize}
+                  onSelect={activeTool === 'highlighter' ? setHighlighterSize : setPenSize}
+                  color={activeTool === 'highlighter' ? highlighterColor : penColor}
+                />
+              </div>
+            )}
+          </>
         )}
 
-        {/* Text formatting toolbar */}
+        {/* Type mode: text formatting toolbar */}
         {activeTool === 'text' && activeEditor && (
           <div className="flex-1">
             <EditorToolbar editor={activeEditor} />
