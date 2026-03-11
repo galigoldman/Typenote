@@ -204,3 +204,70 @@ ON CONFLICT (id) DO NOTHING;
 INSERT INTO public.course_materials (id, week_id, user_id, category, storage_path, file_name, label, file_size, mime_type)
 VALUES ('50000000-0000-0000-0000-000000000003', '40000000-0000-0000-0000-000000000002', 'ac3be77d-4566-406c-9ac0-7c410634ad41', 'material', 'ac3be77d-4566-406c-9ac0-7c410634ad41/30000000-0000-0000-0000-000000000001/40000000-0000-0000-0000-000000000002/lecture-2-slides.pdf', 'lecture-2-slides.pdf', 'Lecture 2: If/Else and Loops', 3072000, 'application/pdf')
 ON CONFLICT (id) DO NOTHING;
+
+-- ============================================
+-- MOODLE SHARED REGISTRY (test data)
+-- ============================================
+
+-- Test Moodle instance
+INSERT INTO public.moodle_instances (id, domain, name)
+VALUES ('60000000-0000-0000-0000-000000000001', 'moodle.test.ac.il', 'Test University Moodle')
+ON CONFLICT (id) DO NOTHING;
+
+-- Test Moodle courses
+INSERT INTO public.moodle_courses (id, instance_id, moodle_course_id, name, moodle_url)
+VALUES ('61000000-0000-0000-0000-000000000001', '60000000-0000-0000-0000-000000000001', '101', 'Introduction to Computer Science', 'https://moodle.test.ac.il/course/view.php?id=101')
+ON CONFLICT (id) DO NOTHING;
+
+INSERT INTO public.moodle_courses (id, instance_id, moodle_course_id, name, moodle_url)
+VALUES ('61000000-0000-0000-0000-000000000002', '60000000-0000-0000-0000-000000000001', '202', 'Data Structures and Algorithms', 'https://moodle.test.ac.il/course/view.php?id=202')
+ON CONFLICT (id) DO NOTHING;
+
+-- Test Moodle sections for CS101
+INSERT INTO public.moodle_sections (id, course_id, moodle_section_id, title, position)
+VALUES ('62000000-0000-0000-0000-000000000001', '61000000-0000-0000-0000-000000000001', 'sec-0', 'General', 0)
+ON CONFLICT (id) DO NOTHING;
+
+INSERT INTO public.moodle_sections (id, course_id, moodle_section_id, title, position)
+VALUES ('62000000-0000-0000-0000-000000000002', '61000000-0000-0000-0000-000000000001', 'sec-1', 'Week 1: Introduction to Programming', 1)
+ON CONFLICT (id) DO NOTHING;
+
+INSERT INTO public.moodle_sections (id, course_id, moodle_section_id, title, position)
+VALUES ('62000000-0000-0000-0000-000000000003', '61000000-0000-0000-0000-000000000001', 'sec-2', 'Week 2: Variables and Data Types', 2)
+ON CONFLICT (id) DO NOTHING;
+
+-- Test Moodle files
+INSERT INTO public.moodle_files (id, section_id, type, moodle_url, file_name, content_hash, storage_path, file_size, mime_type, position)
+VALUES ('63000000-0000-0000-0000-000000000001', '62000000-0000-0000-0000-000000000001', 'file', 'https://moodle.test.ac.il/pluginfile.php/101/syllabus.pdf', 'syllabus.pdf', 'abc123hash', 'moodle.test.ac.il/101/abc123hash_syllabus.pdf', 1048576, 'application/pdf', 0)
+ON CONFLICT (id) DO NOTHING;
+
+INSERT INTO public.moodle_files (id, section_id, type, moodle_url, file_name, content_hash, storage_path, file_size, mime_type, position)
+VALUES ('63000000-0000-0000-0000-000000000002', '62000000-0000-0000-0000-000000000002', 'file', 'https://moodle.test.ac.il/pluginfile.php/101/lecture1.pdf', 'lecture1.pdf', 'def456hash', 'moodle.test.ac.il/101/def456hash_lecture1.pdf', 2097152, 'application/pdf', 0)
+ON CONFLICT (id) DO NOTHING;
+
+INSERT INTO public.moodle_files (id, section_id, type, moodle_url, file_name, external_url, position)
+VALUES ('63000000-0000-0000-0000-000000000003', '62000000-0000-0000-0000-000000000002', 'link', 'https://moodle.test.ac.il/mod/url/view.php?id=501', 'Python Tutorial Video', 'https://youtube.com/watch?v=example', 1)
+ON CONFLICT (id) DO NOTHING;
+
+-- ============================================
+-- MOODLE USER SYNC DATA (test user)
+-- ============================================
+
+-- User's Moodle connection
+INSERT INTO public.user_moodle_connections (id, user_id, instance_id)
+VALUES ('64000000-0000-0000-0000-000000000001', 'ac3be77d-4566-406c-9ac0-7c410634ad41', '60000000-0000-0000-0000-000000000001')
+ON CONFLICT (id) DO NOTHING;
+
+-- User's course sync
+INSERT INTO public.user_course_syncs (id, user_id, moodle_course_id, course_id, last_synced_at)
+VALUES ('65000000-0000-0000-0000-000000000001', 'ac3be77d-4566-406c-9ac0-7c410634ad41', '61000000-0000-0000-0000-000000000001', '30000000-0000-0000-0000-000000000001', now())
+ON CONFLICT (id) DO NOTHING;
+
+-- User's file imports
+INSERT INTO public.user_file_imports (id, user_id, moodle_file_id, sync_id, status)
+VALUES ('66000000-0000-0000-0000-000000000001', 'ac3be77d-4566-406c-9ac0-7c410634ad41', '63000000-0000-0000-0000-000000000001', '65000000-0000-0000-0000-000000000001', 'imported')
+ON CONFLICT (id) DO NOTHING;
+
+INSERT INTO public.user_file_imports (id, user_id, moodle_file_id, sync_id, status)
+VALUES ('66000000-0000-0000-0000-000000000002', 'ac3be77d-4566-406c-9ac0-7c410634ad41', '63000000-0000-0000-0000-000000000002', '65000000-0000-0000-0000-000000000001', 'imported')
+ON CONFLICT (id) DO NOTHING;
