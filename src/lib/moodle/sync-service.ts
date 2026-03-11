@@ -8,6 +8,111 @@ import type {
   SyncFileResult,
 } from './types';
 
+// ============================================
+// Course comparison types & logic (T036)
+// ============================================
+
+export type CourseComparisonStatus =
+  | 'new_to_system'
+  | 'synced_by_others'
+  | 'synced_by_user'
+  | 'has_new_items';
+
+export interface CourseComparison {
+  moodleCourseId: string;
+  name: string;
+  moodleUrl: string;
+  status: CourseComparisonStatus;
+  registryId?: string;
+  lastSyncedAt?: string;
+}
+
+/**
+ * Compare scraped Moodle courses against the shared registry
+ * to determine each course's status for the current user.
+ *
+ * Logic per course:
+ * 1. Look up instance by domain
+ * 2. Check if course exists in `moodle_courses`
+ * 3. If exists, check if this user has a `user_course_syncs` record
+ * 4. Return appropriate status
+ */
+export async function compareCourses(
+  instanceDomain: string,
+  scrapedCourses: Array<{ moodleCourseId: string; name: string; url: string }>,
+  userId: string,
+): Promise<CourseComparison[]> {
+  const admin = createAdminClient();
+
+  // Step 1: Look up instance by domain
+  const { data: instance } = await admin
+    .from('moodle_instances')
+    .select('id')
+    .eq('domain', instanceDomain)
+    .single();
+
+  // If instance doesn't exist, all courses are new
+  if (!instance) {
+    return scrapedCourses.map((course) => ({
+      moodleCourseId: course.moodleCourseId,
+      name: course.name,
+      moodleUrl: course.url,
+      status: 'new_to_system' as const,
+    }));
+  }
+
+  const results: CourseComparison[] = [];
+
+  for (const scraped of scrapedCourses) {
+    // Step 2: Check if course exists in the shared registry
+    const { data: registryCourse } = await admin
+      .from('moodle_courses')
+      .select('id')
+      .eq('instance_id', instance.id)
+      .eq('moodle_course_id', scraped.moodleCourseId)
+      .single();
+
+    if (!registryCourse) {
+      results.push({
+        moodleCourseId: scraped.moodleCourseId,
+        name: scraped.name,
+        moodleUrl: scraped.url,
+        status: 'new_to_system',
+      });
+      continue;
+    }
+
+    // Step 3: Check if this user has a sync record
+    const { data: userSync } = await admin
+      .from('user_course_syncs')
+      .select('id, last_synced_at')
+      .eq('user_id', userId)
+      .eq('moodle_course_id', registryCourse.id)
+      .single();
+
+    if (!userSync) {
+      results.push({
+        moodleCourseId: scraped.moodleCourseId,
+        name: scraped.name,
+        moodleUrl: scraped.url,
+        status: 'synced_by_others',
+        registryId: registryCourse.id,
+      });
+    } else {
+      results.push({
+        moodleCourseId: scraped.moodleCourseId,
+        name: scraped.name,
+        moodleUrl: scraped.url,
+        status: 'synced_by_user',
+        registryId: registryCourse.id,
+        lastSyncedAt: userSync.last_synced_at,
+      });
+    }
+  }
+
+  return results;
+}
+
 /**
  * Upsert scraped Moodle data into the shared registry.
  * Returns the status of each item (exists/new/modified).
