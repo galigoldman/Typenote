@@ -29,6 +29,7 @@ interface CanvasPageProps {
   onEditorReady?: (editor: Editor) => void;
   canvasClass?: string;
   eraserPosition?: { x: number; y: number } | null;
+  remoteUpdateCounter?: number;
 }
 
 export function CanvasPage({
@@ -42,6 +43,7 @@ export function CanvasPage({
   onEditorReady,
   canvasClass,
   eraserPosition = null,
+  remoteUpdateCounter = 0,
 }: CanvasPageProps) {
   const committedCanvasRef = useRef<HTMLCanvasElement>(null);
   const workingCanvasRef = useRef<HTMLCanvasElement>(null);
@@ -155,6 +157,20 @@ export function CanvasPage({
       onEditorReadyRef.current?.(editor);
     }
   }, [editor]);
+
+  // Sync editor content on remote updates
+  const prevRemoteCounterRef = useRef(remoteUpdateCounter);
+  useEffect(() => {
+    if (remoteUpdateCounter !== prevRemoteCounterRef.current) {
+      prevRemoteCounterRef.current = remoteUpdateCounter;
+      if (editor && page.flowContent) {
+        const fc = page.flowContent as { type?: string; content?: unknown[] };
+        if (fc?.content && fc.content.length > 0) {
+          editor.commands.setContent(page.flowContent as Record<string, unknown>, { emitUpdate: false });
+        }
+      }
+    }
+  }, [remoteUpdateCounter, editor, page.flowContent]);
 
   // Re-render committed strokes when page.strokes changes
   const renderCommittedStrokes = useCallback(() => {
