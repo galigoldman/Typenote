@@ -42,11 +42,36 @@ type PickerPhase =
   | 'done'
   | 'error';
 
+/** Maximum file size allowed for import (50 MB) */
+const MAX_FILE_SIZE = 50 * 1024 * 1024;
+
+/** Error messages that suggest a Moodle session has expired */
+const AUTH_ERROR_PATTERNS = [
+  '403',
+  'forbidden',
+  'unauthorized',
+  'login required',
+  'session expired',
+  'download failed',
+];
+
+function isAuthError(message: string): boolean {
+  const lower = message.toLowerCase();
+  return AUTH_ERROR_PATTERNS.some((pattern) => lower.includes(pattern));
+}
+
 /** Format bytes into a human-readable size string */
 function formatFileSize(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+interface FailedItem {
+  sectionId: string;
+  moodleUrl: string;
+  fileName: string;
+  reason: string;
 }
 
 export function MoodleFilePicker({
@@ -69,6 +94,7 @@ export function MoodleFilePicker({
   const [error, setError] = useState<string | null>(null);
   const [importProgress, setImportProgress] = useState<string | null>(null);
   const [importedCount, setImportedCount] = useState(0);
+  const [failedItems, setFailedItems] = useState<FailedItem[]>([]);
 
   /** Build a stable key for each item based on section + url */
   const itemKey = useCallback(
@@ -123,8 +149,10 @@ export function MoodleFilePicker({
           // only if their moodleUrl matches one already tracked.
           // For now, we select all items — the status API returns file IDs
           // not URLs, so matching happens post-registry-sync.
-          // Removed files should never be pre-selected.
-          if (!alreadyImported.has(key) && !removed.has(key)) {
+          // Removed files and oversized files should never be pre-selected.
+          const isOversized =
+            item.fileSize != null && item.fileSize > MAX_FILE_SIZE;
+          if (!alreadyImported.has(key) && !removed.has(key) && !isOversized) {
             preSelected.add(key);
           }
         }
@@ -169,6 +197,7 @@ export function MoodleFilePicker({
   async function handleImport() {
     setPhase('importing');
     setError(null);
+    setFailedItems([]);
     setImportProgress('Preparing import...');
 
     try {
@@ -197,6 +226,7 @@ export function MoodleFilePicker({
       // Step 1: For each file, call the extension to download and upload
       const uploadEndpoint = `${window.location.origin}/api/moodle/upload`;
       const completedFileIds: string[] = [];
+      const failed: FailedItem[] = [];
       let completed = 0;
 
       for (const item of selectedItems) {
@@ -205,20 +235,34 @@ export function MoodleFilePicker({
           `Downloading file ${completed}/${selectedItems.length}: ${item.fileName}`,
         );
 
-        const result = await downloadAndUpload({
-          moodleFileUrl: item.moodleUrl,
-          uploadEndpoint,
-          metadata: {
-            sectionId: item.sectionId,
-            moodleUrl: item.moodleUrl,
-            fileName: item.fileName,
-          },
-        });
+        try {
+          const result = await downloadAndUpload({
+            moodleFileUrl: item.moodleUrl,
+            uploadEndpoint,
+            metadata: {
+              sectionId: item.sectionId,
+              moodleUrl: item.moodleUrl,
+              fileName: item.fileName,
+            },
+          });
 
-        // The stub returns null (not yet implemented), so we handle gracefully
-        if (result) {
-          // In future, result would contain the file ID
-          // For now, we collect what we can
+          if (result) {
+            // In future, result would contain the file ID
+            // For now, we collect what we can
+          } else {
+            // Extension returned null — treat as a download failure
+            failed.push({
+              ...item,
+              reason: 'Download failed',
+            });
+          }
+        } catch (downloadErr) {
+          const message =
+            downloadErr instanceof Error
+              ? downloadErr.message
+              : 'Download failed';
+          failed.push({ ...item, reason: message });
+          // Continue with remaining items — don't halt the import
         }
       }
 
@@ -234,12 +278,57 @@ export function MoodleFilePicker({
       );
 
       setImportedCount(importResult.importedCount);
+      setFailedItems(failed);
       setPhase('done');
       onImportComplete();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Import failed');
       setPhase('error');
     }
+  }
+
+  async function handleRetryFailed() {
+    if (failedItems.length === 0) return;
+
+    setPhase('importing');
+    setError(null);
+    setImportProgress('Retrying failed downloads...');
+
+    const stillFailed: FailedItem[] = [];
+    const uploadEndpoint = `${window.location.origin}/api/moodle/upload`;
+    let retried = 0;
+
+    for (const item of failedItems) {
+      retried++;
+      setImportProgress(
+        `Retrying file ${retried}/${failedItems.length}: ${item.fileName}`,
+      );
+
+      try {
+        const result = await downloadAndUpload({
+          moodleFileUrl: item.moodleUrl,
+          uploadEndpoint,
+          metadata: {
+            sectionId: item.sectionId,
+            moodleUrl: item.moodleUrl,
+            fileName: item.fileName,
+          },
+        });
+
+        if (!result) {
+          stillFailed.push({ ...item, reason: 'Download failed' });
+        }
+      } catch (downloadErr) {
+        const message =
+          downloadErr instanceof Error
+            ? downloadErr.message
+            : 'Download failed';
+        stillFailed.push({ ...item, reason: message });
+      }
+    }
+
+    setFailedItems(stillFailed);
+    setPhase('done');
   }
 
   const totalItems = sections.reduce((sum, s) => sum + s.items.length, 0);
@@ -346,19 +435,23 @@ export function MoodleFilePicker({
                             const isRemoved = removedFileIds.has(key);
                             const isModified = modifiedFileIds.has(key);
                             const isSelected = selectedUrls.has(key);
+                            const isOversized =
+                              item.fileSize != null &&
+                              item.fileSize > MAX_FILE_SIZE;
+                            const isDisabled = isRemoved || isOversized;
 
                             return (
                               <label
                                 key={item.moodleUrl}
                                 className={`flex items-center gap-3 rounded px-2 py-1.5 ${
-                                  isRemoved
+                                  isDisabled
                                     ? 'cursor-not-allowed opacity-60'
                                     : 'cursor-pointer hover:bg-accent/30'
                                 }`}
                               >
                                 <Checkbox
                                   checked={isSelected}
-                                  disabled={isRemoved}
+                                  disabled={isDisabled}
                                   onCheckedChange={() =>
                                     toggleItem(
                                       section.moodleSectionId,
@@ -388,13 +481,16 @@ export function MoodleFilePicker({
                                     {formatFileSize(item.fileSize)}
                                   </span>
                                 )}
+                                {isOversized && (
+                                  <Badge variant="destructive">Too large</Badge>
+                                )}
                                 {isRemoved && (
                                   <Badge variant="destructive">Removed from Moodle</Badge>
                                 )}
-                                {isModified && !isRemoved && (
+                                {isModified && !isRemoved && !isOversized && (
                                   <Badge variant="secondary">Modified</Badge>
                                 )}
-                                {isImported && !isRemoved && !isModified && (
+                                {isImported && !isRemoved && !isModified && !isOversized && (
                                   <Badge variant="outline">Already imported</Badge>
                                 )}
                               </label>
@@ -436,6 +532,57 @@ export function MoodleFilePicker({
           <p className="text-sm font-medium">
             Import complete ({importedCount}{' '}
             {importedCount === 1 ? 'file' : 'files'} recorded)
+          </p>
+
+          {/* Failed items list (T058) */}
+          {failedItems.length > 0 && (
+            <div className="w-full space-y-2 pt-2">
+              <p className="text-sm text-destructive">
+                {failedItems.length}{' '}
+                {failedItems.length === 1 ? 'file' : 'files'} failed to
+                download:
+              </p>
+              <ul className="space-y-1 text-sm" data-testid="failed-items-list">
+                {failedItems.map((item) => (
+                  <li
+                    key={item.moodleUrl}
+                    className="flex items-center justify-between rounded border px-2 py-1"
+                  >
+                    <span className="truncate">{item.fileName}</span>
+                    <Badge variant="outline">{item.reason}</Badge>
+                  </li>
+                ))}
+              </ul>
+              {/* Auth error hint (T057) */}
+              {failedItems.some((f) => isAuthError(f.reason)) && (
+                <p className="text-xs text-muted-foreground">
+                  Some failures may be due to an expired Moodle session.{' '}
+                  <a
+                    href={`https://${instanceDomain}/login`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="underline"
+                  >
+                    Re-log into Moodle
+                  </a>{' '}
+                  and retry.
+                </p>
+              )}
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleRetryFailed}
+                data-testid="retry-failed-button"
+              >
+                Retry Failed ({failedItems.length})
+              </Button>
+            </div>
+          )}
+
+          {/* Course linking note (T061) */}
+          <p className="pt-2 text-xs text-muted-foreground">
+            You can link this Moodle course to a Typenote course from the
+            course settings.
           </p>
         </div>
       )}
