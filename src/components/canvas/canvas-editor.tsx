@@ -13,9 +13,10 @@ import { PAGE_WIDTH, PAGE_HEIGHT } from '@/types/canvas';
 import type { Document } from '@/types/database';
 import type { SaveStatus } from '@/hooks/use-auto-save';
 import type { ConnectionStatus } from '@/hooks/use-realtime-sync';
-import { Pen, Type } from 'lucide-react';
+import { Pen, Type, Eraser } from 'lucide-react';
 import { useDocumentSync } from '@/hooks/use-document-sync';
 import { useDrawing } from '@/hooks/use-drawing';
+import { useEraser } from '@/hooks/use-eraser';
 import { EditorToolbar } from '@/components/editor/editor-toolbar';
 import { CanvasPage } from './canvas-page';
 
@@ -87,7 +88,6 @@ function initializePagesFromDocument(doc: Document): CanvasPageData[] {
   if (pagesData?.pages && pagesData.pages.length > 0) {
     return pagesData.pages;
   }
-  // Initialize a single empty page
   return [createEmptyPage(0)];
 }
 
@@ -96,7 +96,7 @@ export function CanvasEditor({ document }: CanvasEditorProps) {
   const [pages, setPages] = useState<CanvasPageData[]>(() =>
     initializePagesFromDocument(document),
   );
-  const [activeTool, setActiveTool] = useState<CanvasTool>('selection');
+  const [activeTool, setActiveTool] = useState<CanvasTool>('text');
   const [activeEditor, setActiveEditor] = useState<Editor | null>(null);
   const pagesRef = useRef(pages);
 
@@ -164,7 +164,7 @@ export function CanvasEditor({ document }: CanvasEditorProps) {
     [triggerSave],
   );
 
-  // Flow content update handler (T021)
+  // Flow content update handler
   const handleFlowContentUpdate = useCallback(
     (pageId: string, content: Record<string, unknown>) => {
       setPages((prev) =>
@@ -177,16 +177,54 @@ export function CanvasEditor({ document }: CanvasEditorProps) {
     [triggerSave],
   );
 
-  // Editor focus handler (T020)
+  // Editor focus handler
   const handleEditorFocus = useCallback((editor: Editor) => {
     setActiveEditor(editor);
   }, []);
 
+  // Get strokes for a page (used by eraser)
+  const getPageStrokes = useCallback(
+    (pageId: string): Stroke[] => {
+      return pagesRef.current.find((p) => p.id === pageId)?.strokes ?? [];
+    },
+    [],
+  );
+
   // Drawing hook
-  const { handlePointerDown, handlePointerMove, handlePointerUp } = useDrawing({
+  const { handlePointerDown: drawDown, handlePointerMove: drawMove, handlePointerUp: drawUp } = useDrawing({
     activeTool,
     onStrokeComplete: handleStrokeAdd,
   });
+
+  // Eraser hook
+  const { handlePointerDown: eraseDown, handlePointerMove: eraseMove, handlePointerUp: eraseUp, eraserPosition } = useEraser({
+    activeTool,
+    onStrokeRemove: handleStrokeRemove,
+    getPageStrokes,
+  });
+
+  // Route pointer events to active tool's handler
+  const handlePointerDown = useCallback(
+    (e: React.PointerEvent, pageId: string) => {
+      drawDown(e, pageId);
+      eraseDown(e, pageId);
+    },
+    [drawDown, eraseDown],
+  );
+  const handlePointerMove = useCallback(
+    (e: React.PointerEvent, pageId: string) => {
+      drawMove(e, pageId);
+      eraseMove(e, pageId);
+    },
+    [drawMove, eraseMove],
+  );
+  const handlePointerUp = useCallback(
+    (e: React.PointerEvent, pageId: string) => {
+      drawUp(e, pageId);
+      eraseUp(e, pageId);
+    },
+    [drawUp, eraseUp],
+  );
 
   const handleTitleBlur = async () => {
     if (title !== document.title) {
@@ -249,9 +287,20 @@ export function CanvasEditor({ document }: CanvasEditorProps) {
             Draw
           </button>
           <button
-            onClick={() => setActiveTool('selection')}
+            onClick={() => setActiveTool('eraser')}
             className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
-              activeTool === 'selection'
+              activeTool === 'eraser'
+                ? 'bg-primary text-primary-foreground'
+                : 'hover:bg-accent'
+            }`}
+          >
+            <Eraser className="h-4 w-4" />
+            Erase
+          </button>
+          <button
+            onClick={() => setActiveTool('text')}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
+              activeTool === 'text'
                 ? 'bg-primary text-primary-foreground'
                 : 'hover:bg-accent'
             }`}
@@ -260,7 +309,7 @@ export function CanvasEditor({ document }: CanvasEditorProps) {
             Type
           </button>
         </div>
-        {activeTool === 'selection' && activeEditor && (
+        {activeTool === 'text' && activeEditor && (
           <div className="flex-1">
             <EditorToolbar editor={activeEditor} />
           </div>
@@ -271,8 +320,8 @@ export function CanvasEditor({ document }: CanvasEditorProps) {
       <div
         className="flex-1 overflow-y-auto bg-gray-100"
         style={{
-          userSelect: activeTool === 'pen' ? 'none' : 'auto',
-          WebkitUserSelect: activeTool === 'pen' ? 'none' : 'auto',
+          userSelect: activeTool === 'text' ? 'auto' : 'none',
+          WebkitUserSelect: activeTool === 'text' ? 'auto' : 'none',
         }}
       >
         <div className="py-8">
@@ -290,6 +339,7 @@ export function CanvasEditor({ document }: CanvasEditorProps) {
               onFlowContentUpdate={handleFlowContentUpdate}
               onEditorReady={handleEditorFocus}
               canvasClass={canvasClass}
+              eraserPosition={activeTool === 'eraser' ? eraserPosition : null}
             />
           ))}
         </div>
