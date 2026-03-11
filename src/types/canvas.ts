@@ -47,7 +47,7 @@ export interface CanvasDocument {
 export const PAGE_WIDTH = 794;
 export const PAGE_HEIGHT = 1123;
 
-export type CanvasTool = 'pen' | 'eraser' | 'selection';
+export type CanvasTool = 'pen' | 'eraser' | 'text';
 
 /** Current zoom and pan state (view-only, not persisted) */
 export interface ViewTransform {
