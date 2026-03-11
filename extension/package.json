@@ -1,0 +1,15 @@
+{
+  "name": "typenote-moodle-extension",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "esbuild src/background/service-worker.ts src/content/moodle-scraper.ts --bundle --outdir=dist --sourcemap --watch",
+    "build": "esbuild src/background/service-worker.ts src/content/moodle-scraper.ts --bundle --outdir=dist --minify",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@types/chrome": "^0.0.287",
+    "esbuild": "^0.24.0",
+    "typescript": "^5.0.0"
+  }
+}
