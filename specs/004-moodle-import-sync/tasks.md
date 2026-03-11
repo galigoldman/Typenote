@@ -158,15 +158,15 @@
 
 ### Tests for User Story 6
 
-- [ ] T050 [P] [US6] Write unit test for change detection logic in `src/lib/moodle/sync-service.test.ts` — test scenarios: new file detected, file removed from Moodle, file modified (same URL different hash), no changes
+- [x] T050 [P] [US6] Write unit test for change detection logic in `src/lib/moodle/sync-service.test.ts` — test scenarios: new file detected, file removed from Moodle, file modified (same URL different hash), no changes
 
 ### Implementation for User Story 6
 
-- [ ] T051 [US6] Implement change detection in `src/lib/moodle/sync-service.ts` — `detectChanges(courseId, scrapedSections)` that compares current Moodle state against shared registry and returns `{ newFiles, removedFiles, modifiedFiles }`
-- [ ] T052 [US6] Implement removed file flagging — when a file in the registry is no longer in scraped data, set `moodle_files.is_removed = true` and update `user_file_imports.status = 'removed_from_moodle'` for all users who imported it
-- [ ] T053 [US6] Implement modified file replacement — when same URL has different content hash, upload new version to storage, update `moodle_files` record (content_hash, storage_path), delete old storage object
-- [ ] T054 [US6] Update sync dialog UI to show change indicators — "New" badges on new items, "Removed from Moodle" labels on removed items, filter to show only actionable items by default
-- [ ] T055 [US6] Run all tests and verify re-sync scenarios end-to-end
+- [x] T051 [US6] Implement change detection in `src/lib/moodle/sync-service.ts` — `detectChanges(courseId, scrapedSections)` that compares current Moodle state against shared registry and returns `{ newFiles, removedFiles, modifiedFiles }`
+- [x] T052 [US6] Implement removed file flagging — when a file in the registry is no longer in scraped data, set `moodle_files.is_removed = true` and update `user_file_imports.status = 'removed_from_moodle'` for all users who imported it
+- [x] T053 [US6] Implement modified file replacement — when same URL has different content hash, upload new version to storage, update `moodle_files` record (content_hash, storage_path), delete old storage object
+- [x] T054 [US6] Update sync dialog UI to show change indicators — "New" badges on new items, "Removed from Moodle" labels on removed items, filter to show only actionable items by default
+- [x] T055 [US6] Run all tests and verify re-sync scenarios end-to-end
 
 **Checkpoint**: Re-sync correctly detects all change types. Removed files flagged, modified files replaced.
 
