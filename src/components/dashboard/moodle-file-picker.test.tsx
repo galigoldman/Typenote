@@ -70,6 +70,7 @@ const mockStatusResponse = {
   lastSyncedAt: null,
   importedFileIds: [],
   removedFileIds: [],
+  modifiedFileIds: [],
 };
 
 describe('MoodleFilePicker', () => {
@@ -152,6 +153,7 @@ describe('MoodleFilePicker', () => {
             'sec-1::https://moodle.test.ac.il/mod/resource/view.php?id=1',
           ],
           removedFileIds: [],
+          modifiedFileIds: [],
         }),
     });
 
@@ -489,5 +491,153 @@ describe('MoodleFilePicker', () => {
         '/api/moodle/status?moodleCourseId=course-uuid-1',
       );
     });
+  });
+
+  it('shows "Removed from Moodle" indicator for removed files', async () => {
+    const mockScrape = vi.fn().mockResolvedValue(mockScrapedContent);
+    mockUseMoodleExtension.mockReturnValue({
+      scrapeCourseContent: mockScrape,
+      downloadAndUpload: vi.fn(),
+    });
+
+    // Status API returns one file as removed (using itemKey format)
+    global.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: () =>
+        Promise.resolve({
+          lastSyncedAt: '2026-03-10T12:00:00Z',
+          importedFileIds: [],
+          removedFileIds: [
+            'sec-1::https://moodle.test.ac.il/mod/resource/view.php?id=1',
+          ],
+          modifiedFileIds: [],
+        }),
+    });
+
+    render(<MoodleFilePicker {...defaultProps} />);
+
+    await waitFor(() => {
+      expect(screen.getByText('lecture-1.pdf')).toBeInTheDocument();
+    });
+
+    expect(screen.getByText('Removed from Moodle')).toBeInTheDocument();
+  });
+
+  it('disables checkbox for removed files', async () => {
+    const mockScrape = vi.fn().mockResolvedValue(mockScrapedContent);
+    mockUseMoodleExtension.mockReturnValue({
+      scrapeCourseContent: mockScrape,
+      downloadAndUpload: vi.fn(),
+    });
+
+    // Status API returns one file as removed
+    global.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: () =>
+        Promise.resolve({
+          lastSyncedAt: '2026-03-10T12:00:00Z',
+          importedFileIds: [],
+          removedFileIds: [
+            'sec-1::https://moodle.test.ac.il/mod/resource/view.php?id=1',
+          ],
+          modifiedFileIds: [],
+        }),
+    });
+
+    render(<MoodleFilePicker {...defaultProps} />);
+
+    await waitFor(() => {
+      expect(screen.getByText('lecture-1.pdf')).toBeInTheDocument();
+    });
+
+    // The checkbox for the removed file should be disabled
+    const removedCheckbox = screen.getByRole('checkbox', {
+      name: /select lecture-1\.pdf/i,
+    });
+    expect(removedCheckbox).toBeDisabled();
+
+    // Other checkboxes should NOT be disabled
+    const otherCheckbox = screen.getByRole('checkbox', {
+      name: /select course website/i,
+    });
+    expect(otherCheckbox).not.toBeDisabled();
+  });
+
+  it('shows "Modified" badge for modified files', async () => {
+    const mockScrape = vi.fn().mockResolvedValue(mockScrapedContent);
+    mockUseMoodleExtension.mockReturnValue({
+      scrapeCourseContent: mockScrape,
+      downloadAndUpload: vi.fn(),
+    });
+
+    // Status API returns one file as modified
+    global.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: () =>
+        Promise.resolve({
+          lastSyncedAt: '2026-03-10T12:00:00Z',
+          importedFileIds: [],
+          removedFileIds: [],
+          modifiedFileIds: [
+            'sec-2::https://moodle.test.ac.il/mod/resource/view.php?id=3',
+          ],
+        }),
+    });
+
+    render(<MoodleFilePicker {...defaultProps} />);
+
+    await waitFor(() => {
+      expect(screen.getByText('homework-1.pdf')).toBeInTheDocument();
+    });
+
+    expect(screen.getByText('Modified')).toBeInTheDocument();
+  });
+
+  it('filters out non-actionable items when "Show only actionable" is toggled', async () => {
+    const user = userEvent.setup();
+    const mockScrape = vi.fn().mockResolvedValue(mockScrapedContent);
+    mockUseMoodleExtension.mockReturnValue({
+      scrapeCourseContent: mockScrape,
+      downloadAndUpload: vi.fn(),
+    });
+
+    // One file imported, one removed — only one should remain actionable
+    global.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: () =>
+        Promise.resolve({
+          lastSyncedAt: '2026-03-10T12:00:00Z',
+          importedFileIds: [
+            'sec-1::https://moodle.test.ac.il/mod/resource/view.php?id=1',
+          ],
+          removedFileIds: [
+            'sec-1::https://moodle.test.ac.il/mod/url/view.php?id=2',
+          ],
+          modifiedFileIds: [],
+        }),
+    });
+
+    render(<MoodleFilePicker {...defaultProps} />);
+
+    await waitFor(() => {
+      expect(screen.getByText('lecture-1.pdf')).toBeInTheDocument();
+    });
+
+    // All items visible initially
+    expect(screen.getByText('lecture-1.pdf')).toBeInTheDocument();
+    expect(screen.getByText('Course Website')).toBeInTheDocument();
+    expect(screen.getByText('homework-1.pdf')).toBeInTheDocument();
+
+    // Toggle the filter
+    const filterCheckbox = screen.getByRole('checkbox', {
+      name: /show only actionable items/i,
+    });
+    await user.click(filterCheckbox);
+
+    // Imported and removed files should be hidden
+    expect(screen.queryByText('lecture-1.pdf')).not.toBeInTheDocument();
+    expect(screen.queryByText('Course Website')).not.toBeInTheDocument();
+    // homework-1.pdf is neither imported nor removed — should still show
+    expect(screen.getByText('homework-1.pdf')).toBeInTheDocument();
   });
 });

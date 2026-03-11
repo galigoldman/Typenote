@@ -113,6 +113,237 @@ export async function compareCourses(
   return results;
 }
 
+// ============================================
+// Change detection types & logic (T051)
+// ============================================
+
+export interface ChangeDetectionResult {
+  newFiles: Array<{
+    sectionId: string;
+    moodleUrl: string;
+    name: string;
+    type: 'file' | 'link';
+  }>;
+  removedFiles: Array<{
+    fileId: string;
+    fileName: string;
+  }>;
+  modifiedFiles: Array<{
+    fileId: string;
+    fileName: string;
+    moodleUrl: string;
+  }>;
+  unchangedCount: number;
+}
+
+/**
+ * Compare scraped Moodle section data against the shared registry
+ * to detect new, removed, modified, and unchanged files.
+ *
+ * Logic:
+ * 1. Fetch all existing sections and files for this course
+ * 2. Build a map of existing files by moodle_url per section
+ * 3. Compare against scraped data to classify each item
+ */
+export async function detectChanges(
+  courseId: string,
+  scrapedSections: Array<{
+    moodleSectionId: string;
+    title: string;
+    position: number;
+    items: Array<{
+      type: 'file' | 'link';
+      name: string;
+      moodleUrl: string;
+      externalUrl?: string;
+      fileSize?: number;
+      mimeType?: string;
+    }>;
+  }>,
+): Promise<ChangeDetectionResult> {
+  const admin = createAdminClient();
+
+  // Step 1: Fetch all sections for this course
+  const { data: dbSections } = await admin
+    .from('moodle_sections')
+    .select('id, moodle_section_id')
+    .eq('course_id', courseId)
+    .order('position');
+
+  const sections = dbSections ?? [];
+
+  // Step 2: For each DB section, fetch its files and build a lookup map
+  // Map: moodleSectionId -> Map<moodleUrl, fileRecord>
+  type FileRecord = {
+    id: string;
+    moodle_url: string;
+    file_name: string;
+    file_size: number | null;
+    is_removed: boolean;
+  };
+  const registryMap = new Map<string, Map<string, FileRecord>>();
+
+  for (const section of sections) {
+    const { data: files } = await admin
+      .from('moodle_files')
+      .select('id, moodle_url, file_name, file_size, is_removed')
+      .eq('section_id', section.id)
+      .order('position');
+
+    const fileMap = new Map<string, FileRecord>();
+    for (const file of (files ?? []) as FileRecord[]) {
+      fileMap.set(file.moodle_url, file);
+    }
+    registryMap.set(section.moodle_section_id, fileMap);
+  }
+
+  // Step 3: Compare scraped data against registry
+  const result: ChangeDetectionResult = {
+    newFiles: [],
+    removedFiles: [],
+    modifiedFiles: [],
+    unchangedCount: 0,
+  };
+
+  // Track all URLs seen in scraped data (per section) to detect removals
+  const scrapedUrlsBySection = new Map<string, Set<string>>();
+
+  for (const scrapedSection of scrapedSections) {
+    const urlSet = new Set<string>();
+    scrapedUrlsBySection.set(scrapedSection.moodleSectionId, urlSet);
+
+    const registryFiles = registryMap.get(scrapedSection.moodleSectionId);
+
+    for (const item of scrapedSection.items) {
+      urlSet.add(item.moodleUrl);
+
+      if (!registryFiles || !registryFiles.has(item.moodleUrl)) {
+        // New file: not in registry
+        result.newFiles.push({
+          sectionId: scrapedSection.moodleSectionId,
+          moodleUrl: item.moodleUrl,
+          name: item.name,
+          type: item.type,
+        });
+      } else {
+        const existing = registryFiles.get(item.moodleUrl)!;
+        // Check if modified: name or fileSize changed
+        const nameChanged = item.name !== existing.file_name;
+        const sizeChanged =
+          item.fileSize !== undefined &&
+          existing.file_size !== null &&
+          item.fileSize !== existing.file_size;
+
+        if (nameChanged || sizeChanged) {
+          result.modifiedFiles.push({
+            fileId: existing.id,
+            fileName: item.name,
+            moodleUrl: item.moodleUrl,
+          });
+        } else {
+          result.unchangedCount++;
+        }
+      }
+    }
+  }
+
+  // Detect removed files: registry files not present in any scraped section
+  for (const [sectionId, fileMap] of registryMap) {
+    const scrapedUrls = scrapedUrlsBySection.get(sectionId) ?? new Set();
+    for (const [url, file] of fileMap) {
+      // Skip files already flagged as removed
+      if (file.is_removed) continue;
+      if (!scrapedUrls.has(url)) {
+        result.removedFiles.push({
+          fileId: file.id,
+          fileName: file.file_name,
+        });
+      }
+    }
+  }
+
+  return result;
+}
+
+// ============================================
+// Removed file flagging (T052)
+// ============================================
+
+/**
+ * Flag files as removed from Moodle.
+ * Updates moodle_files.is_removed = true and
+ * user_file_imports.status = 'removed_from_moodle' for affected files.
+ */
+export async function flagRemovedFiles(fileIds: string[]): Promise<void> {
+  if (fileIds.length === 0) return;
+
+  const admin = createAdminClient();
+
+  // Mark files as removed in the shared registry
+  await admin
+    .from('moodle_files')
+    .update({ is_removed: true })
+    .in('id', fileIds);
+
+  // Update user import status for all users who imported these files
+  await admin
+    .from('user_file_imports')
+    .update({ status: 'removed_from_moodle' })
+    .in('moodle_file_id', fileIds);
+}
+
+// ============================================
+// Modified file replacement (T053)
+// ============================================
+
+/**
+ * Update a modified file's metadata in the registry.
+ * If a new storage path is provided and an old one exists,
+ * deletes the old file from Supabase Storage.
+ */
+export async function updateModifiedFile(
+  fileId: string,
+  updates: {
+    contentHash?: string;
+    storagePath?: string;
+    fileSize?: number;
+    fileName?: string;
+  },
+): Promise<void> {
+  const admin = createAdminClient();
+
+  // Fetch current file to check for old storage_path
+  const { data: currentFile } = await admin
+    .from('moodle_files')
+    .select('id, storage_path')
+    .eq('id', fileId)
+    .single();
+
+  // Build update payload mapping camelCase to snake_case column names
+  const updatePayload: Record<string, unknown> = {};
+  if (updates.contentHash !== undefined) updatePayload.content_hash = updates.contentHash;
+  if (updates.storagePath !== undefined) updatePayload.storage_path = updates.storagePath;
+  if (updates.fileSize !== undefined) updatePayload.file_size = updates.fileSize;
+  if (updates.fileName !== undefined) updatePayload.file_name = updates.fileName;
+
+  // Update the file record
+  await admin
+    .from('moodle_files')
+    .update(updatePayload)
+    .eq('id', fileId);
+
+  // If there's an old storage_path and a new one, delete the old file
+  if (
+    updates.storagePath &&
+    currentFile?.storage_path &&
+    currentFile.storage_path !== updates.storagePath
+  ) {
+    await admin.storage
+      .from('moodle-materials')
+      .remove([currentFile.storage_path]);
+  }
+}
+
 /**
  * Upsert scraped Moodle data into the shared registry.
  * Returns the status of each item (exists/new/modified).

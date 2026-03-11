@@ -86,6 +86,7 @@ export interface CourseStatusPayload {
   lastSyncedAt: string | null;
   importedFileIds: string[];
   removedFileIds: string[];
+  modifiedFileIds: string[];
 }
 
 // ============================================

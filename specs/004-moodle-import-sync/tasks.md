@@ -136,15 +136,15 @@
 
 ### Implementation for User Story 5
 
-- [ ] T041 [P] [US5] Implement SCRAPE_COURSE_CONTENT handler in extension — fetch individual course page, extract sections with titles/order and items (files + links) with metadata. Add to `extension/src/content/moodle-scraper.ts`
-- [ ] T042 [P] [US5] Implement DOWNLOAD_AND_UPLOAD handler in extension at `extension/src/lib/file-downloader.ts` — download file blob from Moodle URL, compute SHA-256 hash, upload to Typenote API endpoint as multipart form
-- [ ] T043 [US5] Add `scrapeCourseContent(courseUrl)` and `downloadAndUpload(params)` to `src/hooks/use-moodle-extension.ts`
-- [ ] T044 [US5] Create file picker UI within `src/components/dashboard/moodle-sync-dialog.tsx` — expandable sections with checkboxes per item, file type icons, size display, "Already imported" badges
-- [ ] T045 [US5] Create API route `src/app/api/moodle/import/route.ts` (POST) — receives list of moodle_file IDs, creates `user_file_imports` records, updates `user_course_syncs.last_synced_at`
-- [ ] T046 [US5] Create API route `src/app/api/moodle/status/route.ts` (GET) — returns what this student has already imported for a course (imported file IDs, removed file IDs)
-- [ ] T047 [US5] Implement import orchestration in `src/lib/actions/moodle-sync.ts` — `importSelectedFiles(syncId, fileIds, newFiles)` that: (a) calls extension to download/upload truly new files, (b) creates references for existing files, (c) records all imports via /api/moodle/import
-- [ ] T048 [US5] Integrate file picker with import orchestration — wire "Import Selected" button to download, upload, and record flow with progress indicators
-- [ ] T049 [US5] Run full test suite and manually test the complete flow: scrape → pick → download → dedup → import
+- [x] T041 [P] [US5] Implement SCRAPE_COURSE_CONTENT handler in extension — fetch individual course page, extract sections with titles/order and items (files + links) with metadata. Add to `extension/src/content/moodle-scraper.ts`
+- [x] T042 [P] [US5] Implement DOWNLOAD_AND_UPLOAD handler in extension at `extension/src/lib/file-downloader.ts` — download file blob from Moodle URL, compute SHA-256 hash, upload to Typenote API endpoint as multipart form
+- [x] T043 [US5] Add `scrapeCourseContent(courseUrl)` and `downloadAndUpload(params)` to `src/hooks/use-moodle-extension.ts`
+- [x] T044 [US5] Create file picker UI within `src/components/dashboard/moodle-sync-dialog.tsx` — expandable sections with checkboxes per item, file type icons, size display, "Already imported" badges
+- [x] T045 [US5] Create API route `src/app/api/moodle/import/route.ts` (POST) — receives list of moodle_file IDs, creates `user_file_imports` records, updates `user_course_syncs.last_synced_at`
+- [x] T046 [US5] Create API route `src/app/api/moodle/status/route.ts` (GET) — returns what this student has already imported for a course (imported file IDs, removed file IDs)
+- [x] T047 [US5] Implement import orchestration in `src/lib/actions/moodle-sync.ts` — `importSelectedFiles(syncId, fileIds, newFiles)` that: (a) calls extension to download/upload truly new files, (b) creates references for existing files, (c) records all imports via /api/moodle/import
+- [x] T048 [US5] Integrate file picker with import orchestration — wire "Import Selected" button to download, upload, and record flow with progress indicators
+- [x] T049 [US5] Run full test suite and manually test the complete flow: scrape → pick → download → dedup → import
 
 **Checkpoint**: Full import pipeline works. Students can cherry-pick files, dedup works, files land in storage.
 
