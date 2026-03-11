@@ -13,6 +13,7 @@ import type { CanvasPage as CanvasPageData, CanvasTool } from '@/types/canvas';
 import { PAGE_WIDTH, PAGE_HEIGHT } from '@/types/canvas';
 import { setupHighDPICanvas } from '@/lib/canvas/coordinate-utils';
 import { renderStroke } from '@/lib/canvas/stroke-utils';
+import { ERASER_RADIUS } from '@/hooks/use-eraser';
 import type { Editor } from '@tiptap/core';
 
 interface CanvasPageProps {
@@ -27,6 +28,7 @@ interface CanvasPageProps {
   onFlowContentUpdate?: (pageId: string, content: Record<string, unknown>) => void;
   onEditorReady?: (editor: Editor) => void;
   canvasClass?: string;
+  eraserPosition?: { x: number; y: number } | null;
 }
 
 export function CanvasPage({
@@ -39,6 +41,7 @@ export function CanvasPage({
   onFlowContentUpdate,
   onEditorReady,
   canvasClass,
+  eraserPosition = null,
 }: CanvasPageProps) {
   const committedCanvasRef = useRef<HTMLCanvasElement>(null);
   const workingCanvasRef = useRef<HTMLCanvasElement>(null);
@@ -46,7 +49,7 @@ export function CanvasPage({
   const committedCtxRef = useRef<CanvasRenderingContext2D | null>(null);
   const workingCtxRef = useRef<CanvasRenderingContext2D | null>(null);
 
-  const isDrawMode = activeTool === 'pen' || activeTool === 'eraser';
+  const isInteractionMode = activeTool === 'pen' || activeTool === 'eraser';
 
   // Setup canvases for high-DPI on mount
   useEffect(() => {
@@ -66,8 +69,7 @@ export function CanvasPage({
     }
   }, []);
 
-  // Native event listeners — exact same approach as working commit
-  // ALWAYS on the interaction layer, prevents text selection and touch defaults
+  // Native event listeners — prevents text selection and touch defaults
   useEffect(() => {
     const el = interactionLayerRef.current;
     if (!el) return;
@@ -214,17 +216,35 @@ export function CanvasPage({
         style={{ pointerEvents: 'none' }}
       />
 
-      {/* Layer 4: Text content layer — only interactive in type mode */}
+      {/* Layer 4: Text content layer — only interactive in text mode */}
       <div
         className="absolute inset-0 overflow-hidden"
-        style={{ pointerEvents: isDrawMode ? 'none' : 'auto' }}
+        style={{ pointerEvents: isInteractionMode ? 'none' : 'auto' }}
       >
         {editor && <EditorContent editor={editor} />}
       </div>
 
-      {/* Layer 5: Interaction layer — ALWAYS present
-          In draw mode: captures all events (pointer-events: auto)
-          In type mode: transparent (pointer-events: none), lets clicks reach editor */}
+      {/* Layer 5: Eraser cursor circle */}
+      {eraserPosition && (
+        <svg
+          className="absolute inset-0"
+          viewBox={`0 0 ${PAGE_WIDTH} ${PAGE_HEIGHT}`}
+          style={{ pointerEvents: 'none' }}
+        >
+          <circle
+            cx={eraserPosition.x}
+            cy={eraserPosition.y}
+            r={ERASER_RADIUS}
+            fill="rgba(255, 255, 255, 0.5)"
+            stroke="#888888"
+            strokeWidth={1}
+          />
+        </svg>
+      )}
+
+      {/* Layer 6: Interaction layer — ALWAYS present
+          In draw/erase mode: captures all events (pointer-events: auto)
+          In text mode: transparent (pointer-events: none), lets clicks reach editor */}
       <div
         ref={interactionLayerRef}
         className="absolute inset-0"
@@ -232,7 +252,7 @@ export function CanvasPage({
           touchAction: 'none',
           userSelect: 'none',
           WebkitUserSelect: 'none',
-          pointerEvents: isDrawMode ? 'auto' : 'none',
+          pointerEvents: isInteractionMode ? 'auto' : 'none',
         }}
         onPointerDown={handlePointerDown}
         onPointerMove={handlePointerMove}
