@@ -45,6 +45,13 @@ export interface DownloadAndUploadRequest {
   };
 }
 
+export interface CheckPermissionRequest {
+  type: 'CHECK_PERMISSION';
+  payload: {
+    moodleUrl: string;
+  };
+}
+
 export interface RequestPermissionRequest {
   type: 'REQUEST_PERMISSION';
   payload: {
@@ -58,6 +65,7 @@ export type ExtensionRequest =
   | ScrapCoursesRequest
   | ScrapeCourseContentRequest
   | DownloadAndUploadRequest
+  | CheckPermissionRequest
   | RequestPermissionRequest;
 
 // ============================================
