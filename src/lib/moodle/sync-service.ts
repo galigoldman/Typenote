@@ -82,7 +82,28 @@ export async function compareCourses(
       continue;
     }
 
-    // Step 3: Check if this user has a sync record
+    // Step 3: Check if the course actually has content (sections with files)
+    const { count: fileCount } = await admin
+      .from('moodle_sections')
+      .select('id, moodle_files(id)', { count: 'exact', head: false })
+      .eq('course_id', registryCourse.id);
+
+    // Count actual files across all sections
+    const { count: totalFiles } = await admin
+      .from('moodle_files')
+      .select('id', { count: 'exact', head: true })
+      .in(
+        'section_id',
+        (await admin
+          .from('moodle_sections')
+          .select('id')
+          .eq('course_id', registryCourse.id)
+        ).data?.map((s: { id: string }) => s.id) ?? [],
+      );
+
+    const hasContent = (totalFiles ?? 0) > 0;
+
+    // Step 4: Check if this user has a sync record
     const { data: userSync } = await admin
       .from('user_course_syncs')
       .select('id, last_synced_at')
@@ -95,7 +116,16 @@ export async function compareCourses(
         moodleCourseId: scraped.moodleCourseId,
         name: scraped.name,
         moodleUrl: scraped.url,
-        status: 'synced_by_others',
+        status: hasContent ? 'synced_by_others' : 'new_to_system',
+        registryId: registryCourse.id,
+      });
+    } else if (!hasContent) {
+      // User has a sync record but no actual content — treat as new
+      results.push({
+        moodleCourseId: scraped.moodleCourseId,
+        name: scraped.name,
+        moodleUrl: scraped.url,
+        status: 'new_to_system',
         registryId: registryCourse.id,
       });
     } else {
