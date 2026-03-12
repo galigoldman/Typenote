@@ -6,7 +6,10 @@ import type { Stroke, StrokePoint, BBox } from '@/types/canvas';
  * Converts perfect-freehand output points into an SVG path data string
  * using quadratic Bezier curves.
  */
-export function getSvgPathFromStroke(points: number[][], closed = true): string {
+export function getSvgPathFromStroke(
+  points: number[][],
+  closed = true,
+): string {
   const len = points.length;
   if (len < 4) return '';
 
@@ -102,7 +105,10 @@ export function pointToSegmentDistance(
 
   // Parameter t is the scalar projection of AP onto AB, normalised by |AB|².
   // Clamping to [0, 1] restricts the closest point to lie on the segment.
-  const t = Math.max(0, Math.min(1, ((px - ax) * dx + (py - ay) * dy) / lengthSq));
+  const t = Math.max(
+    0,
+    Math.min(1, ((px - ax) * dx + (py - ay) * dy) / lengthSq),
+  );
 
   const closestX = ax + t * dx;
   const closestY = ay + t * dy;

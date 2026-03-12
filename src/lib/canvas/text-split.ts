@@ -73,8 +73,20 @@ export function splitDocumentAtBlockIndex(
  */
 export function findSplitIndex(
   editorView: {
-    posAtCoords: (coords: { left: number; top: number }) => { pos: number } | null;
-    state: { doc: { resolve: (pos: number) => { depth: number; before: (depth: number) => number; parent: { childCount: number }; index: (depth: number) => number } } };
+    posAtCoords: (coords: {
+      left: number;
+      top: number;
+    }) => { pos: number } | null;
+    state: {
+      doc: {
+        resolve: (pos: number) => {
+          depth: number;
+          before: (depth: number) => number;
+          parent: { childCount: number };
+          index: (depth: number) => number;
+        };
+      };
+    };
     dom: { getBoundingClientRect: () => DOMRect };
   },
   selectionBoundaryY: number,

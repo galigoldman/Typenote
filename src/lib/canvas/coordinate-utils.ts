@@ -8,7 +8,7 @@ import type { ViewTransform } from '@/types/canvas';
 export function screenToPage(
   screenX: number,
   screenY: number,
-  viewTransform: ViewTransform
+  viewTransform: ViewTransform,
 ): { x: number; y: number } {
   const { scale, offsetX, offsetY } = viewTransform;
   return {
@@ -25,7 +25,7 @@ export function screenToPage(
 export function pageToScreen(
   pageX: number,
   pageY: number,
-  viewTransform: ViewTransform
+  viewTransform: ViewTransform,
 ): { x: number; y: number } {
   const { scale, offsetX, offsetY } = viewTransform;
   return {
@@ -50,7 +50,7 @@ export function pageToScreen(
 export function setupHighDPICanvas(
   canvas: HTMLCanvasElement,
   width: number,
-  height: number
+  height: number,
 ): CanvasRenderingContext2D | null {
   const dpr = window.devicePixelRatio || 1;
 

@@ -26,9 +26,15 @@ interface CanvasPageProps {
   onPointerDown?: (e: React.PointerEvent, pageId: string) => void;
   onPointerMove?: (e: React.PointerEvent, pageId: string) => void;
   onPointerUp?: (e: React.PointerEvent, pageId: string) => void;
-  onFlowContentUpdate?: (pageId: string, content: Record<string, unknown>) => void;
+  onFlowContentUpdate?: (
+    pageId: string,
+    content: Record<string, unknown>,
+  ) => void;
   onEditorReady?: (pageId: string, editor: Editor) => void;
-  onTextOverflow?: (pageId: string, overflowContent: Record<string, unknown> | null) => void;
+  onTextOverflow?: (
+    pageId: string,
+    overflowContent: Record<string, unknown> | null,
+  ) => void;
   canvasClass?: string;
   eraserPosition?: { x: number; y: number } | null;
   eraserRadius?: number;
@@ -58,7 +64,10 @@ export function CanvasPage({
   const workingCtxRef = useRef<CanvasRenderingContext2D | null>(null);
   const overflowNotifiedRef = useRef(false);
 
-  const isInteractionMode = activeTool === 'pen' || activeTool === 'highlighter' || activeTool === 'eraser';
+  const isInteractionMode =
+    activeTool === 'pen' ||
+    activeTool === 'highlighter' ||
+    activeTool === 'eraser';
 
   // Setup canvases for high-DPI on mount
   useEffect(() => {
@@ -92,7 +101,9 @@ export function CanvasPage({
     const el = interactionLayerRef.current;
     if (!el) return;
 
-    const scrollContainer = el.closest('[data-scroll-container]') as HTMLElement | null;
+    const scrollContainer = el.closest(
+      '[data-scroll-container]',
+    ) as HTMLElement | null;
 
     // ── Pen handlers ──
     const handlePenDown = (e: PointerEvent) => {
@@ -167,7 +178,10 @@ export function CanvasPage({
 
   // Sanitize content: ProseMirror crashes on { type: 'doc', content: [] }
   const safeContent = (() => {
-    const fc = page.flowContent as { type?: string; content?: unknown[] } | null;
+    const fc = page.flowContent as {
+      type?: string;
+      content?: unknown[];
+    } | null;
     if (!fc || !fc.content || fc.content.length === 0) return undefined;
     return fc as Record<string, unknown>;
   })();
@@ -208,7 +222,9 @@ export function CanvasPage({
               onTextOverflowRef.current?.(pageIdRef.current, null);
               return true;
             }
-          } catch { /* coordsAtPos can throw before DOM is ready */ }
+          } catch {
+            /* coordsAtPos can throw before DOM is ready */
+          }
         }
         return false;
       },
@@ -251,7 +267,9 @@ export function CanvasPage({
             // Reset only when cursor is well within the page
             overflowNotifiedRef.current = false;
           }
-        } catch { /* coordsAtPos can throw before DOM is ready */ }
+        } catch {
+          /* coordsAtPos can throw before DOM is ready */
+        }
       });
     },
     onFocus: ({ editor: ed }) => {
@@ -274,7 +292,10 @@ export function CanvasPage({
       if (editor && page.flowContent) {
         const fc = page.flowContent as { type?: string; content?: unknown[] };
         if (fc?.content && fc.content.length > 0) {
-          editor.commands.setContent(page.flowContent as Record<string, unknown>, { emitUpdate: false });
+          editor.commands.setContent(
+            page.flowContent as Record<string, unknown>,
+            { emitUpdate: false },
+          );
         }
       }
     }

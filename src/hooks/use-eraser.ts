@@ -21,7 +21,10 @@ export function useEraser({
   getPageStrokes,
 }: UseEraserOptions) {
   const isErasingRef = useRef(false);
-  const [eraserPosition, setEraserPosition] = useState<{ x: number; y: number } | null>(null);
+  const [eraserPosition, setEraserPosition] = useState<{
+    x: number;
+    y: number;
+  } | null>(null);
 
   const checkHits = useCallback(
     (pageId: string, x: number, y: number) => {

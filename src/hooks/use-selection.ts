@@ -46,8 +46,12 @@ export function useSelection({
   getPageStrokes,
   onStrokesMove,
 }: UseSelectionOptions): UseSelectionReturn {
-  const [selectionPath, setSelectionPath] = useState<[number, number][] | null>(null);
-  const [selectedStrokeIds, setSelectedStrokeIds] = useState<Set<string>>(new Set());
+  const [selectionPath, setSelectionPath] = useState<[number, number][] | null>(
+    null,
+  );
+  const [selectedStrokeIds, setSelectedStrokeIds] = useState<Set<string>>(
+    new Set(),
+  );
   const [selectionBBox, setSelectionBBox] = useState<BBox | null>(null);
   const [isRectMode, setIsRectMode] = useState(true);
   const [isDragging, setIsDragging] = useState(false);
@@ -158,7 +162,11 @@ export function useSelection({
         const targetPageId = activePageIdRef.current ?? pageId;
         const strokes = getPageStrokes(targetPageId);
 
-        if (selectionPath && selectionPath.length >= 2 && startPointRef.current) {
+        if (
+          selectionPath &&
+          selectionPath.length >= 2 &&
+          startPointRef.current
+        ) {
           // For rect mode, build rect polygon from start and current point
           const { x, y } = screenToPageCoords(e);
           const [sx, sy] = startPointRef.current;
@@ -208,7 +216,10 @@ export function useSelection({
         // Commit the move
         const targetPageId = activePageIdRef.current ?? pageId;
 
-        if (dragStartRef.current && (dragOffset.x !== 0 || dragOffset.y !== 0)) {
+        if (
+          dragStartRef.current &&
+          (dragOffset.x !== 0 || dragOffset.y !== 0)
+        ) {
           const dx = dragOffset.x;
           const dy = dragOffset.y;
 
@@ -237,19 +248,21 @@ export function useSelection({
           }
 
           // Update cached strokes
-          selectedStrokesRef.current = selectedStrokesRef.current.map((stroke) => ({
-            ...stroke,
-            points: stroke.points.map(
-              ([px, py, pressure]) =>
-                [px + dx, py + dy, pressure] as Stroke['points'][0],
-            ),
-            bbox: computeBBox(
-              stroke.points.map(
+          selectedStrokesRef.current = selectedStrokesRef.current.map(
+            (stroke) => ({
+              ...stroke,
+              points: stroke.points.map(
                 ([px, py, pressure]) =>
                   [px + dx, py + dy, pressure] as Stroke['points'][0],
               ),
-            ),
-          }));
+              bbox: computeBBox(
+                stroke.points.map(
+                  ([px, py, pressure]) =>
+                    [px + dx, py + dy, pressure] as Stroke['points'][0],
+                ),
+              ),
+            }),
+          );
         }
 
         setIsDragging(false);
@@ -258,7 +271,15 @@ export function useSelection({
         dragStartRef.current = null;
       }
     },
-    [activeTool, selectionPath, selectionBBox, dragOffset, getPageStrokes, onStrokesMove, clearSelection],
+    [
+      activeTool,
+      selectionPath,
+      selectionBBox,
+      dragOffset,
+      getPageStrokes,
+      onStrokesMove,
+      clearSelection,
+    ],
   );
 
   return {
