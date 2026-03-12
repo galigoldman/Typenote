@@ -35,11 +35,12 @@ describe('CreateDocumentDialog', () => {
     expect(screen.getByRole('combobox')).toBeInTheDocument();
   });
 
-  it('renders canvas type radio buttons', () => {
+  it('renders canvas type options', () => {
     renderDialog();
-    expect(screen.getByLabelText(/blank/i)).toBeInTheDocument();
-    expect(screen.getByLabelText(/lined/i)).toBeInTheDocument();
-    expect(screen.getByLabelText(/grid/i)).toBeInTheDocument();
+    expect(screen.getByText('Blank')).toBeInTheDocument();
+    expect(screen.getByText('Lined')).toBeInTheDocument();
+    expect(screen.getByText('Grid')).toBeInTheDocument();
+    expect(screen.getByText('Dotted')).toBeInTheDocument();
   });
 
   it('renders Create and Cancel buttons', () => {
