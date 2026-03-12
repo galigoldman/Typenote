@@ -23,7 +23,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
+import { PageTypeThumb } from '@/components/ui/page-type-thumb';
 
 interface CreateDocumentDialogProps {
   folderId?: string | null;
@@ -140,22 +140,24 @@ export function CreateDocumentDialog({
             )}
 
             <div className="grid gap-2">
-              <Label>Canvas Type</Label>
-              <RadioGroup
-                value={canvasType}
-                onValueChange={setCanvasType}
-                className="flex gap-4"
-              >
+              <Label>Page Style</Label>
+              <div className="flex gap-3">
                 {CANVAS_TYPES.map((ct) => (
-                  <div key={ct.value} className="flex items-center gap-2">
-                    <RadioGroupItem
-                      value={ct.value}
-                      id={`canvas-${ct.value}`}
-                    />
-                    <Label htmlFor={`canvas-${ct.value}`}>{ct.label}</Label>
-                  </div>
+                  <button
+                    key={ct.value}
+                    type="button"
+                    onClick={() => setCanvasType(ct.value)}
+                    className={`flex flex-col items-center gap-1.5 p-2 rounded-lg border-2 transition-colors ${
+                      canvasType === ct.value
+                        ? 'border-primary bg-primary/5'
+                        : 'border-transparent hover:bg-accent'
+                    }`}
+                  >
+                    <PageTypeThumb type={ct.value} size={52} />
+                    <span className="text-xs font-medium">{ct.label}</span>
+                  </button>
                 ))}
-              </RadioGroup>
+              </div>
             </div>
 
             {error && (
