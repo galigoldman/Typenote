@@ -13,7 +13,9 @@ import { PAGE_WIDTH, PAGE_HEIGHT } from '@/types/canvas';
 import type { Document } from '@/types/database';
 import type { SaveStatus } from '@/hooks/use-auto-save';
 import type { ConnectionStatus } from '@/hooks/use-realtime-sync';
-import { Pen, Type, Eraser, Highlighter, Undo2, Redo2 } from 'lucide-react';
+import { Pen, Type, Eraser, Highlighter, Undo2, Redo2, Trash2, Plus } from 'lucide-react';
+import { CANVAS_TYPES } from '@/lib/constants/subjects';
+import { PageTypeThumb } from '@/components/ui/page-type-thumb';
 import { useDocumentSync } from '@/hooks/use-document-sync';
 import { useDrawing } from '@/hooks/use-drawing';
 import { useEraser } from '@/hooks/use-eraser';
@@ -28,7 +30,17 @@ const CANVAS_CLASSES: Record<string, string> = {
   blank: '',
   lined: 'canvas-lined',
   grid: 'canvas-grid',
+  dotted: 'canvas-dotted',
 };
+
+/** Returns true if a page has any real content (strokes or typed text). */
+function pageHasContent(page: CanvasPageData): boolean {
+  if (page.strokes.length > 0) return true;
+  if (!page.flowContent) return false;
+  // An empty TipTap editor produces { type:'doc', content:[{type:'paragraph'}] }.
+  // Real text contains a "text" key somewhere in the JSON.
+  return JSON.stringify(page.flowContent).includes('"text"');
+}
 
 const PEN_COLORS = [
   '#000000', '#374151', '#DC2626', '#EA580C', '#CA8A04',
@@ -101,10 +113,11 @@ function ConnectionIndicator({
   );
 }
 
-function createEmptyPage(order: number): CanvasPageData {
+function createEmptyPage(order: number, pageType?: string): CanvasPageData {
   return {
     id: Math.random().toString(36).slice(2) + Date.now().toString(36),
     order,
+    pageType: pageType as CanvasPageData['pageType'],
     strokes: [],
     textBoxes: [],
     flowContent: null,
@@ -114,9 +127,16 @@ function createEmptyPage(order: number): CanvasPageData {
 function initializePagesFromDocument(doc: Document): CanvasPageData[] {
   const pagesData = doc.pages as CanvasDocument | null;
   if (pagesData?.pages && pagesData.pages.length > 0) {
-    return pagesData.pages;
+    const loaded = pagesData.pages;
+    // Always ensure a trailing empty page for infinite-scroll feel
+    const lastPage = loaded[loaded.length - 1];
+    if (pageHasContent(lastPage)) {
+      const newType = lastPage.pageType || doc.canvas_type;
+      return [...loaded, createEmptyPage(loaded.length, newType)];
+    }
+    return loaded;
   }
-  return [createEmptyPage(0)];
+  return [createEmptyPage(0, doc.canvas_type)];
 }
 
 export function CanvasEditor({ document }: CanvasEditorProps) {
@@ -127,6 +147,9 @@ export function CanvasEditor({ document }: CanvasEditorProps) {
   const [activeTool, setActiveTool] = useState<CanvasTool>('text');
   const [activeEditor, setActiveEditor] = useState<Editor | null>(null);
   const [remoteUpdateCounter, setRemoteUpdateCounter] = useState(0);
+
+  // Add page popover
+  const [addPagePopoverIndex, setAddPagePopoverIndex] = useState<number | null>(null);
 
   // Drawing tool settings
   const [penColor, setPenColor] = useState('#000000');
@@ -153,7 +176,14 @@ export function CanvasEditor({ document }: CanvasEditorProps) {
   }, [pages]);
 
   const getPagesData = useCallback((): Record<string, unknown> => {
-    return { pages: pagesRef.current } as unknown as Record<string, unknown>;
+    // Strip empty trailing pages — only save pages with content
+    const all = pagesRef.current;
+    let lastContentIndex = all.length - 1;
+    while (lastContentIndex > 0 && !pageHasContent(all[lastContentIndex])) {
+      lastContentIndex--;
+    }
+    const toSave = all.slice(0, lastContentIndex + 1);
+    return { pages: toSave } as unknown as Record<string, unknown>;
   }, []);
 
   const onRemoteTitleUpdate = useCallback((remoteTitle: string) => {
@@ -186,21 +216,28 @@ export function CanvasEditor({ document }: CanvasEditorProps) {
     onRemotePagesUpdate,
   });
 
-  // Stroke management (with undo history)
+  // Stroke management (with undo history + auto-add page)
   const handleStrokeAdd = useCallback(
     (pageId: string, stroke: Stroke) => {
       undoStackRef.current.push({ type: 'add', pageId, stroke });
       redoStackRef.current = [];
       if (undoStackRef.current.length > 100) undoStackRef.current.shift();
       setHistoryVersion((v) => v + 1);
-      setPages((prev) =>
-        prev.map((p) =>
+      setPages((prev) => {
+        const updated = prev.map((p) =>
           p.id === pageId ? { ...p, strokes: [...p.strokes, stroke] } : p,
-        ),
-      );
+        );
+        // Auto-add page when the last page now has content
+        const lastPage = updated[updated.length - 1];
+        if (pageHasContent(lastPage)) {
+          const newType = lastPage.pageType || document.canvas_type;
+          return [...updated, createEmptyPage(updated.length, newType)];
+        }
+        return updated;
+      });
       triggerSave();
     },
-    [triggerSave],
+    [triggerSave, document.canvas_type],
   );
 
   const handleStrokeRemove = useCallback(
@@ -224,7 +261,8 @@ export function CanvasEditor({ document }: CanvasEditorProps) {
     [triggerSave],
   );
 
-  // Flow content update handler
+  // Flow content update handler (save only — auto-add is triggered by
+  // overflow detection in CanvasPage, like Word/Google Docs)
   const handleFlowContentUpdate = useCallback(
     (pageId: string, content: Record<string, unknown>) => {
       setPages((prev) =>
@@ -237,9 +275,21 @@ export function CanvasEditor({ document }: CanvasEditorProps) {
     [triggerSave],
   );
 
-  // Editor focus handler
-  const handleEditorFocus = useCallback((editor: Editor) => {
+  // Pending focus: when a new page is created from text overflow, we want to
+  // auto-focus its editor once it mounts.
+  const pendingFocusPageIdRef = useRef<string | null>(null);
+
+  // Editor ready / focus handler — receives pageId from CanvasPage
+  const handleEditorReady = useCallback((pageId: string, editor: Editor) => {
     setActiveEditor(editor);
+    // If this page was just created by text overflow, focus it at the start
+    if (pendingFocusPageIdRef.current === pageId) {
+      pendingFocusPageIdRef.current = null;
+      // Small delay to ensure the editor DOM is fully settled
+      setTimeout(() => {
+        editor.commands.focus('end');
+      }, 50);
+    }
   }, []);
 
   // Get strokes for a page (used by eraser)
@@ -250,6 +300,61 @@ export function CanvasEditor({ document }: CanvasEditorProps) {
     [],
   );
 
+  // Auto-add page when drawing near the bottom of the last page
+  const handleNearPageBottom = useCallback(
+    (pageId: string) => {
+      setPages((prev) => {
+        const lastPage = prev[prev.length - 1];
+        if (lastPage.id === pageId) {
+          const newType = lastPage.pageType || document.canvas_type;
+          return [...prev, createEmptyPage(prev.length, newType)];
+        }
+        return prev;
+      });
+    },
+    [document.canvas_type],
+  );
+
+  // Text overflow handler — creates a new page with the overflowed content,
+  // scrolls to it, and queues auto-focus for its editor (like Google Docs).
+  const handleTextOverflow = useCallback(
+    (pageId: string, overflowContent: Record<string, unknown> | null) => {
+      setPages((prev) => {
+        const pageIndex = prev.findIndex((p) => p.id === pageId);
+        if (pageIndex === -1) return prev;
+        // Only auto-add after the last page
+        if (pageIndex !== prev.length - 1) return prev;
+
+        const currentPage = prev[pageIndex];
+        const newType = currentPage.pageType || document.canvas_type;
+        const newPage = createEmptyPage(prev.length, newType);
+        if (overflowContent) {
+          newPage.flowContent = overflowContent;
+        }
+
+        // Queue focus for the new page's editor
+        pendingFocusPageIdRef.current = newPage.id;
+
+        // Scroll to the new page after React renders it
+        setTimeout(() => {
+          const scrollContainer = globalThis.document.querySelector(
+            '[data-scroll-container]',
+          ) as HTMLElement | null;
+          if (scrollContainer) {
+            scrollContainer.scrollTo({
+              top: scrollContainer.scrollHeight,
+              behavior: 'smooth',
+            });
+          }
+        }, 100);
+
+        return [...prev, newPage];
+      });
+      triggerSave();
+    },
+    [triggerSave, document.canvas_type],
+  );
+
   // Drawing hook
   const { handlePointerDown: drawDown, handlePointerMove: drawMove, handlePointerUp: drawUp } = useDrawing({
     activeTool,
@@ -257,6 +362,7 @@ export function CanvasEditor({ document }: CanvasEditorProps) {
     penSize: currentSize,
     penOpacity: currentOpacity,
     onStrokeComplete: handleStrokeAdd,
+    onNearPageBottom: handleNearPageBottom,
   });
 
   // Eraser hook
@@ -353,6 +459,48 @@ export function CanvasEditor({ document }: CanvasEditorProps) {
   const canUndoDraw = historyVersion >= 0 && undoStackRef.current.length > 0;
   const canRedoDraw = historyVersion >= 0 && redoStackRef.current.length > 0;
 
+  // Page management
+  const handleDeletePage = useCallback(
+    (pageId: string) => {
+      setPages((prev) => {
+        if (prev.length <= 1) return prev;
+        return prev.filter((p) => p.id !== pageId).map((p, i) => ({ ...p, order: i }));
+      });
+      triggerSave();
+    },
+    [triggerSave],
+  );
+
+  const handleAddPage = useCallback(
+    (afterIndex: number, pageType: string) => {
+      setPages((prev) => {
+        const newPage = createEmptyPage(afterIndex + 1, pageType);
+        const updated = [
+          ...prev.slice(0, afterIndex + 1),
+          newPage,
+          ...prev.slice(afterIndex + 1),
+        ].map((p, i) => ({ ...p, order: i }));
+        return updated;
+      });
+      setAddPagePopoverIndex(null);
+      triggerSave();
+    },
+    [triggerSave],
+  );
+
+  // Close add page popover on outside click
+  useEffect(() => {
+    if (addPagePopoverIndex === null) return;
+    const handler = (e: PointerEvent) => {
+      const target = e.target as HTMLElement;
+      if (!target.closest('[data-add-page-popover]')) {
+        setAddPagePopoverIndex(null);
+      }
+    };
+    window.addEventListener('pointerdown', handler);
+    return () => window.removeEventListener('pointerdown', handler);
+  }, [addPagePopoverIndex]);
+
   const handleTitleBlur = async () => {
     if (title !== document.title) {
       await saveTitle(title);
@@ -363,7 +511,6 @@ export function CanvasEditor({ document }: CanvasEditorProps) {
     unlockEditor();
   };
 
-  const canvasClass = CANVAS_CLASSES[document.canvas_type] ?? '';
   const isDrawMode = activeTool === 'pen' || activeTool === 'highlighter' || activeTool === 'eraser';
   const showColorSize = activeTool === 'pen' || activeTool === 'highlighter';
 
@@ -509,31 +656,84 @@ export function CanvasEditor({ document }: CanvasEditorProps) {
         {/* Canvas scroll area */}
         <div
           className="flex-1 overflow-y-auto bg-gray-100"
+          data-scroll-container
           style={{
             userSelect: activeTool === 'text' ? 'auto' : 'none',
             WebkitUserSelect: activeTool === 'text' ? 'auto' : 'none',
           }}
         >
           <div className="py-8">
-            {pages.map((page) => (
-              <CanvasPage
-                key={page.id}
-                page={page}
-                activeTool={activeTool}
-                canvasType={document.canvas_type}
-                onStrokeAdd={handleStrokeAdd}
-                onStrokeRemove={handleStrokeRemove}
-                onPointerDown={(e) => handlePointerDown(e, page.id)}
-                onPointerMove={(e) => handlePointerMove(e, page.id)}
-                onPointerUp={(e) => handlePointerUp(e, page.id)}
-                onFlowContentUpdate={handleFlowContentUpdate}
-                onEditorReady={handleEditorFocus}
-                canvasClass={canvasClass}
-                eraserPosition={activeTool === 'eraser' ? eraserPosition : null}
-                eraserRadius={eraserSize}
-                remoteUpdateCounter={remoteUpdateCounter}
-              />
-            ))}
+            {pages.map((page, index) => {
+              const effectiveType = page.pageType || document.canvas_type;
+              return (
+                <div key={page.id}>
+                  <CanvasPage
+                    page={page}
+                    activeTool={activeTool}
+                    canvasType={effectiveType}
+                    onStrokeAdd={handleStrokeAdd}
+                    onStrokeRemove={handleStrokeRemove}
+                    onPointerDown={(e) => handlePointerDown(e, page.id)}
+                    onPointerMove={(e) => handlePointerMove(e, page.id)}
+                    onPointerUp={(e) => handlePointerUp(e, page.id)}
+                    onFlowContentUpdate={handleFlowContentUpdate}
+                    onEditorReady={handleEditorReady}
+                    onTextOverflow={handleTextOverflow}
+                    canvasClass={CANVAS_CLASSES[effectiveType] ?? ''}
+                    eraserPosition={activeTool === 'eraser' ? eraserPosition : null}
+                    eraserRadius={eraserSize}
+                    remoteUpdateCounter={remoteUpdateCounter}
+                  />
+                  {/* Page break divider */}
+                  <div
+                    className="group flex items-center justify-center mx-auto py-1.5"
+                    style={{ width: PAGE_WIDTH }}
+                  >
+                    <div className="h-px flex-1 bg-border" />
+                    <span className="px-3 text-xs text-muted-foreground select-none">
+                      {index + 1} / {pages.length}
+                    </span>
+                    {/* Add page button */}
+                    <div className="relative" data-add-page-popover>
+                      <button
+                        onClick={() => setAddPagePopoverIndex(addPagePopoverIndex === index ? null : index)}
+                        className="p-1 rounded hover:bg-accent transition-colors text-muted-foreground"
+                        title="Add page"
+                      >
+                        <Plus className="h-3.5 w-3.5" />
+                      </button>
+                      {addPagePopoverIndex === index && (
+                        <div className="absolute top-full left-1/2 -translate-x-1/2 mt-1 bg-popover border rounded-lg shadow-lg z-50 p-2">
+                          <div className="flex gap-2">
+                            {CANVAS_TYPES.map((t) => (
+                              <button
+                                key={t.value}
+                                onClick={() => handleAddPage(index, t.value)}
+                                className="flex flex-col items-center gap-1 p-1.5 rounded-lg hover:bg-accent transition-colors"
+                              >
+                                <PageTypeThumb type={t.value} size={36} />
+                                <span className="text-[10px] text-muted-foreground">{t.label}</span>
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                    {pages.length > 1 && (
+                      <button
+                        onClick={() => handleDeletePage(page.id)}
+                        className="opacity-0 group-hover:opacity-100 p-1 rounded hover:bg-destructive/10 hover:text-destructive transition-all"
+                        title="Delete page"
+                      >
+                        <Trash2 className="h-3 w-3" />
+                      </button>
+                    )}
+                    <div className="h-px flex-1 bg-border" />
+                  </div>
+                </div>
+              );
+            })}
+
           </div>
         </div>
 
@@ -656,6 +856,10 @@ export function CanvasEditor({ document }: CanvasEditorProps) {
           background-image:
             linear-gradient(#e5e7eb 1px, transparent 1px),
             linear-gradient(90deg, #e5e7eb 1px, transparent 1px);
+          background-size: 32px 32px;
+        }
+        .canvas-dotted {
+          background-image: radial-gradient(circle, #d1d5db 1px, transparent 1px);
           background-size: 32px 32px;
         }
       `}</style>

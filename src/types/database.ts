@@ -8,7 +8,7 @@ export type Subject =
   | 'physics'
   | 'other';
 
-export type CanvasType = 'blank' | 'lined' | 'grid';
+export type CanvasType = 'blank' | 'lined' | 'grid' | 'dotted';
 
 export type MaterialCategory = 'material' | 'homework';
 
