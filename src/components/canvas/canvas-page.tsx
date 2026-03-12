@@ -153,13 +153,15 @@ export function CanvasPage({
 
   // TipTap editor for flow content
   const onFlowContentUpdateRef = useRef(onFlowContentUpdate);
-  onFlowContentUpdateRef.current = onFlowContentUpdate;
   const onEditorReadyRef = useRef(onEditorReady);
-  onEditorReadyRef.current = onEditorReady;
   const onTextOverflowRef = useRef(onTextOverflow);
-  onTextOverflowRef.current = onTextOverflow;
   const pageIdRef = useRef(page.id);
-  pageIdRef.current = page.id;
+  useEffect(() => {
+    onFlowContentUpdateRef.current = onFlowContentUpdate;
+    onEditorReadyRef.current = onEditorReady;
+    onTextOverflowRef.current = onTextOverflow;
+    pageIdRef.current = page.id;
+  });
 
   const editorPaddingTop = canvasType === 'lined' ? 'pt-8' : 'pt-4';
 

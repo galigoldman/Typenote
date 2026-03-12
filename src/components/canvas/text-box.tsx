@@ -28,11 +28,13 @@ export function TextBox({
   // Store callbacks in refs so the TipTap editor instance (created once)
   // always calls the latest version without needing to be re-created.
   const onContentUpdateRef = useRef(onContentUpdate);
-  onContentUpdateRef.current = onContentUpdate;
   const onEditorReadyRef = useRef(onEditorReady);
-  onEditorReadyRef.current = onEditorReady;
   const textBoxIdRef = useRef(textBox.id);
-  textBoxIdRef.current = textBox.id;
+  useEffect(() => {
+    onContentUpdateRef.current = onContentUpdate;
+    onEditorReadyRef.current = onEditorReady;
+    textBoxIdRef.current = textBox.id;
+  });
 
   // Sanitize content: ProseMirror crashes on { type: 'doc', content: [] }
   const safeContent = (() => {

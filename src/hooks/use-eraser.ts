@@ -23,32 +23,17 @@ export function useEraser({
   const isErasingRef = useRef(false);
   const [eraserPosition, setEraserPosition] = useState<{ x: number; y: number } | null>(null);
 
-  const screenToPageCoords = (
-    e: React.PointerEvent,
-    target: EventTarget,
-  ): { x: number; y: number } => {
-    const interactionLayer = target as HTMLElement;
-    const pageContainer = interactionLayer.parentElement;
-    if (!pageContainer) {
-      return { x: 0, y: 0 };
-    }
-    const rect = pageContainer.getBoundingClientRect();
-    const scaleX = PAGE_WIDTH / rect.width;
-    const scaleY = PAGE_HEIGHT / rect.height;
-    return {
-      x: (e.clientX - rect.left) * scaleX,
-      y: (e.clientY - rect.top) * scaleY,
-    };
-  };
-
-  const checkHits = (pageId: string, x: number, y: number) => {
-    const strokes = getPageStrokes(pageId);
-    for (const stroke of strokes) {
-      if (isStrokeHit(stroke, x, y, eraserRadius)) {
-        onStrokeRemove(pageId, stroke.id);
+  const checkHits = useCallback(
+    (pageId: string, x: number, y: number) => {
+      const strokes = getPageStrokes(pageId);
+      for (const stroke of strokes) {
+        if (isStrokeHit(stroke, x, y, eraserRadius)) {
+          onStrokeRemove(pageId, stroke.id);
+        }
       }
-    }
-  };
+    },
+    [eraserRadius, onStrokeRemove, getPageStrokes],
+  );
 
   const handlePointerDown = useCallback(
     (e: React.PointerEvent, pageId: string) => {
@@ -58,11 +43,16 @@ export function useEraser({
       e.preventDefault();
       isErasingRef.current = true;
 
-      const { x, y } = screenToPageCoords(e, e.target);
+      const interactionLayer = e.target as HTMLElement;
+      const pageContainer = interactionLayer.parentElement;
+      if (!pageContainer) return;
+      const rect = pageContainer.getBoundingClientRect();
+      const x = (e.clientX - rect.left) * (PAGE_WIDTH / rect.width);
+      const y = (e.clientY - rect.top) * (PAGE_HEIGHT / rect.height);
       setEraserPosition({ x, y });
       checkHits(pageId, x, y);
     },
-    [activeTool, eraserRadius, onStrokeRemove, getPageStrokes],
+    [activeTool, checkHits],
   );
 
   const handlePointerMove = useCallback(
@@ -72,14 +62,19 @@ export function useEraser({
 
       e.preventDefault();
 
-      const { x, y } = screenToPageCoords(e, e.target);
+      const interactionLayer = e.target as HTMLElement;
+      const pageContainer = interactionLayer.parentElement;
+      if (!pageContainer) return;
+      const rect = pageContainer.getBoundingClientRect();
+      const x = (e.clientX - rect.left) * (PAGE_WIDTH / rect.width);
+      const y = (e.clientY - rect.top) * (PAGE_HEIGHT / rect.height);
       setEraserPosition({ x, y });
 
       if (!isErasingRef.current) return;
 
       checkHits(pageId, x, y);
     },
-    [activeTool, eraserRadius, onStrokeRemove, getPageStrokes],
+    [activeTool, checkHits],
   );
 
   const handlePointerUp = useCallback(

@@ -456,8 +456,14 @@ export function CanvasEditor({ document }: CanvasEditorProps) {
   }, [activeTool, activeEditor, triggerSave]);
 
   // Compute disabled state (draw mode only — text mode always enabled)
-  const canUndoDraw = historyVersion >= 0 && undoStackRef.current.length > 0;
-  const canRedoDraw = historyVersion >= 0 && redoStackRef.current.length > 0;
+  // historyVersion is bumped whenever the undo/redo stacks change, so we
+  // derive canUndo/canRedo from it without accessing refs during render.
+  const [canUndoDraw, setCanUndoDraw] = useState(false);
+  const [canRedoDraw, setCanRedoDraw] = useState(false);
+  useEffect(() => {
+    setCanUndoDraw(undoStackRef.current.length > 0);
+    setCanRedoDraw(redoStackRef.current.length > 0);
+  }, [historyVersion]);
 
   // Page management
   const handleDeletePage = useCallback(
