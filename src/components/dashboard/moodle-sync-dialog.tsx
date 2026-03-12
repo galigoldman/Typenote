@@ -31,13 +31,7 @@ interface MoodleSyncDialogProps {
   moodleConnection: { domain: string; instanceId: string };
 }
 
-type DialogPhase =
-  | 'scraping'
-  | 'comparing'
-  | 'ready'
-  | 'syncing'
-  | 'done'
-  | 'error';
+type DialogPhase = 'scraping' | 'comparing' | 'ready' | 'scraping-content' | 'syncing' | 'done' | 'error';
 
 /** Error messages that suggest a Moodle session has expired */
 const AUTH_ERROR_PATTERNS = [
@@ -59,7 +53,7 @@ const STATUS_BADGE_MAP: Record<
 > = {
   new_to_system: { label: 'New', variant: 'default' },
   synced_by_others: { label: 'Available', variant: 'secondary' },
-  synced_by_user: { label: 'Already Synced', variant: 'outline' },
+  synced_by_user: { label: 'Synced', variant: 'outline' },
   has_new_items: { label: 'New Items', variant: 'default' },
 };
 
@@ -68,18 +62,17 @@ export function MoodleSyncDialog({
   onOpenChange,
   moodleConnection,
 }: MoodleSyncDialogProps) {
-  const { scrapeCourses } = useMoodleExtension();
+  const { scrapeCourses, scrapeCourseContent } = useMoodleExtension();
 
   const [phase, setPhase] = useState<DialogPhase>('scraping');
   const [courses, setCourses] = useState<CourseComparison[]>([]);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [error, setError] = useState<string | null>(null);
   const [authError, setAuthError] = useState(false);
+  const [syncProgress, setSyncProgress] = useState('');
   const [syncedCount, setSyncedCount] = useState(0);
   const [syncedCourses, setSyncedCourses] = useState<SyncCourseResult[]>([]);
-  const [expandedFilePicker, setExpandedFilePicker] = useState<string | null>(
-    null,
-  );
+  const [expandedFilePicker, setExpandedFilePicker] = useState<string | null>(null);
 
   const loadCourses = useCallback(async () => {
     setPhase('scraping');
@@ -109,19 +102,19 @@ export function MoodleSyncDialog({
 
       setCourses(comparisons);
 
-      // Pre-select courses that are new or have new items
+      // Pre-select courses that are new, have new items, or synced by others
+      // Also allow re-selecting "synced_by_user" — user can always re-sync
       const preSelected = new Set(
         comparisons
           .filter(
-            (c) => c.status === 'new_to_system' || c.status === 'has_new_items',
+            (c) => c.status === 'new_to_system' || c.status === 'has_new_items' || c.status === 'synced_by_others',
           )
           .map((c) => c.moodleCourseId),
       );
       setSelectedIds(preSelected);
       setPhase('ready');
     } catch (err) {
-      const message =
-        err instanceof Error ? err.message : 'Failed to load courses';
+      const message = err instanceof Error ? err.message : 'Failed to load courses';
       setError(message);
       setAuthError(isAuthError(message));
       setPhase('error');
@@ -129,13 +122,11 @@ export function MoodleSyncDialog({
   }, [scrapeCourses, moodleConnection.domain]);
 
   // Load courses when dialog opens
-  /* eslint-disable react-hooks/set-state-in-effect -- async data fetch on dialog open */
   useEffect(() => {
     if (open) {
-      void loadCourses();
+      loadCourses();
     }
   }, [open, loadCourses]);
-  /* eslint-enable react-hooks/set-state-in-effect */
 
   function toggleCourse(moodleCourseId: string) {
     setSelectedIds((prev) => {
@@ -150,19 +141,21 @@ export function MoodleSyncDialog({
   }
 
   async function handleSync() {
-    setPhase('syncing');
+    setPhase('scraping-content');
     setError(null);
     setAuthError(false);
 
     try {
-      const selected = courses.filter((c) => selectedIds.has(c.moodleCourseId));
+      const selected = courses.filter((c) =>
+        selectedIds.has(c.moodleCourseId),
+      );
 
-      // Build payloads with empty sections (real content scraping deferred)
-      const coursePayloads = selected.map((c) => ({
-        moodleCourseId: c.moodleCourseId,
-        name: c.name,
-        moodleUrl: c.moodleUrl,
-        sections: [] as Array<{
+      // Step 1: Scrape actual content for each selected course
+      const coursePayloads: Array<{
+        moodleCourseId: string;
+        name: string;
+        moodleUrl: string;
+        sections: Array<{
           moodleSectionId: string;
           title: string;
           position: number;
@@ -174,8 +167,27 @@ export function MoodleSyncDialog({
             fileSize?: number;
             mimeType?: string;
           }>;
-        }>,
-      }));
+        }>;
+      }> = [];
+
+      for (let i = 0; i < selected.length; i++) {
+        const course = selected[i];
+        setSyncProgress(`Scraping content for "${course.name}" (${i + 1}/${selected.length})...`);
+
+        const content = await scrapeCourseContent(course.moodleUrl);
+        const sections = content?.sections ?? [];
+
+        coursePayloads.push({
+          moodleCourseId: course.moodleCourseId,
+          name: course.name,
+          moodleUrl: course.moodleUrl,
+          sections,
+        });
+      }
+
+      // Step 2: Sync to registry with actual content
+      setPhase('syncing');
+      setSyncProgress('Saving courses and files to registry...');
 
       const result = await syncMoodleCourses(
         moodleConnection.domain,
@@ -203,8 +215,8 @@ export function MoodleSyncDialog({
         <DialogHeader>
           <DialogTitle>Sync Moodle Courses</DialogTitle>
           <DialogDescription>
-            Select courses from <strong>{moodleConnection.domain}</strong> to
-            sync.
+            Select courses from{' '}
+            <strong>{moodleConnection.domain}</strong> to sync.
           </DialogDescription>
         </DialogHeader>
 
@@ -246,7 +258,9 @@ export function MoodleSyncDialog({
                 >
                   <Checkbox
                     checked={selectedIds.has(course.moodleCourseId)}
-                    onCheckedChange={() => toggleCourse(course.moodleCourseId)}
+                    onCheckedChange={() =>
+                      toggleCourse(course.moodleCourseId)
+                    }
                     aria-label={`Select ${course.name}`}
                   />
                   <span className="flex-1 text-sm font-medium">
@@ -259,11 +273,20 @@ export function MoodleSyncDialog({
           </div>
         )}
 
+        {/* Scraping content phase */}
+        {phase === 'scraping-content' && (
+          <div className="flex items-center justify-center py-8">
+            <p className="text-sm text-muted-foreground">
+              {syncProgress}
+            </p>
+          </div>
+        )}
+
         {/* Syncing phase */}
         {phase === 'syncing' && (
           <div className="flex items-center justify-center py-8">
             <p className="text-sm text-muted-foreground">
-              Syncing selected courses...
+              {syncProgress}
             </p>
           </div>
         )}
@@ -337,7 +360,7 @@ export function MoodleSyncDialog({
               <p className="text-xs text-muted-foreground">
                 Your Moodle session may have expired.{' '}
                 <a
-                  href={`https://${moodleConnection.domain}/login`}
+                  href={`https://${moodleConnection.domain}`}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="underline"
@@ -352,11 +375,16 @@ export function MoodleSyncDialog({
 
         <DialogFooter>
           {phase === 'ready' && courses.length > 0 && (
-            <Button onClick={handleSync} disabled={selectedIds.size === 0}>
+            <Button
+              onClick={handleSync}
+              disabled={selectedIds.size === 0}
+            >
               Sync Selected ({selectedIds.size})
             </Button>
           )}
-          {phase === 'done' && <Button onClick={handleClose}>Close</Button>}
+          {phase === 'done' && (
+            <Button onClick={handleClose}>Close</Button>
+          )}
           {phase === 'error' && (
             <Button variant="outline" onClick={loadCourses}>
               Retry
