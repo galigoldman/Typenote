@@ -21,7 +21,7 @@ Replace the current text-only TipTap editor with a GoodNotes/OneNote-style freef
 
 ## Constitution Check
 
-*No constitution defined — no gates to check.*
+_No constitution defined — no gates to check._
 
 ## Project Structure
 

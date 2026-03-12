@@ -5,7 +5,7 @@
 **Status**: Draft
 **Input**: User description: "GoodNotes/OneNote-style freeform canvas editor with pen drawing, eraser, selection/cut tool, A4 pages with infinite scroll, and pinch-to-zoom. Replaces current text-only editor with a hybrid model where typing works like a normal document by default, and canvas tools unlock freeform capabilities."
 
-## User Scenarios & Testing *(mandatory)*
+## User Scenarios & Testing _(mandatory)_
 
 ### User Story 1 - Pen Drawing on the Canvas (Priority: P1)
 
@@ -137,7 +137,7 @@ On touch devices, the user places two fingers on the screen and pinches or sprea
 - What happens on a device without stylus support? Pen and eraser tools should be unavailable or disabled. Typing and scrolling should work normally.
 - What happens when a document with drawings is opened on a device without canvas support? The document should still display text content gracefully.
 
-## Requirements *(mandatory)*
+## Requirements _(mandatory)_
 
 ### Functional Requirements
 
@@ -165,7 +165,7 @@ On touch devices, the user places two fingers on the screen and pinches or sprea
 - **Text Box**: A container for rich text content. Can be in "flow mode" (default document text) or "positioned mode" (after being cut/moved by the selection tool). Positioned text boxes have explicit x/y coordinates on a page.
 - **Document**: The top-level entity. Contains an ordered list of pages, each with their strokes and content objects.
 
-## Success Criteria *(mandatory)*
+## Success Criteria _(mandatory)_
 
 ### Measurable Outcomes
 
