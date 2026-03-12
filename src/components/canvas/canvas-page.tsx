@@ -27,7 +27,8 @@ interface CanvasPageProps {
   onPointerMove?: (e: React.PointerEvent, pageId: string) => void;
   onPointerUp?: (e: React.PointerEvent, pageId: string) => void;
   onFlowContentUpdate?: (pageId: string, content: Record<string, unknown>) => void;
-  onEditorReady?: (editor: Editor) => void;
+  onEditorReady?: (pageId: string, editor: Editor) => void;
+  onTextOverflow?: (pageId: string, overflowContent: Record<string, unknown> | null) => void;
   canvasClass?: string;
   eraserPosition?: { x: number; y: number } | null;
   eraserRadius?: number;
@@ -43,6 +44,7 @@ export function CanvasPage({
   onPointerUp,
   onFlowContentUpdate,
   onEditorReady,
+  onTextOverflow,
   canvasClass,
   eraserPosition = null,
   eraserRadius = DEFAULT_ERASER_RADIUS,
@@ -51,8 +53,10 @@ export function CanvasPage({
   const committedCanvasRef = useRef<HTMLCanvasElement>(null);
   const workingCanvasRef = useRef<HTMLCanvasElement>(null);
   const interactionLayerRef = useRef<HTMLDivElement>(null);
+  const textLayerRef = useRef<HTMLDivElement>(null);
   const committedCtxRef = useRef<CanvasRenderingContext2D | null>(null);
   const workingCtxRef = useRef<CanvasRenderingContext2D | null>(null);
+  const overflowNotifiedRef = useRef(false);
 
   const isInteractionMode = activeTool === 'pen' || activeTool === 'highlighter' || activeTool === 'eraser';
 
@@ -74,35 +78,76 @@ export function CanvasPage({
     }
   }, []);
 
-  // Native event listeners — prevents text selection and touch defaults
+  // Native event listeners for pen and touch.
+  //
+  // PEN (Apple Pencil): Must NEVER scroll. We preventDefault on pointer events
+  // AND forcibly set overflow-y:hidden on the scroll container while the pen
+  // is down — this is the only reliable way on iPad Safari, where
+  // touch-action / preventDefault alone can still let the compositor scroll.
+  //
+  // FINGER: touch-action:none blocks native scrolling, so we manually scroll
+  // via TouchEvent listeners. On iOS, TouchEvent fires only for fingers,
+  // never for Apple Pencil, so this cleanly separates the two.
   useEffect(() => {
     const el = interactionLayerRef.current;
     if (!el) return;
 
-    const preventForPen = (e: PointerEvent) => {
+    const scrollContainer = el.closest('[data-scroll-container]') as HTMLElement | null;
+
+    // ── Pen handlers ──
+    const handlePenDown = (e: PointerEvent) => {
+      if (e.pointerType === 'pen') {
+        e.preventDefault();
+        if (scrollContainer) scrollContainer.style.overflowY = 'hidden';
+      }
+    };
+
+    const handlePenMove = (e: PointerEvent) => {
       if (e.pointerType === 'pen') {
         e.preventDefault();
       }
     };
 
-    const preventTouch = (e: TouchEvent) => {
+    const handlePenEnd = (e: PointerEvent) => {
+      if (e.pointerType === 'pen') {
+        e.preventDefault();
+        if (scrollContainer) scrollContainer.style.overflowY = 'auto';
+      }
+    };
+
+    // ── Finger scroll handlers ──
+    let touchStartY = 0;
+    let scrollStartTop = 0;
+
+    const handleTouchStart = (e: TouchEvent) => {
+      if (e.touches.length !== 1 || !scrollContainer) return;
+      touchStartY = e.touches[0].clientY;
+      scrollStartTop = scrollContainer.scrollTop;
+    };
+
+    const handleTouchMove = (e: TouchEvent) => {
+      if (e.touches.length !== 1 || !scrollContainer) return;
+      const deltaY = touchStartY - e.touches[0].clientY;
+      scrollContainer.scrollTop = scrollStartTop + deltaY;
       e.preventDefault();
     };
 
-    el.addEventListener('pointerdown', preventForPen, { passive: false });
-    el.addEventListener('pointermove', preventForPen, { passive: false });
-    el.addEventListener('pointerup', preventForPen, { passive: false });
-    el.addEventListener('touchstart', preventTouch, { passive: false });
-    el.addEventListener('touchmove', preventTouch, { passive: false });
-    el.addEventListener('touchend', preventTouch, { passive: false });
+    el.addEventListener('pointerdown', handlePenDown, { passive: false });
+    el.addEventListener('pointermove', handlePenMove, { passive: false });
+    el.addEventListener('pointerup', handlePenEnd, { passive: false });
+    el.addEventListener('pointercancel', handlePenEnd, { passive: false });
+    el.addEventListener('touchstart', handleTouchStart, { passive: true });
+    el.addEventListener('touchmove', handleTouchMove, { passive: false });
 
     return () => {
-      el.removeEventListener('pointerdown', preventForPen);
-      el.removeEventListener('pointermove', preventForPen);
-      el.removeEventListener('pointerup', preventForPen);
-      el.removeEventListener('touchstart', preventTouch);
-      el.removeEventListener('touchmove', preventTouch);
-      el.removeEventListener('touchend', preventTouch);
+      el.removeEventListener('pointerdown', handlePenDown);
+      el.removeEventListener('pointermove', handlePenMove);
+      el.removeEventListener('pointerup', handlePenEnd);
+      el.removeEventListener('pointercancel', handlePenEnd);
+      el.removeEventListener('touchstart', handleTouchStart);
+      el.removeEventListener('touchmove', handleTouchMove);
+      // Ensure scrolling is restored on unmount
+      if (scrollContainer) scrollContainer.style.overflowY = 'auto';
     };
   }, []);
 
@@ -111,6 +156,8 @@ export function CanvasPage({
   onFlowContentUpdateRef.current = onFlowContentUpdate;
   const onEditorReadyRef = useRef(onEditorReady);
   onEditorReadyRef.current = onEditorReady;
+  const onTextOverflowRef = useRef(onTextOverflow);
+  onTextOverflowRef.current = onTextOverflow;
   const pageIdRef = useRef(page.id);
   pageIdRef.current = page.id;
 
@@ -143,22 +190,77 @@ export function CanvasPage({
       attributes: {
         class: `prose prose-sm sm:prose-base max-w-none focus:outline-none min-h-full ${editorPaddingTop} pb-4 px-4`,
       },
+      // Intercept Enter near the bottom of the page → move to next page
+      handleKeyDown: (view, event) => {
+        if (event.key === 'Enter' && !event.shiftKey) {
+          const layer = textLayerRef.current;
+          if (!layer) return false;
+          try {
+            const coords = view.coordsAtPos(view.state.selection.from);
+            const layerRect = layer.getBoundingClientRect();
+            const cursorY = coords.bottom - layerRect.top;
+            // If the cursor is within ~60px of the page bottom, there's no
+            // room for a new paragraph — move to the next page instead.
+            if (cursorY > PAGE_HEIGHT - 60) {
+              event.preventDefault();
+              onTextOverflowRef.current?.(pageIdRef.current, null);
+              return true;
+            }
+          } catch { /* coordsAtPos can throw before DOM is ready */ }
+        }
+        return false;
+      },
     },
     onUpdate: ({ editor: ed }) => {
       onFlowContentUpdateRef.current?.(
         pageIdRef.current,
         ed.getJSON() as Record<string, unknown>,
       );
+
+      // Fallback overflow detection for paste / bulk-insert that pushes
+      // the cursor past the page boundary (uses cursor position, not
+      // scrollHeight, to avoid false positives from CSS margins).
+      requestAnimationFrame(() => {
+        const layer = textLayerRef.current;
+        if (!layer || overflowNotifiedRef.current) return;
+        try {
+          const coords = ed.view.coordsAtPos(ed.state.selection.from);
+          const layerRect = layer.getBoundingClientRect();
+          const cursorY = coords.bottom - layerRect.top;
+
+          if (cursorY > PAGE_HEIGHT) {
+            overflowNotifiedRef.current = true;
+            // Extract the last block node and move it to the new page
+            const { doc } = ed.state;
+            if (doc.childCount > 1) {
+              const lastChild = doc.lastChild!;
+              const lastNodeJson = lastChild.toJSON();
+              const nodeFrom = doc.content.size - lastChild.nodeSize;
+              const nodeTo = doc.content.size;
+              ed.chain().deleteRange({ from: nodeFrom, to: nodeTo }).run();
+              onTextOverflowRef.current?.(pageIdRef.current, {
+                type: 'doc',
+                content: [lastNodeJson],
+              } as Record<string, unknown>);
+            } else {
+              onTextOverflowRef.current?.(pageIdRef.current, null);
+            }
+          } else if (cursorY < PAGE_HEIGHT - 100) {
+            // Reset only when cursor is well within the page
+            overflowNotifiedRef.current = false;
+          }
+        } catch { /* coordsAtPos can throw before DOM is ready */ }
+      });
     },
     onFocus: ({ editor: ed }) => {
-      onEditorReadyRef.current?.(ed);
+      onEditorReadyRef.current?.(pageIdRef.current, ed);
     },
   });
 
   // Notify parent when editor is created
   useEffect(() => {
     if (editor) {
-      onEditorReadyRef.current?.(editor);
+      onEditorReadyRef.current?.(pageIdRef.current, editor);
     }
   }, [editor]);
 
@@ -212,7 +314,6 @@ export function CanvasPage({
       style={{
         width: PAGE_WIDTH,
         height: PAGE_HEIGHT,
-        marginBottom: 20,
         userSelect: 'none',
         WebkitUserSelect: 'none',
       }}
@@ -239,6 +340,7 @@ export function CanvasPage({
 
       {/* Layer 4: Text content layer — only interactive in text mode */}
       <div
+        ref={textLayerRef}
         className="absolute inset-0 overflow-hidden"
         style={{ pointerEvents: isInteractionMode ? 'none' : 'auto' }}
       >
@@ -270,7 +372,7 @@ export function CanvasPage({
         ref={interactionLayerRef}
         className="absolute inset-0"
         style={{
-          touchAction: 'none',
+          touchAction: isInteractionMode ? 'none' : 'auto',
           userSelect: 'none',
           WebkitUserSelect: 'none',
           pointerEvents: isInteractionMode ? 'auto' : 'none',

@@ -12,13 +12,15 @@ interface UseDrawingOptions {
   penSize: number;
   penOpacity: number;
   onStrokeComplete: (pageId: string, stroke: Stroke) => void;
+  onNearPageBottom?: (pageId: string) => void;
 }
 
-export function useDrawing({ activeTool, penColor, penSize, penOpacity, onStrokeComplete }: UseDrawingOptions) {
+export function useDrawing({ activeTool, penColor, penSize, penOpacity, onStrokeComplete, onNearPageBottom }: UseDrawingOptions) {
   const currentPointsRef = useRef<StrokePoint[]>([]);
   const isDrawingRef = useRef(false);
   const activePageIdRef = useRef<string | null>(null);
   const workingCanvasRef = useRef<HTMLCanvasElement | null>(null);
+  const firedNearBottomRef = useRef(false);
 
   const isDrawTool = activeTool === 'pen' || activeTool === 'highlighter';
 
@@ -81,6 +83,7 @@ export function useDrawing({ activeTool, penColor, penSize, penOpacity, onStroke
 
       isDrawingRef.current = true;
       activePageIdRef.current = pageId;
+      firedNearBottomRef.current = false;
 
       const canvas = getWorkingCanvas(pageId, e.target);
       workingCanvasRef.current = canvas;
@@ -109,8 +112,14 @@ export function useDrawing({ activeTool, penColor, penSize, penOpacity, onStroke
       if (workingCanvasRef.current) {
         renderInProgressStroke(workingCanvasRef.current, currentPointsRef.current);
       }
+
+      // Notify when drawing in bottom 15% of the page (fires once per stroke)
+      if (!firedNearBottomRef.current && y > PAGE_HEIGHT * 0.85 && onNearPageBottom) {
+        firedNearBottomRef.current = true;
+        onNearPageBottom(pageId);
+      }
     },
-    [isDrawTool, renderInProgressStroke],
+    [isDrawTool, renderInProgressStroke, onNearPageBottom],
   );
 
   const handlePointerUp = useCallback(

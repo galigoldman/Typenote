@@ -34,6 +34,7 @@ export interface TextBox {
 export interface CanvasPage {
   id: string;
   order: number;
+  pageType?: 'blank' | 'lined' | 'grid' | 'dotted';
   strokes: Stroke[];
   textBoxes: TextBox[];
   flowContent: Record<string, unknown> | null;
