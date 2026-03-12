@@ -15,7 +15,14 @@ interface UseDrawingOptions {
   onNearPageBottom?: (pageId: string) => void;
 }
 
-export function useDrawing({ activeTool, penColor, penSize, penOpacity, onStrokeComplete, onNearPageBottom }: UseDrawingOptions) {
+export function useDrawing({
+  activeTool,
+  penColor,
+  penSize,
+  penOpacity,
+  onStrokeComplete,
+  onNearPageBottom,
+}: UseDrawingOptions) {
   const currentPointsRef = useRef<StrokePoint[]>([]);
   const isDrawingRef = useRef(false);
   const activePageIdRef = useRef<string | null>(null);
@@ -41,38 +48,41 @@ export function useDrawing({ activeTool, penColor, penSize, penOpacity, onStroke
     const scaleX = PAGE_WIDTH / rect.width;
     const scaleY = PAGE_HEIGHT / rect.height;
     return {
-      x: Math.round(((e.clientX - rect.left) * scaleX) * 10) / 10,
-      y: Math.round(((e.clientY - rect.top) * scaleY) * 10) / 10,
+      x: Math.round((e.clientX - rect.left) * scaleX * 10) / 10,
+      y: Math.round((e.clientY - rect.top) * scaleY * 10) / 10,
     };
   };
 
-  const renderInProgressStroke = useCallback((canvas: HTMLCanvasElement, points: StrokePoint[]) => {
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
+  const renderInProgressStroke = useCallback(
+    (canvas: HTMLCanvasElement, points: StrokePoint[]) => {
+      const ctx = canvas.getContext('2d');
+      if (!ctx) return;
 
-    // Clear working canvas
-    ctx.save();
-    ctx.setTransform(1, 0, 0, 1, 0, 0);
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-    ctx.restore();
+      // Clear working canvas
+      ctx.save();
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      ctx.restore();
 
-    if (points.length < 2) return;
+      if (points.length < 2) return;
 
-    const outlinePoints = getStroke(points, {
-      size: penSize,
-      simulatePressure: false,
-      last: false,
-    });
+      const outlinePoints = getStroke(points, {
+        size: penSize,
+        simulatePressure: false,
+        last: false,
+      });
 
-    const pathData = getSvgPathFromStroke(outlinePoints);
-    if (!pathData) return;
+      const pathData = getSvgPathFromStroke(outlinePoints);
+      if (!pathData) return;
 
-    const path = new Path2D(pathData);
-    ctx.globalAlpha = penOpacity;
-    ctx.fillStyle = penColor;
-    ctx.fill(path);
-    ctx.globalAlpha = 1;
-  }, [penColor, penSize, penOpacity]);
+      const path = new Path2D(pathData);
+      ctx.globalAlpha = penOpacity;
+      ctx.fillStyle = penColor;
+      ctx.fill(path);
+      ctx.globalAlpha = 1;
+    },
+    [penColor, penSize, penOpacity],
+  );
 
   const handlePointerDown = useCallback(
     (e: React.PointerEvent, pageId: string) => {
@@ -110,11 +120,18 @@ export function useDrawing({ activeTool, penColor, penSize, penOpacity, onStroke
       currentPointsRef.current.push([x, y, pressure]);
 
       if (workingCanvasRef.current) {
-        renderInProgressStroke(workingCanvasRef.current, currentPointsRef.current);
+        renderInProgressStroke(
+          workingCanvasRef.current,
+          currentPointsRef.current,
+        );
       }
 
       // Notify when drawing in bottom 15% of the page (fires once per stroke)
-      if (!firedNearBottomRef.current && y > PAGE_HEIGHT * 0.85 && onNearPageBottom) {
+      if (
+        !firedNearBottomRef.current &&
+        y > PAGE_HEIGHT * 0.85 &&
+        onNearPageBottom
+      ) {
         firedNearBottomRef.current = true;
         onNearPageBottom(pageId);
       }
@@ -151,7 +168,12 @@ export function useDrawing({ activeTool, penColor, penSize, penOpacity, onStroke
         if (ctx) {
           ctx.save();
           ctx.setTransform(1, 0, 0, 1, 0, 0);
-          ctx.clearRect(0, 0, workingCanvasRef.current.width, workingCanvasRef.current.height);
+          ctx.clearRect(
+            0,
+            0,
+            workingCanvasRef.current.width,
+            workingCanvasRef.current.height,
+          );
           ctx.restore();
         }
       }

@@ -13,7 +13,16 @@ import { PAGE_WIDTH, PAGE_HEIGHT } from '@/types/canvas';
 import type { Document } from '@/types/database';
 import type { SaveStatus } from '@/hooks/use-auto-save';
 import type { ConnectionStatus } from '@/hooks/use-realtime-sync';
-import { Pen, Type, Eraser, Highlighter, Undo2, Redo2, Trash2, Plus } from 'lucide-react';
+import {
+  Pen,
+  Type,
+  Eraser,
+  Highlighter,
+  Undo2,
+  Redo2,
+  Trash2,
+  Plus,
+} from 'lucide-react';
 import { CANVAS_TYPES } from '@/lib/constants/subjects';
 import { PageTypeThumb } from '@/components/ui/page-type-thumb';
 import { useDocumentSync } from '@/hooks/use-document-sync';
@@ -43,12 +52,24 @@ function pageHasContent(page: CanvasPageData): boolean {
 }
 
 const PEN_COLORS = [
-  '#000000', '#374151', '#DC2626', '#EA580C', '#CA8A04',
-  '#16A34A', '#2563EB', '#7C3AED', '#DB2777', '#FFFFFF',
+  '#000000',
+  '#374151',
+  '#DC2626',
+  '#EA580C',
+  '#CA8A04',
+  '#16A34A',
+  '#2563EB',
+  '#7C3AED',
+  '#DB2777',
+  '#FFFFFF',
 ];
 
 const HIGHLIGHTER_COLORS = [
-  '#FBBF24', '#34D399', '#60A5FA', '#F472B6', '#A78BFA',
+  '#FBBF24',
+  '#34D399',
+  '#60A5FA',
+  '#F472B6',
+  '#A78BFA',
 ];
 
 const PEN_SIZES = [
@@ -149,7 +170,9 @@ export function CanvasEditor({ document }: CanvasEditorProps) {
   const [remoteUpdateCounter, setRemoteUpdateCounter] = useState(0);
 
   // Add page popover
-  const [addPagePopoverIndex, setAddPagePopoverIndex] = useState<number | null>(null);
+  const [addPagePopoverIndex, setAddPagePopoverIndex] = useState<number | null>(
+    null,
+  );
 
   // Drawing tool settings
   const [penColor, setPenColor] = useState('#000000');
@@ -159,12 +182,17 @@ export function CanvasEditor({ document }: CanvasEditorProps) {
   const [eraserSize, setEraserSize] = useState(14);
 
   // Derived values based on active tool
-  const currentColor = activeTool === 'highlighter' ? highlighterColor : penColor;
+  const currentColor =
+    activeTool === 'highlighter' ? highlighterColor : penColor;
   const currentSize = activeTool === 'highlighter' ? highlighterSize : penSize;
   const currentOpacity = activeTool === 'highlighter' ? 0.4 : 1;
 
   // Stroke undo/redo history
-  type StrokeAction = { type: 'add' | 'remove'; pageId: string; stroke: Stroke };
+  type StrokeAction = {
+    type: 'add' | 'remove';
+    pageId: string;
+    stroke: Stroke;
+  };
   const undoStackRef = useRef<StrokeAction[]>([]);
   const redoStackRef = useRef<StrokeAction[]>([]);
   const [historyVersion, setHistoryVersion] = useState(0);
@@ -242,7 +270,9 @@ export function CanvasEditor({ document }: CanvasEditorProps) {
 
   const handleStrokeRemove = useCallback(
     (pageId: string, strokeId: string) => {
-      const stroke = pagesRef.current.find((p) => p.id === pageId)?.strokes.find((s) => s.id === strokeId);
+      const stroke = pagesRef.current
+        .find((p) => p.id === pageId)
+        ?.strokes.find((s) => s.id === strokeId);
       if (stroke) {
         undoStackRef.current.push({ type: 'remove', pageId, stroke });
         redoStackRef.current = [];
@@ -266,9 +296,7 @@ export function CanvasEditor({ document }: CanvasEditorProps) {
   const handleFlowContentUpdate = useCallback(
     (pageId: string, content: Record<string, unknown>) => {
       setPages((prev) =>
-        prev.map((p) =>
-          p.id === pageId ? { ...p, flowContent: content } : p,
-        ),
+        prev.map((p) => (p.id === pageId ? { ...p, flowContent: content } : p)),
       );
       triggerSave();
     },
@@ -293,12 +321,9 @@ export function CanvasEditor({ document }: CanvasEditorProps) {
   }, []);
 
   // Get strokes for a page (used by eraser)
-  const getPageStrokes = useCallback(
-    (pageId: string): Stroke[] => {
-      return pagesRef.current.find((p) => p.id === pageId)?.strokes ?? [];
-    },
-    [],
-  );
+  const getPageStrokes = useCallback((pageId: string): Stroke[] => {
+    return pagesRef.current.find((p) => p.id === pageId)?.strokes ?? [];
+  }, []);
 
   // Auto-add page when drawing near the bottom of the last page
   const handleNearPageBottom = useCallback(
@@ -356,7 +381,11 @@ export function CanvasEditor({ document }: CanvasEditorProps) {
   );
 
   // Drawing hook
-  const { handlePointerDown: drawDown, handlePointerMove: drawMove, handlePointerUp: drawUp } = useDrawing({
+  const {
+    handlePointerDown: drawDown,
+    handlePointerMove: drawMove,
+    handlePointerUp: drawUp,
+  } = useDrawing({
     activeTool,
     penColor: currentColor,
     penSize: currentSize,
@@ -366,7 +395,12 @@ export function CanvasEditor({ document }: CanvasEditorProps) {
   });
 
   // Eraser hook
-  const { handlePointerDown: eraseDown, handlePointerMove: eraseMove, handlePointerUp: eraseUp, eraserPosition } = useEraser({
+  const {
+    handlePointerDown: eraseDown,
+    handlePointerMove: eraseMove,
+    handlePointerUp: eraseUp,
+    eraserPosition,
+  } = useEraser({
     activeTool,
     eraserRadius: eraserSize,
     onStrokeRemove: handleStrokeRemove,
@@ -408,7 +442,10 @@ export function CanvasEditor({ document }: CanvasEditorProps) {
       setPages((prev) =>
         prev.map((p) =>
           p.id === action.pageId
-            ? { ...p, strokes: p.strokes.filter((s) => s.id !== action.stroke.id) }
+            ? {
+                ...p,
+                strokes: p.strokes.filter((s) => s.id !== action.stroke.id),
+              }
             : p,
         ),
       );
@@ -445,7 +482,10 @@ export function CanvasEditor({ document }: CanvasEditorProps) {
       setPages((prev) =>
         prev.map((p) =>
           p.id === action.pageId
-            ? { ...p, strokes: p.strokes.filter((s) => s.id !== action.stroke.id) }
+            ? {
+                ...p,
+                strokes: p.strokes.filter((s) => s.id !== action.stroke.id),
+              }
             : p,
         ),
       );
@@ -470,7 +510,9 @@ export function CanvasEditor({ document }: CanvasEditorProps) {
     (pageId: string) => {
       setPages((prev) => {
         if (prev.length <= 1) return prev;
-        return prev.filter((p) => p.id !== pageId).map((p, i) => ({ ...p, order: i }));
+        return prev
+          .filter((p) => p.id !== pageId)
+          .map((p, i) => ({ ...p, order: i }));
       });
       triggerSave();
     },
@@ -517,7 +559,10 @@ export function CanvasEditor({ document }: CanvasEditorProps) {
     unlockEditor();
   };
 
-  const isDrawMode = activeTool === 'pen' || activeTool === 'highlighter' || activeTool === 'eraser';
+  const isDrawMode =
+    activeTool === 'pen' ||
+    activeTool === 'highlighter' ||
+    activeTool === 'eraser';
   const showColorSize = activeTool === 'pen' || activeTool === 'highlighter';
 
   return (
@@ -559,7 +604,10 @@ export function CanvasEditor({ document }: CanvasEditorProps) {
         {/* Undo / Redo — always visible */}
         <div className="flex items-center gap-0.5 mr-2">
           <button
-            onPointerDown={(e) => { e.stopPropagation(); handleUndo(); }}
+            onPointerDown={(e) => {
+              e.stopPropagation();
+              handleUndo();
+            }}
             disabled={isDrawMode ? !canUndoDraw : false}
             className="flex items-center justify-center h-8 w-8 rounded-lg transition-colors hover:bg-accent disabled:opacity-30 disabled:pointer-events-none text-muted-foreground"
             title="Undo"
@@ -567,7 +615,10 @@ export function CanvasEditor({ document }: CanvasEditorProps) {
             <Undo2 className="h-4 w-4" />
           </button>
           <button
-            onPointerDown={(e) => { e.stopPropagation(); handleRedo(); }}
+            onPointerDown={(e) => {
+              e.stopPropagation();
+              handleRedo();
+            }}
             disabled={isDrawMode ? !canRedoDraw : false}
             className="flex items-center justify-center h-8 w-8 rounded-lg transition-colors hover:bg-accent disabled:opacity-30 disabled:pointer-events-none text-muted-foreground"
             title="Redo"
@@ -581,7 +632,10 @@ export function CanvasEditor({ document }: CanvasEditorProps) {
         {/* Mode toggle: Draw / Type */}
         <div className="flex items-center gap-1">
           <button
-            onPointerDown={(e) => { e.stopPropagation(); if (!isDrawMode) setActiveTool('pen'); }}
+            onPointerDown={(e) => {
+              e.stopPropagation();
+              if (!isDrawMode) setActiveTool('pen');
+            }}
             className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
               isDrawMode
                 ? 'bg-primary text-primary-foreground'
@@ -592,7 +646,10 @@ export function CanvasEditor({ document }: CanvasEditorProps) {
             Draw
           </button>
           <button
-            onPointerDown={(e) => { e.stopPropagation(); setActiveTool('text'); }}
+            onPointerDown={(e) => {
+              e.stopPropagation();
+              setActiveTool('text');
+            }}
             className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
               activeTool === 'text'
                 ? 'bg-primary text-primary-foreground'
@@ -610,7 +667,10 @@ export function CanvasEditor({ document }: CanvasEditorProps) {
             <div className="h-6 w-px bg-border mx-2" />
             <div className="flex items-center gap-1">
               <button
-                onPointerDown={(e) => { e.stopPropagation(); setActiveTool('pen'); }}
+                onPointerDown={(e) => {
+                  e.stopPropagation();
+                  setActiveTool('pen');
+                }}
                 className={`flex items-center justify-center h-8 w-8 rounded-lg transition-colors ${
                   activeTool === 'pen'
                     ? 'bg-accent text-accent-foreground'
@@ -621,7 +681,10 @@ export function CanvasEditor({ document }: CanvasEditorProps) {
                 <Pen className="h-4 w-4" />
               </button>
               <button
-                onPointerDown={(e) => { e.stopPropagation(); setActiveTool('highlighter'); }}
+                onPointerDown={(e) => {
+                  e.stopPropagation();
+                  setActiveTool('highlighter');
+                }}
                 className={`flex items-center justify-center h-8 w-8 rounded-lg transition-colors ${
                   activeTool === 'highlighter'
                     ? 'bg-accent text-accent-foreground'
@@ -632,7 +695,10 @@ export function CanvasEditor({ document }: CanvasEditorProps) {
                 <Highlighter className="h-4 w-4" />
               </button>
               <button
-                onPointerDown={(e) => { e.stopPropagation(); setActiveTool('eraser'); }}
+                onPointerDown={(e) => {
+                  e.stopPropagation();
+                  setActiveTool('eraser');
+                }}
                 className={`flex items-center justify-center h-8 w-8 rounded-lg transition-colors ${
                   activeTool === 'eraser'
                     ? 'bg-accent text-accent-foreground'
@@ -686,7 +752,9 @@ export function CanvasEditor({ document }: CanvasEditorProps) {
                     onEditorReady={handleEditorReady}
                     onTextOverflow={handleTextOverflow}
                     canvasClass={CANVAS_CLASSES[effectiveType] ?? ''}
-                    eraserPosition={activeTool === 'eraser' ? eraserPosition : null}
+                    eraserPosition={
+                      activeTool === 'eraser' ? eraserPosition : null
+                    }
                     eraserRadius={eraserSize}
                     remoteUpdateCounter={remoteUpdateCounter}
                   />
@@ -702,7 +770,11 @@ export function CanvasEditor({ document }: CanvasEditorProps) {
                     {/* Add page button */}
                     <div className="relative" data-add-page-popover>
                       <button
-                        onClick={() => setAddPagePopoverIndex(addPagePopoverIndex === index ? null : index)}
+                        onClick={() =>
+                          setAddPagePopoverIndex(
+                            addPagePopoverIndex === index ? null : index,
+                          )
+                        }
                         className="p-1 rounded hover:bg-accent transition-colors text-muted-foreground"
                         title="Add page"
                       >
@@ -718,7 +790,9 @@ export function CanvasEditor({ document }: CanvasEditorProps) {
                                 className="flex flex-col items-center gap-1 p-1.5 rounded-lg hover:bg-accent transition-colors"
                               >
                                 <PageTypeThumb type={t.value} size={36} />
-                                <span className="text-[10px] text-muted-foreground">{t.label}</span>
+                                <span className="text-[10px] text-muted-foreground">
+                                  {t.label}
+                                </span>
                               </button>
                             ))}
                           </div>
@@ -739,13 +813,15 @@ export function CanvasEditor({ document }: CanvasEditorProps) {
                 </div>
               );
             })}
-
           </div>
         </div>
 
         {/* Right sidebar — draw mode settings */}
         {isDrawMode && (
-          <div className="flex flex-col items-center gap-1 border-l bg-background py-3 overflow-y-auto" style={{ width: 48 }}>
+          <div
+            className="flex flex-col items-center gap-1 border-l bg-background py-3 overflow-y-auto"
+            style={{ width: 48 }}
+          >
             {/* Pen: thickness + colors */}
             {activeTool === 'pen' && (
               <>
@@ -753,9 +829,14 @@ export function CanvasEditor({ document }: CanvasEditorProps) {
                 {PEN_SIZES.map((s) => (
                   <button
                     key={s.label}
-                    onPointerDown={(e) => { e.stopPropagation(); setPenSize(s.value); }}
+                    onPointerDown={(e) => {
+                      e.stopPropagation();
+                      setPenSize(s.value);
+                    }}
                     className={`flex items-center justify-center h-8 w-8 rounded-lg transition-colors ${
-                      penSize === s.value ? 'bg-accent ring-1 ring-primary/50' : 'hover:bg-accent/50'
+                      penSize === s.value
+                        ? 'bg-accent ring-1 ring-primary/50'
+                        : 'hover:bg-accent/50'
                     }`}
                     title={`${s.label} (${s.value}px)`}
                   >
@@ -776,9 +857,14 @@ export function CanvasEditor({ document }: CanvasEditorProps) {
                 {PEN_COLORS.map((c) => (
                   <button
                     key={c}
-                    onPointerDown={(e) => { e.stopPropagation(); setPenColor(c); }}
+                    onPointerDown={(e) => {
+                      e.stopPropagation();
+                      setPenColor(c);
+                    }}
                     className={`flex items-center justify-center rounded-full transition-transform hover:scale-110 ${
-                      penColor === c ? 'ring-2 ring-primary ring-offset-1 scale-110' : ''
+                      penColor === c
+                        ? 'ring-2 ring-primary ring-offset-1 scale-110'
+                        : ''
                     }`}
                     style={{ width: 28, height: 28 }}
                     title={c}
@@ -789,7 +875,8 @@ export function CanvasEditor({ document }: CanvasEditorProps) {
                         width: 22,
                         height: 22,
                         backgroundColor: c,
-                        border: c === '#FFFFFF' ? '1px solid #d1d5db' : undefined,
+                        border:
+                          c === '#FFFFFF' ? '1px solid #d1d5db' : undefined,
                       }}
                     />
                   </button>
@@ -803,9 +890,14 @@ export function CanvasEditor({ document }: CanvasEditorProps) {
                 {HIGHLIGHTER_COLORS.map((c) => (
                   <button
                     key={c}
-                    onPointerDown={(e) => { e.stopPropagation(); setHighlighterColor(c); }}
+                    onPointerDown={(e) => {
+                      e.stopPropagation();
+                      setHighlighterColor(c);
+                    }}
                     className={`flex items-center justify-center rounded-full transition-transform hover:scale-110 ${
-                      highlighterColor === c ? 'ring-2 ring-primary ring-offset-1 scale-110' : ''
+                      highlighterColor === c
+                        ? 'ring-2 ring-primary ring-offset-1 scale-110'
+                        : ''
                     }`}
                     style={{ width: 28, height: 28 }}
                     title={c}
@@ -825,9 +917,14 @@ export function CanvasEditor({ document }: CanvasEditorProps) {
                 {ERASER_SIZES.map((s) => (
                   <button
                     key={s.label}
-                    onPointerDown={(e) => { e.stopPropagation(); setEraserSize(s.value); }}
+                    onPointerDown={(e) => {
+                      e.stopPropagation();
+                      setEraserSize(s.value);
+                    }}
                     className={`flex items-center justify-center h-8 w-8 rounded-lg transition-colors ${
-                      eraserSize === s.value ? 'bg-accent ring-1 ring-primary/50' : 'hover:bg-accent/50'
+                      eraserSize === s.value
+                        ? 'bg-accent ring-1 ring-primary/50'
+                        : 'hover:bg-accent/50'
                     }`}
                     title={`${s.label} eraser`}
                   >
@@ -865,7 +962,11 @@ export function CanvasEditor({ document }: CanvasEditorProps) {
           background-size: 32px 32px;
         }
         .canvas-dotted {
-          background-image: radial-gradient(circle, #d1d5db 1px, transparent 1px);
+          background-image: radial-gradient(
+            circle,
+            #d1d5db 1px,
+            transparent 1px
+          );
           background-size: 32px 32px;
         }
       `}</style>

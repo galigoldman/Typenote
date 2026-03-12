@@ -121,7 +121,11 @@ function HighlightButton({ editor }: { editor: Editor }) {
             size="icon-xs"
             onMouseDown={(e) => e.preventDefault()}
             onClick={() => setOpen((o) => !o)}
-            className={editor.isActive('highlight') ? 'bg-accent text-accent-foreground' : ''}
+            className={
+              editor.isActive('highlight')
+                ? 'bg-accent text-accent-foreground'
+                : ''
+            }
             aria-label="Highlight"
           >
             <Highlighter />
@@ -148,16 +152,25 @@ function HighlightButton({ editor }: { editor: Editor }) {
                   if (c.value === '') {
                     editor.chain().focus().unsetHighlight().run();
                   } else {
-                    editor.chain().focus().toggleHighlight({ color: c.value }).run();
+                    editor
+                      .chain()
+                      .focus()
+                      .toggleHighlight({ color: c.value })
+                      .run();
                   }
                   setOpen(false);
                 }}
                 className={`h-6 w-6 rounded-full border-2 transition-transform hover:scale-110 ${
-                  activeColor === c.value ? 'border-primary ring-2 ring-primary/30' : 'border-gray-200'
+                  activeColor === c.value
+                    ? 'border-primary ring-2 ring-primary/30'
+                    : 'border-gray-200'
                 }`}
                 style={{
                   backgroundColor: c.value || '#ffffff',
-                  backgroundImage: c.value === '' ? 'linear-gradient(135deg, transparent 45%, #ef4444 45%, #ef4444 55%, transparent 55%)' : undefined,
+                  backgroundImage:
+                    c.value === ''
+                      ? 'linear-gradient(135deg, transparent 45%, #ef4444 45%, #ef4444 55%, transparent 55%)'
+                      : undefined,
                 }}
                 title={c.label}
               />
