@@ -13,6 +13,7 @@
 **Key config for stylus**: Set `simulatePressure: false` when using real pen pressure data. Otherwise the library ignores pressure values and simulates from velocity.
 
 **Alternatives rejected**:
+
 - Rough.js — wrong aesthetic (sketchy, not smooth)
 - Konva.js — heavy framework, conflicts with direct pointer event usage
 - Custom Bezier smoothing — `perfect-freehand` already solves pressure-to-width, tapering, smoothing
@@ -28,6 +29,7 @@
 **Safari caveat**: Does not support `getCoalescedEvents()`, but Apple Pencil delivers 120–240Hz natively via regular `pointermove` events, so raw stream is already smooth.
 
 **Alternatives rejected**:
+
 - Touch Events API — no pen/finger distinction, no pressure
 - Pressure.js polyfill — unnecessary now that Pointer Events is baseline
 
@@ -38,19 +40,23 @@
 **Rationale**: Canvas performance is constant regardless of stroke count (immediate mode — draws pixels, forgets commands). SVG degrades as each stroke becomes a DOM node — at 500+ `<path>` elements, significant overhead. Benchmarks confirm SVG performance degrades exponentially on Safari.
 
 **High-DPI handling**: Scale canvas by `devicePixelRatio`:
+
 ```
 canvas.width = clientWidth * dpr
 canvas.height = clientHeight * dpr
 ctx.scale(dpr, dpr)
 ```
+
 Without this, strokes look blurry on Retina/iPad displays.
 
 **Rendering strategy**: Two-layer approach:
+
 1. "Committed" canvas — holds all finalized strokes as rasterized bitmap
 2. "Working" canvas — renders current in-progress stroke on every `pointermove`
-On `pointerup`, render stroke onto committed canvas and clear working layer. Avoids re-rendering all previous strokes per frame.
+   On `pointerup`, render stroke onto committed canvas and clear working layer. Avoids re-rendering all previous strokes per frame.
 
 **Alternatives rejected**:
+
 - SVG — DOM overhead with 500+ paths, especially on iPad Safari
 - WebGL/PixiJS — overkill for note-taking; Canvas 2D is fast enough
 - OffscreenCanvas — limited Safari support, premature optimization
@@ -60,12 +66,14 @@ On `pointerup`, render stroke onto committed canvas and clear working layer. Avo
 **Decision**: Canvas behind, HTML text boxes in front, transparent interaction layer on top.
 
 **Layer stack (bottom to top)**:
+
 1. Page background (white, shadow, grid/lines CSS)
 2. Canvas (pen strokes)
 3. Text boxes (positioned HTML divs with TipTap editors)
 4. Interaction layer (transparent div capturing all pointer events)
 
 **Event routing**: The interaction layer captures all pointer/touch events and routes them based on active tool:
+
 - Pen/eraser active → forward coordinates to canvas logic, set `pointer-events: none` on text boxes
 - Text input → let events pass through to text boxes
 
@@ -86,6 +94,7 @@ On `pointerup`, render stroke onto committed canvas and clear working layer. Avo
 **Desktop trackpad zoom**: Handle `wheel` events with `ctrlKey` (how browsers report trackpad pinch).
 
 **Alternatives rejected**:
+
 - Hammer.js — unmaintained, uses older Touch Events API
 - Canvas-only transform — would require manually repositioning every text box div per frame
 
@@ -98,6 +107,7 @@ On `pointerup`, render stroke onto committed canvas and clear working layer. Avo
 **Virtualization**: Only mount full canvas rendering for pages intersecting the viewport. Off-screen pages rendered as placeholder divs. Can use IntersectionObserver-based manual virtualization.
 
 **Alternatives rejected**:
+
 - Single giant canvas — browser canvas size limits, no per-page memory optimization
 - `aspect-ratio` CSS only — need explicit dimensions for coordinate precision
 
@@ -112,6 +122,7 @@ On `pointerup`, render stroke onto committed canvas and clear working layer. Avo
 **Performance**: With bbox filter, typically narrows 500 strokes to 5–20 candidates. Fast enough for 60fps.
 
 **Alternatives rejected**:
+
 - Pixel-based (offscreen canvas) — requires GPU-to-CPU readback (`getImageData()`), resolution-dependent, harder to adjust eraser size
 - R-tree spatial index (rbush) — premature optimization for <1000 strokes per page
 
@@ -148,19 +159,21 @@ On `pointerup`, render stroke onto committed canvas and clear working layer. Avo
 **Size budget**: Keep under ~800 KB total to stay within Supabase Realtime payload limits (~1 MB). At 50 strokes/page, supports ~14 pages comfortably.
 
 **Migration**: Three-phase additive:
+
 1. `ALTER TABLE ADD COLUMN pages jsonb DEFAULT '{"pages":[]}'`
 2. Dual-write in application code (content + pages)
 3. Backfill existing documents (wrap content as flowContent of page 0)
 
 **Alternatives rejected**:
+
 - Same `content` column — mixing TipTap tree with stroke arrays creates coupling
 - Separate `strokes` table — breaks single-subscription model, premature at this scale
 - Base64-encoded binary — loses queryability and debuggability
 
 ## 11. Key Dependencies
 
-| Package | Purpose | Size |
-|---------|---------|------|
+| Package            | Purpose                               | Size  |
+| ------------------ | ------------------------------------- | ----- |
 | `perfect-freehand` | Stroke geometry from raw input points | ~3 KB |
 
 No other new dependencies needed. Pointer Events, Canvas, IntersectionObserver, and pinch detection all use native browser APIs.

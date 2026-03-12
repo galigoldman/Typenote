@@ -20,34 +20,34 @@ No other new dependencies. All other features use native browser APIs (Pointer E
 
 ### New files
 
-| File | Purpose |
-|------|---------|
-| `src/components/canvas/canvas-page.tsx` | Single A4 page: canvas layer + text layer + interaction layer |
-| `src/components/canvas/canvas-editor.tsx` | Document-level container: pages list, scroll, zoom, toolbar |
-| `src/components/canvas/canvas-toolbar.tsx` | Tool switcher: Pen, Eraser, Selection/Cut |
-| `src/components/canvas/text-box.tsx` | Positioned text box with own TipTap editor instance |
-| `src/components/canvas/selection-overlay.tsx` | SVG overlay for lasso/rectangle selection and handles |
-| `src/hooks/use-drawing.ts` | Pen stroke capture, rendering, perfect-freehand integration |
-| `src/hooks/use-canvas-zoom.ts` | Pinch-to-zoom and trackpad zoom handling |
-| `src/hooks/use-selection.ts` | Selection tool logic: lasso, rectangle, hit detection, move |
-| `src/hooks/use-eraser.ts` | Eraser tool: stroke hit detection and removal |
-| `src/hooks/use-canvas-pages.ts` | Page management: auto-create, virtualization |
-| `src/lib/canvas/stroke-utils.ts` | Stroke rendering, bbox computation, point-in-polygon |
-| `src/lib/canvas/coordinate-utils.ts` | Screen ↔ page coordinate transforms |
-| `src/lib/canvas/text-split.ts` | ProseMirror document splitting logic |
-| `src/types/canvas.ts` | TypeScript types: Stroke, Page, TextBox, CanvasDocument |
+| File                                          | Purpose                                                       |
+| --------------------------------------------- | ------------------------------------------------------------- |
+| `src/components/canvas/canvas-page.tsx`       | Single A4 page: canvas layer + text layer + interaction layer |
+| `src/components/canvas/canvas-editor.tsx`     | Document-level container: pages list, scroll, zoom, toolbar   |
+| `src/components/canvas/canvas-toolbar.tsx`    | Tool switcher: Pen, Eraser, Selection/Cut                     |
+| `src/components/canvas/text-box.tsx`          | Positioned text box with own TipTap editor instance           |
+| `src/components/canvas/selection-overlay.tsx` | SVG overlay for lasso/rectangle selection and handles         |
+| `src/hooks/use-drawing.ts`                    | Pen stroke capture, rendering, perfect-freehand integration   |
+| `src/hooks/use-canvas-zoom.ts`                | Pinch-to-zoom and trackpad zoom handling                      |
+| `src/hooks/use-selection.ts`                  | Selection tool logic: lasso, rectangle, hit detection, move   |
+| `src/hooks/use-eraser.ts`                     | Eraser tool: stroke hit detection and removal                 |
+| `src/hooks/use-canvas-pages.ts`               | Page management: auto-create, virtualization                  |
+| `src/lib/canvas/stroke-utils.ts`              | Stroke rendering, bbox computation, point-in-polygon          |
+| `src/lib/canvas/coordinate-utils.ts`          | Screen ↔ page coordinate transforms                           |
+| `src/lib/canvas/text-split.ts`                | ProseMirror document splitting logic                          |
+| `src/types/canvas.ts`                         | TypeScript types: Stroke, Page, TextBox, CanvasDocument       |
 
 ### Modified files
 
-| File | Change |
-|------|--------|
+| File                                      | Change                                                     |
+| ----------------------------------------- | ---------------------------------------------------------- |
 | `src/components/editor/tiptap-editor.tsx` | Replace with canvas-editor for documents using canvas mode |
-| `src/hooks/use-document-sync.ts` | Handle `pages` field in save/load |
-| `src/hooks/use-auto-save.ts` | Support saving `pages` JSONB alongside content |
-| `src/hooks/use-realtime-sync.ts` | Sync `pages` field via Realtime |
-| `src/lib/actions/documents.ts` | Accept and persist `pages` in server actions |
-| `src/types/database.ts` | Add `pages` field to Document type |
-| `supabase/migrations/` | New migration adding `pages` column |
+| `src/hooks/use-document-sync.ts`          | Handle `pages` field in save/load                          |
+| `src/hooks/use-auto-save.ts`              | Support saving `pages` JSONB alongside content             |
+| `src/hooks/use-realtime-sync.ts`          | Sync `pages` field via Realtime                            |
+| `src/lib/actions/documents.ts`            | Accept and persist `pages` in server actions               |
+| `src/types/database.ts`                   | Add `pages` field to Document type                         |
+| `supabase/migrations/`                    | New migration adding `pages` column                        |
 
 ## Architecture Overview
 
