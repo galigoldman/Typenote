@@ -76,6 +76,7 @@ interface FailedItem {
 
 export function MoodleFilePicker({
   moodleCourseId,
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   moodleCourseMoodleId,
   courseUrl,
   instanceDomain,
@@ -165,9 +166,11 @@ export function MoodleFilePicker({
     }
   }, [scrapeCourseContent, courseUrl, moodleCourseId, itemKey]);
 
+  /* eslint-disable react-hooks/set-state-in-effect -- async data fetch on mount */
   useEffect(() => {
-    loadContent();
+    void loadContent();
   }, [loadContent]);
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   function toggleItem(sectionId: string, moodleUrl: string) {
     const key = itemKey(sectionId, moodleUrl);
