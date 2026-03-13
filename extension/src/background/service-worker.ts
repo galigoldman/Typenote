@@ -322,6 +322,42 @@ async function handleScrapeCourseContent(
 // Handler: DOWNLOAD_AND_UPLOAD
 // ============================================
 
+/**
+ * Resolves a Moodle activity URL to the actual pluginfile.php download URL.
+ * For view.php URLs: navigates a tab to the page and extracts the real URL
+ * from the DOM (pluginfile.php links in embeds/iframes/download links).
+ * For pluginfile.php URLs: returns as-is.
+ */
+async function resolveFileUrl(moodleUrl: string): Promise<string> {
+  // Already a direct file URL
+  if (moodleUrl.includes('/pluginfile.php')) {
+    return moodleUrl;
+  }
+
+  // Navigate to the resource page and extract the real file URL
+  if (moodleUrl.includes('/mod/resource/view.php') || moodleUrl.includes('/mod/folder/view.php')) {
+    const tabId = await getOrCreateMoodleTab(moodleUrl);
+    const tab = await chrome.tabs.get(tabId);
+    if (tab.url !== moodleUrl) {
+      await chrome.tabs.update(tabId, { url: moodleUrl });
+      await waitForTabLoad(tabId);
+    }
+
+    try {
+      const realUrl = await executeScraperFunction<string>(tabId, 'scrapeFileUrl');
+      if (realUrl) return realUrl;
+    } catch {
+      // scrapeFileUrl returned null — no pluginfile.php link found on page
+    }
+
+    // Fallback: try redirect=1 parameter
+    const sep = moodleUrl.includes('?') ? '&' : '?';
+    return `${moodleUrl}${sep}redirect=1`;
+  }
+
+  return moodleUrl;
+}
+
 async function handleDownloadAndUpload(
   payload: ExtensionRequest & { type: 'DOWNLOAD_AND_UPLOAD' } extends { payload: infer P }
     ? P
@@ -330,14 +366,26 @@ async function handleDownloadAndUpload(
   try {
     const { moodleFileUrl, uploadEndpoint, metadata } = payload;
 
+    // Resolve view.php URLs to actual pluginfile.php download URLs
+    const downloadUrl = await resolveFileUrl(moodleFileUrl);
+
     // Download the file using the student's Moodle session cookies
-    const response = await fetch(moodleFileUrl, {
+    const response = await fetch(downloadUrl, {
       credentials: 'include',
       redirect: 'follow',
     });
 
     if (!response.ok) {
       throw new Error(`Download failed: ${response.status} ${response.statusText}`);
+    }
+
+    // Verify we got a real file, not an HTML page
+    const contentType = response.headers.get('content-type') ?? '';
+    if (contentType.includes('text/html')) {
+      throw new Error(
+        `Got HTML instead of file — could not resolve download URL. ` +
+        `Resource: ${moodleFileUrl.substring(0, 80)}`,
+      );
     }
 
     const blob = await response.blob();
