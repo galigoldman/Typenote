@@ -63,6 +63,7 @@ export function CanvasPage({
   const committedCtxRef = useRef<CanvasRenderingContext2D | null>(null);
   const workingCtxRef = useRef<CanvasRenderingContext2D | null>(null);
   const overflowNotifiedRef = useRef(false);
+  const isSplittingRef = useRef(false);
 
   const isInteractionMode =
     activeTool === 'pen' ||
@@ -206,8 +207,9 @@ export function CanvasPage({
       attributes: {
         class: `prose prose-sm sm:prose-base max-w-none focus:outline-none min-h-full ${editorPaddingTop} pb-4 px-4`,
       },
-      // Intercept Enter near the bottom of the page → move to next page
+      // Intercept Enter / ArrowDown near the bottom → move to next page
       handleKeyDown: (view, event) => {
+        // Enter near bottom → move to next page
         if (event.key === 'Enter' && !event.shiftKey) {
           const layer = textLayerRef.current;
           if (!layer) return false;
@@ -215,10 +217,9 @@ export function CanvasPage({
             const coords = view.coordsAtPos(view.state.selection.from);
             const layerRect = layer.getBoundingClientRect();
             const cursorY = coords.bottom - layerRect.top;
-            // If the cursor is within ~60px of the page bottom, there's no
-            // room for a new paragraph — move to the next page instead.
             if (cursorY > PAGE_HEIGHT - 60) {
               event.preventDefault();
+              view.dom.blur();
               onTextOverflowRef.current?.(pageIdRef.current, null);
               return true;
             }
@@ -226,18 +227,70 @@ export function CanvasPage({
             /* coordsAtPos can throw before DOM is ready */
           }
         }
+
+        // ArrowDown at end of content near page bottom → next page
+        if (event.key === 'ArrowDown') {
+          const { state } = view;
+          const endPos = state.doc.content.size - 1;
+          if (state.selection.from >= endPos) {
+            const layer = textLayerRef.current;
+            if (!layer) return false;
+            try {
+              const coords = view.coordsAtPos(state.selection.from);
+              const layerRect = layer.getBoundingClientRect();
+              const cursorY = coords.bottom - layerRect.top;
+              if (cursorY > PAGE_HEIGHT * 0.8) {
+                event.preventDefault();
+                view.dom.blur();
+                onTextOverflowRef.current?.(pageIdRef.current, null);
+                return true;
+              }
+            } catch {
+              /* coordsAtPos can throw before DOM is ready */
+            }
+          }
+        }
+
         return false;
       },
     },
     onUpdate: ({ editor: ed }) => {
-      onFlowContentUpdateRef.current?.(
-        pageIdRef.current,
-        ed.getJSON() as Record<string, unknown>,
-      );
+      // Suppress content saves during split operations to avoid
+      // persisting intermediate states
+      if (!isSplittingRef.current) {
+        onFlowContentUpdateRef.current?.(
+          pageIdRef.current,
+          ed.getJSON() as Record<string, unknown>,
+        );
+      }
 
-      // Fallback overflow detection for paste / bulk-insert that pushes
-      // the cursor past the page boundary (uses cursor position, not
-      // scrollHeight, to avoid false positives from CSS margins).
+      // Auto-scroll to keep cursor visible while typing (like Word/Docs).
+      // Without this the cursor drifts to the very bottom of the viewport.
+      if (!isSplittingRef.current) {
+        requestAnimationFrame(() => {
+          const layer = textLayerRef.current;
+          if (!layer) return;
+          try {
+            const coords = ed.view.coordsAtPos(ed.state.selection.from);
+            const scrollContainer = layer.closest(
+              '[data-scroll-container]',
+            ) as HTMLElement | null;
+            if (!scrollContainer) return;
+            const containerRect = scrollContainer.getBoundingClientRect();
+            const margin = 100;
+            if (coords.bottom > containerRect.bottom - margin) {
+              scrollContainer.scrollBy({
+                top: coords.bottom - containerRect.bottom + margin,
+              });
+            }
+          } catch {
+            /* coordsAtPos can throw */
+          }
+        });
+      }
+
+      // Overflow detection — runs after every edit to check if the
+      // cursor has pushed past the page boundary.
       requestAnimationFrame(() => {
         const layer = textLayerRef.current;
         if (!layer || overflowNotifiedRef.current) return;
@@ -248,23 +301,81 @@ export function CanvasPage({
 
           if (cursorY > PAGE_HEIGHT) {
             overflowNotifiedRef.current = true;
-            // Extract the last block node and move it to the new page
             const { doc } = ed.state;
+
             if (doc.childCount > 1) {
+              // Multi-block: extract the last block node
               const lastChild = doc.lastChild!;
               const lastNodeJson = lastChild.toJSON();
               const nodeFrom = doc.content.size - lastChild.nodeSize;
               const nodeTo = doc.content.size;
               ed.chain().deleteRange({ from: nodeFrom, to: nodeTo }).run();
+              ed.commands.blur();
               onTextOverflowRef.current?.(pageIdRef.current, {
                 type: 'doc',
                 content: [lastNodeJson],
               } as Record<string, unknown>);
             } else {
-              onTextOverflowRef.current?.(pageIdRef.current, null);
+              // Single block: split at page boundary word break
+              const bottomY = layerRect.top + PAGE_HEIGHT - 20;
+              const posInfo = ed.view.posAtCoords({
+                left: layerRect.left + PAGE_WIDTH / 2,
+                top: bottomY,
+              });
+
+              if (posInfo && posInfo.pos > 2) {
+                let splitPos = posInfo.pos;
+
+                // Walk backward to find a word boundary (space)
+                const $pos = doc.resolve(splitPos);
+                const text = $pos.parent.textContent;
+                const offset = $pos.parentOffset;
+                let wordBreak = offset;
+                while (wordBreak > 0 && text[wordBreak - 1] !== ' ') {
+                  wordBreak--;
+                }
+                if (wordBreak > 0) {
+                  splitPos = $pos.start() + wordBreak;
+                }
+
+                // Split the block, then extract the second half
+                isSplittingRef.current = true;
+                ed.chain().setTextSelection(splitPos).splitBlock().run();
+
+                const newDoc = ed.state.doc;
+                const overflowNodes: unknown[] = [];
+                for (let i = 1; i < newDoc.childCount; i++) {
+                  overflowNodes.push(newDoc.child(i).toJSON());
+                }
+
+                const firstBlockEnd = newDoc.child(0).nodeSize;
+                ed.chain()
+                  .deleteRange({
+                    from: firstBlockEnd,
+                    to: newDoc.content.size,
+                  })
+                  .run();
+
+                isSplittingRef.current = false;
+
+                // Manually save the final state (intermediate was suppressed)
+                onFlowContentUpdateRef.current?.(
+                  pageIdRef.current,
+                  ed.getJSON() as Record<string, unknown>,
+                );
+
+                ed.commands.blur();
+                onTextOverflowRef.current?.(pageIdRef.current, {
+                  type: 'doc',
+                  content: overflowNodes,
+                } as Record<string, unknown>);
+              } else {
+                // Can't determine split position — just navigate
+                ed.commands.blur();
+                onTextOverflowRef.current?.(pageIdRef.current, null);
+              }
             }
           } else if (cursorY < PAGE_HEIGHT - 100) {
-            // Reset only when cursor is well within the page
             overflowNotifiedRef.current = false;
           }
         } catch {
