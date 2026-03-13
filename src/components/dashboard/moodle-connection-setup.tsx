@@ -55,11 +55,15 @@ export function MoodleConnectionSetup({
     setSaving(true);
 
     try {
-      // Parse and validate URL
+      // Parse and validate URL — keep host + base path (e.g. moodle.runi.ac.il/2026)
       let domain: string;
       try {
         const parsed = new URL(url.startsWith('http') ? url : `https://${url}`);
-        domain = parsed.host;
+        // Strip known Moodle paths to extract just the base prefix
+        let basePath = parsed.pathname
+          .replace(/\/(my|course|login|mod|lib|theme|admin|message|calendar|user|badges|grade|report|backup|blocks|question|tag|cohort|enrol|webservice|auth|completion|files|search)\b.*/, '')
+          .replace(/\/+$/, '');
+        domain = parsed.host + basePath;
       } catch {
         setError('Please enter a valid URL');
         setSaving(false);
@@ -102,7 +106,7 @@ export function MoodleConnectionSetup({
         <div className="flex gap-2">
           <Input
             id="moodle-url"
-            placeholder="moodle.university.ac.il"
+            placeholder="moodle.university.ac.il/2026"
             value={url}
             onChange={(e) => setUrl(e.target.value)}
             disabled={saving}

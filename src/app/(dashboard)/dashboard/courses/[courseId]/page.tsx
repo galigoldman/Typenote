@@ -1,13 +1,14 @@
 import { notFound } from 'next/navigation';
 import Link from 'next/link';
 import { createClient } from '@/lib/supabase/server';
-import { AiChatWrapper } from '@/components/ai/ai-chat-wrapper';
+import { createAdminClient } from '@/lib/supabase/admin';
 import { DocumentCard } from '@/components/dashboard/document-card';
 import { CreateDocumentDialog } from '@/components/dashboard/create-document-dialog';
 import { WeekSection } from '@/components/dashboard/week-section';
 import { WeekDialog } from '@/components/dashboard/week-dialog';
 import { EmptyState } from '@/components/dashboard/empty-state';
 import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
 import {
   Breadcrumb,
   BreadcrumbItem,
@@ -82,6 +83,42 @@ export default async function CoursePage({
     allMaterials = (materialsData as CourseMaterial[] | null) ?? [];
   }
 
+  // Fetch linked Moodle data (if this course was created from a Moodle sync)
+  const admin = createAdminClient();
+  const { data: syncRecord } = await admin
+    .from('user_course_syncs')
+    .select('moodle_course_id')
+    .eq('user_id', user?.id ?? '')
+    .eq('course_id', courseId)
+    .single();
+
+  type MoodleFileRow = {
+    id: string;
+    file_name: string;
+    type: string;
+    moodle_url: string;
+    mime_type: string | null;
+    file_size: number | null;
+    position: number;
+  };
+  type MoodleSectionWithFiles = {
+    id: string;
+    title: string;
+    position: number;
+    moodle_files: MoodleFileRow[];
+  };
+
+  let moodleSections: MoodleSectionWithFiles[] = [];
+  if (syncRecord) {
+    const { data: sections } = await admin
+      .from('moodle_sections')
+      .select('id, title, position, moodle_files(id, file_name, type, moodle_url, mime_type, file_size, position)')
+      .eq('course_id', syncRecord.moodle_course_id)
+      .order('position');
+    moodleSections = ((sections ?? []) as MoodleSectionWithFiles[])
+      .filter((s) => s.moodle_files.length > 0);
+  }
+
   // Build breadcrumbs - if course is in a folder, include it
   let parentFolder = null;
   if (typedCourse.folder_id) {
@@ -93,10 +130,10 @@ export default async function CoursePage({
     parentFolder = folder;
   }
 
-  const isEmpty = typedWeeks.length === 0 && courseDocuments.length === 0;
+  const isEmpty = typedWeeks.length === 0 && courseDocuments.length === 0 && moodleSections.length === 0;
 
   return (
-    <div className="h-full overflow-y-auto p-6">
+    <div className="p-6">
       <div className="mb-6 flex items-center justify-between">
         <Breadcrumb>
           <BreadcrumbList>
@@ -124,7 +161,6 @@ export default async function CoursePage({
           </BreadcrumbList>
         </Breadcrumb>
         <div className="flex items-center gap-2">
-          <AiChatWrapper courseId={courseId} />
           <CreateDocumentDialog folderId={null} courseId={courseId}>
             <Button variant="outline" size="sm">
               New Document
@@ -185,6 +221,44 @@ export default async function CoursePage({
                       (d) => d.week_id === week.id,
                     )}
                   />
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Moodle materials */}
+          {moodleSections.length > 0 && (
+            <div className="mt-6">
+              <h2 className="mb-3 text-sm font-medium text-muted-foreground">
+                Moodle Materials
+              </h2>
+              <div className="space-y-3">
+                {moodleSections.map((section) => (
+                  <div key={section.id} className="rounded-lg border">
+                    <div className="border-b bg-muted/30 px-4 py-2">
+                      <h3 className="text-sm font-medium">{section.title}</h3>
+                    </div>
+                    <div className="divide-y">
+                      {section.moodle_files
+                        .sort((a, b) => a.position - b.position)
+                        .map((file) => (
+                        <a
+                          key={file.id}
+                          href={file.moodle_url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="flex items-center gap-3 px-4 py-2 hover:bg-accent/30 transition-colors"
+                        >
+                          <span className="flex-1 text-sm truncate">{file.file_name}</span>
+                          <Badge variant="outline" className="text-xs shrink-0">
+                            {file.type === 'file'
+                              ? (file.mime_type?.split('/')[1] ?? 'file')
+                              : 'link'}
+                          </Badge>
+                        </a>
+                      ))}
+                    </div>
+                  </div>
                 ))}
               </div>
             </div>

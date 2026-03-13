@@ -90,11 +90,15 @@ export function useMoodleExtension() {
       data: {
         courses: Array<{ moodleCourseId: string; name: string; url: string }>;
       };
+      error?: string;
     }>({
       type: 'SCRAPE_COURSES',
       payload: { moodleUrl },
     });
-    if (!response?.success) return null;
+    if (!response) return null;
+    if (!response.success) {
+      throw new Error((response as { error?: string }).error ?? 'Scraping failed');
+    }
     return response.data;
   }, []);
 
@@ -116,11 +120,15 @@ export function useMoodleExtension() {
           }>;
         }>;
       };
+      error?: string;
     }>({
       type: 'SCRAPE_COURSE_CONTENT',
       payload: { courseUrl },
     });
-    if (!response?.success) return null;
+    if (!response) return null;
+    if (!response.success) {
+      throw new Error((response as { error?: string }).error ?? 'Content scraping failed');
+    }
     return response.data;
   }, []);
 

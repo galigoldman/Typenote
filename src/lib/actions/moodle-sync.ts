@@ -47,6 +47,30 @@ export async function removeMoodleConnection() {
 }
 
 /**
+ * Get the set of Moodle file URLs already in the registry for a course.
+ * Used to mark already-synced items in the content picker.
+ */
+export async function getExistingFileUrls(
+  registryId: string,
+): Promise<string[]> {
+  const admin = createAdminClient();
+
+  const { data: sections } = await admin
+    .from('moodle_sections')
+    .select('id')
+    .eq('course_id', registryId);
+
+  if (!sections || sections.length === 0) return [];
+
+  const { data: files } = await admin
+    .from('moodle_files')
+    .select('moodle_url')
+    .in('section_id', sections.map((s: { id: string }) => s.id));
+
+  return (files ?? []).map((f: { moodle_url: string }) => f.moodle_url);
+}
+
+/**
  * Compare scraped Moodle courses against the shared registry.
  * Called from client to determine each course's sync status.
  */
@@ -100,10 +124,39 @@ export async function syncMoodleCourses(
     courses,
   });
 
-  // Step 2: Create/update user_course_syncs records only for courses with actual content
-  for (const courseResult of syncResult.courses) {
+  // Step 2: Create Typenote courses and user_course_syncs for courses with actual content
+  const courseName = (idx: number) => courses[idx]?.name ?? 'Untitled Course';
+  for (let i = 0; i < syncResult.courses.length; i++) {
+    const courseResult = syncResult.courses[i];
     const hasFiles = courseResult.sections.some((s) => s.items.length > 0);
     if (!hasFiles) continue;
+
+    // Check if a user_course_syncs record already exists with a linked Typenote course
+    const { data: existingSync } = await admin
+      .from('user_course_syncs')
+      .select('id, course_id')
+      .eq('user_id', user.id)
+      .eq('moodle_course_id', courseResult.id)
+      .single();
+
+    let courseId = existingSync?.course_id ?? null;
+
+    // If no linked Typenote course yet, create one
+    if (!courseId) {
+      const { data: newCourse, error: courseCreateError } = await supabase
+        .from('courses')
+        .insert({
+          user_id: user.id,
+          name: courseName(i),
+          color: '#3B82F6',
+        })
+        .select()
+        .single();
+      if (courseCreateError) {
+        throw new Error(`Failed to create course: ${courseCreateError.message}`);
+      }
+      courseId = newCourse.id;
+    }
 
     const { error } = await admin
       .from('user_course_syncs')
@@ -111,6 +164,7 @@ export async function syncMoodleCourses(
         {
           user_id: user.id,
           moodle_course_id: courseResult.id,
+          course_id: courseId,
           last_synced_at: new Date().toISOString(),
         },
         { onConflict: 'user_id,moodle_course_id' },

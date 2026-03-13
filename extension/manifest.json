@@ -3,13 +3,29 @@
   "name": "Typenote Moodle Sync",
   "version": "0.1.0",
   "description": "Import course materials from Moodle into Typenote",
-  "permissions": ["storage", "scripting"],
-  "optional_host_permissions": ["https://*/*", "http://*/*"],
+  "permissions": [
+    "storage",
+    "scripting",
+    "cookies",
+    "tabs",
+    "activeTab"
+  ],
+  "host_permissions": [
+    "<all_urls>"
+  ],
   "background": {
     "service_worker": "dist/service-worker.js"
   },
   "externally_connectable": {
-    "matches": ["http://localhost:3000/*", "https://*.typenote.app/*"]
+    "matches": [
+      "http://localhost:3000/*",
+      "https://*.typenote.app/*"
+    ]
   },
-  "icons": {}
+  "web_accessible_resources": [
+    {
+      "resources": ["dist/moodle-scraper.js"],
+      "matches": ["https://*/*", "http://*/*"]
+    }
+  ]
 }

@@ -25,6 +25,7 @@ export interface CourseComparison {
   status: CourseComparisonStatus;
   registryId?: string;
   lastSyncedAt?: string;
+  syncedFileCount?: number;
 }
 
 /**
@@ -136,6 +137,7 @@ export async function compareCourses(
         status: 'synced_by_user',
         registryId: registryCourse.id,
         lastSyncedAt: userSync.last_synced_at,
+        syncedFileCount: totalFiles ?? 0,
       });
     }
   }
