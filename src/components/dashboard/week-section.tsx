@@ -24,8 +24,18 @@ import { deleteCourseWeek } from '@/lib/actions/course-weeks';
 import { createWeekDocument } from '@/lib/actions/documents';
 import { MaterialUpload } from './material-upload';
 import { MaterialItem } from './material-item';
+import { MoodleImportPicker } from './moodle-import-picker';
 import type { CourseWeek, CourseMaterial, Document } from '@/types/database';
 import { cn } from '@/lib/utils';
+
+interface MoodleFileOption {
+  id: string;
+  file_name: string;
+  storage_path: string | null;
+  mime_type: string | null;
+  file_size: number | null;
+  sectionTitle: string;
+}
 
 interface WeekSectionProps {
   week: CourseWeek;
@@ -34,6 +44,7 @@ interface WeekSectionProps {
   materials: CourseMaterial[];
   homework: CourseMaterial[];
   documents: Document[];
+  moodleFiles?: MoodleFileOption[];
 }
 
 export function WeekSection({
@@ -43,6 +54,7 @@ export function WeekSection({
   materials,
   homework,
   documents,
+  moodleFiles = [],
 }: WeekSectionProps) {
   const router = useRouter();
   const [expanded, setExpanded] = useState(true);
@@ -195,12 +207,22 @@ export function WeekSection({
                 ))}
               </div>
             )}
-            <MaterialUpload
-              weekId={week.id}
-              courseId={courseId}
-              userId={userId}
-              category="material"
-            />
+            <div className="flex items-center gap-2">
+              <MaterialUpload
+                weekId={week.id}
+                courseId={courseId}
+                userId={userId}
+                category="material"
+              />
+              {moodleFiles.length > 0 && (
+                <MoodleImportPicker
+                  weekId={week.id}
+                  courseId={courseId}
+                  category="material"
+                  moodleFiles={moodleFiles}
+                />
+              )}
+            </div>
           </div>
 
           {/* Assignment PDFs (questions from professor) */}
@@ -215,12 +237,22 @@ export function WeekSection({
                 ))}
               </div>
             )}
-            <MaterialUpload
-              weekId={week.id}
-              courseId={courseId}
-              userId={userId}
-              category="homework"
-            />
+            <div className="flex items-center gap-2">
+              <MaterialUpload
+                weekId={week.id}
+                courseId={courseId}
+                userId={userId}
+                category="homework"
+              />
+              {moodleFiles.length > 0 && (
+                <MoodleImportPicker
+                  weekId={week.id}
+                  courseId={courseId}
+                  category="homework"
+                  moodleFiles={moodleFiles}
+                />
+              )}
+            </div>
           </div>
         </div>
       )}

@@ -6,6 +6,7 @@ import { indexContent } from '@/lib/actions/ai-context';
 import { invalidateCache } from '@/lib/ai/context-cache';
 import { deleteEmbeddingsBySource } from '@/lib/queries/embeddings';
 import { createClient } from '@/lib/supabase/server';
+import { createAdminClient } from '@/lib/supabase/admin';
 
 export async function createCourseMaterial(data: {
   week_id: string;
@@ -84,6 +85,73 @@ export async function updateCourseMaterial(
     .select()
     .single();
   if (error) throw new Error(error.message);
+  revalidatePath('/dashboard');
+  return material;
+}
+
+/**
+ * Import a Moodle file into a course week as a course_material.
+ * Copies the file from moodle-materials → course-materials bucket.
+ */
+export async function importMoodleFile(data: {
+  moodleFileId: string;
+  weekId: string;
+  courseId: string;
+  category: 'material' | 'homework';
+}) {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error('Not authenticated');
+
+  const admin = createAdminClient();
+
+  // Fetch the Moodle file record
+  const { data: moodleFile, error: fetchError } = await admin
+    .from('moodle_files')
+    .select('id, file_name, storage_path, file_size, mime_type')
+    .eq('id', data.moodleFileId)
+    .single();
+
+  if (fetchError || !moodleFile) throw new Error('Moodle file not found');
+  if (!moodleFile.storage_path) throw new Error('File not downloaded yet — sync first');
+
+  // Download from moodle-materials bucket
+  const { data: fileData, error: downloadError } = await admin.storage
+    .from('moodle-materials')
+    .download(moodleFile.storage_path);
+
+  if (downloadError || !fileData) throw new Error(`Download failed: ${downloadError?.message}`);
+
+  // Upload to course-materials bucket
+  const destPath = `${user.id}/${data.courseId}/${data.weekId}/${moodleFile.file_name}`;
+  const buffer = Buffer.from(await fileData.arrayBuffer());
+
+  const { error: uploadError } = await admin.storage
+    .from('course-materials')
+    .upload(destPath, buffer, {
+      contentType: moodleFile.mime_type ?? 'application/octet-stream',
+      upsert: true,
+    });
+
+  if (uploadError) throw new Error(`Upload failed: ${uploadError.message}`);
+
+  // Create course_material record
+  const { data: material, error: insertError } = await supabase
+    .from('course_materials')
+    .insert({
+      user_id: user.id,
+      week_id: data.weekId,
+      category: data.category,
+      storage_path: destPath,
+      file_name: moodleFile.file_name,
+      file_size: moodleFile.file_size ?? 0,
+      mime_type: moodleFile.mime_type ?? 'application/octet-stream',
+    })
+    .select()
+    .single();
+
+  if (insertError) throw new Error(insertError.message);
+
   revalidatePath('/dashboard');
   return material;
 }

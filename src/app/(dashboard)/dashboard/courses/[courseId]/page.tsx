@@ -145,6 +145,20 @@ export default async function CoursePage({
     parentFolder = folder;
   }
 
+  // Build flat list of importable Moodle files for the week import picker
+  const importableMoodleFiles = moodleSections.flatMap((section) =>
+    section.moodle_files
+      .filter((f) => f.storage_path && f.type === 'file')
+      .map((f) => ({
+        id: f.id,
+        file_name: f.file_name,
+        storage_path: f.storage_path,
+        mime_type: f.mime_type,
+        file_size: f.file_size,
+        sectionTitle: section.title,
+      })),
+  );
+
   const isEmpty = typedWeeks.length === 0 && courseDocuments.length === 0 && moodleSections.length === 0;
 
   return (
@@ -235,6 +249,7 @@ export default async function CoursePage({
                     documents={weekDocuments.filter(
                       (d) => d.week_id === week.id,
                     )}
+                    moodleFiles={importableMoodleFiles}
                   />
                 ))}
               </div>
