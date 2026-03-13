@@ -1,5 +1,7 @@
 import { jsPDF } from 'jspdf';
+
 import type { CanvasPage } from '@/types/canvas';
+
 import { renderCanvasPage } from './canvas-page-renderer';
 import { loadFonts } from './font-loader';
 import { renderTextDocument } from './text-document-renderer';
