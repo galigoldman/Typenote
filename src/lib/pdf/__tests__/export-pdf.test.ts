@@ -5,10 +5,10 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 // ---------------------------------------------------------------------------
 
 const mockAddPage = vi.fn();
-const mockOutput = vi.fn().mockReturnValue(new Blob());
+const mockSave = vi.fn();
 const mockJsPdfInstance = {
   addPage: mockAddPage,
-  output: mockOutput,
+  save: mockSave,
 };
 
 vi.mock('jspdf', () => ({
@@ -31,14 +31,13 @@ vi.mock('../text-document-renderer', () => ({
 
 vi.mock('../utils', () => ({
   sanitizeFilename: vi.fn((title: string) => title || 'Untitled'),
-  triggerDownload: vi.fn(),
 }));
 
 import { jsPDF } from 'jspdf';
 import { loadFonts } from '../font-loader';
 import { renderCanvasPage } from '../canvas-page-renderer';
 import { renderTextDocument } from '../text-document-renderer';
-import { sanitizeFilename, triggerDownload } from '../utils';
+import { sanitizeFilename } from '../utils';
 import { exportDocumentAsPdf, type ExportableDocument } from '../export-pdf';
 
 const mockJsPDF = vi.mocked(jsPDF);
@@ -46,7 +45,6 @@ const mockLoadFonts = vi.mocked(loadFonts);
 const mockRenderCanvasPage = vi.mocked(renderCanvasPage);
 const mockRenderTextDocument = vi.mocked(renderTextDocument);
 const mockSanitizeFilename = vi.mocked(sanitizeFilename);
-const mockTriggerDownload = vi.mocked(triggerDownload);
 
 // ---------------------------------------------------------------------------
 // Test helpers
@@ -80,7 +78,6 @@ function makeTextContent() {
 describe('exportDocumentAsPdf', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mockOutput.mockReturnValue(new Blob());
   });
 
   // -------------------------------------------------------------------------
@@ -206,8 +203,8 @@ describe('exportDocumentAsPdf', () => {
     expect(mockRenderCanvasPage).not.toHaveBeenCalled();
     expect(mockRenderTextDocument).not.toHaveBeenCalled();
 
-    // Download should still be triggered (blank PDF)
-    expect(mockTriggerDownload).toHaveBeenCalledOnce();
+    // Save should still be triggered (blank PDF)
+    expect(mockSave).toHaveBeenCalledOnce();
   });
 
   // -------------------------------------------------------------------------
@@ -269,7 +266,7 @@ describe('exportDocumentAsPdf', () => {
     expect(callOrder[1]).toBe('renderText');
   });
 
-  it('should trigger download with sanitized filename', async () => {
+  it('should save with sanitized filename', async () => {
     const document: ExportableDocument = {
       title: 'My Document',
       content: {},
@@ -280,10 +277,8 @@ describe('exportDocumentAsPdf', () => {
     await exportDocumentAsPdf(document);
 
     expect(mockSanitizeFilename).toHaveBeenCalledWith('My Document');
-    expect(mockTriggerDownload).toHaveBeenCalledOnce();
-    // Second argument should be the filename with .pdf extension
-    const [, filename] = mockTriggerDownload.mock.calls[0];
-    expect(filename).toBe('My Document.pdf');
+    expect(mockSave).toHaveBeenCalledOnce();
+    expect(mockSave).toHaveBeenCalledWith('My Document.pdf');
   });
 
   it('should sort canvas pages by order before rendering', async () => {
