@@ -21,6 +21,8 @@ import {
   Code,
   Minus,
   Quote,
+  Download,
+  Loader2,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
@@ -30,11 +32,14 @@ import {
   TooltipTrigger,
 } from '@/components/ui/tooltip';
 import { HeadingDropdown } from './heading-dropdown';
+import { useExportPdf } from '@/hooks/use-export-pdf';
+import type { ExportableDocument } from '@/lib/pdf/export-pdf';
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 interface EditorToolbarProps {
   editor: Editor;
   hideUndoRedo?: boolean;
+  document?: ExportableDocument;
 }
 
 interface ToolbarButtonProps {
@@ -182,7 +187,13 @@ function HighlightButton({ editor }: { editor: Editor }) {
   );
 }
 
-export function EditorToolbar({ editor, hideUndoRedo }: EditorToolbarProps) {
+export function EditorToolbar({
+  editor,
+  hideUndoRedo,
+  document,
+}: EditorToolbarProps) {
+  const { exportPdf, isExporting } = useExportPdf();
+
   const setLink = useCallback(() => {
     const previousUrl = editor.getAttributes('link').href as string | undefined;
     const url = window.prompt('URL', previousUrl);
@@ -338,6 +349,25 @@ export function EditorToolbar({ editor, hideUndoRedo }: EditorToolbarProps) {
         icon={<Quote />}
         label="Blockquote"
       />
+
+      {/* Export PDF */}
+      {document && (
+        <>
+          <VerticalSeparator />
+          <ToolbarButton
+            onClick={() => exportPdf(document)}
+            disabled={isExporting}
+            icon={
+              isExporting ? (
+                <Loader2 className="animate-spin" />
+              ) : (
+                <Download />
+              )
+            }
+            label="Export as PDF"
+          />
+        </>
+      )}
     </div>
   );
 }

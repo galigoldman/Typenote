@@ -1,10 +1,11 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
-import { MoreHorizontal, Pencil, FolderInput, Trash2 } from 'lucide-react';
+import { MoreHorizontal, Pencil, FolderInput, Trash2, Download, Loader2 } from 'lucide-react';
 import type { Document } from '@/types/database';
 import { SUBJECTS } from '@/lib/constants/subjects';
 import { deleteDocument } from '@/lib/actions/documents';
+import { useExportPdf } from '@/hooks/use-export-pdf';
 import { cn } from '@/lib/utils';
 import {
   Card,
@@ -66,6 +67,7 @@ export function DocumentCard({
   onDelete,
 }: DocumentCardProps) {
   const router = useRouter();
+  const { exportPdf, isExporting } = useExportPdf();
 
   const subjectLabel =
     document.subject === 'other' && document.subject_custom
@@ -114,6 +116,17 @@ export function DocumentCard({
               <DropdownMenuItem onClick={() => onMove?.(document.id)}>
                 <FolderInput className="mr-2 size-4" />
                 Move
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                disabled={isExporting}
+                onClick={() => exportPdf(document)}
+              >
+                {isExporting ? (
+                  <Loader2 className="mr-2 size-4 animate-spin" />
+                ) : (
+                  <Download className="mr-2 size-4" />
+                )}
+                {isExporting ? 'Exporting...' : 'Export as PDF'}
               </DropdownMenuItem>
               <DropdownMenuItem
                 className="text-destructive focus:text-destructive"
