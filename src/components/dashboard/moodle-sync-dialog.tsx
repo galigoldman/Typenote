@@ -17,6 +17,7 @@ import { useMoodleExtension } from '@/hooks/use-moodle-extension';
 import {
   compareScrapedCourses,
   syncMoodleCourses,
+  getExistingFileUrls,
 } from '@/lib/actions/moodle-sync';
 import type {
   CourseComparison,
@@ -104,6 +105,8 @@ export function MoodleSyncDialog({
   const [deselectedItems, setDeselectedItems] = useState<Set<string>>(new Set());
   // Collapsed sections
   const [collapsedSections, setCollapsedSections] = useState<Set<string>>(new Set());
+  // Set of moodle URLs already in the registry (already synced)
+  const [alreadySyncedUrls, setAlreadySyncedUrls] = useState<Set<string>>(new Set());
 
   const [syncedCount, setSyncedCount] = useState(0);
 
@@ -223,20 +226,37 @@ export function MoodleSyncDialog({
 
   // ---- Phase 1: Load courses ----
   const loadCourses = useCallback(async () => {
-    setPhase('scraping');
     setError(null);
     setAuthError(false);
     setCourses([]);
     setSelectedCourseIds(new Set());
+
+    setPhase('scraping');
 
     try {
       const scrapeResult = await scrapeCourses(
         `https://${moodleConnection.domain}`,
       );
 
-      if (!scrapeResult || scrapeResult.courses.length === 0) {
-        setCourses([]);
-        setPhase('select-courses');
+      if (!scrapeResult) {
+        setError(
+          'Could not communicate with the Typenote extension. ' +
+          'Make sure the extension is installed and reload the page.',
+        );
+        setPhase('error');
+        return;
+      }
+
+      if (scrapeResult.courses.length === 0) {
+        const debug = (scrapeResult as Record<string, unknown>)._debug as
+          { title: string; url: string; cardCount: number } | undefined;
+        setError(
+          `No courses found. ` +
+          (debug
+            ? `Page: "${debug.title}" at ${debug.url} (${debug.cardCount} cards)`
+            : 'No debug info available.'),
+        );
+        setPhase('error');
         return;
       }
 
@@ -304,17 +324,37 @@ export function MoodleSyncDialog({
 
       setCoursesWithContent(results);
 
-      // Pre-select all sections that have items
+      // Fetch already-synced file URLs for courses that have a registryId
+      const existingUrls = new Set<string>();
+      for (const course of selected) {
+        if (course.registryId) {
+          const urls = await getExistingFileUrls(course.registryId);
+          for (const u of urls) existingUrls.add(u);
+        }
+      }
+      setProgress('Checking existing files...');
+      setAlreadySyncedUrls(existingUrls);
+
+      // Pre-select sections with NEW items (not already synced)
       const preSelectedSections = new Set<string>();
+      const preDeselectedItems = new Set<string>();
       for (const course of results) {
         for (const section of course.sections) {
-          if (section.items.length > 0) {
+          if (section.items.length === 0) continue;
+          const hasNewItems = section.items.some((i) => !existingUrls.has(i.moodleUrl));
+          if (hasNewItems) {
             preSelectedSections.add(sectionKey(course.moodleCourseId, section.moodleSectionId));
+            // Deselect already-synced items within selected sections
+            for (const item of section.items) {
+              if (existingUrls.has(item.moodleUrl)) {
+                preDeselectedItems.add(itemKey(course.moodleCourseId, section.moodleSectionId, item.moodleUrl));
+              }
+            }
           }
         }
       }
       setSelectedSections(preSelectedSections);
-      setDeselectedItems(new Set());
+      setDeselectedItems(preDeselectedItems);
       setCollapsedSections(new Set());
       setPhase('select-content');
     } catch (err) {
@@ -413,8 +453,27 @@ export function MoodleSyncDialog({
 
         {phase === 'select-courses' && courses.length > 0 && (
           <div className="space-y-2">
+            <div className="flex gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setSelectedCourseIds(new Set(courses.map((c) => c.moodleCourseId)))}
+              >
+                Select All
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setSelectedCourseIds(new Set())}
+              >
+                Deselect All
+              </Button>
+            </div>
             {courses.map((course) => {
               const badgeInfo = STATUS_BADGE_MAP[course.status];
+              const badgeLabel = course.status === 'synced_by_user' && course.syncedFileCount
+                ? `${course.syncedFileCount} files synced`
+                : badgeInfo.label;
               return (
                 <label
                   key={course.moodleCourseId}
@@ -426,7 +485,7 @@ export function MoodleSyncDialog({
                     aria-label={`Select ${course.name}`}
                   />
                   <span className="flex-1 text-sm font-medium">{course.name}</span>
-                  <Badge variant={badgeInfo.variant}>{badgeInfo.label}</Badge>
+                  <Badge variant={badgeInfo.variant}>{badgeLabel}</Badge>
                 </label>
               );
             })}
@@ -468,6 +527,9 @@ export function MoodleSyncDialog({
                   const selectedInSection = section.items.filter((item) =>
                     isItemSelected(course.moodleCourseId, section.moodleSectionId, item.moodleUrl),
                   ).length;
+                  const syncedInSection = section.items.filter((item) =>
+                    alreadySyncedUrls.has(item.moodleUrl),
+                  ).length;
 
                   return (
                     <div key={sk} className="rounded-md border">
@@ -487,6 +549,7 @@ export function MoodleSyncDialog({
                         </button>
                         <span className="text-xs text-muted-foreground">
                           {sectionSelected ? `${selectedInSection}/` : ''}{section.items.length} items
+                          {syncedInSection > 0 && ` (${syncedInSection} synced)`}
                         </span>
                         <button
                           type="button"
@@ -506,10 +569,11 @@ export function MoodleSyncDialog({
                               section.moodleSectionId,
                               item.moodleUrl,
                             );
+                            const isSynced = alreadySyncedUrls.has(item.moodleUrl);
                             return (
                               <label
                                 key={item.moodleUrl}
-                                className="flex cursor-pointer items-center gap-2 px-3 py-1.5 hover:bg-accent/30"
+                                className={`flex cursor-pointer items-center gap-2 px-3 py-1.5 hover:bg-accent/30 ${isSynced ? 'opacity-60' : ''}`}
                               >
                                 <Checkbox
                                   checked={selected}
@@ -519,6 +583,11 @@ export function MoodleSyncDialog({
                                   aria-label={`Select ${item.name}`}
                                 />
                                 <span className="flex-1 text-xs truncate">{item.name}</span>
+                                {isSynced && (
+                                  <Badge variant="secondary" className="text-[10px] px-1">
+                                    synced
+                                  </Badge>
+                                )}
                                 <Badge variant="outline" className="text-[10px] px-1">
                                   {item.type === 'file' ? (item.mimeType?.split('/')[1] ?? 'file') : 'link'}
                                 </Badge>

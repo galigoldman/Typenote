@@ -146,11 +146,28 @@ async function executeScraperFunction<T>(
   tabId: number,
   functionName: string,
 ): Promise<T> {
+  // Check current tab URL for debugging
+  const tab = await chrome.tabs.get(tabId);
+  const tabUrl = tab.url ?? '';
+
   // Inject the scraper content script
-  const results = await chrome.scripting.executeScript({
-    target: { tabId },
-    files: ['dist/moodle-scraper.js'],
-  });
+  let results;
+  try {
+    results = await chrome.scripting.executeScript({
+      target: { tabId },
+      files: ['dist/moodle-scraper.js'],
+    });
+  } catch (err) {
+    // If injection failed, it's likely a redirect to SSO or permission issue
+    const msg = String(err);
+    if (tabUrl && !tabUrl.startsWith('chrome')) {
+      throw new Error(
+        `Cannot access page at: ${tabUrl.substring(0, 100)}. ` +
+        'You may need to log into Moodle in this browser first.',
+      );
+    }
+    throw new Error(msg);
+  }
 
   if (!results || results.length === 0) {
     throw new Error('Script injection failed');
@@ -223,14 +240,15 @@ async function handleScrapeCourses(
   moodleUrl: string,
 ): Promise<ExtensionResponse> {
   try {
-    const url = new URL(moodleUrl);
-    const coursesPageUrl = `${url.protocol}//${url.host}${url.pathname.replace(/\/[^/]*$/, '')}/my/courses.php`;
+    // moodleUrl is the base URL (e.g. https://moodle.runi.ac.il/2026)
+    const base = moodleUrl.replace(/\/+$/, '');
+    const coursesPageUrl = `${base}/my/courses.php`;
 
     const tabId = await getOrCreateMoodleTab(coursesPageUrl);
 
-    // Navigate to courses page if not already there
+    // Always navigate to the exact courses page URL
     const tab = await chrome.tabs.get(tabId);
-    if (!tab.url?.includes('/my/courses.php')) {
+    if (tab.url !== coursesPageUrl) {
       await chrome.tabs.update(tabId, { url: coursesPageUrl });
       await waitForTabLoad(tabId);
     }
