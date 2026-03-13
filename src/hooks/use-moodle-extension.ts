@@ -18,12 +18,12 @@ async function sendExtensionMessage<T>(message: unknown): Promise<T | null> {
 
   return new Promise((resolve) => {
     try {
-      chrome.runtime.sendMessage(EXTENSION_ID, message, (response: T) => {
+      chrome.runtime.sendMessage(EXTENSION_ID, message, (response: unknown) => {
         if (chrome.runtime.lastError) {
           resolve(null);
           return;
         }
-        resolve(response);
+        resolve(response as T);
       });
     } catch {
       resolve(null);
