@@ -97,9 +97,11 @@ export default async function CoursePage({
     file_name: string;
     type: string;
     moodle_url: string;
+    storage_path: string | null;
     mime_type: string | null;
     file_size: number | null;
     position: number;
+    downloadUrl?: string;
   };
   type MoodleSectionWithFiles = {
     id: string;
@@ -112,11 +114,24 @@ export default async function CoursePage({
   if (syncRecord) {
     const { data: sections } = await admin
       .from('moodle_sections')
-      .select('id, title, position, moodle_files(id, file_name, type, moodle_url, mime_type, file_size, position)')
+      .select('id, title, position, moodle_files(id, file_name, type, moodle_url, storage_path, mime_type, file_size, position)')
       .eq('course_id', syncRecord.moodle_course_id)
       .order('position');
-    moodleSections = ((sections ?? []) as MoodleSectionWithFiles[])
+    const rawSections = ((sections ?? []) as MoodleSectionWithFiles[])
       .filter((s) => s.moodle_files.length > 0);
+
+    // Generate signed download URLs for files stored in Supabase Storage
+    for (const section of rawSections) {
+      for (const file of section.moodle_files) {
+        if (file.storage_path) {
+          const { data: signedUrl } = await admin.storage
+            .from('moodle-materials')
+            .createSignedUrl(file.storage_path, 3600); // 1 hour
+          file.downloadUrl = signedUrl?.signedUrl ?? undefined;
+        }
+      }
+    }
+    moodleSections = rawSections;
   }
 
   // Build breadcrumbs - if course is in a folder, include it
@@ -241,22 +256,34 @@ export default async function CoursePage({
                     <div className="divide-y">
                       {section.moodle_files
                         .sort((a, b) => a.position - b.position)
-                        .map((file) => (
-                        <a
-                          key={file.id}
-                          href={file.moodle_url}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="flex items-center gap-3 px-4 py-2 hover:bg-accent/30 transition-colors"
-                        >
-                          <span className="flex-1 text-sm truncate">{file.file_name}</span>
-                          <Badge variant="outline" className="text-xs shrink-0">
-                            {file.type === 'file'
-                              ? (file.mime_type?.split('/')[1] ?? 'file')
-                              : 'link'}
-                          </Badge>
-                        </a>
-                      ))}
+                        .map((file) => {
+                          const href = file.downloadUrl ?? file.moodle_url;
+                          const isStored = !!file.downloadUrl;
+                          return (
+                            <a
+                              key={file.id}
+                              href={href}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="flex items-center gap-3 px-4 py-2 hover:bg-accent/30 transition-colors"
+                              {...(isStored ? { download: file.file_name } : {})}
+                            >
+                              <span className="flex-1 text-sm truncate">{file.file_name}</span>
+                              {file.file_size && (
+                                <span className="text-xs text-muted-foreground shrink-0">
+                                  {file.file_size > 1024 * 1024
+                                    ? `${(file.file_size / (1024 * 1024)).toFixed(1)} MB`
+                                    : `${Math.round(file.file_size / 1024)} KB`}
+                                </span>
+                              )}
+                              <Badge variant="outline" className="text-xs shrink-0">
+                                {file.type === 'file'
+                                  ? (file.mime_type?.split('/')[1] ?? 'file')
+                                  : 'link'}
+                              </Badge>
+                            </a>
+                          );
+                        })}
                     </div>
                   </div>
                 ))}

@@ -37,6 +37,7 @@ export interface DownloadAndUploadRequest {
   payload: {
     moodleFileUrl: string;
     uploadEndpoint: string;
+    authToken?: string;
     metadata: {
       sectionId: string;
       moodleUrl: string;
