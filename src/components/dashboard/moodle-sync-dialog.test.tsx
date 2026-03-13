@@ -234,7 +234,7 @@ describe('MoodleSyncDialog', () => {
   });
 
   it('disables sync button when no courses are selected', async () => {
-    const user = userEvent.setup();
+    userEvent.setup();
     const mockScrape = vi.fn().mockResolvedValue(mockScrapedCourses);
     mockUseMoodleExtension.mockReturnValue({
       scrapeCourses: mockScrape,

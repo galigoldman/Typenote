@@ -5,7 +5,6 @@ import {
   flagRemovedFiles,
   updateModifiedFile,
 } from './sync-service';
-import type { ChangeDetectionResult } from './sync-service';
 
 // Mock the admin client
 vi.mock('@/lib/supabase/admin', () => ({

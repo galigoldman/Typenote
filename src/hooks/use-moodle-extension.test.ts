@@ -10,6 +10,7 @@ const mockSendMessage = vi.fn();
 beforeEach(() => {
   vi.resetAllMocks();
   // Setup global chrome mock
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   (globalThis as any).chrome = {
     runtime: {
       sendMessage: mockSendMessage,
@@ -23,9 +24,11 @@ const { useMoodleExtension } = await import('./use-moodle-extension');
 
 describe('useMoodleExtension', () => {
   it('detects extension as not installed when ping fails', async () => {
-    mockSendMessage.mockImplementation((_id: string, _msg: unknown, callback: Function) => {
+    mockSendMessage.mockImplementation((_id: string, _msg: unknown, callback: (...args: unknown[]) => void) => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       (globalThis as any).chrome.runtime.lastError = { message: 'Extension not found' };
       callback(undefined);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       (globalThis as any).chrome.runtime.lastError = null;
     });
 
@@ -39,7 +42,7 @@ describe('useMoodleExtension', () => {
   });
 
   it('detects extension as installed when ping succeeds', async () => {
-    mockSendMessage.mockImplementation((_id: string, _msg: unknown, callback: Function) => {
+    mockSendMessage.mockImplementation((_id: string, _msg: unknown, callback: (...args: unknown[]) => void) => {
       callback({ success: true, data: { version: '0.1.0' } });
     });
 
@@ -53,7 +56,7 @@ describe('useMoodleExtension', () => {
   });
 
   it('checkMoodleLogin returns login status', async () => {
-    mockSendMessage.mockImplementation((_id: string, _msg: unknown, callback: Function) => {
+    mockSendMessage.mockImplementation((_id: string, _msg: unknown, callback: (...args: unknown[]) => void) => {
       callback({ success: true, data: { loggedIn: true } });
     });
 
@@ -70,7 +73,7 @@ describe('useMoodleExtension', () => {
       { moodleCourseId: '101', name: 'Intro to CS', url: 'https://moodle.test.ac.il/course/view.php?id=101' },
     ];
 
-    mockSendMessage.mockImplementation((_id: string, _msg: unknown, callback: Function) => {
+    mockSendMessage.mockImplementation((_id: string, _msg: unknown, callback: (...args: unknown[]) => void) => {
       callback({ success: true, data: { courses } });
     });
 
@@ -82,9 +85,11 @@ describe('useMoodleExtension', () => {
   });
 
   it('returns null when extension not available', async () => {
-    mockSendMessage.mockImplementation((_id: string, _msg: unknown, callback: Function) => {
+    mockSendMessage.mockImplementation((_id: string, _msg: unknown, callback: (...args: unknown[]) => void) => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       (globalThis as any).chrome.runtime.lastError = { message: 'not found' };
       callback(undefined);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       (globalThis as any).chrome.runtime.lastError = null;
     });
 

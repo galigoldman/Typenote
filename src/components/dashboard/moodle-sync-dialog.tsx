@@ -120,11 +120,13 @@ export function MoodleSyncDialog({
   }, [scrapeCourses, moodleConnection.domain]);
 
   // Load courses when dialog opens
+  /* eslint-disable react-hooks/set-state-in-effect -- async data fetch on dialog open */
   useEffect(() => {
     if (open) {
-      loadCourses();
+      void loadCourses();
     }
   }, [open, loadCourses]);
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   function toggleCourse(moodleCourseId: string) {
     setSelectedIds((prev) => {

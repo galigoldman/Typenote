@@ -115,7 +115,7 @@ describe('Moodle shared registry — admin CRUD', () => {
   let instanceId: string;
   let courseId: string;
   let sectionId: string;
-  let fileId: string;
+
 
   it('admin can insert into moodle_instances', async () => {
     const { data, error } = await supabase
@@ -189,8 +189,8 @@ describe('Moodle shared registry — admin CRUD', () => {
     expect(data!.file_name).toBe('test.pdf');
     expect(data!.is_removed).toBe(false);
 
-    fileId = data!.id;
     // Not pushing to createdIds — cascade delete test will clean this up
+    expect(data!.id).toBeDefined();
   });
 
   it('admin can read all shared tables', async () => {

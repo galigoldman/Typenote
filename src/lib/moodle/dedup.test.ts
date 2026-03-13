@@ -11,6 +11,7 @@ function createMockClient(
   hashResult?: { data: unknown },
 ) {
   let callCount = 0;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const chain: any = {};
   chain.from = vi.fn().mockReturnValue(chain);
   chain.select = vi.fn().mockReturnValue(chain);
