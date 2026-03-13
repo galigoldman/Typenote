@@ -20,12 +20,13 @@ export async function checkFileExists(
     .single();
 
   if (urlMatch) {
-    // URL exists — check if content changed
-    if (
-      contentHash &&
-      urlMatch.content_hash &&
-      urlMatch.content_hash !== contentHash
-    ) {
+    // URL exists — check if content has been stored
+    if (!urlMatch.content_hash) {
+      // Metadata-only record (not yet downloaded) — needs upload
+      return { exists: true, fileId: urlMatch.id, status: 'modified' };
+    }
+    if (contentHash && urlMatch.content_hash !== contentHash) {
+      // Content changed since last download
       return { exists: true, fileId: urlMatch.id, status: 'modified' };
     }
     return { exists: true, fileId: urlMatch.id, status: 'exists' };

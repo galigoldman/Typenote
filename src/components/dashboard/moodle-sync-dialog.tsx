@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -89,6 +89,7 @@ export function MoodleSyncDialog({
   moodleConnection,
 }: MoodleSyncDialogProps) {
   const { scrapeCourses, scrapeCourseContent, downloadAndUpload } = useMoodleExtension();
+  const supabaseRef = useRef(createClient());
 
   const [phase, setPhase] = useState<DialogPhase>('scraping');
   const [courses, setCourses] = useState<CourseComparison[]>([]);
@@ -111,6 +112,7 @@ export function MoodleSyncDialog({
   const [syncedCount, setSyncedCount] = useState(0);
   const [downloadedCount, setDownloadedCount] = useState(0);
   const [failedCount, setFailedCount] = useState(0);
+  const [totalFileJobs, setTotalFileJobs] = useState(0);
 
   // ---- Helpers for content selection ----
   function sectionKey(courseId: string, sectionId: string) {
@@ -416,14 +418,7 @@ export function MoodleSyncDialog({
         coursePayloads,
       );
 
-      // Step 2: Download and upload actual files via the extension
-      const supabase = createClient();
-      const { data: { session } } = await supabase.auth.getSession();
-      const authToken = session?.access_token;
-
-      const uploadEndpoint = `${window.location.origin}/api/moodle/upload`;
-
-      // Collect all file items with their DB section IDs
+      // Step 2: Download files via extension, upload from web app
       const fileJobs: Array<{
         moodleUrl: string;
         fileName: string;
@@ -431,7 +426,6 @@ export function MoodleSyncDialog({
       }> = [];
       for (const courseResult of result.courses) {
         for (const sectionResult of courseResult.sections) {
-          // Find the matching payload section to get item names
           const payloadCourse = coursePayloads.find(
             (c) => c.moodleCourseId === courseResult.moodleCourseId,
           );
@@ -442,7 +436,6 @@ export function MoodleSyncDialog({
             const payloadItem = payloadSection?.items.find(
               (i) => i.moodleUrl === fileResult.moodleUrl,
             );
-            // Only download actual files, not links
             if (payloadItem?.type === 'file') {
               fileJobs.push({
                 moodleUrl: fileResult.moodleUrl,
@@ -454,30 +447,47 @@ export function MoodleSyncDialog({
         }
       }
 
+      setTotalFileJobs(fileJobs.length);
       let downloaded = 0;
       let failed = 0;
-      for (const job of fileJobs) {
-        setProgress(`Downloading files... (${downloaded + 1}/${fileJobs.length})`);
-        try {
-          await downloadAndUpload({
-            moodleFileUrl: job.moodleUrl,
-            uploadEndpoint,
-            authToken,
-            metadata: {
-              sectionId: job.sectionId,
-              moodleUrl: job.moodleUrl,
-              fileName: job.fileName,
-            },
-          });
-          downloaded++;
-        } catch {
-          failed++;
+      const errors: string[] = [];
+      if (fileJobs.length > 0) {
+        // Get auth token for extension → API upload
+        const { data: { session } } = await supabaseRef.current.auth.getSession();
+        const authToken = session?.access_token;
+        const uploadEndpoint = `${window.location.origin}/api/moodle/upload`;
+
+        setProgress(`Downloading files... (0/${fileJobs.length})`);
+        for (const job of fileJobs) {
+          try {
+            // Extension downloads from Moodle (with cookies) and uploads directly to our API
+            await downloadAndUpload({
+              moodleFileUrl: job.moodleUrl,
+              uploadEndpoint,
+              authToken,
+              metadata: {
+                sectionId: job.sectionId,
+                moodleUrl: job.moodleUrl,
+                fileName: job.fileName,
+              },
+            });
+            downloaded++;
+          } catch (dlErr) {
+            failed++;
+            if (errors.length < 3) {
+              errors.push(`${job.fileName}: ${dlErr instanceof Error ? dlErr.message : String(dlErr)}`);
+            }
+          }
+          setProgress(`Downloading files... (${downloaded + failed}/${fileJobs.length})`);
         }
       }
 
       setSyncedCount(result.syncedCount);
       setDownloadedCount(downloaded);
       setFailedCount(failed);
+      if (errors.length > 0) {
+        setError(`${failed} file(s) failed:\n${errors.join('\n')}`);
+      }
       setPhase('done');
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Sync failed';
@@ -695,19 +705,21 @@ export function MoodleSyncDialog({
             <p className="text-sm font-medium">
               Successfully synced {syncedCount} {syncedCount === 1 ? 'course' : 'courses'}
             </p>
-            {downloadedCount > 0 && (
-              <p className="text-xs text-muted-foreground">
-                {downloadedCount} {downloadedCount === 1 ? 'file' : 'files'} downloaded and stored.
-                {failedCount > 0 && ` ${failedCount} failed.`}
-              </p>
-            )}
+            <p className="text-xs text-muted-foreground">
+              {downloadedCount > 0
+                ? `${downloadedCount} ${downloadedCount === 1 ? 'file' : 'files'} downloaded and stored.`
+                : totalFileJobs > 0
+                  ? `${totalFileJobs} files queued but none downloaded.`
+                  : 'No downloadable files found (only links).'}
+              {failedCount > 0 && ` ${failedCount} failed.`}
+            </p>
           </div>
         )}
 
         {/* Error */}
-        {error && (
+        {error && phase !== 'select-content' && (
           <div className="space-y-2">
-            <p className="text-sm text-destructive" role="alert">{error}</p>
+            <p className="text-sm text-destructive whitespace-pre-wrap" role="alert">{error}</p>
             {authError && (
               <p className="text-xs text-muted-foreground">
                 Your Moodle session may have expired.{' '}

@@ -424,6 +424,43 @@ export function scrapeSectionPage(): ScrapedItem[] {
 }
 
 // ============================================
+// File URL extraction from resource viewer pages
+// ============================================
+
+/**
+ * Extracts the actual pluginfile.php download URL from a Moodle
+ * resource viewer page. Moodle wraps files in HTML pages with
+ * embeds, iframes, or download links pointing to pluginfile.php.
+ *
+ * Checked locations (in priority order):
+ *  1. object[data*="pluginfile.php"]
+ *  2. embed[src*="pluginfile.php"]
+ *  3. iframe[src*="pluginfile.php"]
+ *  4. a[href*="pluginfile.php"] (e.g. .resourceworkaround links)
+ *  5. Any link with ?forcedownload=1
+ */
+export function scrapeFileUrl(): string | null {
+  const selectors = [
+    'object[data*="pluginfile.php"]',
+    'embed[src*="pluginfile.php"]',
+    'iframe[src*="pluginfile.php"]',
+    '#region-main a[href*="pluginfile.php"]',
+    'a[href*="forcedownload=1"]',
+  ];
+  const attrs = ['data', 'src', 'src', 'href', 'href'];
+
+  for (let i = 0; i < selectors.length; i++) {
+    const el = document.querySelector(selectors[i]);
+    if (el) {
+      const url = el.getAttribute(attrs[i]);
+      if (url) return url;
+    }
+  }
+
+  return null;
+}
+
+// ============================================
 // Self-registration: attach functions to window
 // so the service worker can invoke them via
 // chrome.scripting.executeScript()
@@ -434,4 +471,5 @@ export function scrapeSectionPage(): ScrapedItem[] {
   scrapeCourses,
   scrapeCourseContent,
   scrapeSectionPage,
+  scrapeFileUrl,
 };

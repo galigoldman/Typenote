@@ -64,7 +64,7 @@ describe('checkFileExists', () => {
     });
   });
 
-  it('returns status "exists" when URL matches and contentHash is null', async () => {
+  it('returns status "exists" when URL matches and caller contentHash is null but stored hash exists', async () => {
     const client = createMockClient({
       data: { id: 'file-1', content_hash: 'abc123' },
     });
@@ -80,6 +80,25 @@ describe('checkFileExists', () => {
       exists: true,
       fileId: 'file-1',
       status: 'exists',
+    });
+  });
+
+  it('returns status "modified" when URL matches but stored content_hash is null (metadata-only)', async () => {
+    const client = createMockClient({
+      data: { id: 'file-1', content_hash: null },
+    });
+
+    const result = await checkFileExists(
+      client,
+      'section-1',
+      'https://moodle.example.com/file.pdf',
+      'abc123',
+    );
+
+    expect(result).toEqual({
+      exists: true,
+      fileId: 'file-1',
+      status: 'modified',
     });
   });
 
