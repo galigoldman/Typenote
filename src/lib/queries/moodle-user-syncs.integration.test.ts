@@ -165,10 +165,7 @@ describe('Moodle user syncs — admin CRUD', () => {
     ];
 
     for (const table of tables) {
-      const { data, error } = await supabase
-        .from(table)
-        .select('id')
-        .limit(1);
+      const { data, error } = await supabase.from(table).select('id').limit(1);
 
       expect(error).toBeNull();
       expect(data!.length).toBeGreaterThanOrEqual(1);

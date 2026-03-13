@@ -5,7 +5,7 @@
 **Status**: Draft
 **Input**: User description: "Easy Moodle course import via browser extension with shared/deduped material storage across students. Extension scrapes Moodle using the student's existing session. Sync flow triggered from the Typenote app. Students choose exactly what to import. Materials stored once and shared across all students to save storage and enable future AI retrieval."
 
-## User Scenarios & Testing *(mandatory)*
+## User Scenarios & Testing _(mandatory)_
 
 ### User Story 1 - Shared Moodle Registry & Deduplication (Priority: P1)
 
@@ -118,7 +118,7 @@ When a student syncs a course they've already synced, the system compares the cu
 - **Very large files (exceeding storage limit)**: Files exceeding the size limit are flagged during selection ("File too large to import") and cannot be selected.
 - **Student has no courses on Moodle**: The sync completes with a friendly message: "No courses found on your Moodle."
 
-## Requirements *(mandatory)*
+## Requirements _(mandatory)_
 
 ### Functional Requirements
 
@@ -148,7 +148,7 @@ When a student syncs a course they've already synced, the system compares the cu
 - **User Course Sync**: Tracks which Moodle courses a student has synced and when. Optionally links to their personal Typenote course.
 - **User File Import**: Tracks which specific files a student chose to import and their current status (imported, removed from Moodle).
 
-## Success Criteria *(mandatory)*
+## Success Criteria _(mandatory)_
 
 ### Measurable Outcomes
 

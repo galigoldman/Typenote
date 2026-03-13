@@ -9,6 +9,7 @@ All routes require Supabase auth (session cookie). Shared registry writes use se
 Receive scraped course data from the web app. Upsert into the shared registry. Return what's new vs. already stored.
 
 **Request body**:
+
 ```typescript
 {
   instanceDomain: string;
@@ -21,19 +22,20 @@ Receive scraped course data from the web app. Upsert into the shared registry. R
       title: string;
       position: number;
       items: Array<{
-        type: "file" | "link";
+        type: 'file' | 'link';
         name: string;
         moodleUrl: string;
         externalUrl?: string;
         fileSize?: number;
         mimeType?: string;
-      }>
-    }>
-  }>
+      }>;
+    }>;
+  }>;
 }
 ```
 
 **Response**:
+
 ```typescript
 {
   courses: Array<{
@@ -45,13 +47,13 @@ Receive scraped course data from the web app. Upsert into the shared registry. R
       items: Array<{
         moodleUrl: string;
         id: string; // our moodle_files UUID
-        status: "exists" | "new" | "modified";
+        status: 'exists' | 'new' | 'modified';
         // "exists" = already in registry (no upload needed)
         // "new" = not in registry (needs upload)
         // "modified" = URL exists but content may have changed
-      }>
-    }>
-  }>
+      }>;
+    }>;
+  }>;
 }
 ```
 
@@ -60,6 +62,7 @@ Receive scraped course data from the web app. Upsert into the shared registry. R
 Receive a file upload from the extension. Dedup check, store if new.
 
 **Request**: `multipart/form-data`
+
 - `file`: The file blob
 - `sectionId`: UUID of the moodle_section
 - `moodleUrl`: Original Moodle URL
@@ -67,11 +70,12 @@ Receive a file upload from the extension. Dedup check, store if new.
 - `contentHash`: SHA-256 hex string (computed by extension)
 
 **Response**:
+
 ```typescript
 {
-  fileId: string;           // moodle_files UUID
-  deduplicated: boolean;    // true if hash matched existing file
-  storagePath: string;      // path in Supabase Storage
+  fileId: string; // moodle_files UUID
+  deduplicated: boolean; // true if hash matched existing file
+  storagePath: string; // path in Supabase Storage
 }
 ```
 
@@ -80,6 +84,7 @@ Receive a file upload from the extension. Dedup check, store if new.
 Record that a student has imported specific files (creates user_file_imports records).
 
 **Request body**:
+
 ```typescript
 {
   moodleCourseId: string;  // our moodle_courses UUID
@@ -89,9 +94,10 @@ Record that a student has imported specific files (creates user_file_imports rec
 ```
 
 **Response**:
+
 ```typescript
 {
-  syncId: string;           // user_course_syncs UUID
+  syncId: string; // user_course_syncs UUID
   importedCount: number;
 }
 ```
@@ -101,6 +107,7 @@ Record that a student has imported specific files (creates user_file_imports rec
 Check what this student has already imported for a course.
 
 **Response**:
+
 ```typescript
 {
   lastSyncedAt: string | null;

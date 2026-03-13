@@ -4,7 +4,11 @@
  * DOWNLOAD_AND_UPLOAD, REQUEST_PERMISSION
  */
 
-import type { ExtensionRequest, ExtensionResponse, PingData } from '../types/messages';
+import type {
+  ExtensionRequest,
+  ExtensionResponse,
+  PingData,
+} from '../types/messages';
 
 const EXTENSION_VERSION = '0.1.0';
 
@@ -22,10 +26,15 @@ chrome.runtime.onMessageExternal.addListener(
   },
 );
 
-async function handleMessage(message: ExtensionRequest): Promise<ExtensionResponse> {
+async function handleMessage(
+  message: ExtensionRequest,
+): Promise<ExtensionResponse> {
   switch (message.type) {
     case 'PING':
-      return { success: true, data: { version: EXTENSION_VERSION } as PingData };
+      return {
+        success: true,
+        data: { version: EXTENSION_VERSION } as PingData,
+      };
 
     case 'CHECK_LOGIN':
       // TODO: Implement Moodle login detection

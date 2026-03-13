@@ -29,8 +29,16 @@ const mockConnection = { domain: 'moodle.test.ac.il', instanceId: 'inst-123' };
 
 const mockScrapedCourses = {
   courses: [
-    { moodleCourseId: 'CS101', name: 'Intro to CS', url: 'https://moodle.test.ac.il/course/101' },
-    { moodleCourseId: 'CS201', name: 'Data Structures', url: 'https://moodle.test.ac.il/course/201' },
+    {
+      moodleCourseId: 'CS101',
+      name: 'Intro to CS',
+      url: 'https://moodle.test.ac.il/course/101',
+    },
+    {
+      moodleCourseId: 'CS201',
+      name: 'Data Structures',
+      url: 'https://moodle.test.ac.il/course/201',
+    },
   ],
 };
 
@@ -70,7 +78,9 @@ describe('MoodleSyncDialog', () => {
       />,
     );
 
-    expect(screen.getByText(/scanning moodle for courses/i)).toBeInTheDocument();
+    expect(
+      screen.getByText(/scanning moodle for courses/i),
+    ).toBeInTheDocument();
   });
 
   it('shows course list after scraping and comparing', async () => {
@@ -162,7 +172,9 @@ describe('MoodleSyncDialog', () => {
     });
 
     // Click on the Data Structures checkbox to select it
-    const dsCheckbox = screen.getByRole('checkbox', { name: /select data structures/i });
+    const dsCheckbox = screen.getByRole('checkbox', {
+      name: /select data structures/i,
+    });
     await user.click(dsCheckbox);
 
     // Now 2 courses should be selected
@@ -196,7 +208,9 @@ describe('MoodleSyncDialog', () => {
     await user.click(syncButton);
 
     await waitFor(() => {
-      expect(screen.getByText(/successfully synced 1 course/i)).toBeInTheDocument();
+      expect(
+        screen.getByText(/successfully synced 1 course/i),
+      ).toBeInTheDocument();
     });
 
     expect(mockSync).toHaveBeenCalledWith(
@@ -211,7 +225,9 @@ describe('MoodleSyncDialog', () => {
   });
 
   it('shows error and retry button on scrape failure', async () => {
-    const mockScrape = vi.fn().mockRejectedValue(new Error('Extension timeout'));
+    const mockScrape = vi
+      .fn()
+      .mockRejectedValue(new Error('Extension timeout'));
     mockUseMoodleExtension.mockReturnValue({
       scrapeCourses: mockScrape,
     });
@@ -228,9 +244,7 @@ describe('MoodleSyncDialog', () => {
       expect(screen.getByRole('alert')).toHaveTextContent('Extension timeout');
     });
 
-    expect(
-      screen.getByRole('button', { name: /retry/i }),
-    ).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /retry/i })).toBeInTheDocument();
   });
 
   it('disables sync button when no courses are selected', async () => {
@@ -262,7 +276,9 @@ describe('MoodleSyncDialog', () => {
       expect(screen.getByText('Intro to CS')).toBeInTheDocument();
     });
 
-    const syncButton = screen.getByRole('button', { name: /sync selected \(0\)/i });
+    const syncButton = screen.getByRole('button', {
+      name: /sync selected \(0\)/i,
+    });
     expect(syncButton).toBeDisabled();
   });
 });

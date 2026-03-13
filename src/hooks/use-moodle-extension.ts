@@ -52,14 +52,20 @@ export function useMoodleExtension() {
   }, []);
 
   const ping = useCallback(async () => {
-    const response = await sendExtensionMessage<{ success: boolean; data: { version: string } }>({
+    const response = await sendExtensionMessage<{
+      success: boolean;
+      data: { version: string };
+    }>({
       type: 'PING',
     });
     return response?.success ? response.data : null;
   }, []);
 
   const requestPermission = useCallback(async (moodleUrl: string) => {
-    const response = await sendExtensionMessage<{ success: boolean; error?: string }>({
+    const response = await sendExtensionMessage<{
+      success: boolean;
+      error?: string;
+    }>({
       type: 'REQUEST_PERMISSION',
       payload: { moodleUrl },
     });

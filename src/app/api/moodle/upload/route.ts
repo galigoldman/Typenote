@@ -58,8 +58,12 @@ export async function POST(request: NextRequest) {
       .single();
 
     const sectionData = section as Record<string, unknown> | null;
-    const moodleCourses = sectionData?.moodle_courses as Record<string, unknown> | undefined;
-    const moodleInstances = moodleCourses?.moodle_instances as Record<string, unknown> | undefined;
+    const moodleCourses = sectionData?.moodle_courses as
+      | Record<string, unknown>
+      | undefined;
+    const moodleInstances = moodleCourses?.moodle_instances as
+      | Record<string, unknown>
+      | undefined;
     const domain = (moodleInstances?.domain as string) ?? 'unknown';
     const courseId = (moodleCourses?.moodle_course_id as string) ?? 'unknown';
     const storagePath = `${domain}/${courseId}/${contentHash}_${fileName}`;

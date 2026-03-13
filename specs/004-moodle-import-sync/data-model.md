@@ -22,13 +22,13 @@ profiles (existing)
 
 One per university Moodle deployment. Identified by domain.
 
-| Field | Type | Constraints | Description |
-|-------|------|-------------|-------------|
-| id | uuid | PK, default uuid_generate_v4() | |
-| domain | text | UNIQUE, NOT NULL | e.g., `moodle.tau.ac.il` |
-| name | text | | Human-readable name (auto-detected or user-provided) |
-| created_at | timestamptz | NOT NULL, default now() | |
-| updated_at | timestamptz | NOT NULL, default now() | |
+| Field      | Type        | Constraints                    | Description                                          |
+| ---------- | ----------- | ------------------------------ | ---------------------------------------------------- |
+| id         | uuid        | PK, default uuid_generate_v4() |                                                      |
+| domain     | text        | UNIQUE, NOT NULL               | e.g., `moodle.tau.ac.il`                             |
+| name       | text        |                                | Human-readable name (auto-detected or user-provided) |
+| created_at | timestamptz | NOT NULL, default now()        |                                                      |
+| updated_at | timestamptz | NOT NULL, default now()        |                                                      |
 
 **RLS**: SELECT for any authenticated user. INSERT/UPDATE/DELETE via service role only.
 
@@ -36,15 +36,15 @@ One per university Moodle deployment. Identified by domain.
 
 Canonical course from a Moodle instance. Shared across all students.
 
-| Field | Type | Constraints | Description |
-|-------|------|-------------|-------------|
-| id | uuid | PK, default uuid_generate_v4() | |
-| instance_id | uuid | FK → moodle_instances(id) ON DELETE CASCADE, NOT NULL | |
-| moodle_course_id | text | NOT NULL | Moodle's own course ID (from URL `?id=123`) |
-| name | text | NOT NULL | Course name as shown on Moodle |
-| moodle_url | text | | Full URL to the course page |
-| created_at | timestamptz | NOT NULL, default now() | |
-| updated_at | timestamptz | NOT NULL, default now() | |
+| Field            | Type        | Constraints                                           | Description                                 |
+| ---------------- | ----------- | ----------------------------------------------------- | ------------------------------------------- |
+| id               | uuid        | PK, default uuid_generate_v4()                        |                                             |
+| instance_id      | uuid        | FK → moodle_instances(id) ON DELETE CASCADE, NOT NULL |                                             |
+| moodle_course_id | text        | NOT NULL                                              | Moodle's own course ID (from URL `?id=123`) |
+| name             | text        | NOT NULL                                              | Course name as shown on Moodle              |
+| moodle_url       | text        |                                                       | Full URL to the course page                 |
+| created_at       | timestamptz | NOT NULL, default now()                               |                                             |
+| updated_at       | timestamptz | NOT NULL, default now()                               |                                             |
 
 **Unique**: `(instance_id, moodle_course_id)`
 **RLS**: SELECT for any authenticated user. INSERT/UPDATE/DELETE via service role only.
@@ -53,15 +53,15 @@ Canonical course from a Moodle instance. Shared across all students.
 
 Sections within a course. Preserves Moodle's native ordering and naming.
 
-| Field | Type | Constraints | Description |
-|-------|------|-------------|-------------|
-| id | uuid | PK, default uuid_generate_v4() | |
-| course_id | uuid | FK → moodle_courses(id) ON DELETE CASCADE, NOT NULL | |
-| moodle_section_id | text | | Moodle's own section identifier (if available) |
-| title | text | | Section title (e.g., "Week 1 - Introduction" or "General") |
-| position | integer | NOT NULL, default 0 | Preserves Moodle ordering |
-| created_at | timestamptz | NOT NULL, default now() | |
-| updated_at | timestamptz | NOT NULL, default now() | |
+| Field             | Type        | Constraints                                         | Description                                                |
+| ----------------- | ----------- | --------------------------------------------------- | ---------------------------------------------------------- |
+| id                | uuid        | PK, default uuid_generate_v4()                      |                                                            |
+| course_id         | uuid        | FK → moodle_courses(id) ON DELETE CASCADE, NOT NULL |                                                            |
+| moodle_section_id | text        |                                                     | Moodle's own section identifier (if available)             |
+| title             | text        |                                                     | Section title (e.g., "Week 1 - Introduction" or "General") |
+| position          | integer     | NOT NULL, default 0                                 | Preserves Moodle ordering                                  |
+| created_at        | timestamptz | NOT NULL, default now()                             |                                                            |
+| updated_at        | timestamptz | NOT NULL, default now()                             |                                                            |
 
 **Unique**: `(course_id, moodle_section_id)`
 **Index**: `(course_id, position)`
@@ -71,22 +71,22 @@ Sections within a course. Preserves Moodle's native ordering and naming.
 
 Files and links within sections. Deduplicated — the actual file is stored once in Supabase Storage.
 
-| Field | Type | Constraints | Description |
-|-------|------|-------------|-------------|
-| id | uuid | PK, default uuid_generate_v4() | |
-| section_id | uuid | FK → moodle_sections(id) ON DELETE CASCADE, NOT NULL | |
-| type | text | NOT NULL, CHECK (type IN ('file', 'link')) | Whether this is an uploaded file or an external link |
-| moodle_url | text | NOT NULL | Original Moodle resource URL |
-| file_name | text | NOT NULL | Display name |
-| content_hash | text | | SHA-256 hash of file content (null for links) |
-| storage_path | text | | Path in Supabase Storage (null for links) |
-| external_url | text | | Target URL (for links only) |
-| file_size | bigint | | File size in bytes (null for links) |
-| mime_type | text | | MIME type (null for links) |
-| position | integer | NOT NULL, default 0 | Order within section |
-| is_removed | boolean | NOT NULL, default false | Flagged if removed from Moodle |
-| created_at | timestamptz | NOT NULL, default now() | |
-| updated_at | timestamptz | NOT NULL, default now() | |
+| Field        | Type        | Constraints                                          | Description                                          |
+| ------------ | ----------- | ---------------------------------------------------- | ---------------------------------------------------- |
+| id           | uuid        | PK, default uuid_generate_v4()                       |                                                      |
+| section_id   | uuid        | FK → moodle_sections(id) ON DELETE CASCADE, NOT NULL |                                                      |
+| type         | text        | NOT NULL, CHECK (type IN ('file', 'link'))           | Whether this is an uploaded file or an external link |
+| moodle_url   | text        | NOT NULL                                             | Original Moodle resource URL                         |
+| file_name    | text        | NOT NULL                                             | Display name                                         |
+| content_hash | text        |                                                      | SHA-256 hash of file content (null for links)        |
+| storage_path | text        |                                                      | Path in Supabase Storage (null for links)            |
+| external_url | text        |                                                      | Target URL (for links only)                          |
+| file_size    | bigint      |                                                      | File size in bytes (null for links)                  |
+| mime_type    | text        |                                                      | MIME type (null for links)                           |
+| position     | integer     | NOT NULL, default 0                                  | Order within section                                 |
+| is_removed   | boolean     | NOT NULL, default false                              | Flagged if removed from Moodle                       |
+| created_at   | timestamptz | NOT NULL, default now()                              |                                                      |
+| updated_at   | timestamptz | NOT NULL, default now()                              |                                                      |
 
 **Unique**: `(section_id, moodle_url)`
 **Index**: `(content_hash)` — for cross-course dedup lookups
@@ -99,12 +99,12 @@ Files and links within sections. Deduplicated — the actual file is stored once
 
 Student's link to their Moodle instance.
 
-| Field | Type | Constraints | Description |
-|-------|------|-------------|-------------|
-| id | uuid | PK, default uuid_generate_v4() | |
-| user_id | uuid | FK → profiles(id) ON DELETE CASCADE, NOT NULL | |
-| instance_id | uuid | FK → moodle_instances(id) ON DELETE CASCADE, NOT NULL | |
-| created_at | timestamptz | NOT NULL, default now() | |
+| Field       | Type        | Constraints                                           | Description |
+| ----------- | ----------- | ----------------------------------------------------- | ----------- |
+| id          | uuid        | PK, default uuid_generate_v4()                        |             |
+| user_id     | uuid        | FK → profiles(id) ON DELETE CASCADE, NOT NULL         |             |
+| instance_id | uuid        | FK → moodle_instances(id) ON DELETE CASCADE, NOT NULL |             |
+| created_at  | timestamptz | NOT NULL, default now()                               |             |
 
 **Unique**: `(user_id, instance_id)`
 **RLS**: Standard user_id — users can CRUD their own connections.
@@ -113,15 +113,15 @@ Student's link to their Moodle instance.
 
 Tracks which Moodle courses this student has synced. Links to their personal Typenote course.
 
-| Field | Type | Constraints | Description |
-|-------|------|-------------|-------------|
-| id | uuid | PK, default uuid_generate_v4() | |
-| user_id | uuid | FK → profiles(id) ON DELETE CASCADE, NOT NULL | |
-| moodle_course_id | uuid | FK → moodle_courses(id) ON DELETE CASCADE, NOT NULL | |
-| course_id | uuid | FK → courses(id) ON DELETE SET NULL, nullable | Link to personal Typenote course |
-| last_synced_at | timestamptz | | When this student last synced this course |
-| created_at | timestamptz | NOT NULL, default now() | |
-| updated_at | timestamptz | NOT NULL, default now() | |
+| Field            | Type        | Constraints                                         | Description                               |
+| ---------------- | ----------- | --------------------------------------------------- | ----------------------------------------- |
+| id               | uuid        | PK, default uuid_generate_v4()                      |                                           |
+| user_id          | uuid        | FK → profiles(id) ON DELETE CASCADE, NOT NULL       |                                           |
+| moodle_course_id | uuid        | FK → moodle_courses(id) ON DELETE CASCADE, NOT NULL |                                           |
+| course_id        | uuid        | FK → courses(id) ON DELETE SET NULL, nullable       | Link to personal Typenote course          |
+| last_synced_at   | timestamptz |                                                     | When this student last synced this course |
+| created_at       | timestamptz | NOT NULL, default now()                             |                                           |
+| updated_at       | timestamptz | NOT NULL, default now()                             |                                           |
 
 **Unique**: `(user_id, moodle_course_id)`
 **RLS**: Standard user_id — users can CRUD their own syncs.
@@ -130,15 +130,15 @@ Tracks which Moodle courses this student has synced. Links to their personal Typ
 
 Tracks which specific files this student chose to import.
 
-| Field | Type | Constraints | Description |
-|-------|------|-------------|-------------|
-| id | uuid | PK, default uuid_generate_v4() | |
-| user_id | uuid | FK → profiles(id) ON DELETE CASCADE, NOT NULL | |
-| moodle_file_id | uuid | FK → moodle_files(id) ON DELETE CASCADE, NOT NULL | |
-| sync_id | uuid | FK → user_course_syncs(id) ON DELETE CASCADE, NOT NULL | |
-| status | text | NOT NULL, default 'imported', CHECK (status IN ('imported', 'removed_from_moodle')) | |
-| created_at | timestamptz | NOT NULL, default now() | |
-| updated_at | timestamptz | NOT NULL, default now() | |
+| Field          | Type        | Constraints                                                                         | Description |
+| -------------- | ----------- | ----------------------------------------------------------------------------------- | ----------- |
+| id             | uuid        | PK, default uuid_generate_v4()                                                      |             |
+| user_id        | uuid        | FK → profiles(id) ON DELETE CASCADE, NOT NULL                                       |             |
+| moodle_file_id | uuid        | FK → moodle_files(id) ON DELETE CASCADE, NOT NULL                                   |             |
+| sync_id        | uuid        | FK → user_course_syncs(id) ON DELETE CASCADE, NOT NULL                              |             |
+| status         | text        | NOT NULL, default 'imported', CHECK (status IN ('imported', 'removed_from_moodle')) |             |
+| created_at     | timestamptz | NOT NULL, default now()                                                             |             |
+| updated_at     | timestamptz | NOT NULL, default now()                                                             |             |
 
 **Unique**: `(user_id, moodle_file_id)`
 **RLS**: Standard user_id — users can CRUD their own imports.
@@ -150,9 +150,11 @@ Tracks which specific files this student chose to import.
 Shared bucket (not path-per-user like existing `course-materials`).
 
 **Path pattern**: `{instance_domain}/{moodle_course_id}/{content_hash}_{filename}`
+
 - Example: `moodle.tau.ac.il/123/a1b2c3d4_lecture3.pdf`
 
 **RLS**:
+
 - SELECT: Any authenticated user
 - INSERT/UPDATE/DELETE: Service role only (via API routes)
 
