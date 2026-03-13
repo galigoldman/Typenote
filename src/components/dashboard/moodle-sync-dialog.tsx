@@ -12,8 +12,8 @@ import {
 } from '@/components/ui/dialog';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Badge } from '@/components/ui/badge';
-import { Separator } from '@/components/ui/separator';
 import { useMoodleExtension } from '@/hooks/use-moodle-extension';
+import { createClient } from '@/lib/supabase/client';
 import {
   compareScrapedCourses,
   syncMoodleCourses,
@@ -88,7 +88,7 @@ export function MoodleSyncDialog({
   onOpenChange,
   moodleConnection,
 }: MoodleSyncDialogProps) {
-  const { scrapeCourses, scrapeCourseContent } = useMoodleExtension();
+  const { scrapeCourses, scrapeCourseContent, downloadAndUpload } = useMoodleExtension();
 
   const [phase, setPhase] = useState<DialogPhase>('scraping');
   const [courses, setCourses] = useState<CourseComparison[]>([]);
@@ -109,6 +109,8 @@ export function MoodleSyncDialog({
   const [alreadySyncedUrls, setAlreadySyncedUrls] = useState<Set<string>>(new Set());
 
   const [syncedCount, setSyncedCount] = useState(0);
+  const [downloadedCount, setDownloadedCount] = useState(0);
+  const [failedCount, setFailedCount] = useState(0);
 
   // ---- Helpers for content selection ----
   function sectionKey(courseId: string, sectionId: string) {
@@ -355,7 +357,19 @@ export function MoodleSyncDialog({
       }
       setSelectedSections(preSelectedSections);
       setDeselectedItems(preDeselectedItems);
-      setCollapsedSections(new Set());
+
+      // Collapse sections that are fully synced (not selected); expand selected ones
+      const preCollapsed = new Set<string>();
+      for (const course of results) {
+        for (const section of course.sections) {
+          if (section.items.length === 0) continue;
+          const sk = sectionKey(course.moodleCourseId, section.moodleSectionId);
+          if (!preSelectedSections.has(sk)) {
+            preCollapsed.add(sk);
+          }
+        }
+      }
+      setCollapsedSections(preCollapsed);
       setPhase('select-content');
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to scrape content';
@@ -396,12 +410,74 @@ export function MoodleSyncDialog({
         return;
       }
 
+      // Step 1: Save metadata to registry
       const result = await syncMoodleCourses(
         moodleConnection.domain,
         coursePayloads,
       );
 
+      // Step 2: Download and upload actual files via the extension
+      const supabase = createClient();
+      const { data: { session } } = await supabase.auth.getSession();
+      const authToken = session?.access_token;
+
+      const uploadEndpoint = `${window.location.origin}/api/moodle/upload`;
+
+      // Collect all file items with their DB section IDs
+      const fileJobs: Array<{
+        moodleUrl: string;
+        fileName: string;
+        sectionId: string;
+      }> = [];
+      for (const courseResult of result.courses) {
+        for (const sectionResult of courseResult.sections) {
+          // Find the matching payload section to get item names
+          const payloadCourse = coursePayloads.find(
+            (c) => c.moodleCourseId === courseResult.moodleCourseId,
+          );
+          const payloadSection = payloadCourse?.sections.find(
+            (s) => s.moodleSectionId === sectionResult.moodleSectionId,
+          );
+          for (const fileResult of sectionResult.items) {
+            const payloadItem = payloadSection?.items.find(
+              (i) => i.moodleUrl === fileResult.moodleUrl,
+            );
+            // Only download actual files, not links
+            if (payloadItem?.type === 'file') {
+              fileJobs.push({
+                moodleUrl: fileResult.moodleUrl,
+                fileName: payloadItem.name,
+                sectionId: sectionResult.id,
+              });
+            }
+          }
+        }
+      }
+
+      let downloaded = 0;
+      let failed = 0;
+      for (const job of fileJobs) {
+        setProgress(`Downloading files... (${downloaded + 1}/${fileJobs.length})`);
+        try {
+          await downloadAndUpload({
+            moodleFileUrl: job.moodleUrl,
+            uploadEndpoint,
+            authToken,
+            metadata: {
+              sectionId: job.sectionId,
+              moodleUrl: job.moodleUrl,
+              fileName: job.fileName,
+            },
+          });
+          downloaded++;
+        } catch {
+          failed++;
+        }
+      }
+
       setSyncedCount(result.syncedCount);
+      setDownloadedCount(downloaded);
+      setFailedCount(failed);
       setPhase('done');
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Sync failed';
@@ -420,8 +496,11 @@ export function MoodleSyncDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[80vh] overflow-y-auto sm:max-w-lg">
-        <DialogHeader>
+      <DialogContent
+        className="sm:max-w-2xl"
+        style={{ maxHeight: '85vh', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}
+      >
+        <DialogHeader style={{ flexShrink: 0 }}>
           <DialogTitle>
             {phase === 'select-content' ? 'Select Materials to Sync' : 'Sync Moodle Courses'}
           </DialogTitle>
@@ -432,6 +511,7 @@ export function MoodleSyncDialog({
           </DialogDescription>
         </DialogHeader>
 
+        <div style={{ flex: 1, minHeight: 0, overflowY: 'auto' }}>
         {/* Loading phases */}
         {(phase === 'scraping' || phase === 'comparing' || phase === 'scraping-content' || phase === 'syncing') && (
           <div className="flex items-center justify-center py-8">
@@ -494,7 +574,7 @@ export function MoodleSyncDialog({
 
         {/* Phase 2: Content selection */}
         {phase === 'select-content' && (
-          <div className="space-y-3">
+          <div className="space-y-4">
             {/* Select all / Deselect all */}
             <div className="flex gap-2">
               <Button variant="outline" size="sm" onClick={selectAll}>
@@ -505,104 +585,107 @@ export function MoodleSyncDialog({
               </Button>
             </div>
 
-            {coursesWithContent.map((course) => (
-              <div key={course.moodleCourseId} className="space-y-1">
-                {/* Course header */}
-                <div className="flex items-center gap-2">
-                  <h4 className="text-sm font-semibold">{course.name}</h4>
-                  {course.status === 'synced_by_user' && (
-                    <Badge variant="outline" className="text-xs">Previously Synced</Badge>
+            {coursesWithContent.map((course) => {
+              const sectionsWithItems = course.sections.filter((s) => s.items.length > 0);
+              return (
+                <div key={course.moodleCourseId} className="rounded-lg border">
+                  {/* Course header */}
+                  <div className="flex items-center gap-2 border-b bg-muted/40 px-4 py-2.5">
+                    <h4 className="flex-1 text-sm font-semibold">{course.name}</h4>
+                    {course.status === 'synced_by_user' && (
+                      <Badge variant="outline" className="text-xs">Previously Synced</Badge>
+                    )}
+                  </div>
+
+                  {sectionsWithItems.length === 0 && (
+                    <p className="px-4 py-3 text-xs text-muted-foreground">No materials found</p>
                   )}
-                </div>
 
-                {course.sections.length === 0 && (
-                  <p className="text-xs text-muted-foreground pl-2">No materials found</p>
-                )}
+                  {/* Sections */}
+                  <div className="divide-y">
+                    {sectionsWithItems.map((section) => {
+                      const sk = sectionKey(course.moodleCourseId, section.moodleSectionId);
+                      const isCollapsed = collapsedSections.has(sk);
+                      const sectionSelected = isSectionSelected(course.moodleCourseId, section.moodleSectionId);
+                      const selectedInSection = section.items.filter((item) =>
+                        isItemSelected(course.moodleCourseId, section.moodleSectionId, item.moodleUrl),
+                      ).length;
+                      const syncedInSection = section.items.filter((item) =>
+                        alreadySyncedUrls.has(item.moodleUrl),
+                      ).length;
 
-                {/* Sections */}
-                {course.sections.filter((s) => s.items.length > 0).map((section) => {
-                  const sk = sectionKey(course.moodleCourseId, section.moodleSectionId);
-                  const isCollapsed = collapsedSections.has(sk);
-                  const sectionSelected = isSectionSelected(course.moodleCourseId, section.moodleSectionId);
-                  const selectedInSection = section.items.filter((item) =>
-                    isItemSelected(course.moodleCourseId, section.moodleSectionId, item.moodleUrl),
-                  ).length;
-                  const syncedInSection = section.items.filter((item) =>
-                    alreadySyncedUrls.has(item.moodleUrl),
-                  ).length;
+                      return (
+                        <div key={sk}>
+                          {/* Section header */}
+                          <div className="flex items-center gap-2 px-3 py-2 bg-muted/20">
+                            <Checkbox
+                              checked={sectionSelected}
+                              onCheckedChange={() => toggleSection(course.moodleCourseId, section.moodleSectionId)}
+                              aria-label={`Select section ${section.title}`}
+                            />
+                            <button
+                              type="button"
+                              className="flex-1 text-left text-xs font-medium hover:underline"
+                              onClick={() => toggleCollapse(course.moodleCourseId, section.moodleSectionId)}
+                            >
+                              {section.title}
+                            </button>
+                            <span className="text-[11px] text-muted-foreground whitespace-nowrap">
+                              {sectionSelected ? `${selectedInSection}/` : ''}{section.items.length}
+                              {syncedInSection > 0 && ` (${syncedInSection} synced)`}
+                            </span>
+                            <button
+                              type="button"
+                              className="text-xs text-muted-foreground hover:text-foreground px-1"
+                              onClick={() => toggleCollapse(course.moodleCourseId, section.moodleSectionId)}
+                            >
+                              {isCollapsed ? '▸' : '▾'}
+                            </button>
+                          </div>
 
-                  return (
-                    <div key={sk} className="rounded-md border">
-                      {/* Section header */}
-                      <div className="flex items-center gap-2 p-2 bg-muted/30">
-                        <Checkbox
-                          checked={sectionSelected}
-                          onCheckedChange={() => toggleSection(course.moodleCourseId, section.moodleSectionId)}
-                          aria-label={`Select section ${section.title}`}
-                        />
-                        <button
-                          type="button"
-                          className="flex-1 text-left text-sm font-medium hover:underline"
-                          onClick={() => toggleCollapse(course.moodleCourseId, section.moodleSectionId)}
-                        >
-                          {section.title}
-                        </button>
-                        <span className="text-xs text-muted-foreground">
-                          {sectionSelected ? `${selectedInSection}/` : ''}{section.items.length} items
-                          {syncedInSection > 0 && ` (${syncedInSection} synced)`}
-                        </span>
-                        <button
-                          type="button"
-                          className="text-xs text-muted-foreground hover:text-foreground"
-                          onClick={() => toggleCollapse(course.moodleCourseId, section.moodleSectionId)}
-                        >
-                          {isCollapsed ? '▸' : '▾'}
-                        </button>
-                      </div>
-
-                      {/* Items */}
-                      {!isCollapsed && (
-                        <div className="divide-y">
-                          {section.items.map((item) => {
-                            const selected = isItemSelected(
-                              course.moodleCourseId,
-                              section.moodleSectionId,
-                              item.moodleUrl,
-                            );
-                            const isSynced = alreadySyncedUrls.has(item.moodleUrl);
-                            return (
-                              <label
-                                key={item.moodleUrl}
-                                className={`flex cursor-pointer items-center gap-2 px-3 py-1.5 hover:bg-accent/30 ${isSynced ? 'opacity-60' : ''}`}
-                              >
-                                <Checkbox
-                                  checked={selected}
-                                  onCheckedChange={() =>
-                                    toggleItem(course.moodleCourseId, section.moodleSectionId, item.moodleUrl)
-                                  }
-                                  aria-label={`Select ${item.name}`}
-                                />
-                                <span className="flex-1 text-xs truncate">{item.name}</span>
-                                {isSynced && (
-                                  <Badge variant="secondary" className="text-[10px] px-1">
-                                    synced
-                                  </Badge>
-                                )}
-                                <Badge variant="outline" className="text-[10px] px-1">
-                                  {item.type === 'file' ? (item.mimeType?.split('/')[1] ?? 'file') : 'link'}
-                                </Badge>
-                              </label>
-                            );
-                          })}
+                          {/* Items */}
+                          {!isCollapsed && (
+                            <div className="divide-y border-t">
+                              {section.items.map((item) => {
+                                const selected = isItemSelected(
+                                  course.moodleCourseId,
+                                  section.moodleSectionId,
+                                  item.moodleUrl,
+                                );
+                                const isSynced = alreadySyncedUrls.has(item.moodleUrl);
+                                return (
+                                  <label
+                                    key={item.moodleUrl}
+                                    className={`flex cursor-pointer items-center gap-2 px-4 py-1.5 hover:bg-accent/30 ${isSynced ? 'opacity-50' : ''}`}
+                                  >
+                                    <Checkbox
+                                      checked={selected}
+                                      onCheckedChange={() =>
+                                        toggleItem(course.moodleCourseId, section.moodleSectionId, item.moodleUrl)
+                                      }
+                                      aria-label={`Select ${item.name}`}
+                                    />
+                                    <span className="flex-1 text-xs truncate">{item.name}</span>
+                                    {isSynced && (
+                                      <Badge variant="secondary" className="text-[10px] px-1.5 py-0">
+                                        synced
+                                      </Badge>
+                                    )}
+                                    <Badge variant="outline" className="text-[10px] px-1.5 py-0">
+                                      {item.type === 'file' ? (item.mimeType?.split('/')[1] ?? 'file') : 'link'}
+                                    </Badge>
+                                  </label>
+                                );
+                              })}
+                            </div>
+                          )}
                         </div>
-                      )}
-                    </div>
-                  );
-                })}
-
-                <Separator className="my-2" />
-              </div>
-            ))}
+                      );
+                    })}
+                  </div>
+                </div>
+              );
+            })}
           </div>
         )}
 
@@ -612,9 +695,12 @@ export function MoodleSyncDialog({
             <p className="text-sm font-medium">
               Successfully synced {syncedCount} {syncedCount === 1 ? 'course' : 'courses'}
             </p>
-            <p className="text-xs text-muted-foreground">
-              Files are now in the Moodle registry. Use the file picker to import them into your notes.
-            </p>
+            {downloadedCount > 0 && (
+              <p className="text-xs text-muted-foreground">
+                {downloadedCount} {downloadedCount === 1 ? 'file' : 'files'} downloaded and stored.
+                {failedCount > 0 && ` ${failedCount} failed.`}
+              </p>
+            )}
           </div>
         )}
 
@@ -639,7 +725,9 @@ export function MoodleSyncDialog({
           </div>
         )}
 
-        <DialogFooter>
+        </div>
+
+        <DialogFooter style={{ flexShrink: 0 }}>
           {phase === 'select-courses' && courses.length > 0 && (
             <Button onClick={handlePreviewContent} disabled={selectedCourseIds.size === 0}>
               Preview Content ({selectedCourseIds.size})

@@ -1,16 +1,29 @@
 import { NextRequest, NextResponse } from 'next/server';
-
-import { indexContent } from '@/lib/actions/ai-context';
-import { checkFileExists } from '@/lib/moodle/dedup';
-import { createAdminClient } from '@/lib/supabase/admin';
 import { createClient } from '@/lib/supabase/server';
+import { createAdminClient } from '@/lib/supabase/admin';
+import { createClient as createSupabaseClient } from '@supabase/supabase-js';
+import { checkFileExists } from '@/lib/moodle/dedup';
 
 export async function POST(request: NextRequest) {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) {
+  // Auth: try Bearer token first (extension uploads), fall back to cookies
+  let userId: string | null = null;
+  const authHeader = request.headers.get('authorization');
+  if (authHeader?.startsWith('Bearer ')) {
+    const token = authHeader.slice(7);
+    const tokenClient = createSupabaseClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+      { global: { headers: { Authorization: `Bearer ${token}` } } },
+    );
+    const { data: { user: tokenUser } } = await tokenClient.auth.getUser();
+    userId = tokenUser?.id ?? null;
+  }
+  if (!userId) {
+    const supabase = await createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    userId = user?.id ?? null;
+  }
+  if (!userId) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
@@ -59,15 +72,10 @@ export async function POST(request: NextRequest) {
       .eq('id', sectionId)
       .single();
 
-    const sectionData = section as Record<string, unknown> | null;
-    const moodleCourses = sectionData?.moodle_courses as
-      | Record<string, unknown>
-      | undefined;
-    const moodleInstances = moodleCourses?.moodle_instances as
-      | Record<string, unknown>
-      | undefined;
-    const domain = (moodleInstances?.domain as string) ?? 'unknown';
-    const courseId = (moodleCourses?.moodle_course_id as string) ?? 'unknown';
+    const domain =
+      (section as any)?.moodle_courses?.moodle_instances?.domain ?? 'unknown';
+    const courseId =
+      (section as any)?.moodle_courses?.moodle_course_id ?? 'unknown';
     const storagePath = `${domain}/${courseId}/${contentHash}_${fileName}`;
 
     const { error: uploadError } = await admin.storage
@@ -96,13 +104,6 @@ export async function POST(request: NextRequest) {
       if (updateError)
         throw new Error(`File update failed: ${updateError.message}`);
 
-      // Index for AI search (fire-and-forget, shared content)
-      indexContent({
-        type: 'moodle_file',
-        fileId: updated.id,
-        courseId: updated.id, // placeholder — mapped during search via user_course_syncs
-      }).catch((err) => console.error('Failed to index moodle file:', err));
-
       return NextResponse.json({
         fileId: updated.id,
         deduplicated: false,
@@ -126,13 +127,6 @@ export async function POST(request: NextRequest) {
 
     if (fileError)
       throw new Error(`File record update failed: ${fileError.message}`);
-
-    // Index for AI search (fire-and-forget, shared content)
-    indexContent({
-      type: 'moodle_file',
-      fileId: fileRecord.id,
-      courseId: fileRecord.id, // placeholder — mapped during search via user_course_syncs
-    }).catch((err) => console.error('Failed to index moodle file:', err));
 
     return NextResponse.json({
       fileId: fileRecord.id,

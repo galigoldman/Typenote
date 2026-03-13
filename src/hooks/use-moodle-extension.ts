@@ -136,6 +136,7 @@ export function useMoodleExtension() {
     async (params: {
       moodleFileUrl: string;
       uploadEndpoint: string;
+      authToken?: string;
       metadata: { sectionId: string; moodleUrl: string; fileName: string };
     }) => {
       const response = await sendExtensionMessage<{
@@ -151,7 +152,9 @@ export function useMoodleExtension() {
         type: 'DOWNLOAD_AND_UPLOAD',
         payload: params,
       });
-      if (!response?.success) return null;
+      if (!response?.success) {
+        throw new Error((response as { error?: string })?.error ?? 'Download/upload failed');
+      }
       return response.data;
     },
     [],

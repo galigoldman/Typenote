@@ -246,7 +246,7 @@ async function handleScrapeCourses(
 
     const tabId = await getOrCreateMoodleTab(coursesPageUrl);
 
-    // Always navigate to the exact courses page URL
+    // Navigate if tab is not already on the courses page
     const tab = await chrome.tabs.get(tabId);
     if (tab.url !== coursesPageUrl) {
       await chrome.tabs.update(tabId, { url: coursesPageUrl });
@@ -358,9 +358,15 @@ async function handleDownloadAndUpload(
     formData.append('fileSize', String(blob.size));
     formData.append('mimeType', blob.type);
 
+    const uploadHeaders: Record<string, string> = {};
+    if ((payload as Record<string, unknown>).authToken) {
+      uploadHeaders['Authorization'] = `Bearer ${(payload as Record<string, unknown>).authToken}`;
+    }
+
     const uploadResponse = await fetch(uploadEndpoint, {
       method: 'POST',
       body: formData,
+      headers: uploadHeaders,
     });
 
     if (!uploadResponse.ok) {
