@@ -76,6 +76,12 @@ export function renderCanvasPage(
     const content = textBox.content as { content?: unknown[] };
     if (!content.content || content.content.length === 0) continue;
 
-    renderTiptapContent(doc, textBox.content, textBox.x, textBox.y, textBox.width);
+    renderTiptapContent(
+      doc,
+      textBox.content,
+      textBox.x,
+      textBox.y,
+      textBox.width,
+    );
   }
 }

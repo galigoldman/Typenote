@@ -56,7 +56,9 @@ export function renderStroke(doc: jsPDF, stroke: Stroke): void {
   if (needsOpacity) {
     doc.saveGraphicsState();
     // jsPDF exposes GState as a constructor on the instance
-    const GState = (doc as unknown as { GState: new (opts: { opacity: number }) => unknown }).GState;
+    const GState = (
+      doc as unknown as { GState: new (opts: { opacity: number }) => unknown }
+    ).GState;
     doc.setGState(new GState({ opacity: stroke.opacity }));
   }
 

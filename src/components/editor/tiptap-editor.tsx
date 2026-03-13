@@ -241,7 +241,10 @@ export function TiptapEditor({ document }: TiptapEditorProps) {
       )}
 
       {/* Toolbar */}
-      <EditorToolbar editor={editor} document={{ ...document, content: editor.getJSON() }} />
+      <EditorToolbar
+        editor={editor}
+        document={{ ...document, content: editor.getJSON() }}
+      />
 
       {/* Editor Canvas */}
       <div className={`flex-1 overflow-y-auto ${canvasClass}`}>

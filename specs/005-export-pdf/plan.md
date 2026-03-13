@@ -21,15 +21,15 @@ Client-side PDF export for Typenote documents using jsPDF + svg2pdf.js. The expo
 
 ## Constitution Check
 
-*GATE: Must pass before Phase 0 research. Re-check after Phase 1 design.*
+_GATE: Must pass before Phase 0 research. Re-check after Phase 1 design._
 
-| Principle | Status | Notes |
-|-----------|--------|-------|
-| I. Incremental Development | PASS | Feature is built in phases: core engine → canvas rendering → text rendering → UI triggers. Each phase produces testable output. No database changes needed. |
-| II. Test-Driven Quality | PASS | Unit tests for each renderer module, integration tests for full document export, e2e tests for download UX. Uses Vitest + Playwright per constitution. |
-| III. Protected Main Branch | PASS | Work on `005-export-pdf` branch. PR with CI checks before merge. |
-| IV. Migrations as Code | PASS (N/A) | No database schema changes required. Feature reads existing data only. |
-| V. Interview-Ready Architecture | PASS | Pure function architecture (data in → PDF blob out) demonstrates separation of concerns. Strategy pattern for different document types. Pagination algorithm is a common interview topic. |
+| Principle                       | Status     | Notes                                                                                                                                                                                     |
+| ------------------------------- | ---------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| I. Incremental Development      | PASS       | Feature is built in phases: core engine → canvas rendering → text rendering → UI triggers. Each phase produces testable output. No database changes needed.                               |
+| II. Test-Driven Quality         | PASS       | Unit tests for each renderer module, integration tests for full document export, e2e tests for download UX. Uses Vitest + Playwright per constitution.                                    |
+| III. Protected Main Branch      | PASS       | Work on `005-export-pdf` branch. PR with CI checks before merge.                                                                                                                          |
+| IV. Migrations as Code          | PASS (N/A) | No database schema changes required. Feature reads existing data only.                                                                                                                    |
+| V. Interview-Ready Architecture | PASS       | Pure function architecture (data in → PDF blob out) demonstrates separation of concerns. Strategy pattern for different document types. Pagination algorithm is a common interview topic. |
 
 ## Project Structure
 
@@ -89,6 +89,7 @@ src/test/
 ## Complexity Tracking
 
 No constitution violations to justify. The feature:
+
 - Adds no new database tables or migrations
 - Uses the existing document data model as-is
 - Introduces two new dependencies (jsPDF, svg2pdf.js) which are standard for this use case

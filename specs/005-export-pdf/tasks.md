@@ -30,7 +30,7 @@
 **Warning**: No user story work can begin until this phase is complete
 
 - [x] T004 Implement font loader that registers Geist Sans (Regular, Bold, Italic) and Geist Mono (Regular) TTF fonts with jsPDF in `src/lib/pdf/font-loader.ts` — fetch TTF files from `/fonts/`, convert to base64, register via `addFileToVFS` + `addFont`
-- [x] T005 [P] Implement utility functions in `src/lib/pdf/utils.ts` — `sanitizeFilename(title)` to strip unsafe characters (/, \, :, *, ?, ", <, >, |) and `triggerDownload(blob, filename)` to create a temporary anchor element and trigger browser download
+- [x] T005 [P] Implement utility functions in `src/lib/pdf/utils.ts` — `sanitizeFilename(title)` to strip unsafe characters (/, \, :, \*, ?, ", <, >, |) and `triggerDownload(blob, filename)` to create a temporary anchor element and trigger browser download
 - [x] T006 [P] Create main entry point skeleton `exportDocumentAsPdf(document)` in `src/lib/pdf/export-pdf.ts` — inspects document for `pages` and `content`, delegates to canvas or text renderer, handles empty documents (single blank A4 page), calls triggerDownload
 - [x] T007 [P] Write unit tests for font-loader in `src/lib/pdf/__tests__/font-loader.test.ts` — verify fonts are registered with jsPDF mock
 - [x] T008 [P] Write unit tests for utils in `src/lib/pdf/__tests__/utils.test.ts` — test filename sanitization with special characters, empty titles, and download trigger

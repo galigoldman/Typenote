@@ -358,11 +358,7 @@ export function EditorToolbar({
             onClick={() => exportPdf(document)}
             disabled={isExporting}
             icon={
-              isExporting ? (
-                <Loader2 className="animate-spin" />
-              ) : (
-                <Download />
-              )
+              isExporting ? <Loader2 className="animate-spin" /> : <Download />
             }
             label="Export as PDF"
           />

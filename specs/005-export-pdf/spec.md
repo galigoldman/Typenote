@@ -5,7 +5,7 @@
 **Status**: Draft
 **Input**: User description: "Export documents as PDF. Client-side PDF generation modeled after GoodNotes. Users can export any document (text-only with rich text, canvas with pen strokes and text boxes, or mixed) as a PDF. Vector strokes, selectable text via font embedding, page backgrounds (blank/lined/grid/dotted), and A4 pagination for text-only docs (Google Docs style). Two trigger points: editor toolbar button and dashboard document card context menu. Direct browser download with loading indicator."
 
-## User Scenarios & Testing *(mandatory)*
+## User Scenarios & Testing _(mandatory)_
 
 ### User Story 1 - Export Canvas Document from Editor (Priority: P1)
 
@@ -81,7 +81,7 @@ A student has a document that contains both canvas pages (handwritten notes with
 - What happens when export fails mid-generation? The user sees an error toast with a retry option; no partial file is downloaded.
 - What happens when a text box on a canvas page is empty? It should be omitted from the PDF (no empty space artifact).
 
-## Requirements *(mandatory)*
+## Requirements _(mandatory)_
 
 ### Functional Requirements
 
@@ -108,7 +108,7 @@ A student has a document that contains both canvas pages (handwritten notes with
 - **Text Box**: A positioned rectangle on a canvas page containing rich text content.
 - **PDF File**: The output artifact — a multi-page document containing vector graphics, embedded fonts, and selectable text, downloadable as a file.
 
-## Success Criteria *(mandatory)*
+## Success Criteria _(mandatory)_
 
 ### Measurable Outcomes
 

@@ -17,11 +17,7 @@ function fillWhite(doc: jsPDF, width: number, height: number): void {
 /**
  * Draw horizontal lines spaced every {@link GRID_SPACING} points.
  */
-function drawHorizontalLines(
-  doc: jsPDF,
-  width: number,
-  height: number,
-): void {
+function drawHorizontalLines(doc: jsPDF, width: number, height: number): void {
   doc.setDrawColor(LIGHT_GRAY.r, LIGHT_GRAY.g, LIGHT_GRAY.b);
   doc.setLineWidth(LINE_WIDTH);
 
@@ -33,11 +29,7 @@ function drawHorizontalLines(
 /**
  * Draw vertical lines spaced every {@link GRID_SPACING} points.
  */
-function drawVerticalLines(
-  doc: jsPDF,
-  width: number,
-  height: number,
-): void {
+function drawVerticalLines(doc: jsPDF, width: number, height: number): void {
   doc.setDrawColor(LIGHT_GRAY.r, LIGHT_GRAY.g, LIGHT_GRAY.b);
   doc.setLineWidth(LINE_WIDTH);
 

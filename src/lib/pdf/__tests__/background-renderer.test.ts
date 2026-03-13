@@ -80,7 +80,12 @@ describe('renderBackground', () => {
     expect(doc.line).toHaveBeenCalledWith(0, GRID_SPACING, WIDTH, GRID_SPACING);
 
     // Verify a vertical line
-    expect(doc.line).toHaveBeenCalledWith(GRID_SPACING, 0, GRID_SPACING, HEIGHT);
+    expect(doc.line).toHaveBeenCalledWith(
+      GRID_SPACING,
+      0,
+      GRID_SPACING,
+      HEIGHT,
+    );
 
     // No circles for grid pages
     expect(doc.circle).not.toHaveBeenCalled();

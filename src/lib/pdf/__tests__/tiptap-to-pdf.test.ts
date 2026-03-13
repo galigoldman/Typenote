@@ -1,6 +1,10 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-import { renderTiptapContent, measureNodeHeight, PX_TO_PT } from '../tiptap-to-pdf';
+import {
+  renderTiptapContent,
+  measureNodeHeight,
+  PX_TO_PT,
+} from '../tiptap-to-pdf';
 
 // ---------------------------------------------------------------------------
 // Mock jsPDF document factory
@@ -101,7 +105,11 @@ function makeCodeBlock(text: string) {
   };
 }
 
-function makeTextWithMark(text: string, markType: string, attrs?: Record<string, unknown>) {
+function makeTextWithMark(
+  text: string,
+  markType: string,
+  attrs?: Record<string, unknown>,
+) {
   return {
     type: 'text',
     text,
@@ -243,7 +251,9 @@ describe('renderTiptapContent', () => {
       {
         type: 'paragraph',
         content: [
-          makeTextWithMark('Click here', 'link', { href: 'https://example.com' }),
+          makeTextWithMark('Click here', 'link', {
+            href: 'https://example.com',
+          }),
         ],
       },
     ]);
