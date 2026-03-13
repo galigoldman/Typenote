@@ -3,7 +3,7 @@ import type { CanvasPage } from '@/types/canvas';
 import { renderCanvasPage } from './canvas-page-renderer';
 import { loadFonts } from './font-loader';
 import { renderTextDocument } from './text-document-renderer';
-import { sanitizeFilename, triggerDownload } from './utils';
+import { sanitizeFilename } from './utils';
 
 // Re-export a type for the document shape needed by this module
 export interface ExportableDocument {
@@ -13,7 +13,9 @@ export interface ExportableDocument {
   canvas_type: string;
 }
 
-export async function exportDocumentAsPdf(document: ExportableDocument): Promise<void> {
+export async function exportDocumentAsPdf(
+  document: ExportableDocument,
+): Promise<void> {
   // 1. Determine what content exists
   const hasCanvasPages =
     document.pages != null &&
@@ -61,8 +63,9 @@ export async function exportDocumentAsPdf(document: ExportableDocument): Promise
   }
   // If neither: empty document -> already has one blank page from jsPDF constructor
 
-  // 5. Generate filename and trigger download
+  // 5. Generate filename and save
+  // jsPDF.save() uses FileSaver.js internally which handles cross-platform
+  // downloads including iOS Safari and Chrome.
   const filename = sanitizeFilename(document.title) + '.pdf';
-  const blob = doc.output('blob');
-  triggerDownload(blob, filename);
+  doc.save(filename);
 }
