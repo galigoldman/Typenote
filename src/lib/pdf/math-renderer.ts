@@ -72,7 +72,11 @@ export async function renderMath(
 
     // --- Attempt 1: SVG vector embedding via svg2pdf.js -------------------
     try {
-      const svgElement = buildForeignObjectSvg(container, renderedWidth, renderedHeight);
+      const svgElement = buildForeignObjectSvg(
+        container,
+        renderedWidth,
+        renderedHeight,
+      );
       document.body.appendChild(svgElement);
 
       try {

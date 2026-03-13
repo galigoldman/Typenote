@@ -46,6 +46,7 @@ PDF Export Service (client-side module)
 Handles documents with the `pages` JSONB — pen strokes, text boxes, backgrounds on A4 pages (794x1123 pts).
 
 ### Background Patterns
+
 - Each page's `pageType` determines its background
 - `blank` -> white fill only
 - `lined` -> horizontal lines every 32px (light gray)
@@ -54,6 +55,7 @@ Handles documents with the `pages` JSONB — pen strokes, text boxes, background
 - All rendered as PDF vector primitives (lines/circles), not images
 
 ### Stroke Rendering
+
 - Read each stroke's `points` array (x, y, pressure)
 - Run through `perfect-freehand`'s `getStroke()` to get outline polygon
 - Convert outline to filled PDF path via jsPDF's path drawing API
@@ -61,6 +63,7 @@ Handles documents with the `pages` JSONB — pen strokes, text boxes, background
 - Produces crisp vector strokes identical to screen rendering
 
 ### TextBox Rendering (like GoodNotes)
+
 - Each text box has fixed (x, y, width, height) coordinates
 - Embed the app's actual fonts into jsPDF
 - Place text at exact PDF coordinates matching the text box position
@@ -68,6 +71,7 @@ Handles documents with the `pages` JSONB — pen strokes, text boxes, background
 - Math nodes -> KaTeX -> SVG -> embed in PDF at text box position
 
 ### Page Dimensions
+
 - jsPDF page set to 794x1123 pts to match canvas exactly
 - One canvas page = one PDF page
 
@@ -76,16 +80,19 @@ Handles documents with the `pages` JSONB — pen strokes, text boxes, background
 Handles text-only documents (the `content` JSONB — TipTap rich text with no canvas pages).
 
 ### Font Strategy
+
 - Identify the app's fonts from CSS, convert to base64, register with jsPDF
 - All text uses the same fonts as the editor
 
 ### Pagination (Google Docs style)
+
 - A4 page size (595x842 pt standard PDF points)
 - Margins: ~72pt (1 inch) on all sides -> usable area ~451x698 pt
 - Track vertical cursor, insert page breaks on overflow
 - Headings avoid orphans (push to next page if near bottom)
 
 ### TipTap Node Mapping
+
 - `heading` (1-3) -> Bold text, size 24/20/16pt
 - `paragraph` -> Regular text, 12pt, with line wrapping
 - `bulletList` / `listItem` -> Indented with bullet character
@@ -98,36 +105,43 @@ Handles text-only documents (the `content` JSONB — TipTap rich text with no ca
 - `mathExpression` -> KaTeX -> SVG -> embedded in PDF inline
 
 ### Text Wrapping
+
 - jsPDF's `splitTextToSize()` for wrapping to usable width
 - Calculate wrapped block height before rendering to check for page breaks
 
 ## Mixed Documents
+
 - Canvas pages rendered first (primary visual content)
 - Text content follows as additional paginated pages
 
 ## Export UX
 
 ### Editor Toolbar
+
 - "Export as PDF" button in toolbar/menu
 - Document data already in memory — export directly
 - Brief loading spinner ("Exporting...")
 
 ### Dashboard Context Menu
+
 - "Export as PDF" in document card "..." menu
 - Fetch full document data first, then generate
 - Same loading indicator
 
 ### Download
+
 - Generate PDF blob -> trigger browser download as `{document title}.pdf`
 - No preview/print dialog — direct download
 - On failure: toast notification with retry option
 
 ## Technology
+
 - **jsPDF** — PDF construction, vector paths, font embedding
 - **perfect-freehand** — stroke outline generation (already in project)
 - **KaTeX** — LaTeX to SVG (already in project)
 
 ## Testing
+
 - Unit: background patterns, stroke rendering, text positioning, TipTap parsing, pagination, math
 - Integration: full document export for each content type
 - E2E: download trigger from editor and dashboard

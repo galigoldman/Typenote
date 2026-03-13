@@ -37,6 +37,7 @@ Every step of development must follow this git workflow:
 - PRs cannot be merged unless CI passes. This is enforced via GitHub branch protection rules on `main`.
 
 ## Active Technologies
+
 - TypeScript 5.x / Node.js 18+ + jsPDF (PDF construction), svg2pdf.js (KaTeX SVG embedding), perfect-freehand (stroke outlines, already installed), KaTeX (math rendering, already installed) (005-export-pdf)
 - No new storage — reads existing document data from Supabase `documents` table (005-export-pdf)
 

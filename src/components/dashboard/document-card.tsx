@@ -1,7 +1,14 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
-import { MoreHorizontal, Pencil, FolderInput, Trash2, Download, Loader2 } from 'lucide-react';
+import {
+  MoreHorizontal,
+  Pencil,
+  FolderInput,
+  Trash2,
+  Download,
+  Loader2,
+} from 'lucide-react';
 import type { Document } from '@/types/database';
 import { SUBJECTS } from '@/lib/constants/subjects';
 import { deleteDocument } from '@/lib/actions/documents';

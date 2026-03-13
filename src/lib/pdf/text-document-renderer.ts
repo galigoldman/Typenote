@@ -1,6 +1,10 @@
 import type { jsPDF } from 'jspdf';
 
-import { measureNodeHeight, renderTiptapContent, PX_TO_PT } from './tiptap-to-pdf';
+import {
+  measureNodeHeight,
+  renderTiptapContent,
+  PX_TO_PT,
+} from './tiptap-to-pdf';
 
 // ---------------------------------------------------------------------------
 // Page layout constants (A4 in points)
@@ -90,7 +94,14 @@ export function renderTextDocument(
       content: [node],
     };
 
-    renderTiptapContent(doc, singleNodeDoc, MARGIN, cursorY, USABLE_WIDTH, PX_TO_PT);
+    renderTiptapContent(
+      doc,
+      singleNodeDoc,
+      MARGIN,
+      cursorY,
+      USABLE_WIDTH,
+      PX_TO_PT,
+    );
 
     cursorY += height;
   }

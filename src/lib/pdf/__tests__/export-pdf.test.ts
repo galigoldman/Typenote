@@ -116,7 +116,9 @@ describe('exportDocumentAsPdf', () => {
       callOrder.push('renderCanvas');
     });
     mockAddPage.mockImplementation((format) => {
-      callOrder.push(`addPage:${typeof format === 'string' ? format : 'custom'}`);
+      callOrder.push(
+        `addPage:${typeof format === 'string' ? format : 'custom'}`,
+      );
     });
     mockRenderTextDocument.mockImplementation(() => {
       callOrder.push('renderText');
@@ -132,11 +134,7 @@ describe('exportDocumentAsPdf', () => {
     await exportDocumentAsPdf(document);
 
     // After canvas rendering, an A4 page should be added before text rendering
-    expect(callOrder).toEqual([
-      'renderCanvas',
-      'addPage:a4',
-      'renderText',
-    ]);
+    expect(callOrder).toEqual(['renderCanvas', 'addPage:a4', 'renderText']);
   });
 
   // -------------------------------------------------------------------------
@@ -156,9 +154,7 @@ describe('exportDocumentAsPdf', () => {
     expect(mockRenderTextDocument).not.toHaveBeenCalled();
 
     // No addPage('a4') should have been called for text transition
-    const a4Calls = mockAddPage.mock.calls.filter(
-      (call) => call[0] === 'a4',
-    );
+    const a4Calls = mockAddPage.mock.calls.filter((call) => call[0] === 'a4');
     expect(a4Calls).toHaveLength(0);
   });
 

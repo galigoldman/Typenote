@@ -454,7 +454,15 @@ function renderHeading(
 
   const inlines = collectInlineNodes(node.content);
   if (inlines.length > 0) {
-    cursorY = renderInlineContent(doc, inlines, x, cursorY, width, fontSize, lhFactor);
+    cursorY = renderInlineContent(
+      doc,
+      inlines,
+      x,
+      cursorY,
+      width,
+      fontSize,
+      lhFactor,
+    );
   } else {
     // Heading with no inline content — just advance past it
     cursorY += fontSize * lhFactor;
@@ -483,7 +491,14 @@ function renderParagraph(
   let cursorY = y;
 
   if (inlines.length > 0) {
-    cursorY = renderInlineContent(doc, inlines, x, cursorY, width, cfg.paragraphSize);
+    cursorY = renderInlineContent(
+      doc,
+      inlines,
+      x,
+      cursorY,
+      width,
+      cfg.paragraphSize,
+    );
   } else {
     // Empty paragraph — still takes up one line of space
     cursorY += cfg.paragraphSize * LINE_HEIGHT_PARAGRAPH;
@@ -620,7 +635,14 @@ function renderListItem(
         cursorY = renderTaskList(doc, child, x, cursorY, width, depth + 1);
       } else {
         firstBlock = false;
-        cursorY = renderNode(doc, child, contentIndent, cursorY, contentWidth, depth + 1);
+        cursorY = renderNode(
+          doc,
+          child,
+          contentIndent,
+          cursorY,
+          contentWidth,
+          depth + 1,
+        );
       }
     }
   }
@@ -837,7 +859,10 @@ export function renderTiptapContent(
 ): number {
   cfg = createConfig(scale);
 
-  const tiptapDoc = content as unknown as { type: string; content?: TipTapNode[] };
+  const tiptapDoc = content as unknown as {
+    type: string;
+    content?: TipTapNode[];
+  };
 
   if (!tiptapDoc.content || !Array.isArray(tiptapDoc.content)) {
     return y;
@@ -954,7 +979,11 @@ function measureHeading(doc: jsPDF, node: TipTapNode, width: number): number {
   doc.setFont('GeistSans', 'normal');
   doc.setFontSize(cfg.paragraphSize);
 
-  return (cfg.headingSpacingAbove[level] ?? 0) + contentHeight + (cfg.headingSpacingBelow[level] ?? 0);
+  return (
+    (cfg.headingSpacingAbove[level] ?? 0) +
+    contentHeight +
+    (cfg.headingSpacingBelow[level] ?? 0)
+  );
 }
 
 function measureParagraph(doc: jsPDF, node: TipTapNode, width: number): number {
@@ -988,7 +1017,11 @@ function measureList(
     }
 
     for (const child of item.content) {
-      if (child.type === 'bulletList' || child.type === 'orderedList' || child.type === 'taskList') {
+      if (
+        child.type === 'bulletList' ||
+        child.type === 'orderedList' ||
+        child.type === 'taskList'
+      ) {
         total += measureList(doc, child, width, depth + 1);
       } else if (child.type === 'paragraph') {
         doc.setFont('GeistSans', 'normal');
@@ -996,7 +1029,12 @@ function measureList(
         const inlines = collectInlineNodes(child.content);
         const h =
           inlines.length > 0
-            ? measureInlineContentHeight(doc, inlines, contentWidth, cfg.paragraphSize)
+            ? measureInlineContentHeight(
+                doc,
+                inlines,
+                contentWidth,
+                cfg.paragraphSize,
+              )
             : cfg.paragraphSize * LINE_HEIGHT_PARAGRAPH;
         total += h + cfg.paragraphSpacing;
       } else {

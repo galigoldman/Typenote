@@ -717,7 +717,11 @@ export function CanvasEditor({ document }: CanvasEditorProps) {
           <>
             <div className="h-6 w-px bg-border mx-2" />
             <div className="flex-1">
-              <EditorToolbar editor={activeEditor} hideUndoRedo document={{ ...document, pages: { pages } }} />
+              <EditorToolbar
+                editor={activeEditor}
+                hideUndoRedo
+                document={{ ...document, pages: { pages } }}
+              />
             </div>
           </>
         )}

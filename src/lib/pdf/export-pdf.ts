@@ -26,8 +26,8 @@ export async function exportDocumentAsPdf(
     document.content != null &&
     'content' in document.content &&
     Array.isArray((document.content as Record<string, unknown>).content) &&
-    ((document.content as Record<string, unknown>).content as unknown[]).length >
-      0;
+    ((document.content as Record<string, unknown>).content as unknown[])
+      .length > 0;
 
   // 2. Create jsPDF instance
   // For canvas pages: use custom size 794x1123 pts (matches the app's canvas dimensions)

@@ -63,7 +63,9 @@ function makeTextBox(overrides: Partial<TextBox> = {}): TextBox {
     height: 100,
     content: {
       type: 'doc',
-      content: [{ type: 'paragraph', content: [{ type: 'text', text: 'Hello' }] }],
+      content: [
+        { type: 'paragraph', content: [{ type: 'text', text: 'Hello' }] },
+      ],
     },
     ...overrides,
   };
