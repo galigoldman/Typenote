@@ -303,21 +303,77 @@ export function CanvasEditor({ document }: CanvasEditorProps) {
     [triggerSave],
   );
 
-  // Pending focus: when a new page is created from text overflow, we want to
-  // auto-focus its editor once it mounts.
-  const pendingFocusPageIdRef = useRef<string | null>(null);
+  const editorsRef = useRef<Map<string, Editor>>(new Map());
 
-  // Editor ready / focus handler — receives pageId from CanvasPage
-  const handleEditorReady = useCallback((pageId: string, editor: Editor) => {
-    setActiveEditor(editor);
-    // If this page was just created by text overflow, focus it at the start
-    if (pendingFocusPageIdRef.current === pageId) {
-      pendingFocusPageIdRef.current = null;
-      // Small delay to ensure the editor DOM is fully settled
-      setTimeout(() => {
-        editor.commands.focus('end');
-      }, 50);
+  // Scroll so the top of a page is ~1/3 from the top of the viewport,
+  // showing the divider and bottom of the previous page (like Word/Docs).
+  const scrollToPage = useCallback((pageId: string) => {
+    const scrollContainer = globalThis.document.querySelector(
+      '[data-scroll-container]',
+    ) as HTMLElement | null;
+    if (!scrollContainer) return;
+    const targetEl = scrollContainer.querySelector(
+      `[data-page-id="${pageId}"]`,
+    ) as HTMLElement | null;
+    if (targetEl) {
+      const containerRect = scrollContainer.getBoundingClientRect();
+      const targetRect = targetEl.getBoundingClientRect();
+      const scrollOffset =
+        targetRect.top - containerRect.top + scrollContainer.scrollTop;
+      // Show ~1/3 of viewport above the page top (shows divider + prev page bottom)
+      scrollContainer.scrollTo({
+        top: scrollOffset - containerRect.height * 0.35,
+        behavior: 'smooth',
+      });
     }
+  }, []);
+
+  // Focus a page's editor by polling until it appears in editorsRef.
+  // This is reliable for both existing pages and newly created ones
+  // (where the editor mounts asynchronously after React renders).
+  const focusPage = useCallback(
+    (
+      pageId: string,
+      overflowContent: Record<string, unknown> | null,
+      isExistingPage: boolean,
+      attempt = 0,
+    ) => {
+      const editor = editorsRef.current.get(pageId);
+      if (editor) {
+        // Merge overflow content into an existing page
+        if (isExistingPage && overflowContent) {
+          const existing = editor.getJSON() as {
+            type?: string;
+            content?: unknown[];
+          };
+          const merged = {
+            type: 'doc',
+            content: [
+              ...((overflowContent as { content?: unknown[] }).content || []),
+              ...(existing?.content || [{ type: 'paragraph' }]),
+            ],
+          };
+          editor.commands.setContent(merged);
+        }
+        editor.commands.focus('start');
+        scrollToPage(pageId);
+        return;
+      }
+      // Editor not mounted yet — retry (up to 1s)
+      if (attempt < 20) {
+        setTimeout(
+          () => focusPage(pageId, overflowContent, isExistingPage, attempt + 1),
+          50,
+        );
+      }
+    },
+    [scrollToPage],
+  );
+
+  // Editor ready / focus handler — registers editor in the map
+  const handleEditorReady = useCallback((pageId: string, editor: Editor) => {
+    editorsRef.current.set(pageId, editor);
+    setActiveEditor(editor);
   }, []);
 
   // Get strokes for a page (used by eraser)
@@ -340,44 +396,53 @@ export function CanvasEditor({ document }: CanvasEditorProps) {
     [document.canvas_type],
   );
 
-  // Text overflow handler — creates a new page with the overflowed content,
-  // scrolls to it, and queues auto-focus for its editor (like Google Docs).
+  // Text overflow handler — moves cursor (and optionally content) to the
+  // next page, creating one if needed. Works on any page, like Word/Docs.
   const handleTextOverflow = useCallback(
     (pageId: string, overflowContent: Record<string, unknown> | null) => {
+      let targetPageId: string | null = null;
+      let isExisting = false;
+
       setPages((prev) => {
         const pageIndex = prev.findIndex((p) => p.id === pageId);
         if (pageIndex === -1) return prev;
-        // Only auto-add after the last page
-        if (pageIndex !== prev.length - 1) return prev;
 
+        const nextPage = prev[pageIndex + 1];
+
+        if (nextPage) {
+          targetPageId = nextPage.id;
+          isExisting = true;
+          return prev;
+        }
+
+        // No next page — create one after the current page
         const currentPage = prev[pageIndex];
         const newType = currentPage.pageType || document.canvas_type;
-        const newPage = createEmptyPage(prev.length, newType);
+        const newPage = createEmptyPage(pageIndex + 1, newType);
         if (overflowContent) {
           newPage.flowContent = overflowContent;
         }
+        targetPageId = newPage.id;
 
-        // Queue focus for the new page's editor
-        pendingFocusPageIdRef.current = newPage.id;
-
-        // Scroll to the new page after React renders it
-        setTimeout(() => {
-          const scrollContainer = globalThis.document.querySelector(
-            '[data-scroll-container]',
-          ) as HTMLElement | null;
-          if (scrollContainer) {
-            scrollContainer.scrollTo({
-              top: scrollContainer.scrollHeight,
-              behavior: 'smooth',
-            });
-          }
-        }, 100);
-
-        return [...prev, newPage];
+        return [
+          ...prev.slice(0, pageIndex + 1),
+          newPage,
+          ...prev.slice(pageIndex + 1),
+        ].map((p, i) => ({ ...p, order: i }));
       });
+
+      // Poll for the editor and focus it (handles both existing and new pages)
+      if (targetPageId) {
+        focusPage(
+          targetPageId,
+          isExisting ? overflowContent : null,
+          isExisting,
+        );
+      }
+
       triggerSave();
     },
-    [triggerSave, document.canvas_type],
+    [triggerSave, document.canvas_type, focusPage],
   );
 
   // Drawing hook
@@ -508,6 +573,7 @@ export function CanvasEditor({ document }: CanvasEditorProps) {
   // Page management
   const handleDeletePage = useCallback(
     (pageId: string) => {
+      editorsRef.current.delete(pageId);
       setPages((prev) => {
         if (prev.length <= 1) return prev;
         return prev
@@ -742,7 +808,7 @@ export function CanvasEditor({ document }: CanvasEditorProps) {
             {pages.map((page, index) => {
               const effectiveType = page.pageType || document.canvas_type;
               return (
-                <div key={page.id}>
+                <div key={page.id} data-page-id={page.id}>
                   <CanvasPage
                     page={page}
                     activeTool={activeTool}
