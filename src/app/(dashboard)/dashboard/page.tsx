@@ -30,7 +30,10 @@ export default async function DashboardPage() {
   if (user) {
     const connection = await getUserMoodleConnection(user.id);
     if (connection?.moodle_instances) {
-      const instance = connection.moodle_instances as { id: string; domain: string };
+      const instance = connection.moodle_instances as {
+        id: string;
+        domain: string;
+      };
       moodleConnection = {
         domain: instance.domain,
         instanceId: instance.id,

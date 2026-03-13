@@ -108,9 +108,9 @@ function createExtendedMockAdmin(opts: {
   // Storage mock
   const storageChain: Record<string, ReturnType<typeof vi.fn>> = {};
   storageChain.from = vi.fn().mockReturnValue(storageChain);
-  storageChain.remove = vi.fn().mockResolvedValue(
-    opts.storageRemoveResult ?? { data: null, error: null },
-  );
+  storageChain.remove = vi
+    .fn()
+    .mockResolvedValue(opts.storageRemoveResult ?? { data: null, error: null });
 
   (chain as Record<string, unknown>).storage = storageChain;
 
@@ -136,7 +136,11 @@ describe('compareCourses', () => {
     ]);
     mockCreateAdminClient.mockReturnValue(mock);
 
-    const result = await compareCourses('moodle.example.com', scrapedCourses, 'user-1');
+    const result = await compareCourses(
+      'moodle.example.com',
+      scrapedCourses,
+      'user-1',
+    );
 
     expect(result).toEqual([
       {
@@ -150,12 +154,16 @@ describe('compareCourses', () => {
 
   it('returns new_to_system when instance exists but course is not in registry', async () => {
     const mock = createMockAdmin([
-      { data: { id: 'inst-1' } },  // instance exists
-      { data: null },               // course not found in moodle_courses
+      { data: { id: 'inst-1' } }, // instance exists
+      { data: null }, // course not found in moodle_courses
     ]);
     mockCreateAdminClient.mockReturnValue(mock);
 
-    const result = await compareCourses('moodle.example.com', scrapedCourses, 'user-1');
+    const result = await compareCourses(
+      'moodle.example.com',
+      scrapedCourses,
+      'user-1',
+    );
 
     expect(result).toEqual([
       {
@@ -169,13 +177,17 @@ describe('compareCourses', () => {
 
   it('returns synced_by_others when course exists but user has no sync record', async () => {
     const mock = createMockAdmin([
-      { data: { id: 'inst-1' } },         // instance exists
-      { data: { id: 'course-uuid-1' } },  // course exists in registry
-      { data: null },                      // no user_course_syncs record
+      { data: { id: 'inst-1' } }, // instance exists
+      { data: { id: 'course-uuid-1' } }, // course exists in registry
+      { data: null }, // no user_course_syncs record
     ]);
     mockCreateAdminClient.mockReturnValue(mock);
 
-    const result = await compareCourses('moodle.example.com', scrapedCourses, 'user-1');
+    const result = await compareCourses(
+      'moodle.example.com',
+      scrapedCourses,
+      'user-1',
+    );
 
     expect(result).toEqual([
       {
@@ -190,8 +202,8 @@ describe('compareCourses', () => {
 
   it('returns synced_by_user when course exists and user has a sync record', async () => {
     const mock = createMockAdmin([
-      { data: { id: 'inst-1' } },         // instance exists
-      { data: { id: 'course-uuid-1' } },  // course exists in registry
+      { data: { id: 'inst-1' } }, // instance exists
+      { data: { id: 'course-uuid-1' } }, // course exists in registry
       {
         data: {
           id: 'sync-1',
@@ -201,7 +213,11 @@ describe('compareCourses', () => {
     ]);
     mockCreateAdminClient.mockReturnValue(mock);
 
-    const result = await compareCourses('moodle.example.com', scrapedCourses, 'user-1');
+    const result = await compareCourses(
+      'moodle.example.com',
+      scrapedCourses,
+      'user-1',
+    );
 
     expect(result).toEqual([
       {
@@ -235,11 +251,11 @@ describe('compareCourses', () => {
     ];
 
     const mock = createMockAdmin([
-      { data: { id: 'inst-1' } },         // instance exists
-      { data: null },                      // CS101: not in registry
-      { data: { id: 'course-uuid-2' } },  // CS201: in registry
-      { data: null },                      // CS201: no user sync
-      { data: { id: 'course-uuid-3' } },  // CS301: in registry
+      { data: { id: 'inst-1' } }, // instance exists
+      { data: null }, // CS101: not in registry
+      { data: { id: 'course-uuid-2' } }, // CS201: in registry
+      { data: null }, // CS201: no user sync
+      { data: { id: 'course-uuid-3' } }, // CS301: in registry
       {
         data: {
           id: 'sync-3',
@@ -249,7 +265,11 @@ describe('compareCourses', () => {
     ]);
     mockCreateAdminClient.mockReturnValue(mock);
 
-    const result = await compareCourses('moodle.example.com', multiCourses, 'user-1');
+    const result = await compareCourses(
+      'moodle.example.com',
+      multiCourses,
+      'user-1',
+    );
 
     expect(result).toHaveLength(3);
     expect(result[0].status).toBe('new_to_system');
@@ -276,9 +296,7 @@ describe('detectChanges', () => {
       queryResults: [
         // 1st query: fetch sections for courseId (order terminates)
         {
-          data: [
-            { id: 'sec-uuid-1', moodle_section_id: 'sec-1' },
-          ],
+          data: [{ id: 'sec-uuid-1', moodle_section_id: 'sec-1' }],
         },
         // 2nd query: fetch files for sec-uuid-1 (order terminates)
         {
@@ -335,9 +353,7 @@ describe('detectChanges', () => {
       queryResults: [
         // sections
         {
-          data: [
-            { id: 'sec-uuid-1', moodle_section_id: 'sec-1' },
-          ],
+          data: [{ id: 'sec-uuid-1', moodle_section_id: 'sec-1' }],
         },
         // files for sec-uuid-1: two files in registry
         {
@@ -394,9 +410,7 @@ describe('detectChanges', () => {
       queryResults: [
         // sections
         {
-          data: [
-            { id: 'sec-uuid-1', moodle_section_id: 'sec-1' },
-          ],
+          data: [{ id: 'sec-uuid-1', moodle_section_id: 'sec-1' }],
         },
         // files for sec-uuid-1
         {
@@ -447,9 +461,7 @@ describe('detectChanges', () => {
       queryResults: [
         // sections
         {
-          data: [
-            { id: 'sec-uuid-1', moodle_section_id: 'sec-1' },
-          ],
+          data: [{ id: 'sec-uuid-1', moodle_section_id: 'sec-1' }],
         },
         // files
         {
@@ -580,9 +592,7 @@ describe('detectChanges', () => {
       queryResults: [
         // sections
         {
-          data: [
-            { id: 'sec-uuid-1', moodle_section_id: 'sec-1' },
-          ],
+          data: [{ id: 'sec-uuid-1', moodle_section_id: 'sec-1' }],
         },
         // files: one is already flagged as removed
         {
@@ -643,7 +653,10 @@ describe('flagRemovedFiles', () => {
     expect(mock.update).toHaveBeenCalledWith({ is_removed: true });
     expect(mock.update).toHaveBeenCalledWith({ status: 'removed_from_moodle' });
     expect(mock.in).toHaveBeenCalledWith('id', ['file-1', 'file-2']);
-    expect(mock.in).toHaveBeenCalledWith('moodle_file_id', ['file-1', 'file-2']);
+    expect(mock.in).toHaveBeenCalledWith('moodle_file_id', [
+      'file-1',
+      'file-2',
+    ]);
   });
 
   it('does nothing when given an empty array', async () => {
@@ -708,19 +721,18 @@ describe('updateModifiedFile', () => {
     });
 
     // Should have called storage.from('moodle-materials').remove(['old/path/file.pdf'])
-    const storageMock = (mock as Record<string, unknown>).storage as Record<string, ReturnType<typeof vi.fn>>;
+    const storageMock = (mock as Record<string, unknown>).storage as Record<
+      string,
+      ReturnType<typeof vi.fn>
+    >;
     expect(storageMock.from).toHaveBeenCalledWith('moodle-materials');
     expect(storageMock.remove).toHaveBeenCalledWith(['old/path/file.pdf']);
   });
 
   it('does not delete storage when there is no old storage_path', async () => {
     const mock = createExtendedMockAdmin({
-      queryResults: [
-        { data: { id: 'file-1', storage_path: null } },
-      ],
-      updateResults: [
-        { data: null, error: null },
-      ],
+      queryResults: [{ data: { id: 'file-1', storage_path: null } }],
+      updateResults: [{ data: null, error: null }],
     });
     mockCreateAdminClient.mockReturnValue(mock);
 
@@ -728,7 +740,10 @@ describe('updateModifiedFile', () => {
       storagePath: 'new/path/file.pdf',
     });
 
-    const storageMock = (mock as Record<string, unknown>).storage as Record<string, ReturnType<typeof vi.fn>>;
+    const storageMock = (mock as Record<string, unknown>).storage as Record<
+      string,
+      ReturnType<typeof vi.fn>
+    >;
     expect(storageMock.remove).not.toHaveBeenCalled();
   });
 });

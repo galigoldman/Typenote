@@ -31,7 +31,13 @@ interface MoodleSyncDialogProps {
   moodleConnection: { domain: string; instanceId: string };
 }
 
-type DialogPhase = 'scraping' | 'comparing' | 'ready' | 'syncing' | 'done' | 'error';
+type DialogPhase =
+  | 'scraping'
+  | 'comparing'
+  | 'ready'
+  | 'syncing'
+  | 'done'
+  | 'error';
 
 /** Error messages that suggest a Moodle session has expired */
 const AUTH_ERROR_PATTERNS = [
@@ -71,7 +77,9 @@ export function MoodleSyncDialog({
   const [authError, setAuthError] = useState(false);
   const [syncedCount, setSyncedCount] = useState(0);
   const [syncedCourses, setSyncedCourses] = useState<SyncCourseResult[]>([]);
-  const [expandedFilePicker, setExpandedFilePicker] = useState<string | null>(null);
+  const [expandedFilePicker, setExpandedFilePicker] = useState<string | null>(
+    null,
+  );
 
   const loadCourses = useCallback(async () => {
     setPhase('scraping');
@@ -112,7 +120,8 @@ export function MoodleSyncDialog({
       setSelectedIds(preSelected);
       setPhase('ready');
     } catch (err) {
-      const message = err instanceof Error ? err.message : 'Failed to load courses';
+      const message =
+        err instanceof Error ? err.message : 'Failed to load courses';
       setError(message);
       setAuthError(isAuthError(message));
       setPhase('error');
@@ -146,9 +155,7 @@ export function MoodleSyncDialog({
     setAuthError(false);
 
     try {
-      const selected = courses.filter((c) =>
-        selectedIds.has(c.moodleCourseId),
-      );
+      const selected = courses.filter((c) => selectedIds.has(c.moodleCourseId));
 
       // Build payloads with empty sections (real content scraping deferred)
       const coursePayloads = selected.map((c) => ({
@@ -196,8 +203,8 @@ export function MoodleSyncDialog({
         <DialogHeader>
           <DialogTitle>Sync Moodle Courses</DialogTitle>
           <DialogDescription>
-            Select courses from{' '}
-            <strong>{moodleConnection.domain}</strong> to sync.
+            Select courses from <strong>{moodleConnection.domain}</strong> to
+            sync.
           </DialogDescription>
         </DialogHeader>
 
@@ -239,9 +246,7 @@ export function MoodleSyncDialog({
                 >
                   <Checkbox
                     checked={selectedIds.has(course.moodleCourseId)}
-                    onCheckedChange={() =>
-                      toggleCourse(course.moodleCourseId)
-                    }
+                    onCheckedChange={() => toggleCourse(course.moodleCourseId)}
                     aria-label={`Select ${course.name}`}
                   />
                   <span className="flex-1 text-sm font-medium">
@@ -347,16 +352,11 @@ export function MoodleSyncDialog({
 
         <DialogFooter>
           {phase === 'ready' && courses.length > 0 && (
-            <Button
-              onClick={handleSync}
-              disabled={selectedIds.size === 0}
-            >
+            <Button onClick={handleSync} disabled={selectedIds.size === 0}>
               Sync Selected ({selectedIds.size})
             </Button>
           )}
-          {phase === 'done' && (
-            <Button onClick={handleClose}>Close</Button>
-          )}
+          {phase === 'done' && <Button onClick={handleClose}>Close</Button>}
           {phase === 'error' && (
             <Button variant="outline" onClick={loadCourses}>
               Retry

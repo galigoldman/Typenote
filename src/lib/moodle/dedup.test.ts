@@ -84,10 +84,7 @@ describe('checkFileExists', () => {
   });
 
   it('returns status "exists" when no URL match but hash matches (cross-course dedup)', async () => {
-    const client = createMockClient(
-      { data: null },
-      { data: { id: 'file-2' } },
-    );
+    const client = createMockClient({ data: null }, { data: { id: 'file-2' } });
 
     const result = await checkFileExists(
       client,

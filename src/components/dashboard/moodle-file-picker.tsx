@@ -35,12 +35,7 @@ interface MoodleFilePickerProps {
   onImportComplete: () => void;
 }
 
-type PickerPhase =
-  | 'loading'
-  | 'ready'
-  | 'importing'
-  | 'done'
-  | 'error';
+type PickerPhase = 'loading' | 'ready' | 'importing' | 'done' | 'error';
 
 /** Maximum file size allowed for import (50 MB) */
 const MAX_FILE_SIZE = 50 * 1024 * 1024;
@@ -86,11 +81,17 @@ export function MoodleFilePicker({
 
   const [phase, setPhase] = useState<PickerPhase>('loading');
   const [sections, setSections] = useState<ScrapedSection[]>([]);
-  const [importedFileIds, setImportedFileIds] = useState<Set<string>>(new Set());
+  const [importedFileIds, setImportedFileIds] = useState<Set<string>>(
+    new Set(),
+  );
   const [removedFileIds, setRemovedFileIds] = useState<Set<string>>(new Set());
-  const [modifiedFileIds, setModifiedFileIds] = useState<Set<string>>(new Set());
+  const [modifiedFileIds, setModifiedFileIds] = useState<Set<string>>(
+    new Set(),
+  );
   const [selectedUrls, setSelectedUrls] = useState<Set<string>>(new Set());
-  const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set());
+  const [expandedSections, setExpandedSections] = useState<Set<string>>(
+    new Set(),
+  );
   const [showOnlyActionable, setShowOnlyActionable] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [importProgress, setImportProgress] = useState<string | null>(null);
@@ -113,7 +114,9 @@ export function MoodleFilePicker({
       // Fetch scraped content and import status in parallel
       const [scrapeResult, statusResponse] = await Promise.all([
         scrapeCourseContent(courseUrl),
-        fetch(`/api/moodle/status?moodleCourseId=${encodeURIComponent(moodleCourseId)}`),
+        fetch(
+          `/api/moodle/status?moodleCourseId=${encodeURIComponent(moodleCourseId)}`,
+        ),
       ]);
 
       // Parse status response
@@ -138,7 +141,9 @@ export function MoodleFilePicker({
       setSections(scrapedSections);
 
       // Expand all sections by default
-      setExpandedSections(new Set(scrapedSections.map((s) => s.moodleSectionId)));
+      setExpandedSections(
+        new Set(scrapedSections.map((s) => s.moodleSectionId)),
+      );
 
       // Pre-select items that are NOT already imported and NOT removed
       const preSelected = new Set<string>();
@@ -161,7 +166,9 @@ export function MoodleFilePicker({
       setSelectedUrls(preSelected);
       setPhase('ready');
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load course content');
+      setError(
+        err instanceof Error ? err.message : 'Failed to load course content',
+      );
       setPhase('error');
     }
   }, [scrapeCourseContent, courseUrl, moodleCourseId, itemKey]);
@@ -375,9 +382,13 @@ export function MoodleFilePicker({
             {sections
               .sort((a, b) => a.position - b.position)
               .map((section) => {
-                const isExpanded = expandedSections.has(section.moodleSectionId);
+                const isExpanded = expandedSections.has(
+                  section.moodleSectionId,
+                );
                 const sectionSelectedCount = section.items.filter((item) =>
-                  selectedUrls.has(itemKey(section.moodleSectionId, item.moodleUrl)),
+                  selectedUrls.has(
+                    itemKey(section.moodleSectionId, item.moodleUrl),
+                  ),
                 ).length;
 
                 return (
@@ -430,75 +441,93 @@ export function MoodleFilePicker({
                               return !isImported && !isRemoved;
                             })
                             .map((item) => {
-                            const key = itemKey(
-                              section.moodleSectionId,
-                              item.moodleUrl,
-                            );
-                            const isImported = importedFileIds.has(key);
-                            const isRemoved = removedFileIds.has(key);
-                            const isModified = modifiedFileIds.has(key);
-                            const isSelected = selectedUrls.has(key);
-                            const isOversized =
-                              item.fileSize != null &&
-                              item.fileSize > MAX_FILE_SIZE;
-                            const isDisabled = isRemoved || isOversized;
+                              const key = itemKey(
+                                section.moodleSectionId,
+                                item.moodleUrl,
+                              );
+                              const isImported = importedFileIds.has(key);
+                              const isRemoved = removedFileIds.has(key);
+                              const isModified = modifiedFileIds.has(key);
+                              const isSelected = selectedUrls.has(key);
+                              const isOversized =
+                                item.fileSize != null &&
+                                item.fileSize > MAX_FILE_SIZE;
+                              const isDisabled = isRemoved || isOversized;
 
-                            return (
-                              <label
-                                key={item.moodleUrl}
-                                className={`flex items-center gap-3 rounded px-2 py-1.5 ${
-                                  isDisabled
-                                    ? 'cursor-not-allowed opacity-60'
-                                    : 'cursor-pointer hover:bg-accent/30'
-                                }`}
-                              >
-                                <Checkbox
-                                  checked={isSelected}
-                                  disabled={isDisabled}
-                                  onCheckedChange={() =>
-                                    toggleItem(
-                                      section.moodleSectionId,
-                                      item.moodleUrl,
-                                    )
-                                  }
-                                  aria-label={`Select ${item.name}`}
-                                />
-                                {/* File type icon */}
-                                <span
-                                  className="text-base"
-                                  title={item.type === 'file' ? 'File' : 'Link'}
-                                  aria-label={item.type === 'file' ? 'File' : 'Link'}
-                                  role="img"
-                                >
-                                  {item.type === 'file' ? '\uD83D\uDCC4' : '\uD83D\uDD17'}
-                                </span>
-                                <span
-                                  className={`flex-1 truncate text-sm ${
-                                    isRemoved ? 'line-through text-muted-foreground' : ''
+                              return (
+                                <label
+                                  key={item.moodleUrl}
+                                  className={`flex items-center gap-3 rounded px-2 py-1.5 ${
+                                    isDisabled
+                                      ? 'cursor-not-allowed opacity-60'
+                                      : 'cursor-pointer hover:bg-accent/30'
                                   }`}
                                 >
-                                  {item.name}
-                                </span>
-                                {item.fileSize != null && item.fileSize > 0 && (
-                                  <span className="text-xs text-muted-foreground">
-                                    {formatFileSize(item.fileSize)}
+                                  <Checkbox
+                                    checked={isSelected}
+                                    disabled={isDisabled}
+                                    onCheckedChange={() =>
+                                      toggleItem(
+                                        section.moodleSectionId,
+                                        item.moodleUrl,
+                                      )
+                                    }
+                                    aria-label={`Select ${item.name}`}
+                                  />
+                                  {/* File type icon */}
+                                  <span
+                                    className="text-base"
+                                    title={
+                                      item.type === 'file' ? 'File' : 'Link'
+                                    }
+                                    aria-label={
+                                      item.type === 'file' ? 'File' : 'Link'
+                                    }
+                                    role="img"
+                                  >
+                                    {item.type === 'file'
+                                      ? '\uD83D\uDCC4'
+                                      : '\uD83D\uDD17'}
                                   </span>
-                                )}
-                                {isOversized && (
-                                  <Badge variant="destructive">Too large</Badge>
-                                )}
-                                {isRemoved && (
-                                  <Badge variant="destructive">Removed from Moodle</Badge>
-                                )}
-                                {isModified && !isRemoved && !isOversized && (
-                                  <Badge variant="secondary">Modified</Badge>
-                                )}
-                                {isImported && !isRemoved && !isModified && !isOversized && (
-                                  <Badge variant="outline">Already imported</Badge>
-                                )}
-                              </label>
-                            );
-                          })}
+                                  <span
+                                    className={`flex-1 truncate text-sm ${
+                                      isRemoved
+                                        ? 'line-through text-muted-foreground'
+                                        : ''
+                                    }`}
+                                  >
+                                    {item.name}
+                                  </span>
+                                  {item.fileSize != null &&
+                                    item.fileSize > 0 && (
+                                      <span className="text-xs text-muted-foreground">
+                                        {formatFileSize(item.fileSize)}
+                                      </span>
+                                    )}
+                                  {isOversized && (
+                                    <Badge variant="destructive">
+                                      Too large
+                                    </Badge>
+                                  )}
+                                  {isRemoved && (
+                                    <Badge variant="destructive">
+                                      Removed from Moodle
+                                    </Badge>
+                                  )}
+                                  {isModified && !isRemoved && !isOversized && (
+                                    <Badge variant="secondary">Modified</Badge>
+                                  )}
+                                  {isImported &&
+                                    !isRemoved &&
+                                    !isModified &&
+                                    !isOversized && (
+                                      <Badge variant="outline">
+                                        Already imported
+                                      </Badge>
+                                    )}
+                                </label>
+                              );
+                            })}
                         </div>
                       </>
                     )}
@@ -584,8 +613,8 @@ export function MoodleFilePicker({
 
           {/* Course linking note (T061) */}
           <p className="pt-2 text-xs text-muted-foreground">
-            You can link this Moodle course to a Typenote course from the
-            course settings.
+            You can link this Moodle course to a Typenote course from the course
+            settings.
           </p>
         </div>
       )}

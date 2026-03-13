@@ -93,9 +93,7 @@ describe('MoodleFilePicker', () => {
 
     render(<MoodleFilePicker {...defaultProps} />);
 
-    expect(
-      screen.getByText(/scanning course content/i),
-    ).toBeInTheDocument();
+    expect(screen.getByText(/scanning course content/i)).toBeInTheDocument();
   });
 
   it('renders sections and files from scraped content', async () => {
@@ -167,9 +165,7 @@ describe('MoodleFilePicker', () => {
   });
 
   it('renders empty state when no sections found', async () => {
-    const mockScrape = vi
-      .fn()
-      .mockResolvedValue({ sections: [] });
+    const mockScrape = vi.fn().mockResolvedValue({ sections: [] });
     mockUseMoodleExtension.mockReturnValue({
       scrapeCourseContent: mockScrape,
       downloadAndUpload: vi.fn(),
@@ -327,7 +323,8 @@ describe('MoodleFilePicker', () => {
             {
               type: 'file' as const,
               name: 'only-file.pdf',
-              moodleUrl: 'https://moodle.test.ac.il/mod/resource/view.php?id=99',
+              moodleUrl:
+                'https://moodle.test.ac.il/mod/resource/view.php?id=99',
             },
           ],
         },
@@ -373,9 +370,7 @@ describe('MoodleFilePicker', () => {
       );
     });
 
-    expect(
-      screen.getByRole('button', { name: /retry/i }),
-    ).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /retry/i })).toBeInTheDocument();
   });
 
   it('shows progress messages during import', async () => {
@@ -652,14 +647,16 @@ describe('MoodleFilePicker', () => {
             {
               type: 'file' as const,
               name: 'huge-video.mp4',
-              moodleUrl: 'https://moodle.test.ac.il/mod/resource/view.php?id=10',
+              moodleUrl:
+                'https://moodle.test.ac.il/mod/resource/view.php?id=10',
               fileSize: 60 * 1024 * 1024, // 60 MB — exceeds 50 MB limit
               mimeType: 'video/mp4',
             },
             {
               type: 'file' as const,
               name: 'small-file.pdf',
-              moodleUrl: 'https://moodle.test.ac.il/mod/resource/view.php?id=11',
+              moodleUrl:
+                'https://moodle.test.ac.il/mod/resource/view.php?id=11',
               fileSize: 1024 * 1024, // 1 MB
               mimeType: 'application/pdf',
             },
@@ -714,12 +711,14 @@ describe('MoodleFilePicker', () => {
             {
               type: 'file' as const,
               name: 'good-file.pdf',
-              moodleUrl: 'https://moodle.test.ac.il/mod/resource/view.php?id=20',
+              moodleUrl:
+                'https://moodle.test.ac.il/mod/resource/view.php?id=20',
             },
             {
               type: 'file' as const,
               name: 'bad-file.pdf',
-              moodleUrl: 'https://moodle.test.ac.il/mod/resource/view.php?id=21',
+              moodleUrl:
+                'https://moodle.test.ac.il/mod/resource/view.php?id=21',
             },
           ],
         },
@@ -729,7 +728,12 @@ describe('MoodleFilePicker', () => {
     // First call succeeds (returns data), second returns null (failure)
     const mockDownload = vi
       .fn()
-      .mockResolvedValueOnce({ contentHash: 'abc', fileSize: 100, mimeType: 'application/pdf', deduplicated: false })
+      .mockResolvedValueOnce({
+        contentHash: 'abc',
+        fileSize: 100,
+        mimeType: 'application/pdf',
+        deduplicated: false,
+      })
       .mockResolvedValueOnce(null);
 
     mockUseMoodleExtension.mockReturnValue({
@@ -781,16 +785,15 @@ describe('MoodleFilePicker', () => {
             {
               type: 'file' as const,
               name: 'protected-file.pdf',
-              moodleUrl: 'https://moodle.test.ac.il/mod/resource/view.php?id=30',
+              moodleUrl:
+                'https://moodle.test.ac.il/mod/resource/view.php?id=30',
             },
           ],
         },
       ],
     });
 
-    const mockDownload = vi
-      .fn()
-      .mockRejectedValue(new Error('403 Forbidden'));
+    const mockDownload = vi.fn().mockRejectedValue(new Error('403 Forbidden'));
 
     mockUseMoodleExtension.mockReturnValue({
       scrapeCourseContent: mockScrape,
@@ -817,9 +820,7 @@ describe('MoodleFilePicker', () => {
     });
 
     // Should show auth error hint with Moodle login link
-    expect(
-      screen.getByText(/expired moodle session/i),
-    ).toBeInTheDocument();
+    expect(screen.getByText(/expired moodle session/i)).toBeInTheDocument();
     expect(
       screen.getByRole('link', { name: /re-log into moodle/i }),
     ).toHaveAttribute('href', 'https://moodle.test.ac.il/login');
@@ -838,7 +839,8 @@ describe('MoodleFilePicker', () => {
             {
               type: 'file' as const,
               name: 'file.pdf',
-              moodleUrl: 'https://moodle.test.ac.il/mod/resource/view.php?id=40',
+              moodleUrl:
+                'https://moodle.test.ac.il/mod/resource/view.php?id=40',
             },
           ],
         },

@@ -6,7 +6,9 @@ import { createAdminClient } from '@/lib/supabase/admin';
 
 export async function saveMoodleConnection(domain: string) {
   const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
   if (!user) throw new Error('Not authenticated');
 
   const admin = createAdminClient();
@@ -34,7 +36,9 @@ export async function saveMoodleConnection(domain: string) {
 
 export async function removeMoodleConnection() {
   const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
   if (!user) throw new Error('Not authenticated');
 
   const { error } = await supabase
@@ -55,7 +59,9 @@ export async function compareScrapedCourses(
   scrapedCourses: Array<{ moodleCourseId: string; name: string; url: string }>,
 ) {
   const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
   if (!user) throw new Error('Not authenticated');
 
   const { compareCourses } = await import('@/lib/moodle/sync-service');
@@ -88,7 +94,9 @@ export async function syncMoodleCourses(
   }>,
 ) {
   const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
   if (!user) throw new Error('Not authenticated');
 
   const { upsertMoodleData } = await import('@/lib/moodle/sync-service');
@@ -102,16 +110,14 @@ export async function syncMoodleCourses(
 
   // Step 2: Create/update user_course_syncs records
   for (const courseResult of syncResult.courses) {
-    const { error } = await admin
-      .from('user_course_syncs')
-      .upsert(
-        {
-          user_id: user.id,
-          moodle_course_id: courseResult.id,
-          last_synced_at: new Date().toISOString(),
-        },
-        { onConflict: 'user_id,moodle_course_id' },
-      );
+    const { error } = await admin.from('user_course_syncs').upsert(
+      {
+        user_id: user.id,
+        moodle_course_id: courseResult.id,
+        last_synced_at: new Date().toISOString(),
+      },
+      { onConflict: 'user_id,moodle_course_id' },
+    );
     if (error) {
       throw new Error(`Failed to create sync record: ${error.message}`);
     }
@@ -142,7 +148,9 @@ export async function recordFileImports(
   courseId?: string,
 ): Promise<{ syncId: string; importedCount: number }> {
   const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
   if (!user) throw new Error('Not authenticated');
 
   const admin = createAdminClient();

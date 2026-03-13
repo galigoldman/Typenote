@@ -21,15 +21,15 @@ Build a Chrome extension + backend system that lets students import Moodle cours
 
 ## Constitution Check
 
-*GATE: Must pass before Phase 0 research. Re-check after Phase 1 design.*
+_GATE: Must pass before Phase 0 research. Re-check after Phase 1 design._
 
-| Principle | Status | Notes |
-|-----------|--------|-------|
-| I. Incremental Development | PASS | Plan starts with DB schema (shared registry), then API, then extension, then UI. Each phase produces testable increment. |
-| II. Test-Driven Quality | PASS | Integration tests for new DB tables/RLS, unit tests for dedup logic and sync service, e2e for import flow. Extension tested manually + with mocked responses. |
-| III. Protected Main Branch | PASS | Work on `004-moodle-import-sync` branch, PR to main when ready. |
-| IV. Migrations as Code | PASS | New shared tables via `supabase migration new`. RLS policies for shared read access. `supabase db reset` to verify. |
-| V. Interview-Ready Architecture | PASS | Shared vs per-user data model, content-addressable dedup, extension security model — all strong interview topics. |
+| Principle                       | Status | Notes                                                                                                                                                         |
+| ------------------------------- | ------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| I. Incremental Development      | PASS   | Plan starts with DB schema (shared registry), then API, then extension, then UI. Each phase produces testable increment.                                      |
+| II. Test-Driven Quality         | PASS   | Integration tests for new DB tables/RLS, unit tests for dedup logic and sync service, e2e for import flow. Extension tested manually + with mocked responses. |
+| III. Protected Main Branch      | PASS   | Work on `004-moodle-import-sync` branch, PR to main when ready.                                                                                               |
+| IV. Migrations as Code          | PASS   | New shared tables via `supabase migration new`. RLS policies for shared read access. `supabase db reset` to verify.                                           |
+| V. Interview-Ready Architecture | PASS   | Shared vs per-user data model, content-addressable dedup, extension security model — all strong interview topics.                                             |
 
 ## Project Structure
 
@@ -102,7 +102,7 @@ supabase/
 
 ## Complexity Tracking
 
-| Violation | Why Needed | Simpler Alternative Rejected Because |
-|-----------|------------|-------------------------------------|
-| Separate extension project | Chrome extensions require their own build pipeline and manifest | Cannot be part of Next.js build; must be a separate artifact |
-| Shared + per-user DB tables | Core requirement: dedup across students while tracking individual imports | Single-user tables would duplicate all storage per student |
+| Violation                   | Why Needed                                                                | Simpler Alternative Rejected Because                         |
+| --------------------------- | ------------------------------------------------------------------------- | ------------------------------------------------------------ |
+| Separate extension project  | Chrome extensions require their own build pipeline and manifest           | Cannot be part of Next.js build; must be a separate artifact |
+| Shared + per-user DB tables | Core requirement: dedup across students while tracking individual imports | Single-user tables would duplicate all storage per student   |

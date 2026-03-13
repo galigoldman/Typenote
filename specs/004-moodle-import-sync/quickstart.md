@@ -30,6 +30,7 @@ pnpm dev          # watch mode, outputs to extension/dist/
 ```
 
 Load in Chrome:
+
 1. Navigate to `chrome://extensions`
 2. Enable "Developer mode"
 3. Click "Load unpacked" → select `extension/dist/`
@@ -38,6 +39,7 @@ Load in Chrome:
 ### 3. Web App Configuration
 
 Add to `.env.local`:
+
 ```
 NEXT_PUBLIC_EXTENSION_ID=<your-extension-id>
 SUPABASE_SERVICE_ROLE_KEY=<from-supabase-status>
@@ -62,20 +64,20 @@ pnpm dev          # Next.js dev server
 
 ## Key Files to Read First
 
-| File | Why |
-|------|-----|
-| `specs/004-moodle-import-sync/data-model.md` | Understand shared vs per-user tables |
-| `specs/004-moodle-import-sync/contracts/` | API and messaging contracts |
-| `src/lib/queries/courses.ts` | Existing query patterns to follow |
-| `src/lib/actions/courses.ts` | Existing server action patterns |
+| File                                           | Why                                      |
+| ---------------------------------------------- | ---------------------------------------- |
+| `specs/004-moodle-import-sync/data-model.md`   | Understand shared vs per-user tables     |
+| `specs/004-moodle-import-sync/contracts/`      | API and messaging contracts              |
+| `src/lib/queries/courses.ts`                   | Existing query patterns to follow        |
+| `src/lib/actions/courses.ts`                   | Existing server action patterns          |
 | `supabase/migrations/00003_create_courses.sql` | Existing RLS pattern for per-user tables |
 
 ## Testing Strategy
 
-| Layer | Tool | What |
-|-------|------|------|
-| DB schema + RLS | Vitest integration | Shared table read access, service role writes, per-user RLS |
-| Dedup logic | Vitest unit | URL match, hash match, new file scenarios |
-| API routes | Vitest integration | Sync upsert, upload dedup, import recording |
-| Extension messaging | Manual + mocked | Ping, login check, scrape, download/upload |
-| Full sync flow | Playwright e2e | End-to-end with extension + Moodle mock |
+| Layer               | Tool               | What                                                        |
+| ------------------- | ------------------ | ----------------------------------------------------------- |
+| DB schema + RLS     | Vitest integration | Shared table read access, service role writes, per-user RLS |
+| Dedup logic         | Vitest unit        | URL match, hash match, new file scenarios                   |
+| API routes          | Vitest integration | Sync upsert, upload dedup, import recording                 |
+| Extension messaging | Manual + mocked    | Ping, login check, scrape, download/upload                  |
+| Full sync flow      | Playwright e2e     | End-to-end with extension + Moodle mock                     |

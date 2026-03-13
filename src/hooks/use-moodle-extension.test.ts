@@ -24,13 +24,17 @@ const { useMoodleExtension } = await import('./use-moodle-extension');
 
 describe('useMoodleExtension', () => {
   it('detects extension as not installed when ping fails', async () => {
-    mockSendMessage.mockImplementation((_id: string, _msg: unknown, callback: (...args: unknown[]) => void) => {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      (globalThis as any).chrome.runtime.lastError = { message: 'Extension not found' };
-      callback(undefined);
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      (globalThis as any).chrome.runtime.lastError = null;
-    });
+    mockSendMessage.mockImplementation(
+      (_id: string, _msg: unknown, callback: (...args: unknown[]) => void) => {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        (globalThis as any).chrome.runtime.lastError = {
+          message: 'Extension not found',
+        };
+        callback(undefined);
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        (globalThis as any).chrome.runtime.lastError = null;
+      },
+    );
 
     const { result } = renderHook(() => useMoodleExtension());
 
@@ -42,9 +46,11 @@ describe('useMoodleExtension', () => {
   });
 
   it('detects extension as installed when ping succeeds', async () => {
-    mockSendMessage.mockImplementation((_id: string, _msg: unknown, callback: (...args: unknown[]) => void) => {
-      callback({ success: true, data: { version: '0.1.0' } });
-    });
+    mockSendMessage.mockImplementation(
+      (_id: string, _msg: unknown, callback: (...args: unknown[]) => void) => {
+        callback({ success: true, data: { version: '0.1.0' } });
+      },
+    );
 
     const { result } = renderHook(() => useMoodleExtension());
 
@@ -56,47 +62,63 @@ describe('useMoodleExtension', () => {
   });
 
   it('checkMoodleLogin returns login status', async () => {
-    mockSendMessage.mockImplementation((_id: string, _msg: unknown, callback: (...args: unknown[]) => void) => {
-      callback({ success: true, data: { loggedIn: true } });
-    });
+    mockSendMessage.mockImplementation(
+      (_id: string, _msg: unknown, callback: (...args: unknown[]) => void) => {
+        callback({ success: true, data: { loggedIn: true } });
+      },
+    );
 
     const { result } = renderHook(() => useMoodleExtension());
 
     await waitFor(() => expect(result.current.isChecking).toBe(false));
 
-    const loginStatus = await result.current.checkMoodleLogin('https://moodle.test.ac.il');
+    const loginStatus = await result.current.checkMoodleLogin(
+      'https://moodle.test.ac.il',
+    );
     expect(loginStatus).toEqual({ loggedIn: true });
   });
 
   it('scrapeCourses returns course list', async () => {
     const courses = [
-      { moodleCourseId: '101', name: 'Intro to CS', url: 'https://moodle.test.ac.il/course/view.php?id=101' },
+      {
+        moodleCourseId: '101',
+        name: 'Intro to CS',
+        url: 'https://moodle.test.ac.il/course/view.php?id=101',
+      },
     ];
 
-    mockSendMessage.mockImplementation((_id: string, _msg: unknown, callback: (...args: unknown[]) => void) => {
-      callback({ success: true, data: { courses } });
-    });
+    mockSendMessage.mockImplementation(
+      (_id: string, _msg: unknown, callback: (...args: unknown[]) => void) => {
+        callback({ success: true, data: { courses } });
+      },
+    );
 
     const { result } = renderHook(() => useMoodleExtension());
     await waitFor(() => expect(result.current.isChecking).toBe(false));
 
-    const data = await result.current.scrapeCourses('https://moodle.test.ac.il');
+    const data = await result.current.scrapeCourses(
+      'https://moodle.test.ac.il',
+    );
     expect(data?.courses).toEqual(courses);
   });
 
   it('returns null when extension not available', async () => {
-    mockSendMessage.mockImplementation((_id: string, _msg: unknown, callback: (...args: unknown[]) => void) => {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      (globalThis as any).chrome.runtime.lastError = { message: 'not found' };
-      callback(undefined);
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      (globalThis as any).chrome.runtime.lastError = null;
-    });
+    mockSendMessage.mockImplementation(
+      (_id: string, _msg: unknown, callback: (...args: unknown[]) => void) => {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        (globalThis as any).chrome.runtime.lastError = { message: 'not found' };
+        callback(undefined);
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        (globalThis as any).chrome.runtime.lastError = null;
+      },
+    );
 
     const { result } = renderHook(() => useMoodleExtension());
     await waitFor(() => expect(result.current.isChecking).toBe(false));
 
-    const data = await result.current.scrapeCourses('https://moodle.test.ac.il');
+    const data = await result.current.scrapeCourses(
+      'https://moodle.test.ac.il',
+    );
     expect(data).toBeNull();
   });
 });

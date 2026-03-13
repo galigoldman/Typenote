@@ -116,7 +116,6 @@ describe('Moodle shared registry — admin CRUD', () => {
   let courseId: string;
   let sectionId: string;
 
-
   it('admin can insert into moodle_instances', async () => {
     const { data, error } = await supabase
       .from('moodle_instances')
@@ -178,7 +177,8 @@ describe('Moodle shared registry — admin CRUD', () => {
       .insert({
         section_id: sectionId,
         type: 'file',
-        moodle_url: 'https://moodle.crud-test.ac.il/pluginfile.php/999/test.pdf',
+        moodle_url:
+          'https://moodle.crud-test.ac.il/pluginfile.php/999/test.pdf',
         file_name: 'test.pdf',
         position: 0,
       })
@@ -202,10 +202,7 @@ describe('Moodle shared registry — admin CRUD', () => {
     ];
 
     for (const table of tables) {
-      const { data, error } = await supabase
-        .from(table)
-        .select('id')
-        .limit(1);
+      const { data, error } = await supabase.from(table).select('id').limit(1);
 
       expect(error).toBeNull();
       expect(data!.length).toBeGreaterThanOrEqual(1);

@@ -39,10 +39,10 @@ describe('MoodleSyncPrompt', () => {
       checkMoodleLogin: vi.fn(),
     });
 
-    render(
-      <MoodleSyncPrompt moodleConnection={null} onSyncClick={vi.fn()} />,
-    );
-    expect(screen.getByText(/install the typenote browser extension/i)).toBeInTheDocument();
+    render(<MoodleSyncPrompt moodleConnection={null} onSyncClick={vi.fn()} />);
+    expect(
+      screen.getByText(/install the typenote browser extension/i),
+    ).toBeInTheDocument();
     expect(screen.getByText(/install extension/i)).toBeInTheDocument();
   });
 
@@ -53,10 +53,10 @@ describe('MoodleSyncPrompt', () => {
       checkMoodleLogin: vi.fn(),
     });
 
-    render(
-      <MoodleSyncPrompt moodleConnection={null} onSyncClick={vi.fn()} />,
-    );
-    expect(screen.getByText(/connect your moodle account in settings/i)).toBeInTheDocument();
+    render(<MoodleSyncPrompt moodleConnection={null} onSyncClick={vi.fn()} />);
+    expect(
+      screen.getByText(/connect your moodle account in settings/i),
+    ).toBeInTheDocument();
   });
 
   it('shows login message when extension is installed, connection exists, not logged in', async () => {
@@ -79,10 +79,9 @@ describe('MoodleSyncPrompt', () => {
     });
 
     expect(screen.getByText(/log into moodle/i)).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: /log into moodle/i })).toHaveAttribute(
-      'href',
-      'https://moodle.test.ac.il/login',
-    );
+    expect(
+      screen.getByRole('link', { name: /log into moodle/i }),
+    ).toHaveAttribute('href', 'https://moodle.test.ac.il/login');
   });
 
   it('shows sync button when extension is installed, connection exists, and logged in', async () => {
