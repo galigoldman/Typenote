@@ -48,6 +48,44 @@ interface UseSelectionReturn {
 const TAP_THRESHOLD = 5;
 const DOUBLE_TAP_DELAY = 300;
 const DOUBLE_TAP_DISTANCE = 15;
+const LINE_HEIGHT_ESTIMATE = 28; // rough px per block node
+const MIN_CONTENT_HEIGHT = 40;
+
+/**
+ * For full-page text boxes, compute a tight bounding box around the actual
+ * text content rather than the full page. This lets strokes below the text
+ * be selected independently.
+ */
+function getSelectableBBox(tb: TextBox): BBox | null {
+  // Empty text box — not selectable
+  const content = tb.content as { type?: string; content?: unknown[] } | null;
+  if (!content?.content || content.content.length === 0) return null;
+  const hasText = JSON.stringify(content).includes('"text"');
+  if (!hasText) return null;
+
+  if (tb.isFullPage) {
+    // Estimate content height from number of block nodes
+    const blockCount = content.content.length;
+    const estimatedHeight = Math.max(
+      blockCount * LINE_HEIGHT_ESTIMATE + 20,
+      MIN_CONTENT_HEIGHT,
+    );
+    return {
+      minX: tb.x,
+      minY: tb.y,
+      maxX: tb.x + tb.width,
+      maxY: tb.y + estimatedHeight,
+    };
+  }
+
+  // Custom text box — use full bounds
+  return {
+    minX: tb.x,
+    minY: tb.y,
+    maxX: tb.x + tb.width,
+    maxY: tb.y + tb.height,
+  };
+}
 
 export function useSelection({
   activeTool,
@@ -133,12 +171,8 @@ export function useSelection({
     const bboxes: BBox[] = [];
     for (const s of strokes) bboxes.push(s.bbox);
     for (const tb of textBoxes) {
-      bboxes.push({
-        minX: tb.x,
-        minY: tb.y,
-        maxX: tb.x + tb.width,
-        maxY: tb.y + tb.height,
-      });
+      const tbBBox = getSelectableBBox(tb);
+      if (tbBBox) bboxes.push(tbBBox);
     }
     if (bboxes.length === 0) return null;
     return {
@@ -240,13 +274,15 @@ export function useSelection({
             Math.hypot(x - last.x, y - last.y) < DOUBLE_TAP_DISTANCE
           ) {
             // Double-tap — check if on a text box → switch to Type mode
-            const tappedTextBox = textBoxes.find(
-              (tb) =>
+            // For double-tap, use full bounds (user wants to edit the text)
+            const tappedTextBox = textBoxes.find((tb) => {
+              return (
                 x >= tb.x &&
                 x <= tb.x + tb.width &&
                 y >= tb.y &&
-                y <= tb.y + tb.height,
-            );
+                y <= tb.y + tb.height
+              );
+            });
             if (tappedTextBox) {
               clearSelection();
               lastTapRef.current = null;
@@ -257,14 +293,17 @@ export function useSelection({
           lastTapRef.current = { time: now, x, y };
 
           // Single tap — select one object at tap point
-          // Check text boxes first (they render on top)
-          const tappedTextBox = textBoxes.find(
-            (tb) =>
-              x >= tb.x &&
-              x <= tb.x + tb.width &&
-              y >= tb.y &&
-              y <= tb.y + tb.height,
-          );
+          // Check text boxes using content-aware bounds (full-page boxes shrink to content)
+          const tappedTextBox = textBoxes.find((tb) => {
+            const bbox = getSelectableBBox(tb);
+            if (!bbox) return false;
+            return (
+              x >= bbox.minX &&
+              x <= bbox.maxX &&
+              y >= bbox.minY &&
+              y <= bbox.maxY
+            );
+          });
           if (tappedTextBox) {
             stateRef.current = 'selected';
             activePageIdRef.current = targetPageId;
@@ -273,9 +312,8 @@ export function useSelection({
             selectedTextBoxIdsRef.current = tbIds;
             setSelectedStrokeIds(new Set());
             selectedStrokesRef.current = [];
-            setSelectionBBox(
-              computeUnionBBox([], [tappedTextBox]),
-            );
+            const tbBBox = getSelectableBBox(tappedTextBox);
+            setSelectionBBox(tbBBox);
             setSelectionPath(null);
             return;
           }
@@ -344,14 +382,10 @@ export function useSelection({
             }
           }
 
-          // Hit-test text boxes
+          // Hit-test text boxes using content-aware bounds
           for (const tb of textBoxes) {
-            const tbBox: BBox = {
-              minX: tb.x,
-              minY: tb.y,
-              maxX: tb.x + tb.width,
-              maxY: tb.y + tb.height,
-            };
+            const tbBox = getSelectableBBox(tb);
+            if (!tbBox) continue;
             if (aabbIntersectsRect(tbBox, selectionRect)) {
               selectedTbIds.push(tb.id);
               selectedTbs.push(tb);
