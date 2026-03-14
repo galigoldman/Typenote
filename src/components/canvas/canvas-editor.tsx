@@ -9,7 +9,7 @@ import type {
   Stroke,
   TextBox,
 } from '@/types/canvas';
-import { PAGE_WIDTH } from '@/types/canvas';
+import { PAGE_WIDTH, PAGE_HEIGHT } from '@/types/canvas';
 import type { Document } from '@/types/database';
 import type { SaveStatus } from '@/hooks/use-auto-save';
 import type { ConnectionStatus } from '@/hooks/use-realtime-sync';
@@ -158,10 +158,32 @@ function createEmptyPage(order: number, pageType?: string): CanvasPageData {
   };
 }
 
+/** Migrate flowContent to a full-page text box if textBoxes is empty */
+function migrateFlowContent(page: CanvasPageData): CanvasPageData {
+  if (page.flowContent && page.textBoxes.length === 0) {
+    const fullPageTextBox: TextBox = {
+      id: Math.random().toString(36).slice(2) + Date.now().toString(36),
+      x: 40,
+      y: 40,
+      width: PAGE_WIDTH - 80,
+      height: PAGE_HEIGHT - 80,
+      content: page.flowContent,
+      isFullPage: true,
+      zIndex: 0,
+    };
+    return { ...page, textBoxes: [fullPageTextBox], flowContent: null };
+  }
+  // If both exist, prefer textBoxes (partially migrated)
+  if (page.textBoxes.length > 0 && page.flowContent) {
+    return { ...page, flowContent: null };
+  }
+  return page;
+}
+
 function initializePagesFromDocument(doc: Document): CanvasPageData[] {
   const pagesData = doc.pages as CanvasDocument | null;
   if (pagesData?.pages && pagesData.pages.length > 0) {
-    const loaded = pagesData.pages;
+    const loaded = pagesData.pages.map(migrateFlowContent);
     // Always ensure a trailing empty page for infinite-scroll feel
     const lastPage = loaded[loaded.length - 1];
     if (pageHasContent(lastPage)) {
@@ -329,6 +351,25 @@ export function CanvasEditor({
     (pageId: string, content: Record<string, unknown>) => {
       setPages((prev) =>
         prev.map((p) => (p.id === pageId ? { ...p, flowContent: content } : p)),
+      );
+      triggerSave();
+    },
+    [triggerSave],
+  );
+
+  // Text box content update handler
+  const handleTextBoxContentUpdate = useCallback(
+    (pageId: string, textBoxId: string, content: Record<string, unknown>) => {
+      setPages((prev) =>
+        prev.map((p) => {
+          if (p.id !== pageId) return p;
+          return {
+            ...p,
+            textBoxes: p.textBoxes.map((tb) =>
+              tb.id === textBoxId ? { ...tb, content } : tb,
+            ),
+          };
+        }),
       );
       triggerSave();
     },
@@ -1153,6 +1194,8 @@ export function CanvasEditor({
                     selectionBBox={selectionBBox}
                     isSelectionDragging={isSelectionDragging}
                     selectionDragOffset={selectionDragOffset}
+                    selectedTextBoxIds={selectedTextBoxIds}
+                    onTextBoxContentUpdate={handleTextBoxContentUpdate}
                   />
                   {/* Page break divider */}
                   <div

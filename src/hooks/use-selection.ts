@@ -9,6 +9,7 @@ import {
   getSelectionBBox,
   computeBBox,
 } from '@/lib/canvas/stroke-utils';
+import { lockScroll } from '@/lib/canvas/scroll-lock';
 
 type SelectionState = 'idle' | 'drawing' | 'selected' | 'dragging';
 
@@ -80,6 +81,7 @@ export function useSelection({
   const lastTapRef = useRef<{ time: number; x: number; y: number } | null>(
     null,
   );
+  const unlockScrollRef = useRef<(() => void) | null>(null);
 
   const screenToPageCoords = (
     e: React.PointerEvent,
@@ -107,6 +109,10 @@ export function useSelection({
     activePageIdRef.current = null;
     startPointRef.current = null;
     dragStartRef.current = null;
+    if (unlockScrollRef.current) {
+      unlockScrollRef.current();
+      unlockScrollRef.current = null;
+    }
   }, []);
 
   const deleteSelected = useCallback(() => {
@@ -149,6 +155,10 @@ export function useSelection({
 
       e.preventDefault();
       (e.target as HTMLElement).setPointerCapture(e.pointerId);
+
+      // Lock scrolling during selection interaction
+      if (unlockScrollRef.current) unlockScrollRef.current();
+      unlockScrollRef.current = lockScroll(e.target as HTMLElement);
 
       const { x, y } = screenToPageCoords(e);
 
@@ -432,6 +442,12 @@ export function useSelection({
         setDragOffset({ x: 0, y: 0 });
         stateRef.current = 'selected';
         dragStartRef.current = null;
+      }
+
+      // Unlock scroll after any pointer-up
+      if (unlockScrollRef.current) {
+        unlockScrollRef.current();
+        unlockScrollRef.current = null;
       }
     },
     [
