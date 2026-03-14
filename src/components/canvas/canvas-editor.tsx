@@ -158,45 +158,14 @@ function createEmptyPage(order: number, pageType?: string): CanvasPageData {
   };
 }
 
-/** Estimate content height from ProseMirror JSON */
-function estimateContentHeight(
-  content: Record<string, unknown> | null,
-): number {
-  const doc = content as { type?: string; content?: unknown[] } | null;
-  if (!doc?.content || doc.content.length === 0) return 60;
-  // ~30px per block node, minimum 60px
-  return Math.max(doc.content.length * 30 + 20, 60);
-}
-
-/** Migrate flowContent to a content-sized text box if textBoxes is empty.
- *  Option C: text box wraps just the content (small), but in Type mode
- *  the full-page editor still handles typing anywhere. */
-function migrateFlowContent(page: CanvasPageData): CanvasPageData {
-  if (page.flowContent && page.textBoxes.length === 0) {
-    const contentHeight = estimateContentHeight(page.flowContent);
-    const textBox: TextBox = {
-      id: Math.random().toString(36).slice(2) + Date.now().toString(36),
-      x: 40,
-      y: 40,
-      width: PAGE_WIDTH - 80,
-      height: contentHeight,
-      content: page.flowContent,
-      isFullPage: true,
-      zIndex: 0,
-    };
-    return { ...page, textBoxes: [textBox], flowContent: null };
-  }
-  // If both exist, prefer textBoxes (partially migrated)
-  if (page.textBoxes.length > 0 && page.flowContent) {
-    return { ...page, flowContent: null };
-  }
-  return page;
-}
+/** No migration — keep flowContent as-is for existing documents.
+ *  Only new text created in Type mode goes into text boxes.
+ *  This preserves all existing document content. */
 
 function initializePagesFromDocument(doc: Document): CanvasPageData[] {
   const pagesData = doc.pages as CanvasDocument | null;
   if (pagesData?.pages && pagesData.pages.length > 0) {
-    const loaded = pagesData.pages.map(migrateFlowContent);
+    const loaded = pagesData.pages;
     // Always ensure a trailing empty page for infinite-scroll feel
     const lastPage = loaded[loaded.length - 1];
     if (pageHasContent(lastPage)) {
