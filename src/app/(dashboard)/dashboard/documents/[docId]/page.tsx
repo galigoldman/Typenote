@@ -2,6 +2,7 @@ import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { GraduationCap } from 'lucide-react';
 import { createClient } from '@/lib/supabase/server';
+import { AiChatWrapper } from '@/components/ai/ai-chat-wrapper';
 import { CanvasEditor } from '@/components/canvas/canvas-editor';
 import type { Course, Document } from '@/types/database';
 
@@ -38,7 +39,7 @@ export default async function DocumentPage({ params }: DocumentPageProps) {
   return (
     <div className="flex h-full min-h-0 flex-col overflow-hidden">
       {course && (
-        <div className="px-4 pt-2">
+        <div className="flex items-center justify-between px-4 pt-2">
           <Link
             href={`/dashboard/courses/${course.id}`}
             className="mb-2 inline-flex items-center gap-1 rounded bg-muted px-2 py-1 text-sm text-muted-foreground hover:text-foreground"
@@ -46,6 +47,10 @@ export default async function DocumentPage({ params }: DocumentPageProps) {
             <GraduationCap className="size-3.5" />
             {course.name}
           </Link>
+          <AiChatWrapper
+            courseId={course.id}
+            weekId={typedDocument.week_id ?? undefined}
+          />
         </div>
       )}
       <CanvasEditor document={typedDocument} />

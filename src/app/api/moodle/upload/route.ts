@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
-import { createAdminClient } from '@/lib/supabase/admin';
+
+import { indexContent } from '@/lib/actions/ai-context';
 import { checkFileExists } from '@/lib/moodle/dedup';
+import { createAdminClient } from '@/lib/supabase/admin';
+import { createClient } from '@/lib/supabase/server';
 
 export async function POST(request: NextRequest) {
   const supabase = await createClient();
@@ -94,6 +96,13 @@ export async function POST(request: NextRequest) {
       if (updateError)
         throw new Error(`File update failed: ${updateError.message}`);
 
+      // Index for AI search (fire-and-forget, shared content)
+      indexContent({
+        type: 'moodle_file',
+        fileId: updated.id,
+        courseId: updated.id, // placeholder — mapped during search via user_course_syncs
+      }).catch((err) => console.error('Failed to index moodle file:', err));
+
       return NextResponse.json({
         fileId: updated.id,
         deduplicated: false,
@@ -117,6 +126,13 @@ export async function POST(request: NextRequest) {
 
     if (fileError)
       throw new Error(`File record update failed: ${fileError.message}`);
+
+    // Index for AI search (fire-and-forget, shared content)
+    indexContent({
+      type: 'moodle_file',
+      fileId: fileRecord.id,
+      courseId: fileRecord.id, // placeholder — mapped during search via user_course_syncs
+    }).catch((err) => console.error('Failed to index moodle file:', err));
 
     return NextResponse.json({
       fileId: fileRecord.id,

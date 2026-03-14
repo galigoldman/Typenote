@@ -1,6 +1,7 @@
 import { notFound } from 'next/navigation';
 import Link from 'next/link';
 import { createClient } from '@/lib/supabase/server';
+import { AiChatWrapper } from '@/components/ai/ai-chat-wrapper';
 import { DocumentCard } from '@/components/dashboard/document-card';
 import { CreateDocumentDialog } from '@/components/dashboard/create-document-dialog';
 import { WeekSection } from '@/components/dashboard/week-section';
@@ -123,6 +124,7 @@ export default async function CoursePage({
           </BreadcrumbList>
         </Breadcrumb>
         <div className="flex items-center gap-2">
+          <AiChatWrapper courseId={courseId} />
           <CreateDocumentDialog folderId={null} courseId={courseId}>
             <Button variant="outline" size="sm">
               New Document

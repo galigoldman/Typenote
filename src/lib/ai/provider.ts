@@ -1,5 +1,5 @@
 import { google } from '@ai-sdk/google';
-import type { LanguageModel } from 'ai';
+import type { EmbeddingModel, LanguageModel } from 'ai';
 
 // Mock model that always returns a fixed LaTeX expression
 // Used for initial development and testing
@@ -33,4 +33,16 @@ export function getModel(): LanguageModel {
   }
 
   return google('gemini-2.5-flash');
+}
+
+export function getEmbeddingModel(): EmbeddingModel<string> {
+  return google.embedding('gemini-embedding-2-preview');
+}
+
+export function getFlashModel() {
+  return google('gemini-2.5-flash');
+}
+
+export function getProModel() {
+  return google('gemini-2.5-pro');
 }
