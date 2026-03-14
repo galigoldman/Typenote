@@ -36,7 +36,8 @@ export async function POST(request: NextRequest) {
       .select()
       .single();
 
-    if (syncError) throw new Error(`Sync record failed: ${syncError.message}`);
+    if (syncError)
+      throw new Error(`Sync record failed: ${syncError.message}`);
 
     // Insert user_file_imports for each file
     const imports = body.fileIds.map((fileId) => ({

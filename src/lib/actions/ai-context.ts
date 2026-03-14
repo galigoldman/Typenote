@@ -190,18 +190,20 @@ export async function indexContent(source: IndexSource): Promise<IndexResult> {
     const rows: EmbeddingRow[] = [];
 
     if (mimeType === 'application/pdf' || mimeType.includes('presentationml') || mimeType.includes('powerpoint')) {
-      // Multimodal embedding — embed raw file as one segment
-      // For large PDFs, the Embedding 2 API handles up to 6 pages per call.
-      // We send the full file and let the API process it.
-      // TODO: For 500+ page PDFs, implement page-level splitting with a PDF library
+      // Direct multimodal embedding with Gemini Embedding 2.
+      // Sends raw PDF bytes — the model processes visual + text content.
       const embedding = await embedFileSegment(fileBuffer, mimeType);
+
+      if (!embedding.length) {
+        return { success: true, segmentsIndexed: 0, skipped: true };
+      }
 
       rows.push({
         source_type: sourceType,
         source_id: sourceId,
         segment_index: 0,
         page_start: 1,
-        page_end: null, // unknown without parsing — API handles internally
+        page_end: null,
         segment_text: null,
         embedding,
         user_id: userId,
@@ -335,14 +337,50 @@ export async function askQuestion(params: QuestionParams): Promise<QuestionResul
       });
     }
   } else {
-    // ----- RAG-only mode -----
+    // ----- RAG-only mode: search + download matched files -----
     const results = await searchContext({
       query: question,
       courseId,
       maxResults: 8,
     });
 
+    // Download actual files for matched results so the LLM can read them
+    const seen = new Set<string>();
     for (const r of results) {
+      if (seen.has(r.sourceId)) continue;
+      seen.add(r.sourceId);
+
+      try {
+        // Determine bucket based on source type
+        const bucket = r.sourceType === 'moodle_file' ? 'moodle-materials' : 'course-materials';
+        const client = r.sourceType === 'moodle_file' ? createAdminClient() : await createClient();
+
+        // Look up storage path
+        const table = r.sourceType === 'moodle_file' ? 'moodle_files' : 'course_materials';
+        const { data: fileRow } = await createAdminClient()
+          .from(table)
+          .select('storage_path, mime_type')
+          .eq('id', r.sourceId)
+          .single();
+
+        if (fileRow?.storage_path) {
+          const storagePath = fileRow.storage_path.startsWith('moodle:')
+            ? fileRow.storage_path.slice(7)
+            : fileRow.storage_path;
+          const { data: fileData } = await client.storage.from(bucket).download(storagePath);
+          if (fileData) {
+            const buffer = Buffer.from(await fileData.arrayBuffer());
+            fileParts.push({
+              type: 'file',
+              data: buffer,
+              mimeType: fileRow.mime_type ?? 'application/pdf',
+            });
+          }
+        }
+      } catch {
+        // Skip files that can't be downloaded
+      }
+
       sourcesUsed.push({
         sourceType: r.sourceType,
         sourceName: r.sourceName,
@@ -412,17 +450,14 @@ export async function askQuestion(params: QuestionParams): Promise<QuestionResul
   // Try shared context cache
   let cached = false;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const generateOptions: Record<string, any> = {
-    model: modelFn(),
-    messages,
-  };
+  let providerOptions: Record<string, any> | undefined;
 
   if (weekId && fileParts.length > 0) {
     try {
       const materialsHash = sourcesUsed.map((s) => s.sourceName).sort().join('|');
       const cacheResult = await getOrCreateCache(courseId, weekId, materialsHash);
       if (cacheResult.cacheName) {
-        generateOptions.providerOptions = {
+        providerOptions = {
           google: { cachedContent: cacheResult.cacheName },
         };
         cached = true;
@@ -432,7 +467,11 @@ export async function askQuestion(params: QuestionParams): Promise<QuestionResul
     }
   }
 
-  const { text: answer } = await generateText(generateOptions);
+  const { text: answer } = await generateText({
+    model: modelFn(),
+    messages,
+    ...(providerOptions ? { providerOptions } : {}),
+  });
 
   return {
     answer,

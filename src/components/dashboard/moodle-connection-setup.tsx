@@ -5,10 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useMoodleExtension } from '@/hooks/use-moodle-extension';
-import {
-  saveMoodleConnection,
-  removeMoodleConnection,
-} from '@/lib/actions/moodle-sync';
+import { saveMoodleConnection, removeMoodleConnection } from '@/lib/actions/moodle-sync';
 import { toast } from 'sonner';
 
 interface MoodleConnectionSetupProps {
@@ -18,30 +15,20 @@ interface MoodleConnectionSetupProps {
   } | null;
 }
 
-export function MoodleConnectionSetup({
-  currentConnection,
-}: MoodleConnectionSetupProps) {
+export function MoodleConnectionSetup({ currentConnection }: MoodleConnectionSetupProps) {
   const { isInstalled, isChecking } = useMoodleExtension();
-  const [url, setUrl] = useState(
-    currentConnection?.domain ? `https://${currentConnection.domain}` : '',
-  );
+  const [url, setUrl] = useState(currentConnection?.domain ? `https://${currentConnection.domain}` : '');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   if (isChecking) {
-    return (
-      <p className="text-sm text-muted-foreground">
-        Checking for Typenote extension...
-      </p>
-    );
+    return <p className="text-sm text-muted-foreground">Checking for Typenote extension...</p>;
   }
 
   if (!isInstalled) {
     return (
       <div className="rounded-lg border border-dashed p-4 text-center">
-        <p className="text-sm font-medium">
-          Typenote Moodle Extension Required
-        </p>
+        <p className="text-sm font-medium">Typenote Moodle Extension Required</p>
         <p className="mt-1 text-sm text-muted-foreground">
           Install the browser extension to sync your Moodle courses.
         </p>
@@ -79,9 +66,7 @@ export function MoodleConnectionSetup({
       await saveMoodleConnection(domain);
       toast.success('Moodle connection saved');
     } catch (err) {
-      setError(
-        err instanceof Error ? err.message : 'Failed to save connection',
-      );
+      setError(err instanceof Error ? err.message : 'Failed to save connection');
     } finally {
       setSaving(false);
     }
@@ -93,9 +78,7 @@ export function MoodleConnectionSetup({
       setUrl('');
       toast.success('Moodle connection removed');
     } catch (err) {
-      toast.error(
-        err instanceof Error ? err.message : 'Failed to remove connection',
-      );
+      toast.error(err instanceof Error ? err.message : 'Failed to remove connection');
     }
   }
 

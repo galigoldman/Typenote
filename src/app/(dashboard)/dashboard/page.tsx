@@ -30,10 +30,7 @@ export default async function DashboardPage() {
   if (user) {
     const connection = await getUserMoodleConnection(user.id);
     if (connection?.moodle_instances) {
-      const instance = connection.moodle_instances as {
-        id: string;
-        domain: string;
-      };
+      const instance = connection.moodle_instances as { id: string; domain: string };
       moodleConnection = {
         domain: instance.domain,
         instanceId: instance.id,
@@ -68,7 +65,7 @@ export default async function DashboardPage() {
     typedDocuments.length === 0;
 
   return (
-    <div className="h-full overflow-y-auto p-6">
+    <div className="p-6">
       <MoodleSyncPromptWrapper moodleConnection={moodleConnection} />
 
       <div className="mb-6 mt-4 flex items-center justify-between">

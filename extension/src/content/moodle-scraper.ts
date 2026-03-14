@@ -186,7 +186,10 @@ function parseActivity(activity: HTMLElement): ScrapedItem | null {
   const nameEl = activity.querySelector<HTMLAnchorElement>('.activityname a');
   if (!nameEl) return null;
 
-  const name = nameEl.textContent?.trim() ?? '';
+  // Get the visible text only — exclude Moodle's hidden accessibility spans
+  const nameClone = nameEl.cloneNode(true) as HTMLElement;
+  nameClone.querySelectorAll('.accesshide, .sr-only').forEach((el) => el.remove());
+  const name = nameClone.textContent?.trim() ?? '';
   const moodleUrl = nameEl.href ?? '';
   const modType = activity.dataset.modtype ?? '';
   const iconAlt =
@@ -206,7 +209,6 @@ function parseActivity(activity: HTMLElement): ScrapedItem | null {
   // Skip non-importable activities (forums, quizzes, assignments, LTI tools)
   const skipTypes = [
     'forum',
-    'assign',
     'quiz',
     'lti',
     'questionnaire',
@@ -222,8 +224,18 @@ function parseActivity(activity: HTMLElement): ScrapedItem | null {
     'survey',
   ];
   const baseModType = modType.split('_')[0];
-  if (!isFile && !isUrl && skipTypes.includes(baseModType)) {
+  if (skipTypes.includes(baseModType)) {
     return null;
+  }
+
+  // Assignments are not downloadable files — treat them as links
+  if (baseModType === 'assign' || moodleUrl.includes('/mod/assign/')) {
+    return {
+      type: 'link',
+      name,
+      moodleUrl,
+      externalUrl: moodleUrl,
+    };
   }
 
   // For files: extract file extension from modtype or icon

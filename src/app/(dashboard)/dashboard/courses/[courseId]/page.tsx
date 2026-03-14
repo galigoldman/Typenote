@@ -2,6 +2,7 @@ import { notFound } from 'next/navigation';
 import Link from 'next/link';
 import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
+import { AiChatWrapper } from '@/components/ai/ai-chat-wrapper';
 import { DocumentCard } from '@/components/dashboard/document-card';
 import { CreateDocumentDialog } from '@/components/dashboard/create-document-dialog';
 import { WeekSection } from '@/components/dashboard/week-section';
@@ -118,6 +119,10 @@ export default async function CoursePage({
       .eq('course_id', syncRecord.moodle_course_id)
       .order('position');
     const rawSections = ((sections ?? []) as MoodleSectionWithFiles[])
+      .map((s) => ({
+        ...s,
+        moodle_files: s.moodle_files.filter((f) => f.storage_path),
+      }))
       .filter((s) => s.moodle_files.length > 0);
 
     // Generate signed download URLs for files stored in Supabase Storage
@@ -162,7 +167,7 @@ export default async function CoursePage({
   const isEmpty = typedWeeks.length === 0 && courseDocuments.length === 0 && moodleSections.length === 0;
 
   return (
-    <div className="p-6">
+    <div className="h-full overflow-y-auto p-6">
       <div className="mb-6 flex items-center justify-between">
         <Breadcrumb>
           <BreadcrumbList>
@@ -190,6 +195,7 @@ export default async function CoursePage({
           </BreadcrumbList>
         </Breadcrumb>
         <div className="flex items-center gap-2">
+          <AiChatWrapper courseId={courseId} />
           <CreateDocumentDialog folderId={null} courseId={courseId}>
             <Button variant="outline" size="sm">
               New Document

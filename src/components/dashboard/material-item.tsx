@@ -23,9 +23,13 @@ export function MaterialItem({ material }: MaterialItemProps) {
 
   async function handleView() {
     const supabase = createClient();
+    const isMoodleRef = material.storage_path.startsWith('moodle:');
+    const bucket = isMoodleRef ? 'moodle-materials' : 'course-materials';
+    const path = isMoodleRef ? material.storage_path.slice(7) : material.storage_path;
+
     const { data } = await supabase.storage
-      .from('course-materials')
-      .createSignedUrl(material.storage_path, 3600);
+      .from(bucket)
+      .createSignedUrl(path, 3600);
 
     if (data?.signedUrl) {
       window.open(data.signedUrl, '_blank');
