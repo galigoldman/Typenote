@@ -34,15 +34,3 @@ export function getModel(): LanguageModel {
 
   return google('gemini-2.5-flash');
 }
-
-export function getEmbeddingModel() {
-  return google.embedding('gemini-embedding-2-preview');
-}
-
-export function getFlashModel() {
-  return google('gemini-2.5-flash');
-}
-
-export function getProModel() {
-  return google('gemini-2.5-pro');
-}
