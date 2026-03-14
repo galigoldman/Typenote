@@ -4,6 +4,7 @@ import { useCallback, useRef, useState } from 'react';
 import type { CanvasTool, Stroke } from '@/types/canvas';
 import { PAGE_WIDTH, PAGE_HEIGHT } from '@/types/canvas';
 import { isStrokeHit } from '@/lib/canvas/stroke-utils';
+import { lockScroll } from '@/lib/canvas/scroll-lock';
 
 export const DEFAULT_ERASER_RADIUS = 10;
 
@@ -21,6 +22,7 @@ export function useEraser({
   getPageStrokes,
 }: UseEraserOptions) {
   const isErasingRef = useRef(false);
+  const unlockScrollRef = useRef<(() => void) | null>(null);
   const [eraserPosition, setEraserPosition] = useState<{
     x: number;
     y: number;
@@ -45,6 +47,11 @@ export function useEraser({
 
       e.preventDefault();
       isErasingRef.current = true;
+
+      (e.target as HTMLElement).setPointerCapture(e.pointerId);
+
+      // LOCK all scrolling — nothing moves while pen is down
+      unlockScrollRef.current = lockScroll(e.target as HTMLElement);
 
       const interactionLayer = e.target as HTMLElement;
       const pageContainer = interactionLayer.parentElement;
@@ -88,6 +95,10 @@ export function useEraser({
       e.preventDefault();
       isErasingRef.current = false;
       setEraserPosition(null);
+
+      // UNLOCK scrolling — pen is up
+      unlockScrollRef.current?.();
+      unlockScrollRef.current = null;
     },
     [activeTool],
   );

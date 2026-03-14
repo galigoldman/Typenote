@@ -797,9 +797,12 @@ export function CanvasEditor({ document }: CanvasEditorProps) {
       <div className="flex flex-1 overflow-hidden">
         {/* Canvas scroll area */}
         <div
-          className="flex-1 overflow-y-auto bg-gray-100"
+          className="flex-1 bg-gray-100"
           data-scroll-container
           style={{
+            overflowY: activeTool === 'text' ? 'auto' : 'hidden',
+            touchAction: activeTool === 'text' ? 'auto' : 'none',
+            overscrollBehavior: 'none',
             userSelect: activeTool === 'text' ? 'auto' : 'none',
             WebkitUserSelect: activeTool === 'text' ? 'auto' : 'none',
           }}

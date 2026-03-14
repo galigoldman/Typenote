@@ -309,16 +309,26 @@ export function EditorToolbar({
 
       <VerticalSeparator />
 
-      {/* Indentation */}
+      {/* Indentation — nest list items when in a list, otherwise margin indent */}
       <ToolbarButton
-        onClick={() => editor.chain().focus().sinkListItem('listItem').run()}
-        disabled={!editor.can().sinkListItem('listItem')}
+        onClick={() => {
+          if (editor.can().sinkListItem('listItem')) {
+            editor.chain().focus().sinkListItem('listItem').run();
+          } else {
+            editor.chain().focus().indent().run();
+          }
+        }}
         icon={<Indent />}
         label="Indent"
       />
       <ToolbarButton
-        onClick={() => editor.chain().focus().liftListItem('listItem').run()}
-        disabled={!editor.can().liftListItem('listItem')}
+        onClick={() => {
+          if (editor.can().liftListItem('listItem')) {
+            editor.chain().focus().liftListItem('listItem').run();
+          } else {
+            editor.chain().focus().outdent().run();
+          }
+        }}
         icon={<Outdent />}
         label="Outdent"
       />

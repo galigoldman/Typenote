@@ -8,6 +8,7 @@ import TextAlign from '@tiptap/extension-text-align';
 import TaskList from '@tiptap/extension-task-list';
 import TaskItem from '@tiptap/extension-task-item';
 import LinkExt from '@tiptap/extension-link';
+import { Indent } from '@/lib/editor/indent-extension';
 import { EditorToolbar } from './editor-toolbar';
 import { TooltipProvider } from '@/components/ui/tooltip';
 
@@ -21,6 +22,7 @@ function createTestEditor(content = '<p>Hello world</p>') {
       TaskList,
       TaskItem.configure({ nested: true }),
       LinkExt.configure({ openOnClick: false }),
+      Indent,
     ],
     content,
   });

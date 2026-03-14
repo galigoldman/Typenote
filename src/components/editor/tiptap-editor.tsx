@@ -13,6 +13,7 @@ import type { SaveStatus } from '@/hooks/use-auto-save';
 import type { ConnectionStatus } from '@/hooks/use-realtime-sync';
 import { useDocumentSync } from '@/hooks/use-document-sync';
 import { AutoDirection } from '@/lib/editor/rtl-extension';
+import { Indent } from '@/lib/editor/indent-extension';
 import { MathExpression } from '@/lib/editor/math-extension';
 import { MathInputBox } from '@/lib/editor/math-input-box';
 import { EditorToolbar } from './editor-toolbar';
@@ -106,6 +107,7 @@ export function TiptapEditor({ document }: TiptapEditorProps) {
         },
       }),
       AutoDirection,
+      Indent,
       MathExpression,
     ],
     content: document.content as Record<string, unknown>,
