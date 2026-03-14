@@ -10,8 +10,10 @@ function getGenAI() {
 }
 
 /**
- * Embed a PDF or PPTX page segment directly via multimodal Embedding 2.
+ * Embed a PDF or PPTX file directly using Gemini Embedding 2 (multimodal).
  * Sends raw file bytes — no text extraction needed.
+ * The model processes visual and text content of each page.
+ * Max 6 pages per call.
  */
 export async function embedFileSegment(
   buffer: Buffer,
@@ -24,14 +26,10 @@ export async function embedFileSegment(
     model: EMBEDDING_MODEL,
     contents: [
       {
-        parts: [
-          {
-            inlineData: {
-              mimeType,
-              data: base64Data,
-            },
-          },
-        ],
+        inlineData: {
+          mimeType,
+          data: base64Data,
+        },
       },
     ],
     config: {

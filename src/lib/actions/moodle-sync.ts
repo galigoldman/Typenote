@@ -172,9 +172,10 @@ export async function syncMoodleCourses(
     if (error) {
       throw new Error(`Failed to create sync record: ${error.message}`);
     }
+
   }
 
-  revalidatePath('/dashboard');
+  revalidatePath('/', 'layout');
 
   return {
     syncedCount: syncResult.courses.length,

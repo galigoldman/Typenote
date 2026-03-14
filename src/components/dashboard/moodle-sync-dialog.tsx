@@ -703,7 +703,11 @@ export function MoodleSyncDialog({
         {phase === 'done' && (
           <div className="flex flex-col items-center gap-2 py-8">
             <p className="text-sm font-medium">
-              Successfully synced {syncedCount} {syncedCount === 1 ? 'course' : 'courses'}
+              {failedCount > 0 && downloadedCount === 0
+                ? `Sync failed — ${failedCount} ${failedCount === 1 ? 'file' : 'files'} could not be downloaded`
+                : failedCount > 0
+                  ? `Synced with errors — ${downloadedCount} downloaded, ${failedCount} failed`
+                  : `Successfully synced ${syncedCount} ${syncedCount === 1 ? 'course' : 'courses'}`}
             </p>
             <p className="text-xs text-muted-foreground">
               {downloadedCount > 0

@@ -111,6 +111,7 @@ export function SidebarFolderTree() {
   const [folders, setFolders] = useState<FolderType[]>([]);
   const [courses, setCourses] = useState<Course[]>([]);
   const [loading, setLoading] = useState(true);
+  const pathname = usePathname();
 
   useEffect(() => {
     async function fetchData() {
@@ -136,7 +137,7 @@ export function SidebarFolderTree() {
     }
 
     fetchData();
-  }, []);
+  }, [pathname]);
 
   const rootFolders = folders.filter((f) => f.parent_id === null);
   const rootCourses = courses.filter((c) => c.folder_id === null);

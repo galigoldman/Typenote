@@ -43,7 +43,8 @@ export async function GET(request: NextRequest) {
     console.error('Status check failed:', error);
     return NextResponse.json(
       {
-        error: error instanceof Error ? error.message : 'Status check failed',
+        error:
+          error instanceof Error ? error.message : 'Status check failed',
       },
       { status: 500 },
     );

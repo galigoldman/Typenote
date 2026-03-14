@@ -1,7 +1,8 @@
 'use client';
 
+import { useState } from 'react';
 import { MoodleSyncPrompt } from './moodle-sync-prompt';
-import { toast } from 'sonner';
+import { MoodleSyncDialog } from './moodle-sync-dialog';
 
 interface MoodleSyncPromptWrapperProps {
   moodleConnection: { domain: string; instanceId: string } | null;
@@ -10,14 +11,25 @@ interface MoodleSyncPromptWrapperProps {
 export function MoodleSyncPromptWrapper({
   moodleConnection,
 }: MoodleSyncPromptWrapperProps) {
+  const [dialogOpen, setDialogOpen] = useState(false);
+
   function handleSyncClick() {
-    toast.info('Sync dialog coming soon');
+    setDialogOpen(true);
   }
 
   return (
-    <MoodleSyncPrompt
-      moodleConnection={moodleConnection}
-      onSyncClick={handleSyncClick}
-    />
+    <>
+      <MoodleSyncPrompt
+        moodleConnection={moodleConnection}
+        onSyncClick={handleSyncClick}
+      />
+      {moodleConnection && (
+        <MoodleSyncDialog
+          open={dialogOpen}
+          onOpenChange={setDialogOpen}
+          moodleConnection={moodleConnection}
+        />
+      )}
+    </>
   );
 }
