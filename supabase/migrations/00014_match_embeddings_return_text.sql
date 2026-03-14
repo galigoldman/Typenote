@@ -1,5 +1,6 @@
 -- Update match_embeddings to return segment_text so RAG can use stored text
 -- instead of re-downloading files.
+drop function if exists match_embeddings(vector,uuid,uuid,uuid,integer,double precision);
 create or replace function match_embeddings(
   query_embedding vector(1536),
   match_user_id uuid,
