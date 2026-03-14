@@ -2,13 +2,11 @@
 
 import crypto from 'crypto';
 
-import { generateText } from 'ai';
+import { GoogleGenAI } from '@google/genai';
 
-import { getOrCreateCache } from '@/lib/ai/context-cache';
 import { embedFileSegments, embedQuery, embedText } from '@/lib/ai/embeddings';
 import { extractDocxText } from '@/lib/ai/extraction/docx';
 import { SYSTEM_PROMPT } from '@/lib/ai/prompts';
-import { getFlashModel, getProModel } from '@/lib/ai/provider';
 import {
   deleteEmbeddingsBySource,
   getContentHash,
@@ -345,7 +343,6 @@ export async function askQuestion(params: QuestionParams): Promise<QuestionResul
       courseId,
       maxResults: 8,
     });
-
     // Download actual files for matched results so the LLM can read them
     const seen = new Set<string>();
     const admin = createAdminClient();
@@ -389,90 +386,90 @@ export async function askQuestion(params: QuestionParams): Promise<QuestionResul
     }
   }
 
-  // Build messages
+  // Build multi-turn contents for Gemini
+  const genai = new GoogleGenAI({
+    apiKey: process.env.GOOGLE_GENERATIVE_AI_API_KEY ?? '',
+  });
+
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const contentParts: any[] = [];
+  const contents: Array<{ role: string; parts: any[] }> = [];
 
-  // Add file parts (raw PDFs for Gemini to read)
-  for (const fp of fileParts) {
-    contentParts.push({
-      type: 'file',
-      data: fp.data,
-      mimeType: fp.mimeType,
+  if (fileParts.length > 0) {
+    // Turn 1: User sends files + context instruction
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const fileContentParts: any[] = fileParts.map((fp) => ({
+      inlineData: {
+        mimeType: fp.mimeType,
+        data: fp.data.toString('base64'),
+      },
+    }));
+    fileContentParts.push({
+      text: 'I have attached course materials. Review them to answer my questions.',
+    });
+    contents.push({ role: 'user', parts: fileContentParts });
+
+    // Turn 2: Model acknowledges
+    contents.push({
+      role: 'model',
+      parts: [{ text: 'I have reviewed the course materials. Please ask your question.' }],
     });
   }
 
-  // If no files were downloaded, don't pretend we have materials
-  if (fileParts.length === 0) {
-    contentParts.push({
-      type: 'text',
-      text: 'No course materials could be loaded. Tell the user you cannot answer without materials.',
-    });
-  }
-
-  // Build conversation
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const messages: any[] = [
-    { role: 'system', content: SYSTEM_PROMPT },
-  ];
-
-  // Add context message with file parts
-  if (contentParts.length > 0) {
-    contentParts.push({
-      type: 'text',
-      text: 'I have attached the course materials above. Please review them to answer my question.',
-    });
-
-    messages.push({ role: 'user', content: contentParts });
-    messages.push({
-      role: 'assistant',
-      content: 'I have reviewed the course materials. Please ask your question.',
-    });
-  }
-
-  // Add conversation history
+  // Add conversation history as alternating turns
+  // Gemini requires strict role alternation (user/model/user/model).
+  // Guard: merge consecutive same-role messages to avoid API errors.
   if (conversationHistory?.length) {
     for (const msg of conversationHistory) {
-      messages.push({ role: msg.role, content: msg.content });
-    }
-  }
-
-  // Add the current question
-  messages.push({ role: 'user', content: question });
-
-  // Select model
-  const modelFn = mode === 'deep' ? getProModel : getFlashModel;
-
-  // Try shared context cache
-  let cached = false;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  let providerOptions: Record<string, any> | undefined;
-
-  if (weekId && fileParts.length > 0) {
-    try {
-      const materialsHash = sourcesUsed.map((s) => s.sourceName).sort().join('|');
-      const cacheResult = await getOrCreateCache(courseId, weekId, materialsHash);
-      if (cacheResult.cacheName) {
-        providerOptions = {
-          google: { cachedContent: cacheResult.cacheName },
-        };
-        cached = true;
+      const role = msg.role === 'user' ? 'user' : 'model';
+      const lastTurn = contents[contents.length - 1];
+      if (lastTurn && lastTurn.role === role) {
+        // Merge into previous turn to maintain alternation
+        lastTurn.parts.push({ text: msg.content });
+      } else {
+        contents.push({ role, parts: [{ text: msg.content }] });
       }
-    } catch {
-      // Cache is optional
     }
   }
 
-  const { text: answer } = await generateText({
-    model: modelFn(),
-    messages,
-    ...(providerOptions ? { providerOptions } : {}),
+  // Final turn: the actual question
+  if (fileParts.length === 0) {
+    contents.push({
+      role: 'user',
+      parts: [{ text: `${question}\n\n(No course materials were loaded. Say you cannot answer without materials.)` }],
+    });
+  } else {
+    // Guard: if last turn is already 'user' (from history), merge question into it
+    const lastTurn = contents[contents.length - 1];
+    if (lastTurn && lastTurn.role === 'user') {
+      lastTurn.parts.push({ text: question });
+    } else {
+      contents.push({
+        role: 'user',
+        parts: [{ text: question }],
+      });
+    }
+  }
+
+  const modelName = mode === 'deep' ? 'gemini-2.5-pro' : 'gemini-2.5-flash';
+
+  // Note: Context caching is deferred — context-cache.ts only supports text content,
+  // not multimodal PDF inlineData. Caching multimodal content requires updating the
+  // cache module to pass inlineData parts instead of text. Tracked as follow-up.
+
+  const result = await genai.models.generateContent({
+    model: modelName,
+    contents,
+    config: {
+      systemInstruction: SYSTEM_PROMPT,
+    },
   });
+
+  const answer = result.text ?? 'No response generated.';
 
   return {
     answer,
     sources: sourcesUsed,
     model: mode === 'deep' ? 'pro' : 'flash',
-    cached,
+    cached: false,
   };
 }

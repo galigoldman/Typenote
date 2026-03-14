@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('@/lib/ai/embeddings', () => ({
-  embedFileSegment: vi.fn(async () => Array.from({ length: 1536 }, () => 0.1)),
+  embedFileSegments: vi.fn(async () => [{ embedding: Array.from({ length: 1536 }, () => 0.1), pageStart: 1, pageEnd: 1 }]),
   embedText: vi.fn(async () => Array.from({ length: 1536 }, () => 0.1)),
   embedQuery: vi.fn(async () => Array.from({ length: 1536 }, () => 0.1)),
 }));
@@ -78,26 +78,21 @@ vi.mock('@/lib/supabase/admin', () => ({
   })),
 }));
 
-vi.mock('ai', () => ({
-  generateText: vi.fn(async () => ({
-    text: 'This is the AI answer based on the lecture materials.',
-  })),
+const mockGenerateContent = vi.fn(async () => ({
+  text: 'This is the AI answer based on the lecture materials.',
 }));
 
-vi.mock('@/lib/ai/provider', () => ({
-  getFlashModel: vi.fn(() => 'mock-flash'),
-  getProModel: vi.fn(() => 'mock-pro'),
-}));
-
-vi.mock('@/lib/ai/context-cache', () => ({
-  getOrCreateCache: vi.fn(async () => ({ cacheName: null, isNew: false })),
+vi.mock('@google/genai', () => ({
+  GoogleGenAI: class MockGenAI {
+    models = { generateContent: mockGenerateContent };
+  },
 }));
 
 vi.mock('@/lib/ai/prompts', () => ({
   SYSTEM_PROMPT: 'You are a test tutor.',
 }));
 
-import { embedFileSegment } from '@/lib/ai/embeddings';
+import { embedFileSegments } from '@/lib/ai/embeddings';
 import { getContentHash, upsertEmbeddings } from '@/lib/queries/embeddings';
 
 import { askQuestion, indexContent, searchContext } from '../ai-context';
@@ -118,7 +113,7 @@ describe('indexContent', () => {
     expect(result.success).toBe(true);
     expect(result.skipped).toBe(false);
     expect(result.segmentsIndexed).toBe(1);
-    expect(embedFileSegment).toHaveBeenCalledWith(
+    expect(embedFileSegments).toHaveBeenCalledWith(
       expect.any(Buffer),
       'application/pdf',
     );
@@ -134,10 +129,7 @@ describe('indexContent', () => {
   });
 
   it('skips indexing when content hash matches', async () => {
-    // Mock: any buffer will produce the same hash
     vi.mocked(getContentHash).mockResolvedValueOnce(
-      // The hash will be computed from Buffer.from(await Blob(['fake file content']).arrayBuffer())
-      // We can't predict it, so just test that getContentHash is called
       'will-not-match',
     );
 
@@ -148,7 +140,6 @@ describe('indexContent', () => {
       weekId: 'week-1',
     });
 
-    // Won't skip because hash doesn't match, but that's ok — we're testing the flow
     expect(result.success).toBe(true);
     expect(getContentHash).toHaveBeenCalledWith('course_material', 'mat-1');
   });
@@ -201,7 +192,7 @@ describe('searchContext', () => {
 });
 
 describe('askQuestion', () => {
-  it('generates an answer using flash model', async () => {
+  it('generates an answer using flash model in quick mode', async () => {
     const result = await askQuestion({
       question: 'What is an integral?',
       courseId: 'course-1',
@@ -210,5 +201,57 @@ describe('askQuestion', () => {
 
     expect(result.answer).toContain('AI answer');
     expect(result.model).toBe('flash');
+    expect(mockGenerateContent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        model: 'gemini-2.5-flash',
+        config: expect.objectContaining({
+          systemInstruction: expect.any(String),
+        }),
+      }),
+    );
+  });
+
+  it('uses multi-turn contents when files are provided', async () => {
+    const { matchEmbeddings } = await import('@/lib/queries/embeddings');
+    vi.mocked(matchEmbeddings).mockResolvedValueOnce([
+      {
+        id: 1,
+        source_type: 'moodle_file',
+        source_id: 'file-1',
+        source_name: 'Lecture.pdf',
+        page_start: 1,
+        page_end: 6,
+        course_id: 'course-1',
+        week_id: 'week-1',
+        mime_type: 'application/pdf',
+        similarity: 0.85,
+      },
+    ]);
+
+    await askQuestion({
+      question: 'What is an integral?',
+      courseId: 'course-1',
+      mode: 'quick',
+    });
+
+    const call = mockGenerateContent.mock.calls[0][0];
+    // Should have multiple turns: user (files) → model (ack) → user (question)
+    expect(call.contents.length).toBeGreaterThanOrEqual(2);
+    expect(call.contents[0].role).toBe('user');
+    expect(call.contents[call.contents.length - 1].role).toBe('user');
+  });
+
+  it('uses pro model in deep mode', async () => {
+    await askQuestion({
+      question: 'Explain eigenvalues',
+      courseId: 'course-1',
+      mode: 'deep',
+    });
+
+    expect(mockGenerateContent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        model: 'gemini-2.5-pro',
+      }),
+    );
   });
 });
