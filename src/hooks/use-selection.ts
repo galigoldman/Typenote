@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useRef, useState } from 'react';
-import type { CanvasTool, Stroke, BBox } from '@/types/canvas';
+import type { CanvasTool, Stroke, TextBox, BBox } from '@/types/canvas';
 import { PAGE_WIDTH, PAGE_HEIGHT } from '@/types/canvas';
 import {
   isStrokeInSelection,
@@ -15,9 +15,17 @@ type SelectionState = 'idle' | 'drawing' | 'selected' | 'dragging';
 interface UseSelectionOptions {
   activeTool: CanvasTool;
   getPageStrokes: (pageId: string) => Stroke[];
+  getPageTextBoxes: (pageId: string) => TextBox[];
   onStrokesMove: (
     pageId: string,
     movedStrokes: { id: string; points: Stroke['points']; bbox: BBox }[],
+  ) => void;
+  onTextBoxMove?: (pageId: string, textBoxId: string, dx: number, dy: number) => void;
+  onModeChange?: (mode: CanvasTool) => void;
+  onDeleteSelected?: (
+    pageId: string,
+    strokeIds: string[],
+    textBoxIds: string[],
   ) => void;
 }
 
@@ -25,31 +33,37 @@ interface UseSelectionReturn {
   handlePointerDown: (e: React.PointerEvent, pageId: string) => void;
   handlePointerMove: (e: React.PointerEvent, pageId: string) => void;
   handlePointerUp: (e: React.PointerEvent, pageId: string) => void;
-  /** Points of the lasso/rect being drawn */
   selectionPath: [number, number][] | null;
-  /** IDs of currently selected strokes */
   selectedStrokeIds: Set<string>;
-  /** Bounding box of all selected strokes */
+  selectedTextBoxIds: Set<string>;
   selectionBBox: BBox | null;
-  /** Whether rectangle selection mode (vs freeform lasso) */
   isRectMode: boolean;
-  /** Whether currently dragging selected objects */
   isDragging: boolean;
-  /** Drag offset for visual feedback */
   dragOffset: { x: number; y: number };
-  /** Clear the current selection */
   clearSelection: () => void;
+  deleteSelected: () => void;
 }
+
+const TAP_THRESHOLD = 5;
+const DOUBLE_TAP_DELAY = 300;
+const DOUBLE_TAP_DISTANCE = 15;
 
 export function useSelection({
   activeTool,
   getPageStrokes,
+  getPageTextBoxes,
   onStrokesMove,
+  onTextBoxMove,
+  onModeChange,
+  onDeleteSelected,
 }: UseSelectionOptions): UseSelectionReturn {
   const [selectionPath, setSelectionPath] = useState<[number, number][] | null>(
     null,
   );
   const [selectedStrokeIds, setSelectedStrokeIds] = useState<Set<string>>(
+    new Set(),
+  );
+  const [selectedTextBoxIds, setSelectedTextBoxIds] = useState<Set<string>>(
     new Set(),
   );
   const [selectionBBox, setSelectionBBox] = useState<BBox | null>(null);
@@ -62,6 +76,10 @@ export function useSelection({
   const startPointRef = useRef<[number, number] | null>(null);
   const dragStartRef = useRef<{ x: number; y: number } | null>(null);
   const selectedStrokesRef = useRef<Stroke[]>([]);
+  const selectedTextBoxIdsRef = useRef<Set<string>>(new Set());
+  const lastTapRef = useRef<{ time: number; x: number; y: number } | null>(
+    null,
+  );
 
   const screenToPageCoords = (
     e: React.PointerEvent,
@@ -80,19 +98,54 @@ export function useSelection({
     stateRef.current = 'idle';
     setSelectionPath(null);
     setSelectedStrokeIds(new Set());
+    setSelectedTextBoxIds(new Set());
     setSelectionBBox(null);
     setIsDragging(false);
     setDragOffset({ x: 0, y: 0 });
     selectedStrokesRef.current = [];
+    selectedTextBoxIdsRef.current = new Set();
     activePageIdRef.current = null;
     startPointRef.current = null;
     dragStartRef.current = null;
   }, []);
 
+  const deleteSelected = useCallback(() => {
+    if (!activePageIdRef.current) return;
+    if (selectedStrokesRef.current.length === 0 && selectedTextBoxIdsRef.current.size === 0) return;
+    onDeleteSelected?.(
+      activePageIdRef.current,
+      selectedStrokesRef.current.map((s) => s.id),
+      Array.from(selectedTextBoxIdsRef.current),
+    );
+    clearSelection();
+  }, [onDeleteSelected, clearSelection]);
+
+  const computeUnionBBox = (
+    strokes: Stroke[],
+    textBoxes: TextBox[],
+  ): BBox | null => {
+    const bboxes: BBox[] = [];
+    for (const s of strokes) bboxes.push(s.bbox);
+    for (const tb of textBoxes) {
+      bboxes.push({
+        minX: tb.x,
+        minY: tb.y,
+        maxX: tb.x + tb.width,
+        maxY: tb.y + tb.height,
+      });
+    }
+    if (bboxes.length === 0) return null;
+    return {
+      minX: Math.min(...bboxes.map((b) => b.minX)),
+      minY: Math.min(...bboxes.map((b) => b.minY)),
+      maxX: Math.max(...bboxes.map((b) => b.maxX)),
+      maxY: Math.max(...bboxes.map((b) => b.maxY)),
+    };
+  };
+
   const handlePointerDown = useCallback(
     (e: React.PointerEvent, pageId: string) => {
-      if (e.pointerType !== 'pen') return;
-      if (activeTool !== ('selection' as CanvasTool)) return;
+      if (activeTool !== 'select') return;
 
       e.preventDefault();
       (e.target as HTMLElement).setPointerCapture(e.pointerId);
@@ -122,15 +175,14 @@ export function useSelection({
       activePageIdRef.current = pageId;
       startPointRef.current = [x, y];
       setSelectionPath([[x, y]]);
-      setIsRectMode(true); // default to rect
+      setIsRectMode(true);
     },
     [activeTool, selectionBBox, clearSelection],
   );
 
   const handlePointerMove = useCallback(
     (e: React.PointerEvent, _pageId: string) => {
-      if (e.pointerType !== 'pen') return;
-      if (activeTool !== ('selection' as CanvasTool)) return;
+      if (activeTool !== 'select') return;
 
       const { x, y } = screenToPageCoords(e);
 
@@ -152,23 +204,108 @@ export function useSelection({
 
   const handlePointerUp = useCallback(
     (e: React.PointerEvent, pageId: string) => {
-      if (e.pointerType !== 'pen') return;
-      if (activeTool !== ('selection' as CanvasTool)) return;
+      if (activeTool !== 'select') return;
 
       e.preventDefault();
 
       if (stateRef.current === 'drawing') {
-        // Finalize selection — run hit detection
         const targetPageId = activePageIdRef.current ?? pageId;
         const strokes = getPageStrokes(targetPageId);
+        const textBoxes = getPageTextBoxes(targetPageId);
+        const { x, y } = screenToPageCoords(e);
 
+        // Check if it's a tap (small movement)
+        const isTap =
+          startPointRef.current &&
+          Math.abs(x - startPointRef.current[0]) < TAP_THRESHOLD &&
+          Math.abs(y - startPointRef.current[1]) < TAP_THRESHOLD;
+
+        if (isTap) {
+          // Double-tap detection
+          const now = Date.now();
+          const last = lastTapRef.current;
+          if (
+            last &&
+            now - last.time < DOUBLE_TAP_DELAY &&
+            Math.hypot(x - last.x, y - last.y) < DOUBLE_TAP_DISTANCE
+          ) {
+            // Double-tap — check if on a text box → switch to Type mode
+            const tappedTextBox = textBoxes.find(
+              (tb) =>
+                x >= tb.x &&
+                x <= tb.x + tb.width &&
+                y >= tb.y &&
+                y <= tb.y + tb.height,
+            );
+            if (tappedTextBox) {
+              clearSelection();
+              lastTapRef.current = null;
+              onModeChange?.('text');
+              return;
+            }
+          }
+          lastTapRef.current = { time: now, x, y };
+
+          // Single tap — select one object at tap point
+          // Check text boxes first (they render on top)
+          const tappedTextBox = textBoxes.find(
+            (tb) =>
+              x >= tb.x &&
+              x <= tb.x + tb.width &&
+              y >= tb.y &&
+              y <= tb.y + tb.height,
+          );
+          if (tappedTextBox) {
+            stateRef.current = 'selected';
+            activePageIdRef.current = targetPageId;
+            const tbIds = new Set([tappedTextBox.id]);
+            setSelectedTextBoxIds(tbIds);
+            selectedTextBoxIdsRef.current = tbIds;
+            setSelectedStrokeIds(new Set());
+            selectedStrokesRef.current = [];
+            setSelectionBBox(
+              computeUnionBBox([], [tappedTextBox]),
+            );
+            setSelectionPath(null);
+            return;
+          }
+
+          // Check strokes (tap within 10px of any stroke point)
+          const tappedStroke = strokes.find((s) => {
+            if (
+              x < s.bbox.minX - 10 ||
+              x > s.bbox.maxX + 10 ||
+              y < s.bbox.minY - 10 ||
+              y > s.bbox.maxY + 10
+            )
+              return false;
+            return s.points.some(
+              ([px, py]) => Math.hypot(px - x, py - y) < 10 + s.width / 2,
+            );
+          });
+          if (tappedStroke) {
+            stateRef.current = 'selected';
+            activePageIdRef.current = targetPageId;
+            setSelectedStrokeIds(new Set([tappedStroke.id]));
+            selectedStrokesRef.current = [tappedStroke];
+            setSelectedTextBoxIds(new Set());
+            selectedTextBoxIdsRef.current = new Set();
+            setSelectionBBox(getSelectionBBox([tappedStroke]));
+            setSelectionPath(null);
+            return;
+          }
+
+          // Tapped empty space
+          clearSelection();
+          return;
+        }
+
+        // Rectangle selection — run hit detection
         if (
           selectionPath &&
           selectionPath.length >= 2 &&
           startPointRef.current
         ) {
-          // For rect mode, build rect polygon from start and current point
-          const { x, y } = screenToPageCoords(e);
           const [sx, sy] = startPointRef.current;
 
           const rectPolygon: [number, number][] = [
@@ -178,33 +315,52 @@ export function useSelection({
             [Math.min(sx, x), Math.max(sy, y)],
           ];
 
-          // Use rect for hit detection (simpler & more reliable)
-          const selectionRect = {
+          const selectionRect: BBox = {
             minX: Math.min(sx, x),
             minY: Math.min(sy, y),
             maxX: Math.max(sx, x),
             maxY: Math.max(sy, y),
           };
 
-          const selected: string[] = [];
           const selectedStrokes: Stroke[] = [];
+          const selectedTbIds: string[] = [];
+          const selectedTbs: TextBox[] = [];
 
+          // Hit-test strokes
           for (const stroke of strokes) {
-            // Broad-phase: bbox must intersect selection rect
             if (!aabbIntersectsRect(stroke.bbox, selectionRect)) continue;
-
-            // Narrow-phase: any point inside rect polygon
             if (isStrokeInSelection(stroke, rectPolygon)) {
-              selected.push(stroke.id);
               selectedStrokes.push(stroke);
             }
           }
 
-          if (selected.length > 0) {
+          // Hit-test text boxes
+          for (const tb of textBoxes) {
+            const tbBox: BBox = {
+              minX: tb.x,
+              minY: tb.y,
+              maxX: tb.x + tb.width,
+              maxY: tb.y + tb.height,
+            };
+            if (aabbIntersectsRect(tbBox, selectionRect)) {
+              selectedTbIds.push(tb.id);
+              selectedTbs.push(tb);
+            }
+          }
+
+          if (selectedStrokes.length > 0 || selectedTbIds.length > 0) {
             stateRef.current = 'selected';
-            setSelectedStrokeIds(new Set(selected));
-            setSelectionBBox(getSelectionBBox(selectedStrokes));
+            activePageIdRef.current = targetPageId;
+            setSelectedStrokeIds(
+              new Set(selectedStrokes.map((s) => s.id)),
+            );
             selectedStrokesRef.current = selectedStrokes;
+            const tbIdSet = new Set(selectedTbIds);
+            setSelectedTextBoxIds(tbIdSet);
+            selectedTextBoxIdsRef.current = tbIdSet;
+            setSelectionBBox(
+              computeUnionBBox(selectedStrokes, selectedTbs),
+            );
             setSelectionPath(null);
           } else {
             clearSelection();
@@ -223,21 +379,45 @@ export function useSelection({
           const dx = dragOffset.x;
           const dy = dragOffset.y;
 
-          const movedStrokes = selectedStrokesRef.current.map((stroke) => {
-            const newPoints = stroke.points.map(
-              ([px, py, pressure]) =>
-                [px + dx, py + dy, pressure] as Stroke['points'][0],
+          // Move strokes
+          if (selectedStrokesRef.current.length > 0) {
+            const movedStrokes = selectedStrokesRef.current.map((stroke) => {
+              const newPoints = stroke.points.map(
+                ([px, py, pressure]) =>
+                  [px + dx, py + dy, pressure] as Stroke['points'][0],
+              );
+              return {
+                id: stroke.id,
+                points: newPoints,
+                bbox: computeBBox(newPoints),
+              };
+            });
+            onStrokesMove(targetPageId, movedStrokes);
+
+            // Update cached strokes
+            selectedStrokesRef.current = selectedStrokesRef.current.map(
+              (stroke) => ({
+                ...stroke,
+                points: stroke.points.map(
+                  ([px, py, pressure]) =>
+                    [px + dx, py + dy, pressure] as Stroke['points'][0],
+                ),
+                bbox: computeBBox(
+                  stroke.points.map(
+                    ([px, py, pressure]) =>
+                      [px + dx, py + dy, pressure] as Stroke['points'][0],
+                  ),
+                ),
+              }),
             );
-            return {
-              id: stroke.id,
-              points: newPoints,
-              bbox: computeBBox(newPoints),
-            };
-          });
+          }
 
-          onStrokesMove(targetPageId, movedStrokes);
+          // Move text boxes
+          for (const tbId of selectedTextBoxIdsRef.current) {
+            onTextBoxMove?.(targetPageId, tbId, dx, dy);
+          }
 
-          // Update selection bbox to reflect new position
+          // Update selection bbox
           if (selectionBBox) {
             setSelectionBBox({
               minX: selectionBBox.minX + dx,
@@ -246,23 +426,6 @@ export function useSelection({
               maxY: selectionBBox.maxY + dy,
             });
           }
-
-          // Update cached strokes
-          selectedStrokesRef.current = selectedStrokesRef.current.map(
-            (stroke) => ({
-              ...stroke,
-              points: stroke.points.map(
-                ([px, py, pressure]) =>
-                  [px + dx, py + dy, pressure] as Stroke['points'][0],
-              ),
-              bbox: computeBBox(
-                stroke.points.map(
-                  ([px, py, pressure]) =>
-                    [px + dx, py + dy, pressure] as Stroke['points'][0],
-                ),
-              ),
-            }),
-          );
         }
 
         setIsDragging(false);
@@ -277,7 +440,10 @@ export function useSelection({
       selectionBBox,
       dragOffset,
       getPageStrokes,
+      getPageTextBoxes,
       onStrokesMove,
+      onTextBoxMove,
+      onModeChange,
       clearSelection,
     ],
   );
@@ -288,10 +454,12 @@ export function useSelection({
     handlePointerUp,
     selectionPath,
     selectedStrokeIds,
+    selectedTextBoxIds,
     selectionBBox,
     isRectMode,
     isDragging,
     dragOffset,
     clearSelection,
+    deleteSelected,
   };
 }
