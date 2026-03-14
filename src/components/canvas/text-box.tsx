@@ -85,7 +85,7 @@ export function TextBox({
 
   return (
     <div
-      className={`absolute overflow-hidden ${
+      className={`absolute ${
         isSelected
           ? 'border-2 border-blue-500 shadow-sm'
           : 'border border-transparent'
