@@ -5,6 +5,7 @@ import { getStroke } from 'perfect-freehand';
 import type { CanvasTool, Stroke, StrokePoint } from '@/types/canvas';
 import { PAGE_WIDTH, PAGE_HEIGHT } from '@/types/canvas';
 import { getSvgPathFromStroke, computeBBox } from '@/lib/canvas/stroke-utils';
+import { lockScroll } from '@/lib/canvas/scroll-lock';
 
 interface UseDrawingOptions {
   activeTool: CanvasTool;
@@ -28,6 +29,8 @@ export function useDrawing({
   const activePageIdRef = useRef<string | null>(null);
   const workingCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const firedNearBottomRef = useRef(false);
+  const cachedRectRef = useRef<DOMRect | null>(null);
+  const unlockScrollRef = useRef<(() => void) | null>(null);
 
   const isDrawTool = activeTool === 'pen' || activeTool === 'highlighter';
 
@@ -43,8 +46,9 @@ export function useDrawing({
     e: React.PointerEvent,
     target: EventTarget,
   ): { x: number; y: number } => {
-    const interactionLayer = target as HTMLElement;
-    const rect = interactionLayer.getBoundingClientRect();
+    const rect =
+      cachedRectRef.current ??
+      (target as HTMLElement).getBoundingClientRect();
     const scaleX = PAGE_WIDTH / rect.width;
     const scaleY = PAGE_HEIGHT / rect.height;
     return {
@@ -58,7 +62,6 @@ export function useDrawing({
       const ctx = canvas.getContext('2d');
       if (!ctx) return;
 
-      // Clear working canvas
       ctx.save();
       ctx.setTransform(1, 0, 0, 1, 0, 0);
       ctx.clearRect(0, 0, canvas.width, canvas.height);
@@ -100,6 +103,14 @@ export function useDrawing({
 
       (e.target as HTMLElement).setPointerCapture(e.pointerId);
 
+      // LOCK all scrolling — nothing moves while pen is down
+      unlockScrollRef.current = lockScroll(e.target as HTMLElement);
+
+      // Snapshot the interaction layer rect — reuse for the entire stroke
+      cachedRectRef.current = (
+        e.target as HTMLElement
+      ).getBoundingClientRect();
+
       const { x, y } = screenToPageCoords(e, e.target);
       const pressure = Math.round(e.pressure * 100) / 100;
       currentPointsRef.current = [[x, y, pressure]];
@@ -126,7 +137,6 @@ export function useDrawing({
         );
       }
 
-      // Notify when drawing in bottom 15% of the page (fires once per stroke)
       if (
         !firedNearBottomRef.current &&
         y > PAGE_HEIGHT * 0.85 &&
@@ -146,6 +156,11 @@ export function useDrawing({
 
       e.preventDefault();
       isDrawingRef.current = false;
+
+      // UNLOCK scrolling — pen is up
+      unlockScrollRef.current?.();
+      unlockScrollRef.current = null;
+
       const points = currentPointsRef.current;
 
       if (points.length < 2) {
@@ -184,6 +199,7 @@ export function useDrawing({
       currentPointsRef.current = [];
       activePageIdRef.current = null;
       workingCanvasRef.current = null;
+      cachedRectRef.current = null;
     },
     [onStrokeComplete, penColor, penSize, penOpacity],
   );

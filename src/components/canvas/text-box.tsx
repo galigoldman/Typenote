@@ -9,6 +9,7 @@ import TaskList from '@tiptap/extension-task-list';
 import TaskItem from '@tiptap/extension-task-item';
 import LinkExt from '@tiptap/extension-link';
 import { AutoDirection } from '@/lib/editor/rtl-extension';
+import { Indent } from '@/lib/editor/indent-extension';
 import type { TextBox as TextBoxData } from '@/types/canvas';
 import type { Editor } from '@tiptap/core';
 
@@ -56,6 +57,7 @@ export function TextBox({
         HTMLAttributes: { class: 'text-primary underline cursor-pointer' },
       }),
       AutoDirection,
+      Indent,
     ],
     content: safeContent,
     editorProps: {

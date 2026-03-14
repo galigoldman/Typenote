@@ -10,6 +10,7 @@ import TaskItem from '@tiptap/extension-task-item';
 import LinkExt from '@tiptap/extension-link';
 import HighlightExt from '@tiptap/extension-highlight';
 import { AutoDirection } from '@/lib/editor/rtl-extension';
+import { Indent } from '@/lib/editor/indent-extension';
 import type { CanvasPage as CanvasPageData, CanvasTool } from '@/types/canvas';
 import { PAGE_WIDTH, PAGE_HEIGHT } from '@/types/canvas';
 import { setupHighDPICanvas } from '@/lib/canvas/coordinate-utils';
@@ -89,15 +90,10 @@ export function CanvasPage({
   }, []);
 
   // Native event listeners for pen and touch.
-  //
-  // PEN (Apple Pencil): Must NEVER scroll. We preventDefault on pointer events
-  // AND forcibly set overflow-y:hidden on the scroll container while the pen
-  // is down — this is the only reliable way on iPad Safari, where
-  // touch-action / preventDefault alone can still let the compositor scroll.
-  //
-  // FINGER: touch-action:none blocks native scrolling, so we manually scroll
-  // via TouchEvent listeners. On iOS, TouchEvent fires only for fingers,
-  // never for Apple Pencil, so this cleanly separates the two.
+  // FINGER scroll: In Draw/Eraser mode the scroll container has overflow:hidden
+  // (set by canvas-editor), so native scrolling is blocked. We manually scroll
+  // via TouchEvent listeners. On iOS, TouchEvent fires only for fingers, never
+  // for Apple Pencil, so this cleanly separates pen drawing from finger scrolling.
   useEffect(() => {
     const el = interactionLayerRef.current;
     if (!el) return;
@@ -106,28 +102,6 @@ export function CanvasPage({
       '[data-scroll-container]',
     ) as HTMLElement | null;
 
-    // ── Pen handlers ──
-    const handlePenDown = (e: PointerEvent) => {
-      if (e.pointerType === 'pen') {
-        e.preventDefault();
-        if (scrollContainer) scrollContainer.style.overflowY = 'hidden';
-      }
-    };
-
-    const handlePenMove = (e: PointerEvent) => {
-      if (e.pointerType === 'pen') {
-        e.preventDefault();
-      }
-    };
-
-    const handlePenEnd = (e: PointerEvent) => {
-      if (e.pointerType === 'pen') {
-        e.preventDefault();
-        if (scrollContainer) scrollContainer.style.overflowY = 'auto';
-      }
-    };
-
-    // ── Finger scroll handlers ──
     let touchStartY = 0;
     let scrollStartTop = 0;
 
@@ -144,22 +118,12 @@ export function CanvasPage({
       e.preventDefault();
     };
 
-    el.addEventListener('pointerdown', handlePenDown, { passive: false });
-    el.addEventListener('pointermove', handlePenMove, { passive: false });
-    el.addEventListener('pointerup', handlePenEnd, { passive: false });
-    el.addEventListener('pointercancel', handlePenEnd, { passive: false });
     el.addEventListener('touchstart', handleTouchStart, { passive: true });
     el.addEventListener('touchmove', handleTouchMove, { passive: false });
 
     return () => {
-      el.removeEventListener('pointerdown', handlePenDown);
-      el.removeEventListener('pointermove', handlePenMove);
-      el.removeEventListener('pointerup', handlePenEnd);
-      el.removeEventListener('pointercancel', handlePenEnd);
       el.removeEventListener('touchstart', handleTouchStart);
       el.removeEventListener('touchmove', handleTouchMove);
-      // Ensure scrolling is restored on unmount
-      if (scrollContainer) scrollContainer.style.overflowY = 'auto';
     };
   }, []);
 
@@ -201,6 +165,7 @@ export function CanvasPage({
       }),
       HighlightExt.configure({ multicolor: true }),
       AutoDirection,
+      Indent,
     ],
     content: safeContent,
     editorProps: {
@@ -265,8 +230,9 @@ export function CanvasPage({
       }
 
       // Auto-scroll to keep cursor visible while typing (like Word/Docs).
-      // Without this the cursor drifts to the very bottom of the viewport.
-      if (!isSplittingRef.current) {
+      // Only runs in text mode — must not fire during drawing or it shifts
+      // the page position and causes jagged strokes.
+      if (!isSplittingRef.current && activeTool === 'text') {
         requestAnimationFrame(() => {
           const layer = textLayerRef.current;
           if (!layer) return;
@@ -394,6 +360,16 @@ export function CanvasPage({
       onEditorReadyRef.current?.(pageIdRef.current, editor);
     }
   }, [editor]);
+
+  // In Draw/Eraser mode the TipTap editor must be non-editable. This prevents
+  // iPadOS Scribble from converting pen strokes into text.
+  useEffect(() => {
+    if (!editor) return;
+    const shouldBeEditable = activeTool === 'text';
+    if (editor.isEditable !== shouldBeEditable) {
+      editor.setEditable(shouldBeEditable);
+    }
+  }, [activeTool, editor]);
 
   // Sync editor content on remote updates
   const prevRemoteCounterRef = useRef(remoteUpdateCounter);
