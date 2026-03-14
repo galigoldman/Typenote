@@ -79,6 +79,7 @@ export interface MatchResult {
   source_type: string;
   source_id: string;
   source_name: string | null;
+  segment_text: string | null;
   page_start: number | null;
   page_end: number | null;
   course_id: string | null;

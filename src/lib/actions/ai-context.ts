@@ -4,12 +4,12 @@ import crypto from 'crypto';
 
 import { GoogleGenAI } from '@google/genai';
 
-import { embedFileSegments, embedQuery, embedText } from '@/lib/ai/embeddings';
+import { chunkText, embedQuery, embedText } from '@/lib/ai/embeddings';
 import { extractDocxText } from '@/lib/ai/extraction/docx';
+import { extractPdfText } from '@/lib/ai/extraction/pdf';
 import { SYSTEM_PROMPT } from '@/lib/ai/prompts';
 import {
   getContentHash,
-  getWeekFileRefs,
   matchEmbeddings,
   upsertEmbeddings,
   type EmbeddingRow,
@@ -45,6 +45,7 @@ export type SearchResult = {
   sourceType: string;
   sourceId: string;
   sourceName: string;
+  segmentText: string | null;
   pageStart: number | null;
   pageEnd: number | null;
   courseId: string;
@@ -96,7 +97,7 @@ async function getAuthUserId(): Promise<string> {
 }
 
 // ---------------------------------------------------------------------------
-// indexContent — multimodal embedding for PDFs/PPTX, text for DOCX
+// indexContent — extract text, embed as text, store in segment_text
 // ---------------------------------------------------------------------------
 
 export async function indexContent(source: IndexSource): Promise<IndexResult> {
@@ -182,49 +183,35 @@ export async function indexContent(source: IndexSource): Promise<IndexResult> {
       return { success: true, segmentsIndexed: 0, skipped: true };
     }
 
+    // Extract text from file
+    let text = '';
+    if (mimeType === 'application/pdf' || mimeType.includes('presentationml') || mimeType.includes('powerpoint')) {
+      text = await extractPdfText(fileBuffer);
+    } else if (mimeType.includes('wordprocessingml') || mimeType === 'application/msword') {
+      text = await extractDocxText(fileBuffer);
+    } else {
+      return { success: false, segmentsIndexed: 0, skipped: false, error: `Unsupported mime type: ${mimeType}` };
+    }
+
+    if (!text.trim()) {
+      return { success: true, segmentsIndexed: 0, skipped: true };
+    }
+
+    // Chunk text if too large, then embed each chunk
+    const chunks = chunkText(text);
     const rows: EmbeddingRow[] = [];
 
-    if (mimeType === 'application/pdf' || mimeType.includes('presentationml') || mimeType.includes('powerpoint')) {
-      // Multimodal embedding with Gemini Embedding 2.
-      // PDFs are split into 6-page chunks, each embedded separately.
-      const segments = await embedFileSegments(fileBuffer, mimeType);
+    for (const chunk of chunks) {
+      const embedding = await embedText(chunk.text);
+      if (!embedding.length) continue;
 
-      if (!segments.length) {
-        return { success: true, segmentsIndexed: 0, skipped: true };
-      }
-
-      for (let i = 0; i < segments.length; i++) {
-        rows.push({
-          source_type: sourceType,
-          source_id: sourceId,
-          segment_index: i,
-          page_start: segments[i].pageStart,
-          page_end: segments[i].pageEnd,
-          segment_text: null,
-          embedding: segments[i].embedding,
-          user_id: userId,
-          course_id: courseId,
-          week_id: weekId,
-          source_name: sourceName,
-          mime_type: mimeType,
-          content_hash: hash,
-        });
-      }
-    } else if (mimeType.includes('wordprocessingml') || mimeType === 'application/msword') {
-      // DOCX — extract text, embed as text
-      const text = await extractDocxText(fileBuffer);
-      if (!text.trim()) {
-        return { success: true, segmentsIndexed: 0, skipped: true };
-      }
-
-      const embedding = await embedText(text);
       rows.push({
         source_type: sourceType,
         source_id: sourceId,
-        segment_index: 0,
+        segment_index: chunk.chunkIndex,
         page_start: null,
         page_end: null,
-        segment_text: text.slice(0, 10000), // store first 10K chars for reference
+        segment_text: chunk.text,
         embedding,
         user_id: userId,
         course_id: courseId,
@@ -233,8 +220,10 @@ export async function indexContent(source: IndexSource): Promise<IndexResult> {
         mime_type: mimeType,
         content_hash: hash,
       });
-    } else {
-      return { success: false, segmentsIndexed: 0, skipped: false, error: `Unsupported mime type: ${mimeType}` };
+    }
+
+    if (!rows.length) {
+      return { success: true, segmentsIndexed: 0, skipped: true };
     }
 
     await upsertEmbeddings(rows);
@@ -248,7 +237,7 @@ export async function indexContent(source: IndexSource): Promise<IndexResult> {
 }
 
 // ---------------------------------------------------------------------------
-// searchContext — semantic search returning file refs with page ranges
+// searchContext — semantic search returning matched text chunks
 // ---------------------------------------------------------------------------
 
 export async function searchContext(params: SearchParams): Promise<SearchResult[]> {
@@ -268,6 +257,7 @@ export async function searchContext(params: SearchParams): Promise<SearchResult[
     sourceType: m.source_type,
     sourceId: m.source_id,
     sourceName: m.source_name ?? 'Unknown',
+    segmentText: m.segment_text,
     pageStart: m.page_start,
     pageEnd: m.page_end,
     courseId: params.courseId,
@@ -278,107 +268,35 @@ export async function searchContext(params: SearchParams): Promise<SearchResult[
 }
 
 // ---------------------------------------------------------------------------
-// askQuestion — downloads raw PDFs, sends to Gemini as file parts
+// askQuestion — uses stored text from search results (no file downloads)
 // ---------------------------------------------------------------------------
 
 export async function askQuestion(params: QuestionParams): Promise<QuestionResult> {
   await getAuthUserId(); // validate auth
-  const { question, courseId, weekId, mode, conversationHistory } = params;
+  const { question, courseId, mode, conversationHistory } = params;
 
-  const fileParts: Array<{ type: 'file'; data: Buffer; mimeType: string }> = [];
+  // RAG search — find relevant text chunks
+  const results = await searchContext({
+    query: question,
+    courseId,
+    maxResults: 8,
+  });
+
+  // Collect text context and sources from search results
+  const contextTexts: string[] = [];
   const sourcesUsed: QuestionResult['sources'] = [];
+  const seen = new Set<string>();
 
-  if (weekId) {
-    // ----- Full-context mode: download raw files for the week -----
-    const fileRefs = await getWeekFileRefs(courseId, weekId);
-
-    for (const ref of fileRefs) {
-      try {
-        const bucket = ref.source_type === 'moodle_file' ? 'moodle-materials' : 'course-materials';
-        const supabase = ref.source_type === 'moodle_file' ? createAdminClient() : await createClient();
-        const { data: fileData } = await supabase.storage.from(bucket).download(ref.storage_path);
-
-        if (fileData) {
-          const buffer = Buffer.from(await fileData.arrayBuffer());
-          fileParts.push({
-            type: 'file',
-            data: buffer,
-            mimeType: ref.mime_type ?? 'application/pdf',
-          });
-          sourcesUsed.push({
-            sourceType: ref.source_type,
-            sourceName: ref.source_name,
-            weekId,
-            pageRange: null,
-          });
-        }
-      } catch (err) {
-        console.error(`Failed to download ${ref.source_name}:`, err);
-      }
-    }
-
-    // Cross-week RAG supplement
-    const crossWeekResults = await searchContext({
-      query: question,
-      courseId,
-      maxResults: 4,
-    });
-
-    for (const r of crossWeekResults.filter((r) => r.weekId !== weekId)) {
+  for (const r of results) {
+    if (r.segmentText && !seen.has(r.sourceId)) {
+      seen.add(r.sourceId);
+      contextTexts.push(`--- ${r.sourceName} ---\n${r.segmentText}`);
       sourcesUsed.push({
         sourceType: r.sourceType,
         sourceName: r.sourceName,
         weekId: r.weekId,
-        pageRange: r.pageStart && r.pageEnd ? `pages ${r.pageStart}-${r.pageEnd}` : null,
+        pageRange: null,
       });
-    }
-  } else {
-    // ----- RAG-only mode: search + download matched files -----
-    const results = await searchContext({
-      query: question,
-      courseId,
-      maxResults: 8,
-    });
-    // Download actual files for matched results so the LLM can read them
-    const seen = new Set<string>();
-    const admin = createAdminClient();
-    for (const r of results) {
-      if (seen.has(r.sourceId)) continue;
-      seen.add(r.sourceId);
-
-      try {
-        const table = r.sourceType === 'moodle_file' ? 'moodle_files' : 'course_materials';
-        const { data: fileRow } = await admin
-          .from(table)
-          .select('storage_path, mime_type')
-          .eq('id', r.sourceId)
-          .single();
-
-        if (fileRow?.storage_path) {
-          const isMoodleRef = fileRow.storage_path.startsWith('moodle:');
-          const bucket = r.sourceType === 'moodle_file' || isMoodleRef ? 'moodle-materials' : 'course-materials';
-          const storagePath = isMoodleRef ? fileRow.storage_path.slice(7) : fileRow.storage_path;
-
-          const { data: fileData } = await admin.storage.from(bucket).download(storagePath);
-          if (fileData) {
-            const buffer = Buffer.from(await fileData.arrayBuffer());
-            fileParts.push({
-              type: 'file',
-              data: buffer,
-              mimeType: fileRow.mime_type ?? 'application/pdf',
-            });
-            // Only add to sources if we actually got the file
-            sourcesUsed.push({
-              sourceType: r.sourceType,
-              sourceName: r.sourceName,
-              weekId: r.weekId,
-              pageRange: r.pageStart && r.pageEnd ? `pages ${r.pageStart}-${r.pageEnd}` : null,
-            });
-          }
-        }
-      } catch (err) {
-        console.error(`Failed to download ${r.sourceName}:`, err);
-      }
     }
   }
 
@@ -390,19 +308,13 @@ export async function askQuestion(params: QuestionParams): Promise<QuestionResul
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const contents: Array<{ role: string; parts: any[] }> = [];
 
-  if (fileParts.length > 0) {
-    // Turn 1: User sends files + context instruction
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const fileContentParts: any[] = fileParts.map((fp) => ({
-      inlineData: {
-        mimeType: fp.mimeType,
-        data: fp.data.toString('base64'),
-      },
-    }));
-    fileContentParts.push({
-      text: 'I have attached course materials. Review them to answer my questions.',
+  if (contextTexts.length > 0) {
+    // Turn 1: User provides course materials as text
+    const materialsText = contextTexts.join('\n\n');
+    contents.push({
+      role: 'user',
+      parts: [{ text: `Here are the relevant course materials:\n\n${materialsText}\n\nReview them to answer my questions.` }],
     });
-    contents.push({ role: 'user', parts: fileContentParts });
 
     // Turn 2: Model acknowledges
     contents.push({
@@ -411,15 +323,12 @@ export async function askQuestion(params: QuestionParams): Promise<QuestionResul
     });
   }
 
-  // Add conversation history as alternating turns
-  // Gemini requires strict role alternation (user/model/user/model).
-  // Guard: merge consecutive same-role messages to avoid API errors.
+  // Add conversation history with role-alternation guard
   if (conversationHistory?.length) {
     for (const msg of conversationHistory) {
       const role = msg.role === 'user' ? 'user' : 'model';
       const lastTurn = contents[contents.length - 1];
       if (lastTurn && lastTurn.role === role) {
-        // Merge into previous turn to maintain alternation
         lastTurn.parts.push({ text: msg.content });
       } else {
         contents.push({ role, parts: [{ text: msg.content }] });
@@ -428,13 +337,12 @@ export async function askQuestion(params: QuestionParams): Promise<QuestionResul
   }
 
   // Final turn: the actual question
-  if (fileParts.length === 0) {
+  if (contextTexts.length === 0) {
     contents.push({
       role: 'user',
       parts: [{ text: `${question}\n\n(No course materials were loaded. Say you cannot answer without materials.)` }],
     });
   } else {
-    // Guard: if last turn is already 'user' (from history), merge question into it
     const lastTurn = contents[contents.length - 1];
     if (lastTurn && lastTurn.role === 'user') {
       lastTurn.parts.push({ text: question });
@@ -447,10 +355,6 @@ export async function askQuestion(params: QuestionParams): Promise<QuestionResul
   }
 
   const modelName = mode === 'deep' ? 'gemini-2.5-pro' : 'gemini-2.5-flash';
-
-  // Note: Context caching is deferred — context-cache.ts only supports text content,
-  // not multimodal PDF inlineData. Caching multimodal content requires updating the
-  // cache module to pass inlineData parts instead of text. Tracked as follow-up.
 
   const result = await genai.models.generateContent({
     model: modelName,
@@ -478,8 +382,6 @@ export async function reindexCourse(courseId: string): Promise<{ cleared: number
   await getAuthUserId();
   const admin = createAdminClient();
 
-  // Clear content_hash for all embeddings in this course.
-  // This makes indexContent think the files have changed, triggering re-embedding.
   const { data, error } = await admin
     .from('content_embeddings')
     .update({ content_hash: null })

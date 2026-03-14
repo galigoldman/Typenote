@@ -1,13 +1,17 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('@/lib/ai/embeddings', () => ({
-  embedFileSegments: vi.fn(async () => [{ embedding: Array.from({ length: 1536 }, () => 0.1), pageStart: 1, pageEnd: 1 }]),
+  chunkText: vi.fn((text: string) => [{ text, chunkIndex: 0 }]),
   embedText: vi.fn(async () => Array.from({ length: 1536 }, () => 0.1)),
   embedQuery: vi.fn(async () => Array.from({ length: 1536 }, () => 0.1)),
 }));
 
 vi.mock('@/lib/ai/extraction/docx', () => ({
   extractDocxText: vi.fn(async () => 'DOCX extracted text'),
+}));
+
+vi.mock('@/lib/ai/extraction/pdf', () => ({
+  extractPdfText: vi.fn(async () => 'PDF extracted text with $x^2$ math'),
 }));
 
 vi.mock('@/lib/queries/embeddings', () => ({
@@ -92,7 +96,7 @@ vi.mock('@/lib/ai/prompts', () => ({
   SYSTEM_PROMPT: 'You are a test tutor.',
 }));
 
-import { embedFileSegments } from '@/lib/ai/embeddings';
+import { extractPdfText } from '@/lib/ai/extraction/pdf';
 import { getContentHash, upsertEmbeddings } from '@/lib/queries/embeddings';
 
 import { askQuestion, indexContent, searchContext } from '../ai-context';
@@ -102,7 +106,7 @@ afterEach(() => {
 });
 
 describe('indexContent', () => {
-  it('embeds a PDF file directly via multimodal (no text extraction)', async () => {
+  it('extracts text from PDF and embeds as text', async () => {
     const result = await indexContent({
       type: 'course_material',
       materialId: 'mat-1',
@@ -113,25 +117,19 @@ describe('indexContent', () => {
     expect(result.success).toBe(true);
     expect(result.skipped).toBe(false);
     expect(result.segmentsIndexed).toBe(1);
-    expect(embedFileSegments).toHaveBeenCalledWith(
-      expect.any(Buffer),
-      'application/pdf',
-    );
+    expect(extractPdfText).toHaveBeenCalledWith(expect.any(Buffer));
     expect(upsertEmbeddings).toHaveBeenCalledWith(
       expect.arrayContaining([
         expect.objectContaining({
           source_type: 'course_material',
-          mime_type: 'application/pdf',
-          segment_text: null, // no text stored for PDFs
+          segment_text: 'PDF extracted text with $x^2$ math',
         }),
       ]),
     );
   });
 
   it('skips indexing when content hash matches', async () => {
-    vi.mocked(getContentHash).mockResolvedValueOnce(
-      'will-not-match',
-    );
+    vi.mocked(getContentHash).mockResolvedValueOnce('will-not-match');
 
     const result = await indexContent({
       type: 'course_material',
@@ -161,7 +159,7 @@ describe('indexContent', () => {
 });
 
 describe('searchContext', () => {
-  it('returns results with page ranges', async () => {
+  it('returns results with segment text', async () => {
     const { matchEmbeddings } = await import('@/lib/queries/embeddings');
     vi.mocked(matchEmbeddings).mockResolvedValueOnce([
       {
@@ -169,8 +167,9 @@ describe('searchContext', () => {
         source_type: 'course_material',
         source_id: 'mat-1',
         source_name: 'Lecture 5.pdf',
-        page_start: 1,
-        page_end: 6,
+        segment_text: 'Extracted text from lecture 5',
+        page_start: null,
+        page_end: null,
         course_id: 'course-1',
         week_id: 'week-5',
         mime_type: 'application/pdf',
@@ -185,8 +184,7 @@ describe('searchContext', () => {
 
     expect(results).toHaveLength(1);
     expect(results[0].sourceName).toBe('Lecture 5.pdf');
-    expect(results[0].pageStart).toBe(1);
-    expect(results[0].pageEnd).toBe(6);
+    expect(results[0].segmentText).toBe('Extracted text from lecture 5');
     expect(results[0].similarity).toBe(0.92);
   });
 });
@@ -211,7 +209,7 @@ describe('askQuestion', () => {
     );
   });
 
-  it('uses multi-turn contents when files are provided', async () => {
+  it('sends matched text as context instead of downloading files', async () => {
     const { matchEmbeddings } = await import('@/lib/queries/embeddings');
     vi.mocked(matchEmbeddings).mockResolvedValueOnce([
       {
@@ -219,8 +217,9 @@ describe('askQuestion', () => {
         source_type: 'moodle_file',
         source_id: 'file-1',
         source_name: 'Lecture.pdf',
-        page_start: 1,
-        page_end: 6,
+        segment_text: 'This is the lecture content about integrals.',
+        page_start: null,
+        page_end: null,
         course_id: 'course-1',
         week_id: 'week-1',
         mime_type: 'application/pdf',
@@ -235,10 +234,12 @@ describe('askQuestion', () => {
     });
 
     const call = mockGenerateContent.mock.calls[0][0];
-    // Should have multiple turns: user (files) → model (ack) → user (question)
-    expect(call.contents.length).toBeGreaterThanOrEqual(2);
-    expect(call.contents[0].role).toBe('user');
-    expect(call.contents[call.contents.length - 1].role).toBe('user');
+    // Should have text context, not file inlineData
+    const firstUserPart = call.contents[0].parts[0];
+    expect(firstUserPart.text).toContain('Lecture.pdf');
+    expect(firstUserPart.text).toContain('integrals');
+    // Should NOT have inlineData
+    expect(firstUserPart.inlineData).toBeUndefined();
   });
 
   it('uses pro model in deep mode', async () => {
