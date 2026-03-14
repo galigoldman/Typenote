@@ -1,9 +1,10 @@
-import { PDFDocument } from 'pdf-lib';
 import { GoogleGenAI } from '@google/genai';
 
 const EMBEDDING_MODEL = 'gemini-embedding-2-preview';
 const EMBEDDING_DIMENSIONS = 1536;
-const PAGES_PER_SEGMENT = 6;
+
+/** Max chars per text chunk for embedding. ~6000 tokens with headroom. */
+const MAX_CHARS_PER_CHUNK = 25000;
 
 function getGenAI() {
   return new GoogleGenAI({
@@ -11,114 +12,51 @@ function getGenAI() {
   });
 }
 
-/**
- * Split a PDF into chunks of up to PAGES_PER_SEGMENT pages.
- * Returns an array of { buffer, pageStart, pageEnd } for each chunk.
- */
-async function splitPdf(
-  buffer: Buffer,
-): Promise<Array<{ buffer: Buffer; pageStart: number; pageEnd: number }>> {
-  const srcDoc = await PDFDocument.load(buffer);
-  const totalPages = srcDoc.getPageCount();
+export interface TextChunk {
+  text: string;
+  chunkIndex: number;
+}
 
-  if (totalPages <= PAGES_PER_SEGMENT) {
-    return [{ buffer, pageStart: 1, pageEnd: totalPages }];
+/**
+ * Split text into chunks if it exceeds MAX_CHARS_PER_CHUNK.
+ * Splits at paragraph boundaries (\n\n) to preserve context.
+ */
+export function chunkText(text: string): TextChunk[] {
+  if (text.length <= MAX_CHARS_PER_CHUNK) {
+    return [{ text, chunkIndex: 0 }];
   }
 
-  const chunks: Array<{ buffer: Buffer; pageStart: number; pageEnd: number }> = [];
+  const chunks: TextChunk[] = [];
+  let remaining = text;
+  let index = 0;
 
-  for (let start = 0; start < totalPages; start += PAGES_PER_SEGMENT) {
-    const end = Math.min(start + PAGES_PER_SEGMENT, totalPages);
-    const newDoc = await PDFDocument.create();
-    const pages = await newDoc.copyPages(
-      srcDoc,
-      Array.from({ length: end - start }, (_, i) => start + i),
-    );
-    for (const page of pages) {
-      newDoc.addPage(page);
+  while (remaining.length > 0) {
+    if (remaining.length <= MAX_CHARS_PER_CHUNK) {
+      chunks.push({ text: remaining, chunkIndex: index });
+      break;
     }
-    const chunkBytes = await newDoc.save();
-    chunks.push({
-      buffer: Buffer.from(chunkBytes),
-      pageStart: start + 1,
-      pageEnd: end,
-    });
+
+    // Find a paragraph break near the limit
+    let splitAt = remaining.lastIndexOf('\n\n', MAX_CHARS_PER_CHUNK);
+    if (splitAt < MAX_CHARS_PER_CHUNK / 2) {
+      // No good paragraph break — split at newline
+      splitAt = remaining.lastIndexOf('\n', MAX_CHARS_PER_CHUNK);
+    }
+    if (splitAt < MAX_CHARS_PER_CHUNK / 2) {
+      // No good break at all — hard split
+      splitAt = MAX_CHARS_PER_CHUNK;
+    }
+
+    chunks.push({ text: remaining.slice(0, splitAt), chunkIndex: index });
+    remaining = remaining.slice(splitAt).trimStart();
+    index++;
   }
 
   return chunks;
 }
 
 /**
- * Embed a single PDF chunk directly using Gemini Embedding 2 (multimodal).
- * Max 6 pages per call.
- */
-async function embedChunk(
-  buffer: Buffer,
-  mimeType: string,
-): Promise<number[]> {
-  const genai = getGenAI();
-  const base64Data = buffer.toString('base64');
-
-  const response = await genai.models.embedContent({
-    model: EMBEDDING_MODEL,
-    contents: [
-      {
-        inlineData: {
-          mimeType,
-          data: base64Data,
-        },
-      },
-    ],
-    config: {
-      outputDimensionality: EMBEDDING_DIMENSIONS,
-      taskType: 'RETRIEVAL_DOCUMENT',
-    },
-  });
-
-  return response.embeddings?.[0]?.values ?? [];
-}
-
-export interface FileSegmentResult {
-  embedding: number[];
-  pageStart: number;
-  pageEnd: number;
-}
-
-/**
- * Embed a PDF file by splitting into 6-page chunks and embedding each.
- * Returns one embedding per chunk with page range info.
- */
-export async function embedFileSegments(
-  buffer: Buffer,
-  mimeType: string,
-): Promise<FileSegmentResult[]> {
-  if (mimeType !== 'application/pdf') {
-    // Non-PDF: embed as single segment
-    const embedding = await embedChunk(buffer, mimeType);
-    return embedding.length
-      ? [{ embedding, pageStart: 1, pageEnd: 1 }]
-      : [];
-  }
-
-  const chunks = await splitPdf(buffer);
-  const results: FileSegmentResult[] = [];
-
-  for (const chunk of chunks) {
-    const embedding = await embedChunk(chunk.buffer, mimeType);
-    if (embedding.length) {
-      results.push({
-        embedding,
-        pageStart: chunk.pageStart,
-        pageEnd: chunk.pageEnd,
-      });
-    }
-  }
-
-  return results;
-}
-
-/**
- * Embed a text string (for DOCX extracted text or search queries).
+ * Embed a text string for storage (document side of asymmetric retrieval).
  */
 export async function embedText(text: string): Promise<number[]> {
   const genai = getGenAI();
@@ -136,7 +74,7 @@ export async function embedText(text: string): Promise<number[]> {
 }
 
 /**
- * Embed a search query (uses RETRIEVAL_QUERY task type for asymmetric search).
+ * Embed a search query (query side of asymmetric retrieval).
  */
 export async function embedQuery(text: string): Promise<number[]> {
   const genai = getGenAI();
