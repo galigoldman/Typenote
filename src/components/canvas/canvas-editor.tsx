@@ -24,6 +24,7 @@ import {
   Plus,
   PanelLeftOpen,
   PanelLeftClose,
+  MousePointer2,
 } from 'lucide-react';
 import { useSidebar } from '@/components/dashboard/sidebar-layout';
 import { CANVAS_TYPES } from '@/lib/constants/subjects';
@@ -858,7 +859,7 @@ export function CanvasEditor({
 
         <div className="h-6 w-px bg-border mr-2" />
 
-        {/* Mode toggle: Draw / Type */}
+        {/* Mode toggle: Draw / Select / Type */}
         <div className="flex items-center gap-1">
           <button
             onPointerDown={(e) => {
@@ -873,6 +874,20 @@ export function CanvasEditor({
           >
             <Pen className="h-4 w-4" />
             Draw
+          </button>
+          <button
+            onPointerDown={(e) => {
+              e.stopPropagation();
+              setActiveTool('select');
+            }}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
+              activeTool === 'select'
+                ? 'bg-primary text-primary-foreground'
+                : 'hover:bg-accent text-muted-foreground'
+            }`}
+          >
+            <MousePointer2 className="h-4 w-4" />
+            Select
           </button>
           <button
             onPointerDown={(e) => {

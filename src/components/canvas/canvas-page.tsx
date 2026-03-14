@@ -69,7 +69,8 @@ export function CanvasPage({
   const isInteractionMode =
     activeTool === 'pen' ||
     activeTool === 'highlighter' ||
-    activeTool === 'eraser';
+    activeTool === 'eraser' ||
+    activeTool === 'select';
 
   // Setup canvases for high-DPI on mount
   useEffect(() => {
