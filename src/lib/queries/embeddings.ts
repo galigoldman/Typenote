@@ -102,7 +102,7 @@ export async function matchEmbeddings(params: {
     match_course_id: params.courseId ?? null,
     match_week_id: params.weekId ?? null,
     match_count: params.matchCount ?? 8,
-    similarity_threshold: params.similarityThreshold ?? 0.5,
+    similarity_threshold: params.similarityThreshold ?? 0.3,
   });
 
   if (error) throw new Error(`match_embeddings failed: ${error.message}`);
