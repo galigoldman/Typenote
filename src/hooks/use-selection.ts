@@ -382,10 +382,17 @@ export function useSelection({
             }
           }
 
-          // Hit-test text boxes using content-aware bounds
+          // Hit-test text boxes — skip full-page boxes for rectangle selection
+          // (full-page boxes cover the whole page, so rectangle always catches them)
+          // Full-page text boxes can only be selected by tapping on text content
           for (const tb of textBoxes) {
-            const tbBox = getSelectableBBox(tb);
-            if (!tbBox) continue;
+            if (tb.isFullPage) continue; // skip full-page boxes in rectangle selection
+            const tbBox: BBox = {
+              minX: tb.x,
+              minY: tb.y,
+              maxX: tb.x + tb.width,
+              maxY: tb.y + tb.height,
+            };
             if (aabbIntersectsRect(tbBox, selectionRect)) {
               selectedTbIds.push(tb.id);
               selectedTbs.push(tb);
