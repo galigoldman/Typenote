@@ -7,6 +7,7 @@ import type {
   CanvasPage as CanvasPageData,
   CanvasTool,
   Stroke,
+  TextBox,
 } from '@/types/canvas';
 import { PAGE_WIDTH } from '@/types/canvas';
 import type { Document } from '@/types/database';
@@ -207,14 +208,23 @@ export function CanvasEditor({
   const currentSize = activeTool === 'highlighter' ? highlighterSize : penSize;
   const currentOpacity = activeTool === 'highlighter' ? 0.4 : 1;
 
-  // Stroke undo/redo history
-  type StrokeAction = {
-    type: 'add' | 'remove';
-    pageId: string;
-    stroke: Stroke;
-  };
-  const undoStackRef = useRef<StrokeAction[]>([]);
-  const redoStackRef = useRef<StrokeAction[]>([]);
+  // Undo/redo history (polymorphic actions)
+  type CanvasAction =
+    | { type: 'stroke-add'; pageId: string; stroke: Stroke }
+    | { type: 'stroke-remove'; pageId: string; stroke: Stroke }
+    | { type: 'textbox-add'; pageId: string; textBox: TextBox }
+    | { type: 'textbox-remove'; pageId: string; textBox: TextBox }
+    | {
+        type: 'textbox-move';
+        pageId: string;
+        textBoxId: string;
+        fromX: number;
+        fromY: number;
+        toX: number;
+        toY: number;
+      };
+  const undoStackRef = useRef<CanvasAction[]>([]);
+  const redoStackRef = useRef<CanvasAction[]>([]);
   const [historyVersion, setHistoryVersion] = useState(0);
 
   const pagesRef = useRef(pages);
@@ -267,7 +277,7 @@ export function CanvasEditor({
   // Stroke management (with undo history + auto-add page)
   const handleStrokeAdd = useCallback(
     (pageId: string, stroke: Stroke) => {
-      undoStackRef.current.push({ type: 'add', pageId, stroke });
+      undoStackRef.current.push({ type: 'stroke-add', pageId, stroke });
       redoStackRef.current = [];
       if (undoStackRef.current.length > 100) undoStackRef.current.shift();
       setHistoryVersion((v) => v + 1);
@@ -294,7 +304,7 @@ export function CanvasEditor({
         .find((p) => p.id === pageId)
         ?.strokes.find((s) => s.id === strokeId);
       if (stroke) {
-        undoStackRef.current.push({ type: 'remove', pageId, stroke });
+        undoStackRef.current.push({ type: 'stroke-remove', pageId, stroke });
         redoStackRef.current = [];
         if (undoStackRef.current.length > 100) undoStackRef.current.shift();
         setHistoryVersion((v) => v + 1);
@@ -560,25 +570,67 @@ export function CanvasEditor({
     }
     const action = undoStackRef.current.pop();
     if (!action) return;
-    if (action.type === 'add') {
-      setPages((prev) =>
-        prev.map((p) =>
-          p.id === action.pageId
-            ? {
-                ...p,
-                strokes: p.strokes.filter((s) => s.id !== action.stroke.id),
-              }
-            : p,
-        ),
-      );
-    } else {
-      setPages((prev) =>
-        prev.map((p) =>
-          p.id === action.pageId
-            ? { ...p, strokes: [...p.strokes, action.stroke] }
-            : p,
-        ),
-      );
+    switch (action.type) {
+      case 'stroke-add':
+        setPages((prev) =>
+          prev.map((p) =>
+            p.id === action.pageId
+              ? {
+                  ...p,
+                  strokes: p.strokes.filter((s) => s.id !== action.stroke.id),
+                }
+              : p,
+          ),
+        );
+        break;
+      case 'stroke-remove':
+        setPages((prev) =>
+          prev.map((p) =>
+            p.id === action.pageId
+              ? { ...p, strokes: [...p.strokes, action.stroke] }
+              : p,
+          ),
+        );
+        break;
+      case 'textbox-add':
+        setPages((prev) =>
+          prev.map((p) =>
+            p.id === action.pageId
+              ? {
+                  ...p,
+                  textBoxes: p.textBoxes.filter(
+                    (tb) => tb.id !== action.textBox.id,
+                  ),
+                }
+              : p,
+          ),
+        );
+        break;
+      case 'textbox-remove':
+        setPages((prev) =>
+          prev.map((p) =>
+            p.id === action.pageId
+              ? { ...p, textBoxes: [...p.textBoxes, action.textBox] }
+              : p,
+          ),
+        );
+        break;
+      case 'textbox-move':
+        setPages((prev) =>
+          prev.map((p) =>
+            p.id === action.pageId
+              ? {
+                  ...p,
+                  textBoxes: p.textBoxes.map((tb) =>
+                    tb.id === action.textBoxId
+                      ? { ...tb, x: action.fromX, y: action.fromY }
+                      : tb,
+                  ),
+                }
+              : p,
+          ),
+        );
+        break;
     }
     redoStackRef.current.push(action);
     setHistoryVersion((v) => v + 1);
@@ -592,25 +644,69 @@ export function CanvasEditor({
     }
     const action = redoStackRef.current.pop();
     if (!action) return;
-    if (action.type === 'add') {
-      setPages((prev) =>
-        prev.map((p) =>
-          p.id === action.pageId
-            ? { ...p, strokes: [...p.strokes, action.stroke] }
-            : p,
-        ),
-      );
-    } else {
-      setPages((prev) =>
-        prev.map((p) =>
-          p.id === action.pageId
-            ? {
-                ...p,
-                strokes: p.strokes.filter((s) => s.id !== action.stroke.id),
-              }
-            : p,
-        ),
-      );
+    switch (action.type) {
+      case 'stroke-add':
+        setPages((prev) =>
+          prev.map((p) =>
+            p.id === action.pageId
+              ? { ...p, strokes: [...p.strokes, action.stroke] }
+              : p,
+          ),
+        );
+        break;
+      case 'stroke-remove':
+        setPages((prev) =>
+          prev.map((p) =>
+            p.id === action.pageId
+              ? {
+                  ...p,
+                  strokes: p.strokes.filter(
+                    (s) => s.id !== action.stroke.id,
+                  ),
+                }
+              : p,
+          ),
+        );
+        break;
+      case 'textbox-add':
+        setPages((prev) =>
+          prev.map((p) =>
+            p.id === action.pageId
+              ? { ...p, textBoxes: [...p.textBoxes, action.textBox] }
+              : p,
+          ),
+        );
+        break;
+      case 'textbox-remove':
+        setPages((prev) =>
+          prev.map((p) =>
+            p.id === action.pageId
+              ? {
+                  ...p,
+                  textBoxes: p.textBoxes.filter(
+                    (tb) => tb.id !== action.textBox.id,
+                  ),
+                }
+              : p,
+          ),
+        );
+        break;
+      case 'textbox-move':
+        setPages((prev) =>
+          prev.map((p) =>
+            p.id === action.pageId
+              ? {
+                  ...p,
+                  textBoxes: p.textBoxes.map((tb) =>
+                    tb.id === action.textBoxId
+                      ? { ...tb, x: action.toX, y: action.toY }
+                      : tb,
+                  ),
+                }
+              : p,
+          ),
+        );
+        break;
     }
     undoStackRef.current.push(action);
     setHistoryVersion((v) => v + 1);
