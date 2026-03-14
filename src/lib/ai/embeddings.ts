@@ -71,6 +71,7 @@ async function embedChunk(
     ],
     config: {
       outputDimensionality: EMBEDDING_DIMENSIONS,
+      taskType: 'RETRIEVAL_DOCUMENT',
     },
   });
 
