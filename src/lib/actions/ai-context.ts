@@ -473,3 +473,23 @@ export async function askQuestion(params: QuestionParams): Promise<QuestionResul
     cached: false,
   };
 }
+
+// ---------------------------------------------------------------------------
+// reindexCourse — clear content hashes to force re-embedding on next sync
+// ---------------------------------------------------------------------------
+
+export async function reindexCourse(courseId: string): Promise<{ cleared: number }> {
+  await getAuthUserId();
+  const admin = createAdminClient();
+
+  // Clear content_hash for all embeddings in this course.
+  // This makes indexContent think the files have changed, triggering re-embedding.
+  const { data, error } = await admin
+    .from('content_embeddings')
+    .update({ content_hash: null })
+    .eq('course_id', courseId)
+    .select('id');
+
+  if (error) throw new Error(`Failed to clear hashes: ${error.message}`);
+  return { cleared: data?.length ?? 0 };
+}
