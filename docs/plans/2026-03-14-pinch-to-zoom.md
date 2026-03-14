@@ -13,6 +13,7 @@
 ### Task 1: Create the `usePinchZoom` hook
 
 **Files:**
+
 - Create: `src/hooks/use-pinch-zoom.ts`
 
 **Step 1: Create the hook**
@@ -206,6 +207,7 @@ git commit -m "feat: add usePinchZoom hook for two-finger zoom and pan"
 ### Task 2: Create the ZoomIndicator component
 
 **Files:**
+
 - Create: `src/components/canvas/zoom-indicator.tsx`
 
 **Step 1: Create the component**
@@ -269,6 +271,7 @@ git commit -m "feat: add ZoomIndicator badge component"
 ### Task 3: Wire pinch-to-zoom into canvas-editor.tsx
 
 **Files:**
+
 - Modify: `src/components/canvas/canvas-editor.tsx:1-30` (imports)
 - Modify: `src/components/canvas/canvas-editor.tsx:168-182` (state section)
 - Modify: `src/components/canvas/canvas-editor.tsx:795-886` (scroll container + page wrapper)
@@ -330,7 +333,7 @@ Both closing `</div>` tags remain unchanged (lines 885-886).
 After the closing `</div>` of the scroll container (line 886), add:
 
 ```tsx
-          <ZoomIndicator scale={scale} visible={isZooming} />
+<ZoomIndicator scale={scale} visible={isZooming} />
 ```
 
 **Step 5: Run tests**
@@ -352,6 +355,7 @@ git commit -m "feat: wire pinch-to-zoom into canvas editor"
 The finger-scroll handler in `canvas-page.tsx` currently fires for single-touch events. It should not interfere with two-finger pinch/pan gestures (those are handled by `usePinchZoom` on the scroll container above).
 
 **Files:**
+
 - Modify: `src/components/canvas/canvas-page.tsx:108-118` (touch handlers)
 
 **Step 1: Add guard to skip if two touches active**
@@ -393,6 +397,7 @@ Open `http://192.168.0.3:3002` on iPad and test:
 **Step 3: Fix any issues found**
 
 Common issues to watch for:
+
 - Pan offset drifting when switching between zoom levels
 - Zoom indicator not centered on iPad
 - Text editor cursor position off when zoomed (if so, TipTap handles coordinates internally and should be fine since the transform is above it)

@@ -19,7 +19,9 @@ export function usePinchZoom({
   const [isZooming, setIsZooming] = useState(false);
 
   const scaleRef = useRef(scale);
-  scaleRef.current = scale;
+  useEffect(() => {
+    scaleRef.current = scale;
+  }, [scale]);
 
   // Track gesture start values
   const gestureRef = useRef<{

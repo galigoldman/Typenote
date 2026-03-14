@@ -15,6 +15,7 @@
 Store every page's TipTap editor in a ref map so we can focus any page's editor directly — not just newly created ones.
 
 **Files:**
+
 - Modify: `src/components/canvas/canvas-editor.tsx:308` (after `pendingFocusPageIdRef`)
 - Modify: `src/components/canvas/canvas-editor.tsx:311-321` (handleEditorReady)
 - Modify: `src/components/canvas/canvas-editor.tsx:509-520` (handleDeletePage)
@@ -70,6 +71,7 @@ git commit -m "feat: add editor registry map for cross-page focus"
 Remove the "last page only" restriction. Support navigating to existing next pages and creating new pages after any page.
 
 **Files:**
+
 - Modify: `src/components/canvas/canvas-editor.tsx:345-381` (handleTextOverflow)
 
 **Step 1: Replace handleTextOverflow**
@@ -184,6 +186,7 @@ git commit -m "feat: allow text overflow navigation on any page, not just the la
 Currently, when a single long paragraph overflows the page, the code calls `onTextOverflow(null)` — creating an empty next page but leaving the overflowing text orphaned. Fix this by splitting the paragraph at the nearest word boundary using ProseMirror's `posAtCoords` and `splitBlock`.
 
 **Files:**
+
 - Modify: `src/components/canvas/canvas-page.tsx:65` (add isSplittingRef)
 - Modify: `src/components/canvas/canvas-page.tsx:232-274` (onUpdate handler)
 
@@ -336,6 +339,7 @@ git commit -m "feat: split single paragraphs at word boundary on page overflow"
 When the cursor is at the end of the document and near the bottom of the page, pressing ArrowDown should navigate to the next page.
 
 **Files:**
+
 - Modify: `src/components/canvas/canvas-page.tsx:210-230` (handleKeyDown)
 
 **Step 1: Extend handleKeyDown**
@@ -423,6 +427,7 @@ Expected: No errors
 **Step 3: Final manual smoke test**
 
 Test the full flow:
+
 1. Open a document in Type mode
 2. Fill a page with multiple paragraphs → last paragraph moves to next page
 3. Fill a page with one long paragraph → text splits at word boundary
