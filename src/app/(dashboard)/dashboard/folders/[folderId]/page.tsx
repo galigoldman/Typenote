@@ -66,7 +66,7 @@ export default async function FolderPage({
     typedDocuments.length === 0;
 
   return (
-    <div className="p-6">
+    <div className="h-full overflow-y-auto p-6">
       <div className="mb-6 flex items-center justify-between">
         <Breadcrumb>
           <BreadcrumbList>

@@ -22,12 +22,17 @@ import {
   Redo2,
   Trash2,
   Plus,
+  PanelLeftOpen,
+  PanelLeftClose,
 } from 'lucide-react';
+import { useSidebar } from '@/components/dashboard/sidebar-layout';
 import { CANVAS_TYPES } from '@/lib/constants/subjects';
 import { PageTypeThumb } from '@/components/ui/page-type-thumb';
 import { useDocumentSync } from '@/hooks/use-document-sync';
 import { useDrawing } from '@/hooks/use-drawing';
 import { useEraser } from '@/hooks/use-eraser';
+import { usePinchZoom } from '@/hooks/use-pinch-zoom';
+import { ZoomIndicator } from './zoom-indicator';
 import { EditorToolbar } from '@/components/editor/editor-toolbar';
 import { CanvasPage } from './canvas-page';
 
@@ -161,6 +166,7 @@ function initializePagesFromDocument(doc: Document): CanvasPageData[] {
 }
 
 export function CanvasEditor({ document }: CanvasEditorProps) {
+  const { isOpen: sidebarOpen, toggle: toggleSidebar } = useSidebar();
   const [title, setTitle] = useState(document.title);
   const [pages, setPages] = useState<CanvasPageData[]>(() =>
     initializePagesFromDocument(document),
@@ -180,6 +186,12 @@ export function CanvasEditor({ document }: CanvasEditorProps) {
   const [highlighterColor, setHighlighterColor] = useState('#FBBF24');
   const [highlighterSize, setHighlighterSize] = useState(20);
   const [eraserSize, setEraserSize] = useState(14);
+
+  // Pinch-to-zoom (scale only — no pan, vertical scroll stays normal)
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const { scale, isZooming } = usePinchZoom({
+    containerRef: scrollContainerRef,
+  });
 
   // Derived values based on active tool
   const currentColor =
@@ -632,9 +644,20 @@ export function CanvasEditor({ document }: CanvasEditorProps) {
   const showColorSize = activeTool === 'pen' || activeTool === 'highlighter';
 
   return (
-    <div className="flex flex-col h-full">
+    <div className="flex flex-col h-full min-h-0">
       {/* Header */}
       <div className="flex items-center justify-between border-b px-4 py-2">
+        <button
+          onClick={toggleSidebar}
+          className="flex items-center justify-center h-8 w-8 rounded-lg hover:bg-accent transition-colors text-muted-foreground mr-2 shrink-0"
+          title={sidebarOpen ? 'Hide sidebar' : 'Show sidebar'}
+        >
+          {sidebarOpen ? (
+            <PanelLeftClose className="h-4 w-4" />
+          ) : (
+            <PanelLeftOpen className="h-4 w-4" />
+          )}
+        </button>
         <input
           type="text"
           value={title}
@@ -794,9 +817,10 @@ export function CanvasEditor({ document }: CanvasEditorProps) {
       </div>
 
       {/* Main content: canvas + optional right sidebar */}
-      <div className="flex flex-1 overflow-hidden">
+      <div className="flex flex-1 min-h-0 overflow-hidden">
         {/* Canvas scroll area */}
         <div
+          ref={scrollContainerRef}
           className="flex-1 bg-gray-100"
           data-scroll-container
           style={{
@@ -807,7 +831,14 @@ export function CanvasEditor({ document }: CanvasEditorProps) {
             WebkitUserSelect: activeTool === 'text' ? 'auto' : 'none',
           }}
         >
-          <div className="py-8">
+          <div
+            className="py-8"
+            style={{
+              transform: scale !== 1 ? `scale(${scale})` : undefined,
+              transformOrigin: 'top center',
+              willChange: scale !== 1 ? 'transform' : 'auto',
+            }}
+          >
             {pages.map((page, index) => {
               const effectiveType = page.pageType || document.canvas_type;
               return (
@@ -888,6 +919,8 @@ export function CanvasEditor({ document }: CanvasEditorProps) {
             })}
           </div>
         </div>
+
+        <ZoomIndicator scale={scale} visible={isZooming} />
 
         {/* Right sidebar — draw mode settings */}
         {isDrawMode && (
