@@ -88,11 +88,11 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const domain =
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       (section as any)?.moodle_courses?.moodle_instances?.domain ?? 'unknown';
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const moodleCourseId =
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       (section as any)?.moodle_courses?.moodle_course_id ?? 'unknown';
     // Supabase Storage keys must be ASCII — use content hash as the key,
     // store the original file name in the DB record only
