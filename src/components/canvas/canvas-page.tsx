@@ -17,6 +17,7 @@ import { setupHighDPICanvas } from '@/lib/canvas/coordinate-utils';
 import { renderStroke } from '@/lib/canvas/stroke-utils';
 import { DEFAULT_ERASER_RADIUS } from '@/hooks/use-eraser';
 import { SelectionOverlay } from './selection-overlay';
+import { TextBox as TextBoxComponent } from './text-box';
 import type { Editor } from '@tiptap/core';
 
 interface CanvasPageProps {
@@ -46,6 +47,12 @@ interface CanvasPageProps {
   selectionBBox?: BBox | null;
   isSelectionDragging?: boolean;
   selectionDragOffset?: { x: number; y: number };
+  selectedTextBoxIds?: Set<string>;
+  onTextBoxContentUpdate?: (
+    pageId: string,
+    textBoxId: string,
+    content: Record<string, unknown>,
+  ) => void;
 }
 
 export function CanvasPage({
@@ -67,6 +74,8 @@ export function CanvasPage({
   selectionBBox = null,
   isSelectionDragging = false,
   selectionDragOffset = { x: 0, y: 0 },
+  selectedTextBoxIds = new Set<string>(),
+  onTextBoxContentUpdate,
 }: CanvasPageProps) {
   const committedCanvasRef = useRef<HTMLCanvasElement>(null);
   const workingCanvasRef = useRef<HTMLCanvasElement>(null);
@@ -467,6 +476,17 @@ export function CanvasPage({
         style={{ pointerEvents: isInteractionMode ? 'none' : 'auto' }}
       >
         {editor && <EditorContent editor={editor} />}
+        {/* Render text boxes */}
+        {page.textBoxes.map((tb) => (
+          <TextBoxComponent
+            key={tb.id}
+            textBox={tb}
+            isSelected={selectedTextBoxIds.has(tb.id)}
+            onContentUpdate={(id, content) =>
+              onTextBoxContentUpdate?.(page.id, id, content)
+            }
+          />
+        ))}
       </div>
 
       {/* Layer 5: Eraser cursor circle */}
