@@ -8,7 +8,6 @@ import { embedFileSegments, embedQuery, embedText } from '@/lib/ai/embeddings';
 import { extractDocxText } from '@/lib/ai/extraction/docx';
 import { SYSTEM_PROMPT } from '@/lib/ai/prompts';
 import {
-  deleteEmbeddingsBySource,
   getContentHash,
   getWeekFileRefs,
   matchEmbeddings,
@@ -95,8 +94,6 @@ async function getAuthUserId(): Promise<string> {
   if (error || !user) throw new Error('Unauthorized');
   return user.id;
 }
-
-const PAGES_PER_SEGMENT = 6;
 
 // ---------------------------------------------------------------------------
 // indexContent — multimodal embedding for PDFs/PPTX, text for DOCX
@@ -285,10 +282,9 @@ export async function searchContext(params: SearchParams): Promise<SearchResult[
 // ---------------------------------------------------------------------------
 
 export async function askQuestion(params: QuestionParams): Promise<QuestionResult> {
-  const userId = await getAuthUserId();
+  await getAuthUserId(); // validate auth
   const { question, courseId, weekId, mode, conversationHistory } = params;
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const fileParts: Array<{ type: 'file'; data: Buffer; mimeType: string }> = [];
   const sourcesUsed: QuestionResult['sources'] = [];
 
