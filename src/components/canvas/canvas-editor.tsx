@@ -32,6 +32,7 @@ import { PageTypeThumb } from '@/components/ui/page-type-thumb';
 import { useDocumentSync } from '@/hooks/use-document-sync';
 import { useDrawing } from '@/hooks/use-drawing';
 import { useEraser } from '@/hooks/use-eraser';
+import { useSelection } from '@/hooks/use-selection';
 import { usePinchZoom } from '@/hooks/use-pinch-zoom';
 import { ZoomIndicator } from './zoom-indicator';
 import { EditorToolbar } from '@/components/editor/editor-toolbar';
@@ -444,9 +445,14 @@ export function CanvasEditor({
     setActiveEditor(editor);
   }, []);
 
-  // Get strokes for a page (used by eraser)
+  // Get strokes for a page (used by eraser + selection)
   const getPageStrokes = useCallback((pageId: string): Stroke[] => {
     return pagesRef.current.find((p) => p.id === pageId)?.strokes ?? [];
+  }, []);
+
+  // Get text boxes for a page (used by selection)
+  const getPageTextBoxes = useCallback((pageId: string): TextBox[] => {
+    return pagesRef.current.find((p) => p.id === pageId)?.textBoxes ?? [];
   }, []);
 
   // Auto-add page when drawing near the bottom of the last page
@@ -513,6 +519,114 @@ export function CanvasEditor({
     [triggerSave, document.canvas_type, focusPage],
   );
 
+  // Move strokes (used by selection drag)
+  const handleStrokesMove = useCallback(
+    (
+      pageId: string,
+      movedStrokes: { id: string; points: Stroke['points']; bbox: BBox }[],
+    ) => {
+      setPages((prev) =>
+        prev.map((p) => {
+          if (p.id !== pageId) return p;
+          const moveMap = new Map(movedStrokes.map((m) => [m.id, m]));
+          return {
+            ...p,
+            strokes: p.strokes.map((s) => {
+              const moved = moveMap.get(s.id);
+              return moved
+                ? { ...s, points: moved.points, bbox: moved.bbox }
+                : s;
+            }),
+          };
+        }),
+      );
+      triggerSave();
+    },
+    [triggerSave],
+  );
+
+  // Move a text box (used by selection drag)
+  const handleTextBoxMove = useCallback(
+    (pageId: string, textBoxId: string, dx: number, dy: number) => {
+      setPages((prev) =>
+        prev.map((p) => {
+          if (p.id !== pageId) return p;
+          return {
+            ...p,
+            textBoxes: p.textBoxes.map((tb) =>
+              tb.id === textBoxId
+                ? { ...tb, x: tb.x + dx, y: tb.y + dy, isFullPage: false }
+                : tb,
+            ),
+          };
+        }),
+      );
+      triggerSave();
+    },
+    [triggerSave],
+  );
+
+  // Delete selected objects
+  const handleDeleteSelected = useCallback(
+    (pageId: string, strokeIds: string[], textBoxIds: string[]) => {
+      // Push undo actions
+      const page = pagesRef.current.find((p) => p.id === pageId);
+      if (page) {
+        for (const sid of strokeIds) {
+          const stroke = page.strokes.find((s) => s.id === sid);
+          if (stroke) {
+            undoStackRef.current.push({ type: 'stroke-remove', pageId, stroke });
+          }
+        }
+        for (const tbId of textBoxIds) {
+          const tb = page.textBoxes.find((t) => t.id === tbId);
+          if (tb) {
+            undoStackRef.current.push({ type: 'textbox-remove', pageId, textBox: tb });
+          }
+        }
+        redoStackRef.current = [];
+        setHistoryVersion((v) => v + 1);
+      }
+
+      setPages((prev) =>
+        prev.map((p) => {
+          if (p.id !== pageId) return p;
+          return {
+            ...p,
+            strokes: p.strokes.filter((s) => !strokeIds.includes(s.id)),
+            textBoxes: p.textBoxes.filter((tb) => !textBoxIds.includes(tb.id)),
+          };
+        }),
+      );
+      triggerSave();
+    },
+    [triggerSave],
+  );
+
+  // Selection hook
+  const {
+    handlePointerDown: selectDown,
+    handlePointerMove: selectMove,
+    handlePointerUp: selectUp,
+    selectionPath,
+    selectedStrokeIds,
+    selectedTextBoxIds,
+    selectionBBox,
+    isRectMode,
+    isDragging: isSelectionDragging,
+    dragOffset: selectionDragOffset,
+    clearSelection,
+    deleteSelected,
+  } = useSelection({
+    activeTool,
+    getPageStrokes,
+    getPageTextBoxes,
+    onStrokesMove: handleStrokesMove,
+    onTextBoxMove: handleTextBoxMove,
+    onModeChange: setActiveTool,
+    onDeleteSelected: handleDeleteSelected,
+  });
+
   // Drawing hook
   const {
     handlePointerDown: drawDown,
@@ -545,22 +659,25 @@ export function CanvasEditor({
     (e: React.PointerEvent, pageId: string) => {
       drawDown(e, pageId);
       eraseDown(e, pageId);
+      selectDown(e, pageId);
     },
-    [drawDown, eraseDown],
+    [drawDown, eraseDown, selectDown],
   );
   const handlePointerMove = useCallback(
     (e: React.PointerEvent, pageId: string) => {
       drawMove(e, pageId);
       eraseMove(e, pageId);
+      selectMove(e, pageId);
     },
-    [drawMove, eraseMove],
+    [drawMove, eraseMove, selectMove],
   );
   const handlePointerUp = useCallback(
     (e: React.PointerEvent, pageId: string) => {
       drawUp(e, pageId);
       eraseUp(e, pageId);
+      selectUp(e, pageId);
     },
-    [drawUp, eraseUp],
+    [drawUp, eraseUp, selectUp],
   );
 
   // Undo / Redo
@@ -723,6 +840,21 @@ export function CanvasEditor({
     setCanUndoDraw(undoStackRef.current.length > 0);
     setCanRedoDraw(redoStackRef.current.length > 0);
   }, [historyVersion]);
+
+  // Delete selected objects with keyboard
+  useEffect(() => {
+    if (activeTool !== 'select') return;
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === 'Delete' || e.key === 'Backspace') {
+        deleteSelected();
+      }
+      if (e.key === 'Escape') {
+        clearSelection();
+      }
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [activeTool, deleteSelected, clearSelection]);
 
   // Page management
   const handleDeletePage = useCallback(
@@ -1016,6 +1148,11 @@ export function CanvasEditor({
                     }
                     eraserRadius={eraserSize}
                     remoteUpdateCounter={remoteUpdateCounter}
+                    selectionPath={selectionPath}
+                    isRectMode={isRectMode}
+                    selectionBBox={selectionBBox}
+                    isSelectionDragging={isSelectionDragging}
+                    selectionDragOffset={selectionDragOffset}
                   />
                   {/* Page break divider */}
                   <div

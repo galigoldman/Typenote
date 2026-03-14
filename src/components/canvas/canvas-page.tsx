@@ -11,11 +11,12 @@ import LinkExt from '@tiptap/extension-link';
 import HighlightExt from '@tiptap/extension-highlight';
 import { AutoDirection } from '@/lib/editor/rtl-extension';
 import { Indent } from '@/lib/editor/indent-extension';
-import type { CanvasPage as CanvasPageData, CanvasTool } from '@/types/canvas';
+import type { CanvasPage as CanvasPageData, CanvasTool, BBox } from '@/types/canvas';
 import { PAGE_WIDTH, PAGE_HEIGHT } from '@/types/canvas';
 import { setupHighDPICanvas } from '@/lib/canvas/coordinate-utils';
 import { renderStroke } from '@/lib/canvas/stroke-utils';
 import { DEFAULT_ERASER_RADIUS } from '@/hooks/use-eraser';
+import { SelectionOverlay } from './selection-overlay';
 import type { Editor } from '@tiptap/core';
 
 interface CanvasPageProps {
@@ -40,6 +41,11 @@ interface CanvasPageProps {
   eraserPosition?: { x: number; y: number } | null;
   eraserRadius?: number;
   remoteUpdateCounter?: number;
+  selectionPath?: [number, number][] | null;
+  isRectMode?: boolean;
+  selectionBBox?: BBox | null;
+  isSelectionDragging?: boolean;
+  selectionDragOffset?: { x: number; y: number };
 }
 
 export function CanvasPage({
@@ -56,6 +62,11 @@ export function CanvasPage({
   eraserPosition = null,
   eraserRadius = DEFAULT_ERASER_RADIUS,
   remoteUpdateCounter = 0,
+  selectionPath = null,
+  isRectMode = true,
+  selectionBBox = null,
+  isSelectionDragging = false,
+  selectionDragOffset = { x: 0, y: 0 },
 }: CanvasPageProps) {
   const committedCanvasRef = useRef<HTMLCanvasElement>(null);
   const workingCanvasRef = useRef<HTMLCanvasElement>(null);
@@ -474,6 +485,17 @@ export function CanvasPage({
             strokeWidth={1}
           />
         </svg>
+      )}
+
+      {/* Layer 5.5: Selection overlay */}
+      {activeTool === 'select' && (
+        <SelectionOverlay
+          selectionPath={selectionPath}
+          isRectMode={isRectMode}
+          selectionBBox={selectionBBox}
+          isDragging={isSelectionDragging}
+          dragOffset={selectionDragOffset}
+        />
       )}
 
       {/* Layer 6: Interaction layer — ALWAYS present
