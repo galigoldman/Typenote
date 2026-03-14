@@ -27,14 +27,14 @@ Small badge ("150%") appears during pinch gestures, fades out after ~1 second.
 
 ## Files Changed
 
-| File | Change |
-|------|--------|
-| `canvas-editor.tsx` | Add zoom state, wrap pages in scaled div, attach pinch/pan gesture handler |
-| `canvas-page.tsx` | No changes |
-| `use-drawing.ts` | No changes — getBoundingClientRect already accounts for transforms |
-| `use-eraser.ts` | No changes — same reason |
-| New: `use-pinch-zoom.ts` | Hook for two-finger gesture detection (pinch + pan + double-tap reset) |
-| New: `zoom-indicator.tsx` | Small fade-out badge component |
+| File                      | Change                                                                     |
+| ------------------------- | -------------------------------------------------------------------------- |
+| `canvas-editor.tsx`       | Add zoom state, wrap pages in scaled div, attach pinch/pan gesture handler |
+| `canvas-page.tsx`         | No changes                                                                 |
+| `use-drawing.ts`          | No changes — getBoundingClientRect already accounts for transforms         |
+| `use-eraser.ts`           | No changes — same reason                                                   |
+| New: `use-pinch-zoom.ts`  | Hook for two-finger gesture detection (pinch + pan + double-tap reset)     |
+| New: `zoom-indicator.tsx` | Small fade-out badge component                                             |
 
 ## Zoom Range
 

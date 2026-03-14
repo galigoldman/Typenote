@@ -1,7 +1,35 @@
 'use client';
 
-import { createContext, useContext, useEffect, useState } from 'react';
+import {
+  createContext,
+  useContext,
+  useMemo,
+  useSyncExternalStore,
+} from 'react';
 import { usePathname } from 'next/navigation';
+
+// Simple toggle store to avoid setState-in-effect issues
+function createSidebarStore(initialOpen: boolean) {
+  let isOpen = initialOpen;
+  const listeners = new Set<() => void>();
+  return {
+    getSnapshot: () => isOpen,
+    subscribe: (cb: () => void) => {
+      listeners.add(cb);
+      return () => listeners.delete(cb);
+    },
+    toggle: () => {
+      isOpen = !isOpen;
+      listeners.forEach((cb) => cb());
+    },
+    set: (value: boolean) => {
+      if (isOpen !== value) {
+        isOpen = value;
+        listeners.forEach((cb) => cb());
+      }
+    },
+  };
+}
 
 // Context so child components (e.g. canvas editor header) can toggle the sidebar
 const SidebarContext = createContext<{
@@ -20,23 +48,25 @@ export function SidebarLayout({ sidebar, children }: SidebarLayoutProps) {
   const pathname = usePathname();
   const isDocumentPage = pathname.includes('/documents/');
 
-  // Auto-hide sidebar on document pages, show on dashboard
-  const [sidebarOpen, setSidebarOpen] = useState(!isDocumentPage);
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- store is stable per mount
+  const store = useMemo(() => createSidebarStore(!isDocumentPage), []);
 
-  // Update sidebar state when navigating between pages
-  useEffect(() => {
-    setSidebarOpen(!isDocumentPage);
-  }, [isDocumentPage]);
+  // Sync sidebar open/close when route changes
+  store.set(!isDocumentPage);
 
-  const toggle = () => setSidebarOpen((prev) => !prev);
+  const isOpen = useSyncExternalStore(
+    store.subscribe,
+    store.getSnapshot,
+    store.getSnapshot,
+  );
 
   return (
-    <SidebarContext.Provider value={{ isOpen: sidebarOpen, toggle }}>
+    <SidebarContext.Provider value={{ isOpen, toggle: store.toggle }}>
       <div className="flex h-screen">
         {/* Sidebar */}
         <aside
           className={`flex shrink-0 flex-col border-r bg-muted/30 transition-[width] duration-200 overflow-hidden ${
-            sidebarOpen ? 'w-[250px]' : 'w-0 border-r-0'
+            isOpen ? 'w-[250px]' : 'w-0 border-r-0'
           }`}
         >
           <div className="w-[250px] flex flex-col h-full">{sidebar}</div>

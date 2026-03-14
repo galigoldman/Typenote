@@ -47,8 +47,7 @@ export function useDrawing({
     target: EventTarget,
   ): { x: number; y: number } => {
     const rect =
-      cachedRectRef.current ??
-      (target as HTMLElement).getBoundingClientRect();
+      cachedRectRef.current ?? (target as HTMLElement).getBoundingClientRect();
     const scaleX = PAGE_WIDTH / rect.width;
     const scaleY = PAGE_HEIGHT / rect.height;
     return {
@@ -107,9 +106,7 @@ export function useDrawing({
       unlockScrollRef.current = lockScroll(e.target as HTMLElement);
 
       // Snapshot the interaction layer rect — reuse for the entire stroke
-      cachedRectRef.current = (
-        e.target as HTMLElement
-      ).getBoundingClientRect();
+      cachedRectRef.current = (e.target as HTMLElement).getBoundingClientRect();
 
       const { x, y } = screenToPageCoords(e, e.target);
       const pressure = Math.round(e.pressure * 100) / 100;

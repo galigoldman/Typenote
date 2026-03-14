@@ -7,9 +7,8 @@ import type {
   CanvasPage as CanvasPageData,
   CanvasTool,
   Stroke,
-  StrokePoint,
 } from '@/types/canvas';
-import { PAGE_WIDTH, PAGE_HEIGHT } from '@/types/canvas';
+import { PAGE_WIDTH } from '@/types/canvas';
 import type { Document } from '@/types/database';
 import type { SaveStatus } from '@/hooks/use-auto-save';
 import type { ConnectionStatus } from '@/hooks/use-realtime-sync';
@@ -82,12 +81,6 @@ const PEN_SIZES = [
   { label: 'M', value: 3 },
   { label: 'L', value: 5 },
   { label: 'XL', value: 8 },
-];
-
-const HIGHLIGHTER_SIZES = [
-  { label: 'S', value: 8 },
-  { label: 'M', value: 20 },
-  { label: 'L', value: 32 },
 ];
 
 const ERASER_SIZES = [
@@ -184,7 +177,7 @@ export function CanvasEditor({ document }: CanvasEditorProps) {
   const [penColor, setPenColor] = useState('#000000');
   const [penSize, setPenSize] = useState(3);
   const [highlighterColor, setHighlighterColor] = useState('#FBBF24');
-  const [highlighterSize, setHighlighterSize] = useState(20);
+  const [highlighterSize] = useState(20);
   const [eraserSize, setEraserSize] = useState(14);
 
   // Pinch-to-zoom (scale only — no pan, vertical scroll stays normal)
@@ -343,6 +336,16 @@ export function CanvasEditor({ document }: CanvasEditorProps) {
   // Focus a page's editor by polling until it appears in editorsRef.
   // This is reliable for both existing pages and newly created ones
   // (where the editor mounts asynchronously after React renders).
+  // Uses a ref for self-reference to satisfy lint rules.
+  const focusPageRef = useRef<
+    (
+      pageId: string,
+      overflowContent: Record<string, unknown> | null,
+      isExistingPage: boolean,
+      attempt?: number,
+    ) => void
+  >(() => {});
+
   const focusPage = useCallback(
     (
       pageId: string,
@@ -374,13 +377,23 @@ export function CanvasEditor({ document }: CanvasEditorProps) {
       // Editor not mounted yet — retry (up to 1s)
       if (attempt < 20) {
         setTimeout(
-          () => focusPage(pageId, overflowContent, isExistingPage, attempt + 1),
+          () =>
+            focusPageRef.current(
+              pageId,
+              overflowContent,
+              isExistingPage,
+              attempt + 1,
+            ),
           50,
         );
       }
     },
     [scrollToPage],
   );
+
+  useEffect(() => {
+    focusPageRef.current = focusPage;
+  }, [focusPage]);
 
   // Editor ready / focus handler — registers editor in the map
   const handleEditorReady = useCallback((pageId: string, editor: Editor) => {
@@ -641,7 +654,6 @@ export function CanvasEditor({ document }: CanvasEditorProps) {
     activeTool === 'pen' ||
     activeTool === 'highlighter' ||
     activeTool === 'eraser';
-  const showColorSize = activeTool === 'pen' || activeTool === 'highlighter';
 
   return (
     <div className="flex flex-col h-full min-h-0">

@@ -49,7 +49,10 @@ export const Indent = Extension.create({
           const { from, to } = state.selection;
           let changed = false;
           state.doc.nodesBetween(from, to, (node, pos) => {
-            if (node.type.name === 'paragraph' || node.type.name === 'heading') {
+            if (
+              node.type.name === 'paragraph' ||
+              node.type.name === 'heading'
+            ) {
               const current = (node.attrs.indent as number) || 0;
               if (current < MAX_INDENT) {
                 if (dispatch) {
@@ -71,7 +74,10 @@ export const Indent = Extension.create({
           const { from, to } = state.selection;
           let changed = false;
           state.doc.nodesBetween(from, to, (node, pos) => {
-            if (node.type.name === 'paragraph' || node.type.name === 'heading') {
+            if (
+              node.type.name === 'paragraph' ||
+              node.type.name === 'heading'
+            ) {
               const current = (node.attrs.indent as number) || 0;
               if (current > 0) {
                 if (dispatch) {
