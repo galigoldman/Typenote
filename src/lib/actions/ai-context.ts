@@ -5,7 +5,7 @@ import crypto from 'crypto';
 import { generateText } from 'ai';
 
 import { getOrCreateCache } from '@/lib/ai/context-cache';
-import { embedFileSegment, embedQuery, embedText } from '@/lib/ai/embeddings';
+import { embedFileSegments, embedQuery, embedText } from '@/lib/ai/embeddings';
 import { extractDocxText } from '@/lib/ai/extraction/docx';
 import { SYSTEM_PROMPT } from '@/lib/ai/prompts';
 import { getFlashModel, getProModel } from '@/lib/ai/provider';
@@ -190,29 +190,31 @@ export async function indexContent(source: IndexSource): Promise<IndexResult> {
     const rows: EmbeddingRow[] = [];
 
     if (mimeType === 'application/pdf' || mimeType.includes('presentationml') || mimeType.includes('powerpoint')) {
-      // Direct multimodal embedding with Gemini Embedding 2.
-      // Sends raw PDF bytes — the model processes visual + text content.
-      const embedding = await embedFileSegment(fileBuffer, mimeType);
+      // Multimodal embedding with Gemini Embedding 2.
+      // PDFs are split into 6-page chunks, each embedded separately.
+      const segments = await embedFileSegments(fileBuffer, mimeType);
 
-      if (!embedding.length) {
+      if (!segments.length) {
         return { success: true, segmentsIndexed: 0, skipped: true };
       }
 
-      rows.push({
-        source_type: sourceType,
-        source_id: sourceId,
-        segment_index: 0,
-        page_start: 1,
-        page_end: null,
-        segment_text: null,
-        embedding,
-        user_id: userId,
-        course_id: courseId,
-        week_id: weekId,
-        source_name: sourceName,
-        mime_type: mimeType,
-        content_hash: hash,
-      });
+      for (let i = 0; i < segments.length; i++) {
+        rows.push({
+          source_type: sourceType,
+          source_id: sourceId,
+          segment_index: i,
+          page_start: segments[i].pageStart,
+          page_end: segments[i].pageEnd,
+          segment_text: null,
+          embedding: segments[i].embedding,
+          user_id: userId,
+          course_id: courseId,
+          week_id: weekId,
+          source_name: sourceName,
+          mime_type: mimeType,
+          content_hash: hash,
+        });
+      }
     } else if (mimeType.includes('wordprocessingml') || mimeType === 'application/msword') {
       // DOCX — extract text, embed as text
       const text = await extractDocxText(fileBuffer);
@@ -346,28 +348,25 @@ export async function askQuestion(params: QuestionParams): Promise<QuestionResul
 
     // Download actual files for matched results so the LLM can read them
     const seen = new Set<string>();
+    const admin = createAdminClient();
     for (const r of results) {
       if (seen.has(r.sourceId)) continue;
       seen.add(r.sourceId);
 
       try {
-        // Determine bucket based on source type
-        const bucket = r.sourceType === 'moodle_file' ? 'moodle-materials' : 'course-materials';
-        const client = r.sourceType === 'moodle_file' ? createAdminClient() : await createClient();
-
-        // Look up storage path
         const table = r.sourceType === 'moodle_file' ? 'moodle_files' : 'course_materials';
-        const { data: fileRow } = await createAdminClient()
+        const { data: fileRow } = await admin
           .from(table)
           .select('storage_path, mime_type')
           .eq('id', r.sourceId)
           .single();
 
         if (fileRow?.storage_path) {
-          const storagePath = fileRow.storage_path.startsWith('moodle:')
-            ? fileRow.storage_path.slice(7)
-            : fileRow.storage_path;
-          const { data: fileData } = await client.storage.from(bucket).download(storagePath);
+          const isMoodleRef = fileRow.storage_path.startsWith('moodle:');
+          const bucket = r.sourceType === 'moodle_file' || isMoodleRef ? 'moodle-materials' : 'course-materials';
+          const storagePath = isMoodleRef ? fileRow.storage_path.slice(7) : fileRow.storage_path;
+
+          const { data: fileData } = await admin.storage.from(bucket).download(storagePath);
           if (fileData) {
             const buffer = Buffer.from(await fileData.arrayBuffer());
             fileParts.push({
@@ -375,18 +374,18 @@ export async function askQuestion(params: QuestionParams): Promise<QuestionResul
               data: buffer,
               mimeType: fileRow.mime_type ?? 'application/pdf',
             });
+            // Only add to sources if we actually got the file
+            sourcesUsed.push({
+              sourceType: r.sourceType,
+              sourceName: r.sourceName,
+              weekId: r.weekId,
+              pageRange: r.pageStart && r.pageEnd ? `pages ${r.pageStart}-${r.pageEnd}` : null,
+            });
           }
         }
-      } catch {
-        // Skip files that can't be downloaded
+      } catch (err) {
+        console.error(`Failed to download ${r.sourceName}:`, err);
       }
-
-      sourcesUsed.push({
-        sourceType: r.sourceType,
-        sourceName: r.sourceName,
-        weekId: r.weekId,
-        pageRange: r.pageStart && r.pageEnd ? `pages ${r.pageStart}-${r.pageEnd}` : null,
-      });
     }
   }
 
@@ -403,14 +402,11 @@ export async function askQuestion(params: QuestionParams): Promise<QuestionResul
     });
   }
 
-  // Add source reference text for RAG results (no file download for cross-week)
-  if (sourcesUsed.length > 0 && fileParts.length === 0) {
-    const sourceList = sourcesUsed
-      .map((s) => `- ${s.sourceName}${s.pageRange ? ` (${s.pageRange})` : ''}${s.weekId ? ` [Week: ${s.weekId}]` : ''}`)
-      .join('\n');
+  // If no files were downloaded, don't pretend we have materials
+  if (fileParts.length === 0) {
     contentParts.push({
       type: 'text',
-      text: `Relevant course materials found:\n${sourceList}\n\nPlease answer based on the provided documents.`,
+      text: 'No course materials could be loaded. Tell the user you cannot answer without materials.',
     });
   }
 
