@@ -48,37 +48,14 @@ interface UseSelectionReturn {
 const TAP_THRESHOLD = 5;
 const DOUBLE_TAP_DELAY = 300;
 const DOUBLE_TAP_DISTANCE = 15;
-const LINE_HEIGHT_ESTIMATE = 28; // rough px per block node
-const MIN_CONTENT_HEIGHT = 40;
 
 /**
- * For full-page text boxes, compute a tight bounding box around the actual
- * text content rather than the full page. This lets strokes below the text
- * be selected independently.
+ * Get selectable bounds for a text box.
+ * Full-page text boxes return null — they are invisible to rectangle selection.
+ * They can only be selected by tapping directly on text content.
  */
 function getSelectableBBox(tb: TextBox): BBox | null {
-  // Empty text box — not selectable
-  const content = tb.content as { type?: string; content?: unknown[] } | null;
-  if (!content?.content || content.content.length === 0) return null;
-  const hasText = JSON.stringify(content).includes('"text"');
-  if (!hasText) return null;
-
-  if (tb.isFullPage) {
-    // Estimate content height from number of block nodes
-    const blockCount = content.content.length;
-    const estimatedHeight = Math.max(
-      blockCount * LINE_HEIGHT_ESTIMATE + 20,
-      MIN_CONTENT_HEIGHT,
-    );
-    return {
-      minX: tb.x,
-      minY: tb.y,
-      maxX: tb.x + tb.width,
-      maxY: tb.y + estimatedHeight,
-    };
-  }
-
-  // Custom text box — use full bounds
+  if (tb.isFullPage) return null;
   return {
     minX: tb.x,
     minY: tb.y,
@@ -293,15 +270,24 @@ export function useSelection({
           lastTapRef.current = { time: now, x, y };
 
           // Single tap — select one object at tap point
-          // Check text boxes using content-aware bounds (full-page boxes shrink to content)
+          // For full-page boxes: only select if tapping near text (check DOM)
+          // For custom boxes: use full bounds
           const tappedTextBox = textBoxes.find((tb) => {
-            const bbox = getSelectableBBox(tb);
-            if (!bbox) return false;
+            if (tb.isFullPage) {
+              // Only match if content has text and tap is in top content area
+              const content = tb.content as { type?: string; content?: unknown[] } | null;
+              if (!content?.content || content.content.length === 0) return false;
+              const hasText = JSON.stringify(content).includes('"text"');
+              if (!hasText) return false;
+              const contentHeight = Math.max(content.content.length * 30 + 20, 60);
+              return (
+                x >= tb.x && x <= tb.x + tb.width &&
+                y >= tb.y && y <= tb.y + contentHeight
+              );
+            }
             return (
-              x >= bbox.minX &&
-              x <= bbox.maxX &&
-              y >= bbox.minY &&
-              y <= bbox.maxY
+              x >= tb.x && x <= tb.x + tb.width &&
+              y >= tb.y && y <= tb.y + tb.height
             );
           });
           if (tappedTextBox) {
