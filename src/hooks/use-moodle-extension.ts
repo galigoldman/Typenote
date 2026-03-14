@@ -52,14 +52,20 @@ export function useMoodleExtension() {
   }, []);
 
   const ping = useCallback(async () => {
-    const response = await sendExtensionMessage<{ success: boolean; data: { version: string } }>({
+    const response = await sendExtensionMessage<{
+      success: boolean;
+      data: { version: string };
+    }>({
       type: 'PING',
     });
     return response?.success ? response.data : null;
   }, []);
 
   const checkPermission = useCallback(async (moodleUrl: string) => {
-    const response = await sendExtensionMessage<{ success: boolean; data: { granted: boolean } }>({
+    const response = await sendExtensionMessage<{
+      success: boolean;
+      data: { granted: boolean };
+    }>({
       type: 'CHECK_PERMISSION',
       payload: { moodleUrl },
     });
@@ -67,7 +73,10 @@ export function useMoodleExtension() {
   }, []);
 
   const requestPermission = useCallback(async (moodleUrl: string) => {
-    const response = await sendExtensionMessage<{ success: boolean; error?: string }>({
+    const response = await sendExtensionMessage<{
+      success: boolean;
+      error?: string;
+    }>({
       type: 'REQUEST_PERMISSION',
       payload: { moodleUrl },
     });
@@ -99,7 +108,9 @@ export function useMoodleExtension() {
     });
     if (!response) return null;
     if (!response.success) {
-      throw new Error((response as { error?: string }).error ?? 'Scraping failed');
+      throw new Error(
+        (response as { error?: string }).error ?? 'Scraping failed',
+      );
     }
     return response.data;
   }, []);
@@ -129,7 +140,9 @@ export function useMoodleExtension() {
     });
     if (!response) return null;
     if (!response.success) {
-      throw new Error((response as { error?: string }).error ?? 'Content scraping failed');
+      throw new Error(
+        (response as { error?: string }).error ?? 'Content scraping failed',
+      );
     }
     return response.data;
   }, []);
@@ -155,7 +168,9 @@ export function useMoodleExtension() {
         payload: params,
       });
       if (!response?.success) {
-        throw new Error((response as { error?: string })?.error ?? 'Download/upload failed');
+        throw new Error(
+          (response as { error?: string })?.error ?? 'Download/upload failed',
+        );
       }
       return response.data;
     },

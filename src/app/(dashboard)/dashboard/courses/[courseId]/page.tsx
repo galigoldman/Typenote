@@ -115,7 +115,9 @@ export default async function CoursePage({
   if (syncRecord) {
     const { data: sections } = await admin
       .from('moodle_sections')
-      .select('id, title, position, moodle_files(id, file_name, type, moodle_url, storage_path, mime_type, file_size, position)')
+      .select(
+        'id, title, position, moodle_files(id, file_name, type, moodle_url, storage_path, mime_type, file_size, position)',
+      )
       .eq('course_id', syncRecord.moodle_course_id)
       .order('position');
     const rawSections = ((sections ?? []) as MoodleSectionWithFiles[])
@@ -164,7 +166,10 @@ export default async function CoursePage({
       })),
   );
 
-  const isEmpty = typedWeeks.length === 0 && courseDocuments.length === 0 && moodleSections.length === 0;
+  const isEmpty =
+    typedWeeks.length === 0 &&
+    courseDocuments.length === 0 &&
+    moodleSections.length === 0;
 
   return (
     <div className="h-full overflow-y-auto p-6">
@@ -287,9 +292,13 @@ export default async function CoursePage({
                               target="_blank"
                               rel="noopener noreferrer"
                               className="flex items-center gap-3 px-4 py-2 hover:bg-accent/30 transition-colors"
-                              {...(isStored ? { download: file.file_name } : {})}
+                              {...(isStored
+                                ? { download: file.file_name }
+                                : {})}
                             >
-                              <span className="flex-1 text-sm truncate">{file.file_name}</span>
+                              <span className="flex-1 text-sm truncate">
+                                {file.file_name}
+                              </span>
                               {file.file_size && (
                                 <span className="text-xs text-muted-foreground shrink-0">
                                   {file.file_size > 1024 * 1024
@@ -297,7 +306,10 @@ export default async function CoursePage({
                                     : `${Math.round(file.file_size / 1024)} KB`}
                                 </span>
                               )}
-                              <Badge variant="outline" className="text-xs shrink-0">
+                              <Badge
+                                variant="outline"
+                                className="text-xs shrink-0"
+                              >
                                 {file.type === 'file'
                                   ? (file.mime_type?.split('/')[1] ?? 'file')
                                   : 'link'}

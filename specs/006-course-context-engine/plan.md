@@ -20,13 +20,13 @@ Build a multimodal AI context engine for course material search and homework ass
 
 ## Constitution Check
 
-| Principle | Status | Notes |
-|-----------|--------|-------|
-| I. Incremental Development | PASS | Phases: migrations → embedding → search → answering → caching |
-| II. Test-Driven Quality | PASS | Unit tests for embeddings/extraction, integration tests for pgvector + RLS |
-| III. Protected Main Branch | PASS | Feature branch `006-course-context-engine`, PR with CI |
-| IV. Migrations as Code | PASS | 3 migrations in `supabase/migrations/` |
-| V. Interview-Ready Architecture | PASS | Multimodal vs text embedding tradeoffs, context caching, RAG architecture |
+| Principle                       | Status | Notes                                                                      |
+| ------------------------------- | ------ | -------------------------------------------------------------------------- |
+| I. Incremental Development      | PASS   | Phases: migrations → embedding → search → answering → caching              |
+| II. Test-Driven Quality         | PASS   | Unit tests for embeddings/extraction, integration tests for pgvector + RLS |
+| III. Protected Main Branch      | PASS   | Feature branch `006-course-context-engine`, PR with CI                     |
+| IV. Migrations as Code          | PASS   | 3 migrations in `supabase/migrations/`                                     |
+| V. Interview-Ready Architecture | PASS   | Multimodal vs text embedding tradeoffs, context caching, RAG architecture  |
 
 **Post-Phase 1 Re-check**: PASS
 

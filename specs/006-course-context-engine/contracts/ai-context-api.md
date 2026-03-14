@@ -12,15 +12,22 @@ Embeds course material files for semantic search. PDFs and PPTX are embedded dir
 **Signature**: `indexContent(source: IndexSource): Promise<IndexResult>`
 
 **Input**:
+
 ```typescript
 type IndexSource =
   | { type: 'moodle_file'; fileId: string; courseId: string; weekId?: string }
-  | { type: 'course_material'; materialId: string; courseId: string; weekId: string };
+  | {
+      type: 'course_material';
+      materialId: string;
+      courseId: string;
+      weekId: string;
+    };
 ```
 
 Note: No `document` type — student note indexing deferred to future phase.
 
 **Output**:
+
 ```typescript
 type IndexResult = {
   success: boolean;
@@ -31,6 +38,7 @@ type IndexResult = {
 ```
 
 **Behavior**:
+
 - Downloads file from Supabase Storage
 - Checks `content_hash` — skips if unchanged
 - For PDF/PPTX: splits into 6-page segments, embeds each segment directly via Embedding 2 multimodal API
@@ -47,6 +55,7 @@ Semantic search across indexed course materials.
 **Signature**: `searchContext(params: SearchParams): Promise<SearchResult[]>`
 
 **Input**:
+
 ```typescript
 type SearchParams = {
   query: string;
@@ -57,6 +66,7 @@ type SearchParams = {
 ```
 
 **Output**:
+
 ```typescript
 type SearchResult = {
   id: number;
@@ -83,11 +93,12 @@ Main AI endpoint. Downloads raw PDFs from storage and sends to Gemini as file pa
 **Signature**: `askQuestion(params: QuestionParams): Promise<QuestionResult>`
 
 **Input**:
+
 ```typescript
 type QuestionParams = {
   question: string;
   courseId: string;
-  weekId?: string;         // enables full-context mode
+  weekId?: string; // enables full-context mode
   documentId?: string;
   mode: 'quick' | 'deep';
   conversationHistory?: Array<{ role: 'user' | 'assistant'; content: string }>;
@@ -95,6 +106,7 @@ type QuestionParams = {
 ```
 
 **Output**:
+
 ```typescript
 type QuestionResult = {
   answer: string;
@@ -110,6 +122,7 @@ type QuestionResult = {
 ```
 
 **Behavior**:
+
 1. `weekId` provided → **full-context mode**:
    - Get file refs for the week (storage paths + metadata)
    - Download raw PDFs/PPTX from Supabase Storage
@@ -139,9 +152,9 @@ Wraps `searchContext()`. Query params: `query, courseId, weekId?, maxResults?`. 
 
 ## Indexing Triggers
 
-| Event | Action |
-|-------|--------|
-| Moodle file uploaded (upload route) | `indexContent({ type: 'moodle_file', ... })` |
-| Course material uploaded | `indexContent({ type: 'course_material', ... })` |
-| Moodle file removed | Delete rows from `content_embeddings` |
-| Course material deleted | Delete rows from `content_embeddings` + invalidate cache |
+| Event                               | Action                                                   |
+| ----------------------------------- | -------------------------------------------------------- |
+| Moodle file uploaded (upload route) | `indexContent({ type: 'moodle_file', ... })`             |
+| Course material uploaded            | `indexContent({ type: 'course_material', ... })`         |
+| Moodle file removed                 | Delete rows from `content_embeddings`                    |
+| Course material deleted             | Delete rows from `content_embeddings` + invalidate cache |

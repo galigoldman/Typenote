@@ -5,15 +5,28 @@ import { askQuestion } from '@/lib/actions/ai-context';
 export async function POST(req: Request) {
   try {
     const body = await req.json();
-    const { question, courseId, weekId, documentId, mode, conversationHistory } = body;
+    const {
+      question,
+      courseId,
+      weekId,
+      documentId,
+      mode,
+      conversationHistory,
+    } = body;
 
     // Validate required fields
     if (!question || typeof question !== 'string' || !question.trim()) {
-      return NextResponse.json({ error: 'question is required' }, { status: 400 });
+      return NextResponse.json(
+        { error: 'question is required' },
+        { status: 400 },
+      );
     }
 
     if (!courseId || typeof courseId !== 'string') {
-      return NextResponse.json({ error: 'courseId is required' }, { status: 400 });
+      return NextResponse.json(
+        { error: 'courseId is required' },
+        { status: 400 },
+      );
     }
 
     if (!mode || (mode !== 'quick' && mode !== 'deep')) {
@@ -33,9 +46,16 @@ export async function POST(req: Request) {
       }
 
       for (const msg of conversationHistory) {
-        if (!msg.role || !msg.content || !['user', 'assistant'].includes(msg.role)) {
+        if (
+          !msg.role ||
+          !msg.content ||
+          !['user', 'assistant'].includes(msg.role)
+        ) {
           return NextResponse.json(
-            { error: 'Each conversationHistory entry must have role ("user"|"assistant") and content' },
+            {
+              error:
+                'Each conversationHistory entry must have role ("user"|"assistant") and content',
+            },
             { status: 400 },
           );
         }

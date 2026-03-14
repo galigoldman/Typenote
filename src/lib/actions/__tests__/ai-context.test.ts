@@ -151,9 +151,7 @@ describe('indexContent', () => {
 
     expect(result.success).toBe(true);
     expect(upsertEmbeddings).toHaveBeenCalledWith(
-      expect.arrayContaining([
-        expect.objectContaining({ user_id: null }),
-      ]),
+      expect.arrayContaining([expect.objectContaining({ user_id: null })]),
     );
   });
 });

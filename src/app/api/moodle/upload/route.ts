@@ -14,13 +14,17 @@ export async function POST(request: NextRequest) {
       const token = authHeader.slice(7);
       // Use admin client to verify the token
       const admin = createAdminClient();
-      const { data: { user: tokenUser } } = await admin.auth.getUser(token);
+      const {
+        data: { user: tokenUser },
+      } = await admin.auth.getUser(token);
       userId = tokenUser?.id ?? null;
     }
 
     if (!userId) {
       const supabase = await createClient();
-      const { data: { user } } = await supabase.auth.getUser();
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
       userId = user?.id ?? null;
     }
 
@@ -37,7 +41,9 @@ export async function POST(request: NextRequest) {
 
     if (!file || !sectionId || !moodleUrl || !fileName || !contentHash) {
       return NextResponse.json(
-        { error: `Missing required fields: file=${!!file} section=${!!sectionId} url=${!!moodleUrl} name=${!!fileName} hash=${!!contentHash}` },
+        {
+          error: `Missing required fields: file=${!!file} section=${!!sectionId} url=${!!moodleUrl} name=${!!fileName} hash=${!!contentHash}`,
+        },
         { status: 400 },
       );
     }
@@ -75,15 +81,19 @@ export async function POST(request: NextRequest) {
 
     if (sectionError) {
       return NextResponse.json(
-        { error: `Section lookup failed for ${sectionId}: ${sectionError.message}` },
+        {
+          error: `Section lookup failed for ${sectionId}: ${sectionError.message}`,
+        },
         { status: 400 },
       );
     }
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const domain = (section as any)?.moodle_courses?.moodle_instances?.domain ?? 'unknown';
+    const domain =
+      (section as any)?.moodle_courses?.moodle_instances?.domain ?? 'unknown';
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const moodleCourseId = (section as any)?.moodle_courses?.moodle_course_id ?? 'unknown';
+    const moodleCourseId =
+      (section as any)?.moodle_courses?.moodle_course_id ?? 'unknown';
     // Supabase Storage keys must be ASCII — use content hash as the key,
     // store the original file name in the DB record only
     const ext = fileName.includes('.') ? fileName.split('.').pop() : '';
@@ -122,8 +132,11 @@ export async function POST(request: NextRequest) {
     if (!fileError && fileRecord) {
       // Index for AI search (fire-and-forget)
       if (appCourseId) {
-        indexContent({ type: 'moodle_file', fileId: fileRecord.id, courseId: appCourseId })
-          .catch((err) => console.error('Index failed:', err));
+        indexContent({
+          type: 'moodle_file',
+          fileId: fileRecord.id,
+          courseId: appCourseId,
+        }).catch((err) => console.error('Index failed:', err));
       }
       return NextResponse.json({
         fileId: fileRecord.id,
@@ -158,8 +171,11 @@ export async function POST(request: NextRequest) {
 
     // Index for AI search (fire-and-forget)
     if (appCourseId) {
-      indexContent({ type: 'moodle_file', fileId: newRecord.id, courseId: appCourseId })
-        .catch((err) => console.error('Index failed:', err));
+      indexContent({
+        type: 'moodle_file',
+        fileId: newRecord.id,
+        courseId: appCourseId,
+      }).catch((err) => console.error('Index failed:', err));
     }
 
     return NextResponse.json({

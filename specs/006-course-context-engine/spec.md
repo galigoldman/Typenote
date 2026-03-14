@@ -148,6 +148,7 @@ When multiple students in the same course are actively studying the same week, t
 ## Scope Boundaries
 
 **In scope**:
+
 - Multimodal embedding of PDF and PPTX files directly (no text extraction needed)
 - Text extraction from DOCX files
 - Vector embedding and similarity search
@@ -158,6 +159,7 @@ When multiple students in the same course are actively studying the same week, t
 - Hebrew and English support
 
 **Out of scope (future phases)**:
+
 - Student note indexing (TipTap documents — will use PDF export → multimodal embedding later)
 - Handwriting/canvas transcription and indexing
 - Cross-course search

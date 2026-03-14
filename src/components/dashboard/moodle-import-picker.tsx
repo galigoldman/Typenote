@@ -81,17 +81,31 @@ export function MoodleImportPicker({
       </Button>
 
       <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent className="sm:max-w-md" style={{ maxHeight: '70vh', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+        <DialogContent
+          className="sm:max-w-md"
+          style={{
+            maxHeight: '70vh',
+            display: 'flex',
+            flexDirection: 'column',
+            overflow: 'hidden',
+          }}
+        >
           <DialogHeader style={{ flexShrink: 0 }}>
             <DialogTitle>Import from Moodle</DialogTitle>
             <DialogDescription>
-              Pick a synced file to add as {category === 'homework' ? 'homework' : 'material'}
+              Pick a synced file to add as{' '}
+              {category === 'homework' ? 'homework' : 'material'}
             </DialogDescription>
           </DialogHeader>
-          <div style={{ flex: 1, minHeight: 0, overflowY: 'auto' }} className="space-y-3">
+          <div
+            style={{ flex: 1, minHeight: 0, overflowY: 'auto' }}
+            className="space-y-3"
+          >
             {[...sections.entries()].map(([title, files]) => (
               <div key={title}>
-                <h4 className="mb-1 text-xs font-medium text-muted-foreground">{title}</h4>
+                <h4 className="mb-1 text-xs font-medium text-muted-foreground">
+                  {title}
+                </h4>
                 <div className="space-y-1">
                   {files.map((file) => (
                     <button
@@ -109,7 +123,9 @@ export function MoodleImportPicker({
                         </span>
                       )}
                       {importing === file.id && (
-                        <span className="shrink-0 text-xs text-muted-foreground">...</span>
+                        <span className="shrink-0 text-xs text-muted-foreground">
+                          ...
+                        </span>
                       )}
                     </button>
                   ))}

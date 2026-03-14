@@ -89,17 +89,17 @@ src/app/api/ai/
 
 ## What Changed from v1 (Embedding 001)
 
-| Aspect | v1 (Embedding 001) | v2 (Embedding 2) |
-|--------|-------------------|-------------------|
-| PDF handling | unpdf text extraction → chunk → embed text | Embed raw PDF pages directly |
-| PPTX handling | jszip XML parsing → embed text | Embed raw file directly |
-| DOCX handling | mammoth → embed text | Same (Embedding 2 doesn't accept DOCX) |
-| Student notes | TipTap → text → embed | Deferred to future phase |
-| Dimensions | 768 | 1,536 |
-| chunk_text stored | Yes (for search snippets) | No (content from raw file at query time) |
-| Answer context | Reassembled extracted text | Raw PDFs sent to Gemini |
-| Dependencies | unpdf, mammoth, jszip, @google/genai | mammoth, @google/genai |
-| Quality | Lossy (broken math, Hebrew) | Native (math, diagrams, Hebrew preserved) |
+| Aspect            | v1 (Embedding 001)                         | v2 (Embedding 2)                          |
+| ----------------- | ------------------------------------------ | ----------------------------------------- |
+| PDF handling      | unpdf text extraction → chunk → embed text | Embed raw PDF pages directly              |
+| PPTX handling     | jszip XML parsing → embed text             | Embed raw file directly                   |
+| DOCX handling     | mammoth → embed text                       | Same (Embedding 2 doesn't accept DOCX)    |
+| Student notes     | TipTap → text → embed                      | Deferred to future phase                  |
+| Dimensions        | 768                                        | 1,536                                     |
+| chunk_text stored | Yes (for search snippets)                  | No (content from raw file at query time)  |
+| Answer context    | Reassembled extracted text                 | Raw PDFs sent to Gemini                   |
+| Dependencies      | unpdf, mammoth, jszip, @google/genai       | mammoth, @google/genai                    |
+| Quality           | Lossy (broken math, Hebrew)                | Native (math, diagrams, Hebrew preserved) |
 
 ## Testing
 

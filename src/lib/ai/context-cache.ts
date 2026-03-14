@@ -46,10 +46,7 @@ export async function getOrCreateCache(
     }
 
     // Expired or materials changed — delete old entry
-    await admin
-      .from('context_cache_registry')
-      .delete()
-      .eq('id', existing.id);
+    await admin.from('context_cache_registry').delete().eq('id', existing.id);
   }
 
   // Create new Gemini cache
@@ -72,7 +69,9 @@ export async function getOrCreateCache(
       return { cacheName: null, isNew: false };
     }
 
-    const expiresAt = new Date(Date.now() + CACHE_TTL_SECONDS * 1000).toISOString();
+    const expiresAt = new Date(
+      Date.now() + CACHE_TTL_SECONDS * 1000,
+    ).toISOString();
 
     // Store in registry
     await admin.from('context_cache_registry').upsert(
