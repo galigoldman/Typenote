@@ -15,10 +15,15 @@ export async function GET(req: Request) {
     }
 
     if (!courseId) {
-      return NextResponse.json({ error: 'courseId is required' }, { status: 400 });
+      return NextResponse.json(
+        { error: 'courseId is required' },
+        { status: 400 },
+      );
     }
 
-    const maxResults = maxResultsParam ? parseInt(maxResultsParam, 10) : undefined;
+    const maxResults = maxResultsParam
+      ? parseInt(maxResultsParam, 10)
+      : undefined;
     if (maxResultsParam && (isNaN(maxResults!) || maxResults! < 1)) {
       return NextResponse.json(
         { error: 'maxResults must be a positive integer' },

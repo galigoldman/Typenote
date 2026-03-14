@@ -21,7 +21,11 @@ export function AiChatWrapper({ courseId, weekId }: AiChatWrapperProps) {
         variant="outline"
         size="sm"
         onClick={() => setIsOpen(!isOpen)}
-        className={isOpen ? 'bg-purple-50 text-purple-700 border-purple-200 dark:bg-purple-950 dark:text-purple-300 dark:border-purple-800' : ''}
+        className={
+          isOpen
+            ? 'bg-purple-50 text-purple-700 border-purple-200 dark:bg-purple-950 dark:text-purple-300 dark:border-purple-800'
+            : ''
+        }
       >
         <Sparkles className="mr-1.5 h-4 w-4" />
         Ask AI

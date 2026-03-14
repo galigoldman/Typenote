@@ -45,7 +45,10 @@ afterEach(() => {
 describe('getOrCreateCache', () => {
   it('returns existing cache when valid and hash matches', async () => {
     const crypto = await import('crypto');
-    const hash = crypto.createHash('sha256').update('test materials', 'utf8').digest('hex');
+    const hash = crypto
+      .createHash('sha256')
+      .update('test materials', 'utf8')
+      .digest('hex');
 
     mockSingle.mockResolvedValueOnce({
       data: {
@@ -57,7 +60,11 @@ describe('getOrCreateCache', () => {
       error: null,
     });
 
-    const result = await getOrCreateCache('course-1', 'week-1', 'test materials');
+    const result = await getOrCreateCache(
+      'course-1',
+      'week-1',
+      'test materials',
+    );
 
     expect(result.cacheName).toBe('cachedContents/existing-cache');
     expect(result.isNew).toBe(false);
@@ -70,7 +77,11 @@ describe('getOrCreateCache', () => {
     });
     mockUpsert.mockResolvedValueOnce({ error: null });
 
-    const result = await getOrCreateCache('course-1', 'week-1', 'new materials');
+    const result = await getOrCreateCache(
+      'course-1',
+      'week-1',
+      'new materials',
+    );
 
     expect(result.cacheName).toBe('cachedContents/test-cache-123');
     expect(result.isNew).toBe(true);

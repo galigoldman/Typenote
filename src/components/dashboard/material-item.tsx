@@ -25,7 +25,9 @@ export function MaterialItem({ material }: MaterialItemProps) {
     const supabase = createClient();
     const isMoodleRef = material.storage_path.startsWith('moodle:');
     const bucket = isMoodleRef ? 'moodle-materials' : 'course-materials';
-    const path = isMoodleRef ? material.storage_path.slice(7) : material.storage_path;
+    const path = isMoodleRef
+      ? material.storage_path.slice(7)
+      : material.storage_path;
 
     const { data } = await supabase.storage
       .from(bucket)

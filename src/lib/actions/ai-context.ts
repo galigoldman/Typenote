@@ -24,7 +24,12 @@ import { createClient } from '@/lib/supabase/server';
 
 export type IndexSource =
   | { type: 'moodle_file'; fileId: string; courseId: string; weekId?: string }
-  | { type: 'course_material'; materialId: string; courseId: string; weekId: string };
+  | {
+      type: 'course_material';
+      materialId: string;
+      courseId: string;
+      weekId: string;
+    };
 
 export type IndexResult = {
   success: boolean;
@@ -127,7 +132,12 @@ export async function indexContent(source: IndexSource): Promise<IndexResult> {
         .single();
 
       if (fileErr || !fileRow?.storage_path) {
-        return { success: false, segmentsIndexed: 0, skipped: false, error: 'Moodle file not found or no storage path' };
+        return {
+          success: false,
+          segmentsIndexed: 0,
+          skipped: false,
+          error: 'Moodle file not found or no storage path',
+        };
       }
 
       sourceName = fileRow.file_name;
@@ -139,7 +149,12 @@ export async function indexContent(source: IndexSource): Promise<IndexResult> {
         .download(fileRow.storage_path);
 
       if (dlErr || !fileData) {
-        return { success: false, segmentsIndexed: 0, skipped: false, error: 'Failed to download moodle file' };
+        return {
+          success: false,
+          segmentsIndexed: 0,
+          skipped: false,
+          error: 'Failed to download moodle file',
+        };
       }
 
       fileBuffer = Buffer.from(await fileData.arrayBuffer());
@@ -158,7 +173,12 @@ export async function indexContent(source: IndexSource): Promise<IndexResult> {
         .single();
 
       if (matErr || !matRow) {
-        return { success: false, segmentsIndexed: 0, skipped: false, error: 'Course material not found' };
+        return {
+          success: false,
+          segmentsIndexed: 0,
+          skipped: false,
+          error: 'Course material not found',
+        };
       }
 
       sourceName = matRow.file_name;
@@ -170,7 +190,12 @@ export async function indexContent(source: IndexSource): Promise<IndexResult> {
         .download(matRow.storage_path);
 
       if (dlErr || !fileData) {
-        return { success: false, segmentsIndexed: 0, skipped: false, error: 'Failed to download course material' };
+        return {
+          success: false,
+          segmentsIndexed: 0,
+          skipped: false,
+          error: 'Failed to download course material',
+        };
       }
 
       fileBuffer = Buffer.from(await fileData.arrayBuffer());
@@ -185,12 +210,24 @@ export async function indexContent(source: IndexSource): Promise<IndexResult> {
 
     // Extract text from file
     let text = '';
-    if (mimeType === 'application/pdf' || mimeType.includes('presentationml') || mimeType.includes('powerpoint')) {
+    if (
+      mimeType === 'application/pdf' ||
+      mimeType.includes('presentationml') ||
+      mimeType.includes('powerpoint')
+    ) {
       text = await extractPdfText(fileBuffer);
-    } else if (mimeType.includes('wordprocessingml') || mimeType === 'application/msword') {
+    } else if (
+      mimeType.includes('wordprocessingml') ||
+      mimeType === 'application/msword'
+    ) {
       text = await extractDocxText(fileBuffer);
     } else {
-      return { success: false, segmentsIndexed: 0, skipped: false, error: `Unsupported mime type: ${mimeType}` };
+      return {
+        success: false,
+        segmentsIndexed: 0,
+        skipped: false,
+        error: `Unsupported mime type: ${mimeType}`,
+      };
     }
 
     if (!text.trim()) {
@@ -232,7 +269,12 @@ export async function indexContent(source: IndexSource): Promise<IndexResult> {
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Unknown error';
     console.error('indexContent error:', message);
-    return { success: false, segmentsIndexed: 0, skipped: false, error: message };
+    return {
+      success: false,
+      segmentsIndexed: 0,
+      skipped: false,
+      error: message,
+    };
   }
 }
 
@@ -240,7 +282,9 @@ export async function indexContent(source: IndexSource): Promise<IndexResult> {
 // searchContext — semantic search returning matched text chunks
 // ---------------------------------------------------------------------------
 
-export async function searchContext(params: SearchParams): Promise<SearchResult[]> {
+export async function searchContext(
+  params: SearchParams,
+): Promise<SearchResult[]> {
   const userId = await getAuthUserId();
   const queryEmbedding = await embedQuery(params.query);
 
@@ -271,7 +315,9 @@ export async function searchContext(params: SearchParams): Promise<SearchResult[
 // askQuestion — uses stored text from search results (no file downloads)
 // ---------------------------------------------------------------------------
 
-export async function askQuestion(params: QuestionParams): Promise<QuestionResult> {
+export async function askQuestion(
+  params: QuestionParams,
+): Promise<QuestionResult> {
   await getAuthUserId(); // validate auth
   const { question, courseId, mode, conversationHistory } = params;
 
@@ -313,13 +359,21 @@ export async function askQuestion(params: QuestionParams): Promise<QuestionResul
     const materialsText = contextTexts.join('\n\n');
     contents.push({
       role: 'user',
-      parts: [{ text: `Here are the relevant course materials:\n\n${materialsText}\n\nReview them to answer my questions.` }],
+      parts: [
+        {
+          text: `Here are the relevant course materials:\n\n${materialsText}\n\nReview them to answer my questions.`,
+        },
+      ],
     });
 
     // Turn 2: Model acknowledges
     contents.push({
       role: 'model',
-      parts: [{ text: 'I have reviewed the course materials. Please ask your question.' }],
+      parts: [
+        {
+          text: 'I have reviewed the course materials. Please ask your question.',
+        },
+      ],
     });
   }
 
@@ -340,7 +394,11 @@ export async function askQuestion(params: QuestionParams): Promise<QuestionResul
   if (contextTexts.length === 0) {
     contents.push({
       role: 'user',
-      parts: [{ text: `${question}\n\n(No course materials were loaded. Say you cannot answer without materials.)` }],
+      parts: [
+        {
+          text: `${question}\n\n(No course materials were loaded. Say you cannot answer without materials.)`,
+        },
+      ],
     });
   } else {
     const lastTurn = contents[contents.length - 1];
@@ -378,7 +436,9 @@ export async function askQuestion(params: QuestionParams): Promise<QuestionResul
 // reindexCourse — clear content hashes to force re-embedding on next sync
 // ---------------------------------------------------------------------------
 
-export async function reindexCourse(courseId: string): Promise<{ cleared: number }> {
+export async function reindexCourse(
+  courseId: string,
+): Promise<{ cleared: number }> {
   await getAuthUserId();
   const admin = createAdminClient();
 

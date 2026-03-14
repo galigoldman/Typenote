@@ -35,10 +35,15 @@ chrome.runtime.onMessageExternal.addListener(
   },
 );
 
-async function handleMessage(message: ExtensionRequest): Promise<ExtensionResponse> {
+async function handleMessage(
+  message: ExtensionRequest,
+): Promise<ExtensionResponse> {
   switch (message.type) {
     case 'PING':
-      return { success: true, data: { version: EXTENSION_VERSION } as PingData };
+      return {
+        success: true,
+        data: { version: EXTENSION_VERSION } as PingData,
+      };
 
     case 'CHECK_LOGIN':
       return await handleCheckLogin(message.payload.moodleUrl);
@@ -56,7 +61,9 @@ async function handleMessage(message: ExtensionRequest): Promise<ExtensionRespon
       const checkUrl = new URL(message.payload.moodleUrl);
       const checkOrigin = `${checkUrl.protocol}//${checkUrl.host}/*`;
       try {
-        const has = await chrome.permissions.contains({ origins: [checkOrigin] });
+        const has = await chrome.permissions.contains({
+          origins: [checkOrigin],
+        });
         return { success: true, data: { granted: has } };
       } catch (err) {
         return { success: false, error: String(err) };
@@ -101,7 +108,11 @@ async function getOrCreateMoodleTab(moodleUrl: string): Promise<number> {
   }
 
   // Create a new tab (in background, minimized)
-  const tab = await chrome.tabs.create({ url: moodleUrl, active: false, pinned: true });
+  const tab = await chrome.tabs.create({
+    url: moodleUrl,
+    active: false,
+    pinned: true,
+  });
   if (!tab.id) throw new Error('Failed to create tab');
 
   // Wait for the tab to finish loading
@@ -163,7 +174,7 @@ async function executeScraperFunction<T>(
     if (tabUrl && !tabUrl.startsWith('chrome')) {
       throw new Error(
         `Cannot access page at: ${tabUrl.substring(0, 100)}. ` +
-        'You may need to log into Moodle in this browser first.',
+          'You may need to log into Moodle in this browser first.',
       );
     }
     throw new Error(msg);
@@ -179,8 +190,8 @@ async function executeScraperFunction<T>(
     func: (fnName: string) => {
       // The scraper module is available as window.__typenote_scraper
       // after the content script bundles it
-      const scraper = (window as unknown as Record<string, unknown>).__typenote_scraper as
-        Record<string, () => unknown> | undefined;
+      const scraper = (window as unknown as Record<string, unknown>)
+        .__typenote_scraper as Record<string, () => unknown> | undefined;
       if (!scraper || typeof scraper[fnName] !== 'function') {
         throw new Error(`Scraper function "${fnName}" not found`);
       }
@@ -205,9 +216,7 @@ async function executeScraperFunction<T>(
 // Handler: CHECK_LOGIN
 // ============================================
 
-async function handleCheckLogin(
-  moodleUrl: string,
-): Promise<ExtensionResponse> {
+async function handleCheckLogin(moodleUrl: string): Promise<ExtensionResponse> {
   try {
     // Quick cookie check first — MoodleSession cookie indicates a session
     const url = new URL(moodleUrl);
@@ -335,7 +344,10 @@ async function resolveFileUrl(moodleUrl: string): Promise<string> {
   }
 
   // Navigate to the resource page and extract the real file URL
-  if (moodleUrl.includes('/mod/resource/view.php') || moodleUrl.includes('/mod/folder/view.php')) {
+  if (
+    moodleUrl.includes('/mod/resource/view.php') ||
+    moodleUrl.includes('/mod/folder/view.php')
+  ) {
     const tabId = await getOrCreateMoodleTab(moodleUrl);
     const tab = await chrome.tabs.get(tabId);
     if (tab.url !== moodleUrl) {
@@ -344,7 +356,10 @@ async function resolveFileUrl(moodleUrl: string): Promise<string> {
     }
 
     try {
-      const realUrl = await executeScraperFunction<string>(tabId, 'scrapeFileUrl');
+      const realUrl = await executeScraperFunction<string>(
+        tabId,
+        'scrapeFileUrl',
+      );
       if (realUrl) return realUrl;
     } catch {
       // scrapeFileUrl returned null — no pluginfile.php link found on page
@@ -359,7 +374,9 @@ async function resolveFileUrl(moodleUrl: string): Promise<string> {
 }
 
 async function handleDownloadAndUpload(
-  payload: ExtensionRequest & { type: 'DOWNLOAD_AND_UPLOAD' } extends { payload: infer P }
+  payload: ExtensionRequest & { type: 'DOWNLOAD_AND_UPLOAD' } extends {
+    payload: infer P;
+  }
     ? P
     : never,
 ): Promise<ExtensionResponse> {
@@ -376,7 +393,9 @@ async function handleDownloadAndUpload(
     });
 
     if (!response.ok) {
-      throw new Error(`Download failed: ${response.status} ${response.statusText}`);
+      throw new Error(
+        `Download failed: ${response.status} ${response.statusText}`,
+      );
     }
 
     // Verify we got a real file, not an HTML page
@@ -384,7 +403,7 @@ async function handleDownloadAndUpload(
     if (contentType.includes('text/html')) {
       throw new Error(
         `Got HTML instead of file — could not resolve download URL. ` +
-        `Resource: ${moodleFileUrl.substring(0, 80)}`,
+          `Resource: ${moodleFileUrl.substring(0, 80)}`,
       );
     }
 
@@ -394,11 +413,17 @@ async function handleDownloadAndUpload(
     // Compute SHA-256 content hash for deduplication
     const hashBuffer = await crypto.subtle.digest('SHA-256', arrayBuffer);
     const hashArray = Array.from(new Uint8Array(hashBuffer));
-    const contentHash = hashArray.map((b) => b.toString(16).padStart(2, '0')).join('');
+    const contentHash = hashArray
+      .map((b) => b.toString(16).padStart(2, '0'))
+      .join('');
 
     // Upload to Typenote backend
     const formData = new FormData();
-    formData.append('file', new Blob([arrayBuffer], { type: blob.type }), metadata.fileName);
+    formData.append(
+      'file',
+      new Blob([arrayBuffer], { type: blob.type }),
+      metadata.fileName,
+    );
     formData.append('contentHash', contentHash);
     formData.append('sectionId', metadata.sectionId);
     formData.append('moodleUrl', metadata.moodleUrl);
@@ -408,7 +433,8 @@ async function handleDownloadAndUpload(
 
     const uploadHeaders: Record<string, string> = {};
     if ((payload as Record<string, unknown>).authToken) {
-      uploadHeaders['Authorization'] = `Bearer ${(payload as Record<string, unknown>).authToken}`;
+      uploadHeaders['Authorization'] =
+        `Bearer ${(payload as Record<string, unknown>).authToken}`;
     }
 
     const uploadResponse = await fetch(uploadEndpoint, {
@@ -418,7 +444,9 @@ async function handleDownloadAndUpload(
     });
 
     if (!uploadResponse.ok) {
-      throw new Error(`Upload failed: ${uploadResponse.status} ${uploadResponse.statusText}`);
+      throw new Error(
+        `Upload failed: ${uploadResponse.status} ${uploadResponse.statusText}`,
+      );
     }
 
     const uploadResult = await uploadResponse.json();

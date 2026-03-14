@@ -74,7 +74,9 @@ export async function importMoodleFile(data: {
   category: 'material' | 'homework';
 }) {
   const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
   if (!user) throw new Error('Not authenticated');
 
   const admin = createAdminClient();
@@ -87,7 +89,8 @@ export async function importMoodleFile(data: {
     .single();
 
   if (fetchError || !moodleFile) throw new Error('Moodle file not found');
-  if (!moodleFile.storage_path) throw new Error('File not downloaded yet — sync first');
+  if (!moodleFile.storage_path)
+    throw new Error('File not downloaded yet — sync first');
 
   // Check if already imported to this week
   const { data: existing } = await supabase

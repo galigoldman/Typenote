@@ -145,7 +145,12 @@ export function AiChatPanel({
               Deep
             </button>
           </div>
-          <Button variant="ghost" size="icon" onClick={onClose} className="h-8 w-8">
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={onClose}
+            className="h-8 w-8"
+          >
             <X className="h-4 w-4" />
           </Button>
         </div>
@@ -161,7 +166,7 @@ export function AiChatPanel({
             </p>
             <p className="mt-1 text-xs text-muted-foreground/60">
               {weekId
-                ? "I can see all materials for this week"
+                ? 'I can see all materials for this week'
                 : "I'll search across all weeks"}
             </p>
           </div>

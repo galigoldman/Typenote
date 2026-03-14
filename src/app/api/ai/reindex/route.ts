@@ -7,7 +7,10 @@ export async function POST() {
   try {
     // Auth check
     const supabase = await createClient();
-    const { data: { user }, error } = await supabase.auth.getUser();
+    const {
+      data: { user },
+      error,
+    } = await supabase.auth.getUser();
     if (error || !user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
@@ -29,7 +32,8 @@ export async function POST() {
 
     return NextResponse.json({
       deleted: data?.length ?? 0,
-      message: 'All embeddings deleted. Re-sync your courses to rebuild with correct embeddings.',
+      message:
+        'All embeddings deleted. Re-sync your courses to rebuild with correct embeddings.',
     });
   } catch (err) {
     console.error('Reindex error:', err);

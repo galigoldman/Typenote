@@ -42,10 +42,8 @@ export function scrapeLoginStatus(): LoginStatusData {
   // Moodle sets M.cfg.sesskey for authenticated users
   const hasSesskey =
     typeof (window as unknown as Record<string, unknown>).M !== 'undefined' &&
-    !!(
-      (window as unknown as Record<string, { cfg?: { sesskey?: string } }>)
-        .M?.cfg?.sesskey
-    );
+    !!(window as unknown as Record<string, { cfg?: { sesskey?: string } }>).M
+      ?.cfg?.sesskey;
 
   return { loggedIn: hasUserMenu && (hasLogoutLink || hasSesskey) };
 }
@@ -64,7 +62,9 @@ export function scrapeLoginStatus(): LoginStatusData {
  *       span[aria-hidden="true"]  ->  visible course name
  *       span.sr-only              ->  accessible course name (fallback)
  */
-export function scrapeCourses(): ScrapedCoursesData & { _debug?: { title: string; url: string; cardCount: number } } {
+export function scrapeCourses(): ScrapedCoursesData & {
+  _debug?: { title: string; url: string; cardCount: number };
+} {
   const cards = document.querySelectorAll<HTMLElement>(
     '.card.dashboard-card[data-course-id]',
   );
@@ -188,7 +188,9 @@ function parseActivity(activity: HTMLElement): ScrapedItem | null {
 
   // Get the visible text only — exclude Moodle's hidden accessibility spans
   const nameClone = nameEl.cloneNode(true) as HTMLElement;
-  nameClone.querySelectorAll('.accesshide, .sr-only').forEach((el) => el.remove());
+  nameClone
+    .querySelectorAll('.accesshide, .sr-only')
+    .forEach((el) => el.remove());
   const name = nameClone.textContent?.trim() ?? '';
   const moodleUrl = nameEl.href ?? '';
   const modType = activity.dataset.modtype ?? '';
@@ -264,9 +266,7 @@ function parseActivity(activity: HTMLElement): ScrapedItem | null {
 /**
  * Scrapes activities from a section element.
  */
-function scrapeActivitiesFromSection(
-  sectionEl: HTMLElement,
-): ScrapedItem[] {
+function scrapeActivitiesFromSection(sectionEl: HTMLElement): ScrapedItem[] {
   // Select only the wrapper activities (not the nested .activity-item duplicates)
   const activities = sectionEl.querySelectorAll<HTMLElement>(
     '.activity.activity-wrapper[data-for="cmitem"]',
@@ -314,9 +314,7 @@ function scrapeTilesFormat(): ScrapedSection[] {
   }
 
   // Tile sections
-  const tiles = document.querySelectorAll<HTMLElement>(
-    'li.tile[data-section]',
-  );
+  const tiles = document.querySelectorAll<HTMLElement>('li.tile[data-section]');
   tiles.forEach((tile) => {
     const sectionNum = tile.dataset.section ?? '';
     const trueSectionId = tile.dataset.trueSectionid ?? sectionNum;
@@ -356,9 +354,7 @@ function scrapeStandardFormat(): ScrapedSection[] {
 
   sectionEls.forEach((sectionEl, idx) => {
     const sectionId =
-      sectionEl.dataset.sectionid ??
-      sectionEl.dataset.section ??
-      String(idx);
+      sectionEl.dataset.sectionid ?? sectionEl.dataset.section ?? String(idx);
     const titleEl = sectionEl.querySelector<HTMLElement>(
       '.sectionname, .section-title h3, .inplaceeditable',
     );
@@ -417,7 +413,8 @@ export function scrapeSectionPage(): ScrapedItem[] {
     'li.section.course-section, li.section.moveablesection',
   );
   for (const section of allSections) {
-    const sectionNum = section.dataset.section ?? section.id.replace('section-', '');
+    const sectionNum =
+      section.dataset.section ?? section.id.replace('section-', '');
     if (sectionNum === '0') continue;
     const activities = section.querySelectorAll(
       '.activity.activity-wrapper[data-for="cmitem"]',

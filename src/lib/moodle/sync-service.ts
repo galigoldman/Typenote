@@ -95,10 +95,11 @@ export async function compareCourses(
       .select('id', { count: 'exact', head: true })
       .in(
         'section_id',
-        (await admin
-          .from('moodle_sections')
-          .select('id')
-          .eq('course_id', registryCourse.id)
+        (
+          await admin
+            .from('moodle_sections')
+            .select('id')
+            .eq('course_id', registryCourse.id)
         ).data?.map((s: { id: string }) => s.id) ?? [],
       );
 
@@ -353,16 +354,17 @@ export async function updateModifiedFile(
 
   // Build update payload mapping camelCase to snake_case column names
   const updatePayload: Record<string, unknown> = {};
-  if (updates.contentHash !== undefined) updatePayload.content_hash = updates.contentHash;
-  if (updates.storagePath !== undefined) updatePayload.storage_path = updates.storagePath;
-  if (updates.fileSize !== undefined) updatePayload.file_size = updates.fileSize;
-  if (updates.fileName !== undefined) updatePayload.file_name = updates.fileName;
+  if (updates.contentHash !== undefined)
+    updatePayload.content_hash = updates.contentHash;
+  if (updates.storagePath !== undefined)
+    updatePayload.storage_path = updates.storagePath;
+  if (updates.fileSize !== undefined)
+    updatePayload.file_size = updates.fileSize;
+  if (updates.fileName !== undefined)
+    updatePayload.file_name = updates.fileName;
 
   // Update the file record
-  await admin
-    .from('moodle_files')
-    .update(updatePayload)
-    .eq('id', fileId);
+  await admin.from('moodle_files').update(updatePayload).eq('id', fileId);
 
   // If there's an old storage_path and a new one, delete the old file
   if (
