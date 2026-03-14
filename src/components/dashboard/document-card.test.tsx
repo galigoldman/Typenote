@@ -55,7 +55,7 @@ describe('DocumentCard', () => {
     render(<DocumentCard document={mockDocument} />);
     // The relative time text should be present — either "Xd ago" or a date string
     const description = screen.getByText(
-      /ago|just now|\d{1,2}\/\d{1,2}\/\d{4}/i,
+      /ago|just now|\d{1,2}[./]\d{1,2}[./]\d{4}/i,
     );
     expect(description).toBeInTheDocument();
   });

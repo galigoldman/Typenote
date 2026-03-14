@@ -19,12 +19,20 @@ const mockCreateAdminClient = createAdminClient as ReturnType<typeof vi.fn>;
  * Helper to build a chainable mock Supabase client.
  * Each call to `.single()` pops the next result from the queue.
  */
-function createMockAdmin(singleResults: Array<{ data: unknown }>) {
+function createMockAdmin(
+  singleResults: Array<{ data: unknown; count?: number | null }>,
+) {
   let callIndex = 0;
   const chain: Record<string, ReturnType<typeof vi.fn>> = {};
   chain.from = vi.fn().mockReturnValue(chain);
   chain.select = vi.fn().mockReturnValue(chain);
   chain.eq = vi.fn().mockReturnValue(chain);
+  chain.in = vi.fn().mockImplementation(() => {
+    // .in() is used as a terminal call in count queries — pop next result
+    const result = singleResults[callIndex] ?? { data: null, count: null };
+    callIndex++;
+    return Promise.resolve(result);
+  });
   chain.single = vi.fn().mockImplementation(() => {
     const result = singleResults[callIndex] ?? { data: null };
     callIndex++;
@@ -177,9 +185,10 @@ describe('compareCourses', () => {
 
   it('returns synced_by_others when course exists but user has no sync record', async () => {
     const mock = createMockAdmin([
-      { data: { id: 'inst-1' } }, // instance exists
-      { data: { id: 'course-uuid-1' } }, // course exists in registry
-      { data: null }, // no user_course_syncs record
+      { data: { id: 'inst-1' } }, // instance exists (.single())
+      { data: { id: 'course-uuid-1' } }, // course exists in registry (.single())
+      { data: null, count: 5 }, // moodle_files count query (.in()) — has content
+      { data: null }, // no user_course_syncs record (.single())
     ]);
     mockCreateAdminClient.mockReturnValue(mock);
 
@@ -202,14 +211,15 @@ describe('compareCourses', () => {
 
   it('returns synced_by_user when course exists and user has a sync record', async () => {
     const mock = createMockAdmin([
-      { data: { id: 'inst-1' } }, // instance exists
-      { data: { id: 'course-uuid-1' } }, // course exists in registry
+      { data: { id: 'inst-1' } }, // instance exists (.single())
+      { data: { id: 'course-uuid-1' } }, // course exists in registry (.single())
+      { data: null, count: 3 }, // moodle_files count query (.in()) — has content
       {
         data: {
           id: 'sync-1',
           last_synced_at: '2026-03-10T12:00:00Z',
         },
-      }, // user has sync record
+      }, // user has sync record (.single())
     ]);
     mockCreateAdminClient.mockReturnValue(mock);
 
@@ -227,6 +237,7 @@ describe('compareCourses', () => {
         status: 'synced_by_user',
         registryId: 'course-uuid-1',
         lastSyncedAt: '2026-03-10T12:00:00Z',
+        syncedFileCount: 3,
       },
     ]);
   });
@@ -251,17 +262,19 @@ describe('compareCourses', () => {
     ];
 
     const mock = createMockAdmin([
-      { data: { id: 'inst-1' } }, // instance exists
-      { data: null }, // CS101: not in registry
-      { data: { id: 'course-uuid-2' } }, // CS201: in registry
-      { data: null }, // CS201: no user sync
-      { data: { id: 'course-uuid-3' } }, // CS301: in registry
+      { data: { id: 'inst-1' } }, // instance exists (.single())
+      { data: null }, // CS101: not in registry (.single())
+      { data: { id: 'course-uuid-2' } }, // CS201: in registry (.single())
+      { data: null, count: 4 }, // CS201: moodle_files count (.in()) — has content
+      { data: null }, // CS201: no user sync (.single())
+      { data: { id: 'course-uuid-3' } }, // CS301: in registry (.single())
+      { data: null, count: 2 }, // CS301: moodle_files count (.in()) — has content
       {
         data: {
           id: 'sync-3',
           last_synced_at: '2026-03-09T08:00:00Z',
         },
-      }, // CS301: user has sync
+      }, // CS301: user has sync (.single())
     ]);
     mockCreateAdminClient.mockReturnValue(mock);
 
