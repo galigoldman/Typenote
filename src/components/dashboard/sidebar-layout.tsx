@@ -51,8 +51,12 @@ export function SidebarLayout({ sidebar, children }: SidebarLayoutProps) {
   // eslint-disable-next-line react-hooks/exhaustive-deps -- store is stable per mount
   const store = useMemo(() => createSidebarStore(!isDocumentPage), []);
 
-  // Sync sidebar open/close when route changes
-  store.set(!isDocumentPage);
+  // Track previous pathname to only sync on route CHANGES, not every render
+  const prevIsDocRef = useMemo(() => ({ current: isDocumentPage }), []);
+  if (prevIsDocRef.current !== isDocumentPage) {
+    prevIsDocRef.current = isDocumentPage;
+    store.set(!isDocumentPage);
+  }
 
   const isOpen = useSyncExternalStore(
     store.subscribe,
