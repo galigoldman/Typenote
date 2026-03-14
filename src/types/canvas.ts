@@ -20,14 +20,17 @@ export interface Stroke {
   createdAt: number;
 }
 
-/** A positioned text box on a page (created by cut/split operations) */
+/** A positioned text box on a page */
 export interface TextBox {
   id: string;
   x: number;
   y: number;
   width: number;
   height: number;
-  content: Record<string, unknown>;
+  content: Record<string, unknown> | null;
+  isFullPage: boolean;
+  zIndex: number;
+  linkedNextId?: string;
 }
 
 /** A single A4 page in the document */
@@ -49,7 +52,7 @@ export interface CanvasDocument {
 export const PAGE_WIDTH = 794;
 export const PAGE_HEIGHT = 1123;
 
-export type CanvasTool = 'pen' | 'highlighter' | 'eraser' | 'text';
+export type CanvasTool = 'pen' | 'highlighter' | 'eraser' | 'select' | 'text';
 
 /** Current zoom and pan state (view-only, not persisted) */
 export interface ViewTransform {
