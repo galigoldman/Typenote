@@ -47,7 +47,7 @@ export function MoodleConnectionSetup({ currentConnection }: MoodleConnectionSet
       try {
         const parsed = new URL(url.startsWith('http') ? url : `https://${url}`);
         // Strip known Moodle paths to extract just the base prefix
-        let basePath = parsed.pathname
+        const basePath = parsed.pathname
           .replace(/\/(my|course|login|mod|lib|theme|admin|message|calendar|user|badges|grade|report|backup|blocks|question|tag|cohort|enrol|webservice|auth|completion|files|search)\b.*/, '')
           .replace(/\/+$/, '');
         domain = parsed.host + basePath;

@@ -290,6 +290,7 @@ export function MoodleSyncDialog({
 
   useEffect(() => {
     if (open) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- loadCourses fetches from external Moodle API
       loadCourses();
     }
   }, [open, loadCourses]);
