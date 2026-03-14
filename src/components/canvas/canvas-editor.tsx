@@ -368,7 +368,7 @@ export function CanvasEditor({ document }: CanvasEditorProps) {
               ...(existing?.content || [{ type: 'paragraph' }]),
             ],
           };
-          editor.commands.setContent(merged);
+          editor.commands.setContent(merged as unknown as Record<string, unknown>);
         }
         editor.commands.focus('start');
         scrollToPage(pageId);
