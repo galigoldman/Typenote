@@ -182,6 +182,18 @@ function migrateFlowContent(page: CanvasPageData): CanvasPageData {
   if (page.textBoxes.length > 0 && page.flowContent) {
     return { ...page, flowContent: null };
   }
+  // Repair oversized full-page text boxes from previous migration
+  if (page.textBoxes.some((tb) => tb.isFullPage && tb.height > 200)) {
+    return {
+      ...page,
+      textBoxes: page.textBoxes.map((tb) => {
+        if (!tb.isFullPage || tb.height <= 200) return tb;
+        const doc = tb.content as { content?: unknown[] } | null;
+        const blockCount = doc?.content?.length ?? 1;
+        return { ...tb, height: Math.max(blockCount * 30 + 20, 60) };
+      }),
+    };
+  }
   return page;
 }
 
@@ -982,6 +994,11 @@ export function CanvasEditor({
           value={title}
           onChange={(e) => setTitle(e.target.value)}
           onBlur={handleTitleBlur}
+          onPointerDown={(e) => {
+            if (activeTool !== 'text') {
+              e.preventDefault();
+            }
+          }}
           className="text-xl font-semibold bg-transparent border-none outline-none flex-1"
           placeholder="Untitled"
         />

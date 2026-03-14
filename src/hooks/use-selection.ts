@@ -51,11 +51,9 @@ const DOUBLE_TAP_DISTANCE = 15;
 
 /**
  * Get selectable bounds for a text box.
- * Full-page text boxes return null — they are invisible to rectangle selection.
- * They can only be selected by tapping directly on text content.
+ * Uses the stored height (which should be content-sized for full-page boxes).
  */
-function getSelectableBBox(tb: TextBox): BBox | null {
-  if (tb.isFullPage) return null;
+function getSelectableBBox(tb: TextBox): BBox {
   return {
     minX: tb.x,
     minY: tb.y,
@@ -270,24 +268,11 @@ export function useSelection({
           lastTapRef.current = { time: now, x, y };
 
           // Single tap — select one object at tap point
-          // For full-page boxes: only select if tapping near text (check DOM)
-          // For custom boxes: use full bounds
           const tappedTextBox = textBoxes.find((tb) => {
-            if (tb.isFullPage) {
-              // Only match if content has text and tap is in top content area
-              const content = tb.content as { type?: string; content?: unknown[] } | null;
-              if (!content?.content || content.content.length === 0) return false;
-              const hasText = JSON.stringify(content).includes('"text"');
-              if (!hasText) return false;
-              const contentHeight = Math.max(content.content.length * 30 + 20, 60);
-              return (
-                x >= tb.x && x <= tb.x + tb.width &&
-                y >= tb.y && y <= tb.y + contentHeight
-              );
-            }
+            const bbox = getSelectableBBox(tb);
             return (
-              x >= tb.x && x <= tb.x + tb.width &&
-              y >= tb.y && y <= tb.y + tb.height
+              x >= bbox.minX && x <= bbox.maxX &&
+              y >= bbox.minY && y <= bbox.maxY
             );
           });
           if (tappedTextBox) {
@@ -368,10 +353,10 @@ export function useSelection({
             }
           }
 
-          // Hit-test text boxes
+          // Hit-test text boxes (skip full-page boxes — they're too big for rectangle)
           for (const tb of textBoxes) {
+            if (tb.isFullPage) continue;
             const tbBox = getSelectableBBox(tb);
-            if (!tbBox) continue;
             if (aabbIntersectsRect(tbBox, selectionRect)) {
               selectedTbIds.push(tb.id);
               selectedTbs.push(tb);
