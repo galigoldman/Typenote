@@ -4,6 +4,15 @@ import userEvent from '@testing-library/user-event';
 import { MoodleSyncDialog } from './moodle-sync-dialog';
 import type { CourseComparison } from '@/lib/moodle/sync-service';
 
+// Mock the Supabase browser client (used by createClient in the component)
+vi.mock('@/lib/supabase/client', () => ({
+  createClient: vi.fn(() => ({
+    auth: {
+      getSession: vi.fn().mockResolvedValue({ data: { session: null } }),
+    },
+  })),
+}));
+
 // Mock the extension hook
 vi.mock('@/hooks/use-moodle-extension', () => ({
   useMoodleExtension: vi.fn(),
@@ -13,6 +22,7 @@ vi.mock('@/hooks/use-moodle-extension', () => ({
 vi.mock('@/lib/actions/moodle-sync', () => ({
   compareScrapedCourses: vi.fn(),
   syncMoodleCourses: vi.fn(),
+  getExistingFileUrls: vi.fn().mockResolvedValue([]),
 }));
 
 import { useMoodleExtension } from '@/hooks/use-moodle-extension';
@@ -104,7 +114,7 @@ describe('MoodleSyncDialog', () => {
 
     expect(screen.getByText('Data Structures')).toBeInTheDocument();
     expect(screen.getByText('New')).toBeInTheDocument();
-    expect(screen.getByText('Already Synced')).toBeInTheDocument();
+    expect(screen.getByText('Synced')).toBeInTheDocument();
   });
 
   it('shows no courses message when scrape returns empty array', async () => {
@@ -145,9 +155,9 @@ describe('MoodleSyncDialog', () => {
       expect(screen.getByText('Intro to CS')).toBeInTheDocument();
     });
 
-    // The sync button should show count of pre-selected courses
+    // The preview button should show count of pre-selected courses
     expect(
-      screen.getByRole('button', { name: /sync selected \(1\)/i }),
+      screen.getByRole('button', { name: /preview content \(1\)/i }),
     ).toBeInTheDocument();
   });
 
@@ -179,18 +189,39 @@ describe('MoodleSyncDialog', () => {
 
     // Now 2 courses should be selected
     expect(
-      screen.getByRole('button', { name: /sync selected \(2\)/i }),
+      screen.getByRole('button', { name: /preview content \(2\)/i }),
     ).toBeInTheDocument();
   });
 
   it('calls syncMoodleCourses and shows success when sync clicked', async () => {
     const user = userEvent.setup();
     const mockScrape = vi.fn().mockResolvedValue(mockScrapedCourses);
+    const mockScrapeContent = vi.fn().mockResolvedValue({
+      sections: [
+        {
+          moodleSectionId: 'sec-1',
+          title: 'Week 1',
+          position: 0,
+          items: [
+            {
+              type: 'link' as const,
+              name: 'Lecture Notes',
+              moodleUrl: 'https://moodle.test.ac.il/link/1',
+            },
+          ],
+        },
+      ],
+    });
     mockUseMoodleExtension.mockReturnValue({
       scrapeCourses: mockScrape,
+      scrapeCourseContent: mockScrapeContent,
+      downloadAndUpload: vi.fn(),
     });
     mockCompare.mockResolvedValue(mockComparisons);
-    mockSync.mockResolvedValue({ syncedCount: 1, courses: [] });
+    mockSync.mockResolvedValue({
+      syncedCount: 1,
+      courses: [{ moodleCourseId: 'CS101', sections: [] }],
+    });
 
     render(
       <MoodleSyncDialog
@@ -200,10 +231,23 @@ describe('MoodleSyncDialog', () => {
       />,
     );
 
+    // Wait for course list to appear
     await waitFor(() => {
       expect(screen.getByText('Intro to CS')).toBeInTheDocument();
     });
 
+    // Click Preview Content to go to content selection phase
+    const previewButton = screen.getByRole('button', {
+      name: /preview content/i,
+    });
+    await user.click(previewButton);
+
+    // Wait for content selection phase
+    await waitFor(() => {
+      expect(screen.getByText('Lecture Notes')).toBeInTheDocument();
+    });
+
+    // Click Sync Selected
     const syncButton = screen.getByRole('button', { name: /sync selected/i });
     await user.click(syncButton);
 
@@ -276,9 +320,9 @@ describe('MoodleSyncDialog', () => {
       expect(screen.getByText('Intro to CS')).toBeInTheDocument();
     });
 
-    const syncButton = screen.getByRole('button', {
-      name: /sync selected \(0\)/i,
+    const previewButton = screen.getByRole('button', {
+      name: /preview content \(0\)/i,
     });
-    expect(syncButton).toBeDisabled();
+    expect(previewButton).toBeDisabled();
   });
 });

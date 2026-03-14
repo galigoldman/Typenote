@@ -8,6 +8,13 @@ vi.mock('@/hooks/use-moodle-extension', () => ({
   useMoodleExtension: vi.fn(),
 }));
 
+// Mock the MoodleConnectionSetup component (avoids needing to mock its server action imports)
+vi.mock('./moodle-connection-setup', () => ({
+  MoodleConnectionSetup: () => (
+    <div data-testid="moodle-connection-setup">Moodle Connection Setup</div>
+  ),
+}));
+
 import { useMoodleExtension } from '@/hooks/use-moodle-extension';
 
 const mockUseMoodleExtension = useMoodleExtension as ReturnType<typeof vi.fn>;
@@ -50,21 +57,19 @@ describe('MoodleSyncPrompt', () => {
     mockUseMoodleExtension.mockReturnValue({
       isInstalled: true,
       isChecking: false,
-      checkMoodleLogin: vi.fn(),
     });
 
     render(<MoodleSyncPrompt moodleConnection={null} onSyncClick={vi.fn()} />);
     expect(
-      screen.getByText(/connect your moodle account in settings/i),
+      screen.getByText(/enter your moodle url to start syncing courses/i),
     ).toBeInTheDocument();
+    expect(screen.getByTestId('moodle-connection-setup')).toBeInTheDocument();
   });
 
-  it('shows login message when extension is installed, connection exists, not logged in', async () => {
-    const mockCheckLogin = vi.fn().mockResolvedValue({ loggedIn: false });
+  it('shows sync button immediately when extension is installed and connection exists', () => {
     mockUseMoodleExtension.mockReturnValue({
       isInstalled: true,
       isChecking: false,
-      checkMoodleLogin: mockCheckLogin,
     });
 
     render(
@@ -74,14 +79,9 @@ describe('MoodleSyncPrompt', () => {
       />,
     );
 
-    await waitFor(() => {
-      expect(mockCheckLogin).toHaveBeenCalledWith('https://moodle.test.ac.il');
-    });
-
-    expect(screen.getByText(/log into moodle/i)).toBeInTheDocument();
-    expect(
-      screen.getByRole('link', { name: /log into moodle/i }),
-    ).toHaveAttribute('href', 'https://moodle.test.ac.il/login');
+    expect(screen.getByText(/connected to/i)).toBeInTheDocument();
+    expect(screen.getByText('moodle.test.ac.il')).toBeInTheDocument();
+    expect(screen.getByText(/sync with moodle/i)).toBeInTheDocument();
   });
 
   it('shows sync button when extension is installed, connection exists, and logged in', async () => {
