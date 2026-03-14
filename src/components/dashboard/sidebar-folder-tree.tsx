@@ -35,12 +35,20 @@ function FolderNode({ folder, folders, courses, level }: FolderNodeProps) {
         style={{ paddingLeft: `${level * 12 + 8}px` }}
       >
         {hasChildren ? (
-          <button
+          <span
+            role="button"
+            tabIndex={0}
             onClick={(e) => {
               e.stopPropagation();
               setExpanded(!expanded);
             }}
-            className="shrink-0"
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.stopPropagation();
+                setExpanded(!expanded);
+              }
+            }}
+            className="shrink-0 cursor-pointer"
           >
             <ChevronRight
               className={cn(
@@ -48,7 +56,7 @@ function FolderNode({ folder, folders, courses, level }: FolderNodeProps) {
                 expanded && 'rotate-90',
               )}
             />
-          </button>
+          </span>
         ) : (
           <span className="w-3.5" />
         )}

@@ -158,14 +158,37 @@ function createEmptyPage(order: number, pageType?: string): CanvasPageData {
   };
 }
 
-/** No migration — keep flowContent as-is for existing documents.
- *  Only new text created in Type mode goes into text boxes.
- *  This preserves all existing document content. */
+/** Migrate flowContent to a text box on load.
+ *  The text box height is set to a small estimate for selection purposes,
+ *  but the TextBox component uses minHeight so content is never clipped. */
+function migrateFlowContent(page: CanvasPageData): CanvasPageData {
+  if (page.flowContent && page.textBoxes.length === 0) {
+    // Estimate height from block count
+    const doc = page.flowContent as { content?: unknown[] };
+    const blockCount = doc?.content?.length ?? 1;
+    const height = Math.max(blockCount * 30 + 20, 60);
+    const textBox: TextBox = {
+      id: Math.random().toString(36).slice(2) + Date.now().toString(36),
+      x: 40,
+      y: 40,
+      width: PAGE_WIDTH - 80,
+      height,
+      content: page.flowContent,
+      isFullPage: true,
+      zIndex: 0,
+    };
+    return { ...page, textBoxes: [textBox], flowContent: null };
+  }
+  if (page.textBoxes.length > 0 && page.flowContent) {
+    return { ...page, flowContent: null };
+  }
+  return page;
+}
 
 function initializePagesFromDocument(doc: Document): CanvasPageData[] {
   const pagesData = doc.pages as CanvasDocument | null;
   if (pagesData?.pages && pagesData.pages.length > 0) {
-    const loaded = pagesData.pages;
+    const loaded = pagesData.pages.map(migrateFlowContent);
     // Always ensure a trailing empty page for infinite-scroll feel
     const lastPage = loaded[loaded.length - 1];
     if (pageHasContent(lastPage)) {
