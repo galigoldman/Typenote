@@ -59,6 +59,7 @@ interface CanvasPageProps {
     textBoxId: string,
     content: Record<string, unknown>,
   ) => void;
+  renderPdfPage?: (pageNum: number, canvas: HTMLCanvasElement) => Promise<void>;
 }
 
 export function CanvasPage({
@@ -84,7 +85,9 @@ export function CanvasPage({
   selectionResizeBBox = null,
   selectedTextBoxIds = new Set<string>(),
   onTextBoxContentUpdate,
+  renderPdfPage,
 }: CanvasPageProps) {
+  const pdfCanvasRef = useRef<HTMLCanvasElement>(null);
   const committedCanvasRef = useRef<HTMLCanvasElement>(null);
   const workingCanvasRef = useRef<HTMLCanvasElement>(null);
   const interactionLayerRef = useRef<HTMLDivElement>(null);
@@ -117,6 +120,13 @@ export function CanvasPage({
       );
     }
   }, []);
+
+  // Render PDF background when pdfPage is set
+  useEffect(() => {
+    const canvas = pdfCanvasRef.current;
+    if (canvas == null || page.pdfPage == null || !renderPdfPage) return;
+    renderPdfPage(page.pdfPage, canvas);
+  }, [page.pdfPage, renderPdfPage]);
 
   // Native event listeners for pen and touch.
   // FINGER scroll: In Draw/Eraser mode the scroll container has overflow:hidden
@@ -457,6 +467,15 @@ export function CanvasPage({
         WebkitUserSelect: 'none',
       }}
     >
+      {/* Layer 0: PDF background (material-backed documents only) */}
+      {page.pdfPage != null && (
+        <canvas
+          ref={pdfCanvasRef}
+          className="absolute inset-0"
+          style={{ pointerEvents: 'none' }}
+        />
+      )}
+
       {/* Layer 1: Page background */}
       <div
         className={`absolute inset-0 ${canvasClass ?? ''}`}

@@ -16,6 +16,7 @@ const mockDocument: Document = {
   folder_id: null,
   course_id: null,
   week_id: null,
+  material_id: null,
   purpose: null,
   title: 'Integration by Parts',
   content: {},

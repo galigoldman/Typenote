@@ -51,7 +51,10 @@ export default async function DocumentPage({ params }: DocumentPageProps) {
   if (!course) {
     return (
       <div className="flex h-full min-h-0 flex-col overflow-hidden">
-        <CanvasEditor document={typedDocument} />
+        <CanvasEditor
+          document={typedDocument}
+          materialId={typedDocument.material_id}
+        />
       </div>
     );
   }
@@ -75,6 +78,7 @@ export default async function DocumentPage({ params }: DocumentPageProps) {
         weekId={typedDocument.week_id ?? undefined}
         weekLabel={weekLabel}
         document={typedDocument}
+        materialId={typedDocument.material_id}
       />
     </div>
   );

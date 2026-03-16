@@ -38,6 +38,9 @@ Every step of development must follow this git workflow:
 
 ## Active Technologies
 
+- TypeScript 5 / Node.js 22+ + Next.js 16 (App Router), pdfjs-dist (NEW), TipTap 3, perfect-freehand, Supabase SSR (008-inline-material-viewer)
+- PostgreSQL via Supabase (documents table), Supabase Storage (course-materials & moodle-materials buckets) (008-inline-material-viewer)
+
 - TypeScript 5 / Node.js 18+ + Next.js 16 (App Router), `@google/genai`, `mammoth`, `react-markdown` (new), `remark-math` (new), `rehype-katex` (new) (007-ai-context-polish)
 - No new storage or migrations — modifies existing AI pipeline and UI components (007-ai-context-polish)
 
