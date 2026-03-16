@@ -11,6 +11,9 @@ export async function POST(req: Request) {
       weekId,
       documentId,
       mode,
+      courseName,
+      weekLabel,
+      documentContent,
       conversationHistory,
     } = body;
 
@@ -68,6 +71,9 @@ export async function POST(req: Request) {
       weekId: weekId || undefined,
       documentId: documentId || undefined,
       mode,
+      courseName: courseName || undefined,
+      weekLabel: weekLabel || undefined,
+      documentContent: documentContent || undefined,
       conversationHistory: conversationHistory || undefined,
     });
 

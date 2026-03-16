@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import { BookOpen, Loader2, Send, Sparkles, X, Zap } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
+import { MarkdownResponse } from './markdown-response';
 
 interface ChatSource {
   sourceType: string;
@@ -23,6 +24,9 @@ interface ChatMessage {
 interface AiChatPanelProps {
   courseId: string;
   weekId?: string;
+  courseName?: string;
+  weekLabel?: string;
+  getDocumentContent?: () => string;
   isOpen: boolean;
   onClose: () => void;
 }
@@ -30,6 +34,9 @@ interface AiChatPanelProps {
 export function AiChatPanel({
   courseId,
   weekId,
+  courseName,
+  weekLabel,
+  getDocumentContent,
   isOpen,
   onClose,
 }: AiChatPanelProps) {
@@ -65,6 +72,9 @@ export function AiChatPanel({
         content: m.content,
       }));
 
+      // Get latest document content at question-time
+      const documentContent = getDocumentContent?.() || undefined;
+
       const res = await fetch('/api/ai/ask', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -73,6 +83,9 @@ export function AiChatPanel({
           courseId,
           weekId,
           mode,
+          courseName,
+          weekLabel,
+          documentContent,
           conversationHistory,
         }),
       });
@@ -113,9 +126,9 @@ export function AiChatPanel({
         <div className="flex items-center gap-2">
           <Sparkles className="h-5 w-5 text-purple-500" />
           <span className="font-semibold">AI Tutor</span>
-          {weekId && (
+          {weekLabel && (
             <span className="rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground">
-              Full context
+              {weekLabel}
             </span>
           )}
         </div>
@@ -162,11 +175,13 @@ export function AiChatPanel({
           <div className="flex flex-col items-center justify-center py-12 text-center">
             <Sparkles className="mb-3 h-10 w-10 text-muted-foreground/40" />
             <p className="text-sm font-medium text-muted-foreground">
-              Ask anything about your course materials
+              {courseName
+                ? `Ask anything about ${courseName}`
+                : 'Ask anything about your course materials'}
             </p>
             <p className="mt-1 text-xs text-muted-foreground/60">
-              {weekId
-                ? 'I can see all materials for this week'
+              {weekLabel
+                ? `I can see all materials for ${weekLabel}`
                 : "I'll search across all weeks"}
             </p>
           </div>
@@ -184,7 +199,7 @@ export function AiChatPanel({
             ) : (
               <div className="max-w-[95%]">
                 <div className="rounded-2xl rounded-bl-md bg-muted px-4 py-3 text-sm leading-relaxed">
-                  <div className="whitespace-pre-wrap">{msg.content}</div>
+                  <MarkdownResponse content={msg.content} />
                 </div>
 
                 {/* Sources */}
@@ -207,7 +222,7 @@ export function AiChatPanel({
                 {msg.model && (
                   <div className="mt-1.5 flex items-center gap-2">
                     <span className="text-[10px] text-muted-foreground/50">
-                      {msg.model === 'flash' ? '⚡ Flash' : '🧠 Pro'}
+                      {msg.model === 'flash' ? 'Flash' : 'Pro'}
                       {msg.cached ? ' · Cached' : ''}
                     </span>
                   </div>

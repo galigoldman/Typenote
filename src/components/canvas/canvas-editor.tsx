@@ -35,8 +35,20 @@ import { ZoomIndicator } from './zoom-indicator';
 import { EditorToolbar } from '@/components/editor/editor-toolbar';
 import { CanvasPage } from './canvas-page';
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function extractNodeText(node: any): string {
+  if (!node) return '';
+  if (node.type === 'mathExpression' && node.attrs?.latex) {
+    return `$${node.attrs.latex}$`;
+  }
+  if (node.text != null) return node.text;
+  if (!node.content || !Array.isArray(node.content)) return '';
+  return node.content.map(extractNodeText).join('');
+}
+
 interface CanvasEditorProps {
   document: Document;
+  onDocumentTextReady?: (getter: () => string) => void;
 }
 
 const CANVAS_CLASSES: Record<string, string> = {
@@ -158,7 +170,7 @@ function initializePagesFromDocument(doc: Document): CanvasPageData[] {
   return [createEmptyPage(0, doc.canvas_type)];
 }
 
-export function CanvasEditor({ document }: CanvasEditorProps) {
+export function CanvasEditor({ document, onDocumentTextReady }: CanvasEditorProps) {
   const { isOpen: sidebarOpen, toggle: toggleSidebar } = useSidebar();
   const [title, setTitle] = useState(document.title);
   const [pages, setPages] = useState<CanvasPageData[]>(() =>
@@ -309,6 +321,21 @@ export function CanvasEditor({ document }: CanvasEditorProps) {
   );
 
   const editorsRef = useRef<Map<string, Editor>>(new Map());
+
+  // Register a getter function that extracts text from all page editors
+  useEffect(() => {
+    if (!onDocumentTextReady) return;
+    onDocumentTextReady(() => {
+      const texts: string[] = [];
+      for (const [, editor] of editorsRef.current) {
+        if (editor && !editor.isDestroyed) {
+          const json = editor.getJSON();
+          texts.push(extractNodeText(json));
+        }
+      }
+      return texts.filter(Boolean).join('\n\n');
+    });
+  }, [onDocumentTextReady]);
 
   // Scroll so the top of a page is ~1/3 from the top of the viewport,
   // showing the divider and bottom of the previous page (like Word/Docs).

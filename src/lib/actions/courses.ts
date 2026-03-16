@@ -2,6 +2,7 @@
 
 import { revalidatePath } from 'next/cache';
 import { createClient } from '@/lib/supabase/server';
+import { deleteEmbeddingsBySource } from '@/lib/queries/embeddings';
 
 export async function createCourse(data: {
   name: string;
@@ -78,10 +79,15 @@ export async function deleteCourse(id: string) {
     const weekIds = weeks.map((w) => w.id);
     const { data: materials, error: materialsError } = await supabase
       .from('course_materials')
-      .select('storage_path')
+      .select('id, storage_path')
       .in('week_id', weekIds)
       .eq('user_id', user.id);
     if (materialsError) throw new Error(materialsError.message);
+
+    // Step b2: Delete embeddings for each material
+    for (const material of materials ?? []) {
+      await deleteEmbeddingsBySource('course_material', material.id);
+    }
 
     // Step c: Remove files from storage
     if (materials && materials.length > 0) {
