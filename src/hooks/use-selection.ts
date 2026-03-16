@@ -36,6 +36,7 @@ interface UseSelectionOptions {
     y: number,
     width: number,
     height: number,
+    fontScale: number,
   ) => void;
   onModeChange?: (mode: CanvasTool) => void;
   onDeleteSelected?: (
@@ -648,7 +649,9 @@ export function useSelection({
                 newBBox.minY + ((tb.y - origBBox.minY) / origH) * newH;
               const newTbW = (tb.width / origW) * newW;
               const newTbH = (tb.height / origH) * newH;
-              onTextBoxResize?.(targetPageId, tbId, newX, newY, newTbW, newTbH);
+              const widthRatio = newTbW / tb.width;
+              const newFontScale = (tb.fontScale ?? 1) * widthRatio;
+              onTextBoxResize?.(targetPageId, tbId, newX, newY, newTbW, newTbH, newFontScale);
             }
           }
 

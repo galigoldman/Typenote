@@ -95,6 +95,9 @@ export function TextBox({
         top: textBox.y,
         width: textBox.width,
         minHeight: textBox.height,
+        fontSize: textBox.fontScale && textBox.fontScale !== 1
+          ? `${textBox.fontScale * 100}%`
+          : undefined,
       }}
     >
       {editor && <EditorContent editor={editor} />}

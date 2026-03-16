@@ -31,6 +31,8 @@ export interface TextBox {
   isFullPage: boolean;
   zIndex: number;
   linkedNextId?: string;
+  /** Font size multiplier (1 = default). Applied when resizing text boxes. */
+  fontScale?: number;
 }
 
 /** A single A4 page in the document */
