@@ -111,6 +111,7 @@ export function TextBox({
   return (
     <div
       ref={containerRef}
+      data-textbox-id={textBox.id}
       className={`absolute ${
         isSelected
           ? 'border-2 border-blue-500 shadow-sm'
