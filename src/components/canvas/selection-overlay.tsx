@@ -14,6 +14,10 @@ interface SelectionOverlayProps {
   isDragging: boolean;
   /** Current drag offset */
   dragOffset: { x: number; y: number };
+  /** Whether currently resizing selected objects */
+  isResizing: boolean;
+  /** Live bounding box during resize, null when not resizing */
+  resizeBBox: BBox | null;
 }
 
 const HANDLE_SIZE = 6;
@@ -77,18 +81,24 @@ function BoundingBox({
   bbox,
   isDragging,
   dragOffset,
+  isResizing,
+  resizeBBox,
 }: {
   bbox: BBox;
   isDragging: boolean;
   dragOffset: { x: number; y: number };
+  isResizing: boolean;
+  resizeBBox: BBox | null;
 }) {
+  // Use the live resize bbox when resizing, otherwise apply drag offset
+  const effectiveBBox = isResizing && resizeBBox ? resizeBBox : bbox;
   const ox = isDragging ? dragOffset.x : 0;
   const oy = isDragging ? dragOffset.y : 0;
 
-  const x = bbox.minX + ox;
-  const y = bbox.minY + oy;
-  const w = bbox.maxX - bbox.minX;
-  const h = bbox.maxY - bbox.minY;
+  const x = effectiveBBox.minX + ox;
+  const y = effectiveBBox.minY + oy;
+  const w = effectiveBBox.maxX - effectiveBBox.minX;
+  const h = effectiveBBox.maxY - effectiveBBox.minY;
 
   const midX = x + w / 2;
   const midY = y + h / 2;
@@ -131,6 +141,8 @@ export function SelectionOverlay({
   selectionBBox,
   isDragging,
   dragOffset,
+  isResizing,
+  resizeBBox,
 }: SelectionOverlayProps) {
   return (
     <svg
@@ -146,6 +158,8 @@ export function SelectionOverlay({
           bbox={selectionBBox}
           isDragging={isDragging}
           dragOffset={dragOffset}
+          isResizing={isResizing}
+          resizeBBox={resizeBBox}
         />
       )}
     </svg>

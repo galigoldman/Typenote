@@ -11,7 +11,11 @@ import LinkExt from '@tiptap/extension-link';
 import HighlightExt from '@tiptap/extension-highlight';
 import { AutoDirection } from '@/lib/editor/rtl-extension';
 import { Indent } from '@/lib/editor/indent-extension';
-import type { CanvasPage as CanvasPageData, CanvasTool, BBox } from '@/types/canvas';
+import type {
+  CanvasPage as CanvasPageData,
+  CanvasTool,
+  BBox,
+} from '@/types/canvas';
 import { PAGE_WIDTH, PAGE_HEIGHT } from '@/types/canvas';
 import { setupHighDPICanvas } from '@/lib/canvas/coordinate-utils';
 import { renderStroke } from '@/lib/canvas/stroke-utils';
@@ -47,6 +51,8 @@ interface CanvasPageProps {
   selectionBBox?: BBox | null;
   isSelectionDragging?: boolean;
   selectionDragOffset?: { x: number; y: number };
+  isSelectionResizing?: boolean;
+  selectionResizeBBox?: BBox | null;
   selectedTextBoxIds?: Set<string>;
   onTextBoxContentUpdate?: (
     pageId: string,
@@ -74,6 +80,8 @@ export function CanvasPage({
   selectionBBox = null,
   isSelectionDragging = false,
   selectionDragOffset = { x: 0, y: 0 },
+  isSelectionResizing = false,
+  selectionResizeBBox = null,
   selectedTextBoxIds = new Set<string>(),
   onTextBoxContentUpdate,
 }: CanvasPageProps) {
@@ -518,6 +526,8 @@ export function CanvasPage({
           selectionBBox={selectionBBox}
           isDragging={isSelectionDragging}
           dragOffset={selectionDragOffset}
+          isResizing={isSelectionResizing}
+          resizeBBox={selectionResizeBBox}
         />
       )}
 
