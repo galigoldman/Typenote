@@ -59,6 +59,11 @@ interface CanvasPageProps {
     textBoxId: string,
     content: Record<string, unknown>,
   ) => void;
+  onTextBoxHeightMeasured?: (
+    pageId: string,
+    textBoxId: string,
+    height: number,
+  ) => void;
   renderPdfPage?: (pageNum: number, canvas: HTMLCanvasElement) => Promise<void>;
 }
 
@@ -85,6 +90,7 @@ export function CanvasPage({
   selectionResizeBBox = null,
   selectedTextBoxIds = new Set<string>(),
   onTextBoxContentUpdate,
+  onTextBoxHeightMeasured,
   renderPdfPage,
 }: CanvasPageProps) {
   const pdfCanvasRef = useRef<HTMLCanvasElement>(null);
@@ -514,6 +520,9 @@ export function CanvasPage({
             isSelected={selectedTextBoxIds.has(tb.id)}
             onContentUpdate={(id, content) =>
               onTextBoxContentUpdate?.(page.id, id, content)
+            }
+            onHeightMeasured={(id, height) =>
+              onTextBoxHeightMeasured?.(page.id, id, height)
             }
           />
         ))}
