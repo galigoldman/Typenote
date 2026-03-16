@@ -11,6 +11,7 @@ import LinkExt from '@tiptap/extension-link';
 import HighlightExt from '@tiptap/extension-highlight';
 import { AutoDirection } from '@/lib/editor/rtl-extension';
 import { Indent } from '@/lib/editor/indent-extension';
+import { Pencil, Trash2 } from 'lucide-react';
 import type {
   CanvasPage as CanvasPageData,
   CanvasTool,
@@ -64,6 +65,9 @@ interface CanvasPageProps {
     textBoxId: string,
     height: number,
   ) => void;
+  onDeleteSelection?: () => void;
+  onEditSelection?: () => void;
+  hasSelectedTextBoxes?: boolean;
   renderPdfPage?: (pageNum: number, canvas: HTMLCanvasElement) => Promise<void>;
 }
 
@@ -91,6 +95,9 @@ export function CanvasPage({
   selectedTextBoxIds = new Set<string>(),
   onTextBoxContentUpdate,
   onTextBoxHeightMeasured,
+  onDeleteSelection,
+  onEditSelection,
+  hasSelectedTextBoxes = false,
   renderPdfPage,
 }: CanvasPageProps) {
   const pdfCanvasRef = useRef<HTMLCanvasElement>(null);
@@ -558,6 +565,46 @@ export function CanvasPage({
           resizeBBox={selectionResizeBBox}
         />
       )}
+
+      {/* Layer 5.6: Floating action bar above selection */}
+      {activeTool === 'select' &&
+        selectionBBox &&
+        !isSelectionDragging &&
+        !isSelectionResizing && (
+          <div
+            className="absolute flex items-center gap-1 bg-white rounded-full shadow-lg border px-2 py-1"
+            style={{
+              left: (selectionBBox.minX + selectionBBox.maxX) / 2,
+              top: selectionBBox.minY - 40,
+              transform: 'translateX(-50%)',
+              pointerEvents: 'auto',
+              zIndex: 10,
+            }}
+          >
+            {hasSelectedTextBoxes && (
+              <button
+                onPointerDown={(e) => {
+                  e.stopPropagation();
+                  onEditSelection?.();
+                }}
+                className="flex items-center justify-center h-7 w-7 rounded-full hover:bg-gray-100 transition-colors text-gray-600"
+                title="Edit text"
+              >
+                <Pencil className="h-3.5 w-3.5" />
+              </button>
+            )}
+            <button
+              onPointerDown={(e) => {
+                e.stopPropagation();
+                onDeleteSelection?.();
+              }}
+              className="flex items-center justify-center h-7 w-7 rounded-full hover:bg-red-50 hover:text-red-500 transition-colors text-gray-600"
+              title="Delete"
+            >
+              <Trash2 className="h-3.5 w-3.5" />
+            </button>
+          </div>
+        )}
 
       {/* Layer 6: Interaction layer — ALWAYS present
           In draw/erase mode: captures all events (pointer-events: auto, touch-action: none)

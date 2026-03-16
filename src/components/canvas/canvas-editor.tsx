@@ -1013,6 +1013,79 @@ export function CanvasEditor({
     return () => window.removeEventListener('keydown', handler);
   }, [activeTool, deleteSelected, clearSelection]);
 
+  // Edit selected text boxes — switch to text mode and focus the editor
+  const handleEditSelection = useCallback(() => {
+    // Grab the first selected text box ID before clearing
+    const tbId =
+      selectedTextBoxIds.size > 0
+        ? Array.from(selectedTextBoxIds)[0]
+        : null;
+    // Save scroll position before mode switch
+    const sc = scrollContainerRef.current;
+    const savedScroll = sc ? sc.scrollTop : 0;
+    clearSelection();
+    setActiveTool('text');
+    // After React re-renders in text mode, restore scroll and focus text box
+    if (tbId) {
+      requestAnimationFrame(() => {
+        // Restore scroll first
+        if (sc) sc.scrollTop = savedScroll;
+        const el = globalThis.document.querySelector(
+          `[data-textbox-id="${tbId}"] .ProseMirror`,
+        ) as HTMLElement | null;
+        if (el) {
+          el.focus({ preventScroll: true });
+          // Place caret at the end of the text content
+          const sel = globalThis.document.getSelection();
+          if (sel) {
+            sel.selectAllChildren(el);
+            sel.collapseToEnd();
+          }
+        }
+        // Restore again after focus (some browsers scroll on focus)
+        requestAnimationFrame(() => {
+          if (sc) sc.scrollTop = savedScroll;
+        });
+      });
+    }
+  }, [clearSelection, setActiveTool, selectedTextBoxIds]);
+
+  // Add a new text box (from Draw mode toolbar)
+  const handleAddTextBox = useCallback(() => {
+    if (pages.length === 0) return;
+    const firstPage = pages[0];
+    const newTextBox: TextBox = {
+      id: Math.random().toString(36).slice(2) + Date.now().toString(36),
+      x: 100,
+      y: 200,
+      width: 300,
+      height: 40,
+      content: null,
+      isFullPage: false,
+      zIndex: 1,
+    };
+
+    // Push undo action
+    undoStackRef.current.push({
+      type: 'textbox-add',
+      pageId: firstPage.id,
+      textBox: newTextBox,
+    });
+    redoStackRef.current = [];
+    if (undoStackRef.current.length > 100) undoStackRef.current.shift();
+    setHistoryVersion((v) => v + 1);
+
+    setPages((prev) =>
+      prev.map((p) =>
+        p.id === firstPage.id
+          ? { ...p, textBoxes: [...p.textBoxes, newTextBox] }
+          : p,
+      ),
+    );
+    setActiveTool('text');
+    triggerSave();
+  }, [pages, setActiveTool, triggerSave]);
+
   // Page management
   const handleDeletePage = useCallback(
     (pageId: string) => {
@@ -1246,6 +1319,16 @@ export function CanvasEditor({
               >
                 <Eraser className="h-4 w-4" />
               </button>
+              <button
+                onPointerDown={(e) => {
+                  e.stopPropagation();
+                  handleAddTextBox();
+                }}
+                className="flex items-center justify-center h-8 w-8 rounded-lg transition-colors hover:bg-accent/50 text-muted-foreground"
+                title="Add text box"
+              >
+                <Type className="h-4 w-4" />
+              </button>
             </div>
           </>
         )}
@@ -1344,6 +1427,9 @@ export function CanvasEditor({
                     selectedTextBoxIds={selectedTextBoxIds}
                     onTextBoxContentUpdate={handleTextBoxContentUpdate}
                     onTextBoxHeightMeasured={handleTextBoxHeightMeasured}
+                    onDeleteSelection={deleteSelected}
+                    onEditSelection={handleEditSelection}
+                    hasSelectedTextBoxes={selectedTextBoxIds.size > 0}
                     renderPdfPage={renderPdfPage}
                   />
                   {/* Page break divider */}
