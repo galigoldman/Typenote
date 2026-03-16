@@ -434,6 +434,26 @@ export function CanvasEditor({
     [triggerSave],
   );
 
+  // Auto-fit text box height to actual rendered content
+  const handleTextBoxHeightMeasured = useCallback(
+    (pageId: string, textBoxId: string, measuredHeight: number) => {
+      setPages((prev) =>
+        prev.map((p) => {
+          if (p.id !== pageId) return p;
+          const tb = p.textBoxes.find((t) => t.id === textBoxId);
+          if (!tb || Math.abs(tb.height - measuredHeight) < 2) return p;
+          return {
+            ...p,
+            textBoxes: p.textBoxes.map((t) =>
+              t.id === textBoxId ? { ...t, height: measuredHeight } : t,
+            ),
+          };
+        }),
+      );
+    },
+    [],
+  );
+
   const editorsRef = useRef<Map<string, Editor>>(new Map());
 
   // Register a getter function that extracts text from all page editors
@@ -1323,6 +1343,7 @@ export function CanvasEditor({
                     selectionResizeBBox={selectionResizeBBox}
                     selectedTextBoxIds={selectedTextBoxIds}
                     onTextBoxContentUpdate={handleTextBoxContentUpdate}
+                    onTextBoxHeightMeasured={handleTextBoxHeightMeasured}
                     renderPdfPage={renderPdfPage}
                   />
                   {/* Page break divider */}

@@ -18,6 +18,7 @@ interface TextBoxProps {
   isSelected: boolean;
   onContentUpdate: (id: string, content: Record<string, unknown>) => void;
   onEditorReady?: (editor: Editor) => void;
+  onHeightMeasured?: (id: string, height: number) => void;
 }
 
 export function TextBox({
@@ -25,15 +26,19 @@ export function TextBox({
   isSelected,
   onContentUpdate,
   onEditorReady,
+  onHeightMeasured,
 }: TextBoxProps) {
   // Store callbacks in refs so the TipTap editor instance (created once)
   // always calls the latest version without needing to be re-created.
   const onContentUpdateRef = useRef(onContentUpdate);
   const onEditorReadyRef = useRef(onEditorReady);
+  const onHeightMeasuredRef = useRef(onHeightMeasured);
   const textBoxIdRef = useRef(textBox.id);
+  const containerRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
     onContentUpdateRef.current = onContentUpdate;
     onEditorReadyRef.current = onEditorReady;
+    onHeightMeasuredRef.current = onHeightMeasured;
     textBoxIdRef.current = textBox.id;
   });
 
@@ -83,10 +88,29 @@ export function TextBox({
     }
   }, [editor]);
 
+  // Auto-measure content height so the selection bbox stays tight.
+  // Uses ResizeObserver to detect when content changes size.
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+    const measure = () => {
+      const measured = el.scrollHeight;
+      if (measured > 0) {
+        onHeightMeasuredRef.current?.(textBoxIdRef.current, measured);
+      }
+    };
+    const observer = new ResizeObserver(measure);
+    observer.observe(el);
+    // Initial measurement after mount
+    measure();
+    return () => observer.disconnect();
+  }, [editor]);
+
   const fontScale = textBox.fontScale;
 
   return (
     <div
+      ref={containerRef}
       className={`absolute ${
         isSelected
           ? 'border-2 border-blue-500 shadow-sm'
