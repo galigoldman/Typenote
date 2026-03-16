@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { Editor } from '@tiptap/core';
 import type {
+  BBox,
   CanvasDocument,
   CanvasPage as CanvasPageData,
   CanvasTool,
@@ -147,9 +148,15 @@ function ConnectionIndicator({
   );
 }
 
-function createEmptyPage(order: number, pageType?: string): CanvasPageData {
+function createEmptyPage(
+  order: number,
+  pageType?: string,
+  seed?: string,
+): CanvasPageData {
   return {
-    id: Math.random().toString(36).slice(2) + Date.now().toString(36),
+    id: seed
+      ? `${seed}-p${order}`
+      : Math.random().toString(36).slice(2) + Date.now().toString(36),
     order,
     pageType: pageType as CanvasPageData['pageType'],
     strokes: [],
@@ -168,13 +175,13 @@ function migrateFlowContent(page: CanvasPageData): CanvasPageData {
     const blockCount = doc?.content?.length ?? 1;
     const height = Math.max(blockCount * 30 + 20, 60);
     const textBox: TextBox = {
-      id: Math.random().toString(36).slice(2) + Date.now().toString(36),
+      id: `${page.id}-ftb`,
       x: 40,
       y: 40,
       width: PAGE_WIDTH - 80,
       height,
       content: page.flowContent,
-      isFullPage: true,
+      isFullPage: false,
       zIndex: 0,
     };
     return { ...page, textBoxes: [textBox], flowContent: null };
@@ -182,15 +189,23 @@ function migrateFlowContent(page: CanvasPageData): CanvasPageData {
   if (page.textBoxes.length > 0 && page.flowContent) {
     return { ...page, flowContent: null };
   }
-  // Repair oversized full-page text boxes from previous migration
-  if (page.textBoxes.some((tb) => tb.isFullPage && tb.height > 200)) {
+  // Repair text boxes from previous migration:
+  // - Set isFullPage to false (all text boxes are now content-sized)
+  // - Fix oversized heights
+  if (page.textBoxes.some((tb) => tb.isFullPage || tb.height > 200)) {
     return {
       ...page,
       textBoxes: page.textBoxes.map((tb) => {
-        if (!tb.isFullPage || tb.height <= 200) return tb;
+        const needsHeightFix = tb.height > 200;
         const doc = tb.content as { content?: unknown[] } | null;
         const blockCount = doc?.content?.length ?? 1;
-        return { ...tb, height: Math.max(blockCount * 30 + 20, 60) };
+        return {
+          ...tb,
+          isFullPage: false,
+          height: needsHeightFix
+            ? Math.max(blockCount * 30 + 20, 60)
+            : tb.height,
+        };
       }),
     };
   }
@@ -205,11 +220,14 @@ function initializePagesFromDocument(doc: Document): CanvasPageData[] {
     const lastPage = loaded[loaded.length - 1];
     if (pageHasContent(lastPage)) {
       const newType = lastPage.pageType || doc.canvas_type;
-      return [...loaded, createEmptyPage(loaded.length, newType)];
+      return [
+        ...loaded,
+        createEmptyPage(loaded.length, newType, doc.id),
+      ];
     }
     return loaded;
   }
-  return [createEmptyPage(0, doc.canvas_type)];
+  return [createEmptyPage(0, doc.canvas_type, doc.id)];
 }
 
 export function CanvasEditor({
@@ -221,7 +239,26 @@ export function CanvasEditor({
   const [pages, setPages] = useState<CanvasPageData[]>(() =>
     initializePagesFromDocument(document),
   );
-  const [activeTool, setActiveTool] = useState<CanvasTool>('text');
+  const [activeTool, setActiveToolRaw] = useState<CanvasTool>('text');
+
+  // Wrap setActiveTool to migrate flowContent → text boxes when entering Select
+  const setActiveTool = useCallback(
+    (tool: CanvasTool) => {
+      if (tool === 'select') {
+        setPages((prev) => {
+          let changed = false;
+          const migrated = prev.map((page) => {
+            const result = migrateFlowContent(page);
+            if (result !== page) changed = true;
+            return result;
+          });
+          return changed ? migrated : prev;
+        });
+      }
+      setActiveToolRaw(tool);
+    },
+    [],
+  );
   const [activeEditor, setActiveEditor] = useState<Editor | null>(null);
   const [remoteUpdateCounter, setRemoteUpdateCounter] = useState(0);
 
@@ -1174,11 +1211,23 @@ export function CanvasEditor({
           className="flex-1 bg-gray-100"
           data-scroll-container
           style={{
-            overflowY: activeTool === 'text' ? 'auto' : 'hidden',
-            touchAction: activeTool === 'text' ? 'auto' : 'none',
+            overflowY:
+              activeTool === 'text' || activeTool === 'select'
+                ? 'auto'
+                : 'hidden',
+            touchAction:
+              activeTool === 'text' || activeTool === 'select'
+                ? 'auto'
+                : 'none',
             overscrollBehavior: 'none',
-            userSelect: activeTool === 'text' ? 'auto' : 'none',
-            WebkitUserSelect: activeTool === 'text' ? 'auto' : 'none',
+            userSelect:
+              activeTool === 'text' || activeTool === 'select'
+                ? 'auto'
+                : 'none',
+            WebkitUserSelect:
+              activeTool === 'text' || activeTool === 'select'
+                ? 'auto'
+                : 'none',
           }}
         >
           <div

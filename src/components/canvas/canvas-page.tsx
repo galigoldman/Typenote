@@ -475,7 +475,10 @@ export function CanvasPage({
         className="absolute inset-0 overflow-hidden"
         style={{ pointerEvents: isInteractionMode ? 'none' : 'auto' }}
       >
-        {editor && <EditorContent editor={editor} />}
+        {/* Flow editor — hidden when page has text boxes (text was migrated) */}
+        {editor && page.textBoxes.length === 0 && (
+          <EditorContent editor={editor} />
+        )}
         {/* Render text boxes */}
         {page.textBoxes.map((tb) => (
           <TextBoxComponent
@@ -519,13 +522,18 @@ export function CanvasPage({
       )}
 
       {/* Layer 6: Interaction layer — ALWAYS present
-          In draw/erase mode: captures all events (pointer-events: auto)
+          In draw/erase mode: captures all events (pointer-events: auto, touch-action: none)
+          In select mode: captures pointer events but allows finger scroll (touch-action: pan-y)
           In text mode: transparent (pointer-events: none), lets clicks reach editor */}
       <div
         ref={interactionLayerRef}
         className="absolute inset-0"
         style={{
-          touchAction: isInteractionMode ? 'none' : 'auto',
+          touchAction: isInteractionMode
+            ? activeTool === 'select'
+              ? 'pan-y'
+              : 'none'
+            : 'auto',
           userSelect: 'none',
           WebkitUserSelect: 'none',
           pointerEvents: isInteractionMode ? 'auto' : 'none',
