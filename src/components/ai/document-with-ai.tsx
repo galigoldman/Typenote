@@ -13,6 +13,7 @@ interface DocumentWithAiProps {
   weekId?: string;
   weekLabel?: string;
   document: Document;
+  materialId?: string | null;
 }
 
 export function DocumentWithAi({
@@ -21,6 +22,7 @@ export function DocumentWithAi({
   weekId,
   weekLabel,
   document,
+  materialId,
 }: DocumentWithAiProps) {
   // Ref holds a getter function populated by CanvasEditor
   const getDocumentTextRef = useRef<(() => string) | null>(null);
@@ -47,6 +49,7 @@ export function DocumentWithAi({
       <CanvasEditor
         document={document}
         onDocumentTextReady={handleDocumentTextReady}
+        materialId={materialId}
       />
     </>
   );

@@ -38,6 +38,7 @@ import { usePinchZoom } from '@/hooks/use-pinch-zoom';
 import { ZoomIndicator } from './zoom-indicator';
 import { EditorToolbar } from '@/components/editor/editor-toolbar';
 import { CanvasPage } from './canvas-page';
+import { usePdfBackground } from '@/hooks/use-pdf-background';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function extractNodeText(node: any): string {
@@ -53,6 +54,7 @@ function extractNodeText(node: any): string {
 interface CanvasEditorProps {
   document: Document;
   onDocumentTextReady?: (getter: () => string) => void;
+  materialId?: string | null;
 }
 
 const CANVAS_CLASSES: Record<string, string> = {
@@ -230,6 +232,7 @@ function initializePagesFromDocument(doc: Document): CanvasPageData[] {
 export function CanvasEditor({
   document,
   onDocumentTextReady,
+  materialId,
 }: CanvasEditorProps) {
   const { isOpen: sidebarOpen, toggle: toggleSidebar } = useSidebar();
   const [title, setTitle] = useState(document.title);
@@ -273,6 +276,13 @@ export function CanvasEditor({
   const { scale, isZooming } = usePinchZoom({
     containerRef: scrollContainerRef,
   });
+
+  // PDF background for material-backed documents
+  const {
+    renderPage: renderPdfPage,
+    isLoading: pdfLoading,
+    error: pdfError,
+  } = usePdfBackground(materialId ?? null);
 
   // Derived values based on active tool
   const currentColor =
@@ -1235,6 +1245,18 @@ export function CanvasEditor({
         )}
       </div>
 
+      {/* PDF loading/error banner for material-backed documents */}
+      {pdfLoading && materialId && (
+        <div className="bg-muted px-4 py-2 text-center text-sm text-muted-foreground">
+          Loading PDF background…
+        </div>
+      )}
+      {pdfError && (
+        <div className="bg-destructive/10 px-4 py-2 text-center text-sm text-destructive">
+          PDF background failed to load: {pdfError}
+        </div>
+      )}
+
       {/* Main content: canvas + optional right sidebar */}
       <div className="flex flex-1 min-h-0 overflow-hidden">
         {/* Canvas scroll area */}
@@ -1301,6 +1323,7 @@ export function CanvasEditor({
                     selectionResizeBBox={selectionResizeBBox}
                     selectedTextBoxIds={selectedTextBoxIds}
                     onTextBoxContentUpdate={handleTextBoxContentUpdate}
+                    renderPdfPage={renderPdfPage}
                   />
                   {/* Page break divider */}
                   <div

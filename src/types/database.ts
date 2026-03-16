@@ -73,6 +73,7 @@ export interface Document {
   folder_id: string | null;
   course_id: string | null;
   week_id: string | null;
+  material_id: string | null;
   purpose: 'homework' | 'summary' | 'notes' | null;
   title: string;
   content: Record<string, unknown>;

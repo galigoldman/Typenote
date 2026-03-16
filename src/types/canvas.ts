@@ -43,6 +43,8 @@ export interface CanvasPage {
   strokes: Stroke[];
   textBoxes: TextBox[];
   flowContent: Record<string, unknown> | null;
+  /** 0-indexed PDF page number for background rendering (material-backed documents only) */
+  pdfPage?: number;
 }
 
 /** The complete canvas data for a document (stored in `pages` JSONB column) */
