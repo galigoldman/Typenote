@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
+import { GoogleGenAI } from '@google/genai';
 
-import { askQuestion } from '@/lib/actions/ai-context';
+import { buildAiContext, type QuestionParams } from '@/lib/actions/ai-context';
 
 export async function POST(req: Request) {
   try {
@@ -65,7 +66,7 @@ export async function POST(req: Request) {
       }
     }
 
-    const result = await askQuestion({
+    const params: QuestionParams = {
       question: question.trim(),
       courseId,
       weekId: weekId || undefined,
@@ -75,9 +76,72 @@ export async function POST(req: Request) {
       weekLabel: weekLabel || undefined,
       documentContent: documentContent || undefined,
       conversationHistory: conversationHistory || undefined,
+    };
+
+    // Build context (RAG search, prompt, etc.)
+    const { systemPrompt, contents, modelName, sources } =
+      await buildAiContext(params);
+
+    // Stream the response
+    const genai = new GoogleGenAI({
+      apiKey: process.env.GOOGLE_GENERATIVE_AI_API_KEY ?? '',
     });
 
-    return NextResponse.json(result);
+    const streamResult = await genai.models.generateContentStream({
+      model: modelName,
+      contents,
+      config: { systemInstruction: systemPrompt },
+    });
+
+    const modelLabel = mode === 'deep' ? 'pro' : 'flash';
+
+    // Create a streaming response using SSE-like format
+    const encoder = new TextEncoder();
+    const stream = new ReadableStream({
+      async start(controller) {
+        try {
+          // Send sources metadata first
+          controller.enqueue(
+            encoder.encode(
+              `data: ${JSON.stringify({ type: 'sources', sources, model: modelLabel })}\n\n`,
+            ),
+          );
+
+          for await (const chunk of streamResult) {
+            const text = chunk.text ?? '';
+            if (text) {
+              controller.enqueue(
+                encoder.encode(
+                  `data: ${JSON.stringify({ type: 'text', text })}\n\n`,
+                ),
+              );
+            }
+          }
+
+          controller.enqueue(
+            encoder.encode(`data: ${JSON.stringify({ type: 'done' })}\n\n`),
+          );
+        } catch (err) {
+          const message =
+            err instanceof Error ? err.message : 'Stream error';
+          controller.enqueue(
+            encoder.encode(
+              `data: ${JSON.stringify({ type: 'error', error: message })}\n\n`,
+            ),
+          );
+        } finally {
+          controller.close();
+        }
+      },
+    });
+
+    return new Response(stream, {
+      headers: {
+        'Content-Type': 'text/event-stream',
+        'Cache-Control': 'no-cache',
+        Connection: 'keep-alive',
+      },
+    });
   } catch (error) {
     console.error('AI ask error:', error);
 
