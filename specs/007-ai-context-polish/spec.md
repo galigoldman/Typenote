@@ -135,6 +135,7 @@ When the AI responds with markdown formatting, LaTeX math expressions, or struct
 ## Scope Boundaries
 
 **In scope**:
+
 - Update system prompt to include course name and week context
 - Pass current document content to the AI
 - Add document content serialization from TipTap editor
@@ -144,6 +145,7 @@ When the AI responds with markdown formatting, LaTeX math expressions, or struct
 - Reset AI conversation when switching documents
 
 **Out of scope (future phases)**:
+
 - Multimodal embedding (replacing text extraction with raw PDF embedding)
 - Sending raw PDF files to Gemini at answer time
 - Shared context caching

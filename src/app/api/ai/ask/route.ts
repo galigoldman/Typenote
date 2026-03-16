@@ -122,8 +122,7 @@ export async function POST(req: Request) {
             encoder.encode(`data: ${JSON.stringify({ type: 'done' })}\n\n`),
           );
         } catch (err) {
-          const message =
-            err instanceof Error ? err.message : 'Stream error';
+          const message = err instanceof Error ? err.message : 'Stream error';
           controller.enqueue(
             encoder.encode(
               `data: ${JSON.stringify({ type: 'error', error: message })}\n\n`,

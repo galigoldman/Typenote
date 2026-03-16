@@ -170,7 +170,10 @@ function initializePagesFromDocument(doc: Document): CanvasPageData[] {
   return [createEmptyPage(0, doc.canvas_type)];
 }
 
-export function CanvasEditor({ document, onDocumentTextReady }: CanvasEditorProps) {
+export function CanvasEditor({
+  document,
+  onDocumentTextReady,
+}: CanvasEditorProps) {
   const { isOpen: sidebarOpen, toggle: toggleSidebar } = useSidebar();
   const [title, setTitle] = useState(document.title);
   const [pages, setPages] = useState<CanvasPageData[]>(() =>

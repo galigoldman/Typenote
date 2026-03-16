@@ -1,9 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import {
-  extractDocumentText,
-  extractNodeText,
-} from '../extract-document-text';
+import { extractDocumentText, extractNodeText } from '../extract-document-text';
 
 // ---------------------------------------------------------------------------
 // Helper: wrap TipTap nodes in a doc root so they mirror real Supabase data
@@ -107,7 +104,9 @@ describe('extractDocumentText — empty documents', () => {
   });
 
   it('returns empty string for content with no doc content array', () => {
-    expect(extractDocumentText({ content: {} as Record<string, unknown> })).toBe('');
+    expect(
+      extractDocumentText({ content: {} as Record<string, unknown> }),
+    ).toBe('');
   });
 
   it('returns empty string for empty pages array', () => {
@@ -117,7 +116,9 @@ describe('extractDocumentText — empty documents', () => {
   it('returns empty string for pages with null flowContent', () => {
     expect(
       extractDocumentText({
-        pages: [{ id: '1', order: 0, strokes: [], textBoxes: [], flowContent: null }],
+        pages: [
+          { id: '1', order: 0, strokes: [], textBoxes: [], flowContent: null },
+        ],
       }),
     ).toBe('');
   });
@@ -134,7 +135,9 @@ describe('extractDocumentText — text-only documents', () => {
       paragraph(textNode('Second paragraph.')),
     ]);
 
-    const result = extractDocumentText({ content: doc as Record<string, unknown> });
+    const result = extractDocumentText({
+      content: doc as Record<string, unknown>,
+    });
     expect(result).toBe('First paragraph.\nSecond paragraph.');
   });
 
@@ -144,7 +147,9 @@ describe('extractDocumentText — text-only documents', () => {
       paragraph(textNode('Body text.')),
     ]);
 
-    const result = extractDocumentText({ content: doc as Record<string, unknown> });
+    const result = extractDocumentText({
+      content: doc as Record<string, unknown>,
+    });
     expect(result).toBe('Main Title\nBody text.');
   });
 
@@ -156,17 +161,19 @@ describe('extractDocumentText — text-only documents', () => {
       ),
     ]);
 
-    const result = extractDocumentText({ content: doc as Record<string, unknown> });
+    const result = extractDocumentText({
+      content: doc as Record<string, unknown>,
+    });
     expect(result).toContain('Item one');
     expect(result).toContain('Item two');
   });
 
   it('extracts text from code blocks', () => {
-    const doc = makeDoc([
-      codeBlock('const x = 42;'),
-    ]);
+    const doc = makeDoc([codeBlock('const x = 42;')]);
 
-    const result = extractDocumentText({ content: doc as Record<string, unknown> });
+    const result = extractDocumentText({
+      content: doc as Record<string, unknown>,
+    });
     expect(result).toBe('const x = 42;');
   });
 });
@@ -185,7 +192,9 @@ describe('extractDocumentText — math nodes', () => {
       ),
     ]);
 
-    const result = extractDocumentText({ content: doc as Record<string, unknown> });
+    const result = extractDocumentText({
+      content: doc as Record<string, unknown>,
+    });
     expect(result).toBe('The equation is $E = mc^2$.');
   });
 
@@ -200,16 +209,18 @@ describe('extractDocumentText — math nodes', () => {
       ),
     ]);
 
-    const result = extractDocumentText({ content: doc as Record<string, unknown> });
+    const result = extractDocumentText({
+      content: doc as Record<string, unknown>,
+    });
     expect(result).toBe('Given $a^2 + b^2 = c^2$ and $\\sin(\\theta)$.');
   });
 
   it('handles paragraph with only a math expression', () => {
-    const doc = makeDoc([
-      paragraph(mathExpression('\\int_0^1 x\\,dx')),
-    ]);
+    const doc = makeDoc([paragraph(mathExpression('\\int_0^1 x\\,dx'))]);
 
-    const result = extractDocumentText({ content: doc as Record<string, unknown> });
+    const result = extractDocumentText({
+      content: doc as Record<string, unknown>,
+    });
     expect(result).toBe('$\\int_0^1 x\\,dx$');
   });
 });
@@ -278,10 +289,7 @@ describe('extractDocumentText — canvas documents', () => {
 
   it('handles canvas pages with math in flowContent', () => {
     const flowContent = makeDoc([
-      paragraph(
-        textNode('Solve '),
-        mathExpression('x^2 - 4 = 0'),
-      ),
+      paragraph(textNode('Solve '), mathExpression('x^2 - 4 = 0')),
     ]);
 
     const result = extractDocumentText({
@@ -318,7 +326,9 @@ describe('extractDocumentText — mixed content', () => {
       paragraph(textNode('Important for exams.')),
     ]);
 
-    const result = extractDocumentText({ content: doc as Record<string, unknown> });
+    const result = extractDocumentText({
+      content: doc as Record<string, unknown>,
+    });
 
     // Empty paragraphs produce empty strings which are filtered out
     expect(result).toContain('Calculus Notes');
@@ -356,16 +366,15 @@ describe('extractDocumentText — mixed content', () => {
     const doc = makeDoc([
       bulletList(
         listItem(
-          paragraph(
-            textNode('Equation: '),
-            mathExpression('a + b = c'),
-          ),
+          paragraph(textNode('Equation: '), mathExpression('a + b = c')),
         ),
         listItem(paragraph(textNode('Plain text item'))),
       ),
     ]);
 
-    const result = extractDocumentText({ content: doc as Record<string, unknown> });
+    const result = extractDocumentText({
+      content: doc as Record<string, unknown>,
+    });
 
     expect(result).toContain('Equation: $a + b = c$');
     expect(result).toContain('Plain text item');

@@ -505,7 +505,11 @@ export async function buildAiContext(params: QuestionParams): Promise<{
     hasDocumentContent,
   });
 
-  const results = await searchContext({ query: question, courseId, maxResults: 8 });
+  const results = await searchContext({
+    query: question,
+    courseId,
+    maxResults: 8,
+  });
 
   const contextTexts: string[] = [];
   const sources: QuestionResult['sources'] = [];
@@ -535,11 +539,19 @@ export async function buildAiContext(params: QuestionParams): Promise<{
         : documentContent!;
     contents.push({
       role: 'user',
-      parts: [{ text: `Here is the student's current document:\n\n${truncated}\n\nReview it to understand their work.` }],
+      parts: [
+        {
+          text: `Here is the student's current document:\n\n${truncated}\n\nReview it to understand their work.`,
+        },
+      ],
     });
     contents.push({
       role: 'model',
-      parts: [{ text: "I have reviewed the student's document. I can see their notes and work." }],
+      parts: [
+        {
+          text: "I have reviewed the student's document. I can see their notes and work.",
+        },
+      ],
     });
   }
 
@@ -547,11 +559,19 @@ export async function buildAiContext(params: QuestionParams): Promise<{
     const materialsText = contextTexts.join('\n\n');
     contents.push({
       role: 'user',
-      parts: [{ text: `Here are the relevant course materials:\n\n${materialsText}\n\nReview them to answer my questions.` }],
+      parts: [
+        {
+          text: `Here are the relevant course materials:\n\n${materialsText}\n\nReview them to answer my questions.`,
+        },
+      ],
     });
     contents.push({
       role: 'model',
-      parts: [{ text: 'I have reviewed the course materials. Please ask your question.' }],
+      parts: [
+        {
+          text: 'I have reviewed the course materials. Please ask your question.',
+        },
+      ],
     });
   }
 
@@ -570,7 +590,11 @@ export async function buildAiContext(params: QuestionParams): Promise<{
   if (contextTexts.length === 0 && !hasDocumentContent) {
     contents.push({
       role: 'user',
-      parts: [{ text: `${question}\n\n(No course materials were loaded. Answer using your own knowledge but note that no materials were found.)` }],
+      parts: [
+        {
+          text: `${question}\n\n(No course materials were loaded. Answer using your own knowledge but note that no materials were found.)`,
+        },
+      ],
     });
   } else {
     const lastTurn = contents[contents.length - 1];

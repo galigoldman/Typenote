@@ -12,6 +12,7 @@ No new tables or migrations. This feature modifies the data flowing through exis
 ### askQuestion() Parameters (Extended)
 
 Current:
+
 ```typescript
 type QuestionParams = {
   question: string;
@@ -24,12 +25,13 @@ type QuestionParams = {
 ```
 
 New fields:
+
 ```typescript
 type QuestionParams = {
   // ... existing fields ...
-  courseName?: string;      // Human-readable course name for prompt
-  weekLabel?: string;        // e.g., "Week 5" or "שבוע 5"
-  documentContent?: string;  // Serialized text from student's current document
+  courseName?: string; // Human-readable course name for prompt
+  weekLabel?: string; // e.g., "Week 5" or "שבוע 5"
+  documentContent?: string; // Serialized text from student's current document
 };
 ```
 
@@ -38,6 +40,7 @@ type QuestionParams = {
 Current: Static `SYSTEM_PROMPT` constant in `prompts.ts`.
 
 New: `buildSystemPrompt()` function accepting context:
+
 ```typescript
 function buildSystemPrompt(context: {
   courseName?: string;
@@ -49,13 +52,16 @@ function buildSystemPrompt(context: {
 ## Existing Tables Referenced (No Changes)
 
 ### content_embeddings
+
 - Used by embedding cleanup (delete rows on material deletion)
 - No schema changes
 
 ### courses / course_weeks
+
 - Read-only: course name and week label used for prompt context
 - No schema changes
 
 ### documents
+
 - Read-only: document content extracted for AI context
 - No schema changes
