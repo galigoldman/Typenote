@@ -664,6 +664,7 @@ export function CanvasEditor({
       y: number,
       width: number,
       height: number,
+      fontScale: number,
     ) => {
       setPages((prev) =>
         prev.map((p) => {
@@ -671,7 +672,9 @@ export function CanvasEditor({
           return {
             ...p,
             textBoxes: p.textBoxes.map((tb) =>
-              tb.id === textBoxId ? { ...tb, x, y, width, height } : tb,
+              tb.id === textBoxId
+                ? { ...tb, x, y, width, height, fontScale }
+                : tb,
             ),
           };
         }),
