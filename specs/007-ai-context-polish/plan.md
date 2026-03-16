@@ -20,13 +20,13 @@ Polish the existing AI context engine with four focused improvements: (1) dynami
 
 ## Constitution Check
 
-| Principle | Status | Notes |
-|-----------|--------|-------|
-| I. Incremental Development | PASS | 4 independent stories, each produces working increment |
-| II. Test-Driven Quality | PASS | Unit tests for prompt builder, rendering; integration tests for embedding cleanup |
-| III. Protected Main Branch | PASS | Feature branch `007-ai-context-polish`, PR with CI |
-| IV. Migrations as Code | N/A | No new migrations in this feature |
-| V. Interview-Ready Architecture | PASS | Prompt engineering, RAG context injection, component data flow |
+| Principle                       | Status | Notes                                                                             |
+| ------------------------------- | ------ | --------------------------------------------------------------------------------- |
+| I. Incremental Development      | PASS   | 4 independent stories, each produces working increment                            |
+| II. Test-Driven Quality         | PASS   | Unit tests for prompt builder, rendering; integration tests for embedding cleanup |
+| III. Protected Main Branch      | PASS   | Feature branch `007-ai-context-polish`, PR with CI                                |
+| IV. Migrations as Code          | N/A    | No new migrations in this feature                                                 |
+| V. Interview-Ready Architecture | PASS   | Prompt engineering, RAG context injection, component data flow                    |
 
 ## Project Structure
 

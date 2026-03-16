@@ -36,16 +36,16 @@ Content-Type: application/json
 
 ### Field descriptions
 
-| Field | Type | Required | Description |
-|-------|------|----------|-------------|
-| question | string | Yes | The student's question |
-| courseId | string (UUID) | Yes | Course to search within |
-| weekId | string (UUID) | No | Week context (informational, search is course-wide) |
-| mode | "quick" \| "deep" | Yes | Model selection |
-| courseName | string | No | Course name for prompt context |
-| weekLabel | string | No | Week label for prompt context (e.g., "Week 5") |
-| documentContent | string | No | Student's current document text (truncated to 50K chars) |
-| conversationHistory | Array | No | Previous messages in session |
+| Field               | Type              | Required | Description                                              |
+| ------------------- | ----------------- | -------- | -------------------------------------------------------- |
+| question            | string            | Yes      | The student's question                                   |
+| courseId            | string (UUID)     | Yes      | Course to search within                                  |
+| weekId              | string (UUID)     | No       | Week context (informational, search is course-wide)      |
+| mode                | "quick" \| "deep" | Yes      | Model selection                                          |
+| courseName          | string            | No       | Course name for prompt context                           |
+| weekLabel           | string            | No       | Week label for prompt context (e.g., "Week 5")           |
+| documentContent     | string            | No       | Student's current document text (truncated to 50K chars) |
+| conversationHistory | Array             | No       | Previous messages in session                             |
 
 ## Response
 

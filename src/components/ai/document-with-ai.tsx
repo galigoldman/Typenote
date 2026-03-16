@@ -25,12 +25,9 @@ export function DocumentWithAi({
   // Ref holds a getter function populated by CanvasEditor
   const getDocumentTextRef = useRef<(() => string) | null>(null);
 
-  const handleDocumentTextReady = useCallback(
-    (getter: () => string) => {
-      getDocumentTextRef.current = getter;
-    },
-    [],
-  );
+  const handleDocumentTextReady = useCallback((getter: () => string) => {
+    getDocumentTextRef.current = getter;
+  }, []);
 
   const getDocumentContent = useCallback(() => {
     return getDocumentTextRef.current?.() ?? '';
