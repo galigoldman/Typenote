@@ -6,15 +6,15 @@ Add a Select tool to the canvas editor and migrate all text to a text-box-based 
 
 ## Key Decisions
 
-| Decision | Choice | Rationale |
-|----------|--------|-----------|
-| Text model | All text in text boxes | Enables moving/resizing text, matches note-taking apps |
-| Select tool placement | Top-level mode (Draw / Select / Type) | Select is fundamentally different from Draw; needs easy access |
-| Full-page text box overflow | Auto-flows to next page | Google Docs feel for default typing experience |
-| Custom text box overflow | Fixed boundary, no auto-flow | User controls the size, content clips at boundary |
-| Double-tap text box in Select | Switches to Type mode, focuses cursor | Quick editing without manual mode switch |
-| Tap outside text box in Type | Returns to Draw mode | Pen is the "home" mode |
-| Pointer types for Select | All (pen, touch, mouse) | Selection must work on desktop and tablet |
+| Decision                      | Choice                                | Rationale                                                      |
+| ----------------------------- | ------------------------------------- | -------------------------------------------------------------- |
+| Text model                    | All text in text boxes                | Enables moving/resizing text, matches note-taking apps         |
+| Select tool placement         | Top-level mode (Draw / Select / Type) | Select is fundamentally different from Draw; needs easy access |
+| Full-page text box overflow   | Auto-flows to next page               | Google Docs feel for default typing experience                 |
+| Custom text box overflow      | Fixed boundary, no auto-flow          | User controls the size, content clips at boundary              |
+| Double-tap text box in Select | Switches to Type mode, focuses cursor | Quick editing without manual mode switch                       |
+| Tap outside text box in Type  | Returns to Draw mode                  | Pen is the "home" mode                                         |
+| Pointer types for Select      | All (pen, touch, mouse)               | Selection must work on desktop and tablet                      |
 
 ## Architecture: Text-as-Text-Boxes
 
@@ -43,15 +43,16 @@ interface TextBox {
   width: number;
   height: number;
   content: Record<string, unknown> | null; // TipTap ProseMirror JSON
-  isFullPage: boolean;       // true = auto-flow on overflow, false = fixed boundary
-  zIndex: number;            // rendering and selection order (higher = on top)
-  linkedNextId?: string;     // for full-page boxes: ID of the overflow text box on next page
+  isFullPage: boolean; // true = auto-flow on overflow, false = fixed boundary
+  zIndex: number; // rendering and selection order (higher = on top)
+  linkedNextId?: string; // for full-page boxes: ID of the overflow text box on next page
 }
 ```
 
 ### Full-Page Text Box Overflow
 
 Overflow detection moves into the `TextBox` component for full-page boxes:
+
 - The text box monitors its content height vs its container height
 - When content overflows, it triggers creation of a new full-page text box on the next page
 - The two boxes are linked via `linkedNextId` — deleting content from the second box flows text back up
@@ -98,16 +99,16 @@ Unlike Draw mode (pen-only), the Select tool responds to **all pointer types**: 
 
 ### Core Interactions (GoodNotes-style)
 
-| Gesture | Action |
-|---------|--------|
-| Tap on object | Select it — show bounding box with 8 resize handles |
-| Tap on empty space | Deselect all |
-| Drag on empty space | Draw selection rectangle — selects all objects inside |
-| Drag selected object | Move all selected objects |
-| Drag resize handle | Resize selected object(s) |
-| Double-tap text box | Switch to Type mode, focus cursor inside |
-| Delete key / toolbar button | Delete selected objects |
-| Tap when objects overlap | Cycle through overlapping objects on repeated taps |
+| Gesture                     | Action                                                |
+| --------------------------- | ----------------------------------------------------- |
+| Tap on object               | Select it — show bounding box with 8 resize handles   |
+| Tap on empty space          | Deselect all                                          |
+| Drag on empty space         | Draw selection rectangle — selects all objects inside |
+| Drag selected object        | Move all selected objects                             |
+| Drag resize handle          | Resize selected object(s)                             |
+| Double-tap text box         | Switch to Type mode, focus cursor inside              |
+| Delete key / toolbar button | Delete selected objects                               |
+| Tap when objects overlap    | Cycle through overlapping objects on repeated taps    |
 
 ### Selection Visual Feedback
 
@@ -119,22 +120,26 @@ Unlike Draw mode (pen-only), the Select tool responds to **all pointer types**: 
 ### Resize Behavior
 
 **Text boxes:**
+
 - Dragging a handle changes width/height. Text reflows within the new dimensions.
 - Minimum size: 50x30px (enough for one line of text)
 - No aspect ratio lock (text boxes are free-form)
 
 **Strokes:**
+
 - Resize scales all points proportionally from the opposite corner/edge
 - Stroke width scales proportionally with the resize
 - Pressure values are preserved (visual thickness scales with the geometry)
 
 **Multi-selection resize:**
+
 - Deferred to v2. In v1, resize handles are only shown for single-object selections.
 - Multi-selection supports move and delete only.
 
 ### Object Disambiguation (Overlapping Objects)
 
 When multiple objects overlap at the tap point:
+
 1. First tap selects the topmost object (highest `zIndex` for text boxes, latest `createdAt` for strokes)
 2. Subsequent taps within 15px of the same location cycle through overlapping objects (next one down in z-order)
 3. Moving the tap point beyond 15px or waiting >1s resets the cycle
@@ -157,6 +162,7 @@ When multiple objects overlap at the tap point:
 ## Interaction Layer for Select Mode
 
 The canvas page has 6 rendering layers. In Select mode:
+
 - The interaction layer (layer 6) captures all pointer events (like Draw mode)
 - Text boxes remain visible but non-interactive (pointer-events: none) — interaction goes through the selection system
 - Double-tap detection happens in the `useSelection` hook; when detected on a text box, it triggers the mode switch to Type and programmatically focuses the TipTap editor
@@ -174,11 +180,11 @@ Draw ──[toolbar]──> Select ──[toolbar]──> Type
   └───────────────────┘ (tap outside text box → Draw)
 ```
 
-| From | Action | To | Details |
-|------|--------|----|---------|
-| Select | double-tap text box | Type | Focus cursor inside that text box |
-| Type | tap outside any text box | Draw | Pen is the "home" mode |
-| Any | tap toolbar button | Target mode | Explicit mode switch |
+| From   | Action                   | To          | Details                           |
+| ------ | ------------------------ | ----------- | --------------------------------- |
+| Select | double-tap text box      | Type        | Focus cursor inside that text box |
+| Type   | tap outside any text box | Draw        | Pen is the "home" mode            |
+| Any    | tap toolbar button       | Target mode | Explicit mode switch              |
 
 ## Undo/Redo
 
@@ -192,9 +198,29 @@ type CanvasAction =
   | { type: 'stroke-remove'; pageId: string; stroke: Stroke }
   | { type: 'textbox-add'; pageId: string; textBox: TextBox }
   | { type: 'textbox-remove'; pageId: string; textBox: TextBox }
-  | { type: 'textbox-move'; pageId: string; textBoxId: string; fromX: number; fromY: number; toX: number; toY: number }
-  | { type: 'textbox-resize'; pageId: string; textBoxId: string; fromBounds: BBox; toBounds: BBox }
-  | { type: 'textbox-split'; pageId: string; originalId: string; topBox: TextBox; bottomBox: TextBox };
+  | {
+      type: 'textbox-move';
+      pageId: string;
+      textBoxId: string;
+      fromX: number;
+      fromY: number;
+      toX: number;
+      toY: number;
+    }
+  | {
+      type: 'textbox-resize';
+      pageId: string;
+      textBoxId: string;
+      fromBounds: BBox;
+      toBounds: BBox;
+    }
+  | {
+      type: 'textbox-split';
+      pageId: string;
+      originalId: string;
+      topBox: TextBox;
+      bottomBox: TextBox;
+    };
 ```
 
 - **Canvas actions** (move, resize, create, delete, split) use the shared undo stack
