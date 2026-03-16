@@ -60,7 +60,7 @@ describe('buildSystemPrompt', () => {
   it('always includes core guidelines', () => {
     const prompt = buildSystemPrompt({ hasDocumentContent: false });
     expect(prompt).toContain('Never fabricate citations');
-    expect(prompt).toContain('Match the language of the question');
+    expect(prompt).toContain('match the language of the question');
     expect(prompt).toContain('Use LaTeX for math');
     expect(prompt).toContain('[Sources]');
     expect(prompt).toContain('primary source');
