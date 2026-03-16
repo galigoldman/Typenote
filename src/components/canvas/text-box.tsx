@@ -83,6 +83,21 @@ export function TextBox({
     }
   }, [editor]);
 
+  // Apply fontScale directly on the ProseMirror DOM element.
+  // TipTap's prose classes use rem units (root-relative), so setting
+  // font-size on a parent div doesn't cascade. Setting it on the
+  // .ProseMirror element overrides the prose class and child elements
+  // scale proportionally since they use em units.
+  useEffect(() => {
+    if (!editor) return;
+    const scale = textBox.fontScale;
+    if (scale && scale !== 1) {
+      editor.view.dom.style.fontSize = `${scale}rem`;
+    } else {
+      editor.view.dom.style.fontSize = '';
+    }
+  }, [editor, textBox.fontScale]);
+
   return (
     <div
       className={`absolute ${
@@ -95,9 +110,6 @@ export function TextBox({
         top: textBox.y,
         width: textBox.width,
         minHeight: textBox.height,
-        fontSize: textBox.fontScale && textBox.fontScale !== 1
-          ? `${textBox.fontScale * 100}%`
-          : undefined,
       }}
     >
       {editor && <EditorContent editor={editor} />}
