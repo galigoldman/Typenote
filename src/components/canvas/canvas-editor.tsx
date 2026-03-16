@@ -220,10 +220,7 @@ function initializePagesFromDocument(doc: Document): CanvasPageData[] {
     const lastPage = loaded[loaded.length - 1];
     if (pageHasContent(lastPage)) {
       const newType = lastPage.pageType || doc.canvas_type;
-      return [
-        ...loaded,
-        createEmptyPage(loaded.length, newType, doc.id),
-      ];
+      return [...loaded, createEmptyPage(loaded.length, newType, doc.id)];
     }
     return loaded;
   }
@@ -242,23 +239,20 @@ export function CanvasEditor({
   const [activeTool, setActiveToolRaw] = useState<CanvasTool>('text');
 
   // Wrap setActiveTool to migrate flowContent → text boxes when entering Select
-  const setActiveTool = useCallback(
-    (tool: CanvasTool) => {
-      if (tool === 'select') {
-        setPages((prev) => {
-          let changed = false;
-          const migrated = prev.map((page) => {
-            const result = migrateFlowContent(page);
-            if (result !== page) changed = true;
-            return result;
-          });
-          return changed ? migrated : prev;
+  const setActiveTool = useCallback((tool: CanvasTool) => {
+    if (tool === 'select') {
+      setPages((prev) => {
+        let changed = false;
+        const migrated = prev.map((page) => {
+          const result = migrateFlowContent(page);
+          if (result !== page) changed = true;
+          return result;
         });
-      }
-      setActiveToolRaw(tool);
-    },
-    [],
-  );
+        return changed ? migrated : prev;
+      });
+    }
+    setActiveToolRaw(tool);
+  }, []);
   const [activeEditor, setActiveEditor] = useState<Editor | null>(null);
   const [remoteUpdateCounter, setRemoteUpdateCounter] = useState(0);
 
@@ -661,6 +655,32 @@ export function CanvasEditor({
     [triggerSave],
   );
 
+  // Resize a text box (used by selection resize)
+  const handleTextBoxResize = useCallback(
+    (
+      pageId: string,
+      textBoxId: string,
+      x: number,
+      y: number,
+      width: number,
+      height: number,
+    ) => {
+      setPages((prev) =>
+        prev.map((p) => {
+          if (p.id !== pageId) return p;
+          return {
+            ...p,
+            textBoxes: p.textBoxes.map((tb) =>
+              tb.id === textBoxId ? { ...tb, x, y, width, height } : tb,
+            ),
+          };
+        }),
+      );
+      triggerSave();
+    },
+    [triggerSave],
+  );
+
   // Delete selected objects
   const handleDeleteSelected = useCallback(
     (pageId: string, strokeIds: string[], textBoxIds: string[]) => {
@@ -670,13 +690,21 @@ export function CanvasEditor({
         for (const sid of strokeIds) {
           const stroke = page.strokes.find((s) => s.id === sid);
           if (stroke) {
-            undoStackRef.current.push({ type: 'stroke-remove', pageId, stroke });
+            undoStackRef.current.push({
+              type: 'stroke-remove',
+              pageId,
+              stroke,
+            });
           }
         }
         for (const tbId of textBoxIds) {
           const tb = page.textBoxes.find((t) => t.id === tbId);
           if (tb) {
-            undoStackRef.current.push({ type: 'textbox-remove', pageId, textBox: tb });
+            undoStackRef.current.push({
+              type: 'textbox-remove',
+              pageId,
+              textBox: tb,
+            });
           }
         }
         redoStackRef.current = [];
@@ -710,6 +738,8 @@ export function CanvasEditor({
     isRectMode,
     isDragging: isSelectionDragging,
     dragOffset: selectionDragOffset,
+    isResizing: isSelectionResizing,
+    resizeBBox: selectionResizeBBox,
     clearSelection,
     deleteSelected,
   } = useSelection({
@@ -718,6 +748,7 @@ export function CanvasEditor({
     getPageTextBoxes,
     onStrokesMove: handleStrokesMove,
     onTextBoxMove: handleTextBoxMove,
+    onTextBoxResize: handleTextBoxResize,
     onModeChange: setActiveTool,
     onDeleteSelected: handleDeleteSelected,
   });
@@ -873,9 +904,7 @@ export function CanvasEditor({
             p.id === action.pageId
               ? {
                   ...p,
-                  strokes: p.strokes.filter(
-                    (s) => s.id !== action.stroke.id,
-                  ),
+                  strokes: p.strokes.filter((s) => s.id !== action.stroke.id),
                 }
               : p,
           ),
@@ -1265,6 +1294,8 @@ export function CanvasEditor({
                     selectionBBox={selectionBBox}
                     isSelectionDragging={isSelectionDragging}
                     selectionDragOffset={selectionDragOffset}
+                    isSelectionResizing={isSelectionResizing}
+                    selectionResizeBBox={selectionResizeBBox}
                     selectedTextBoxIds={selectedTextBoxIds}
                     onTextBoxContentUpdate={handleTextBoxContentUpdate}
                   />

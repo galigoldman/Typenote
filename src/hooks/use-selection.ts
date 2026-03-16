@@ -11,7 +11,9 @@ import {
 } from '@/lib/canvas/stroke-utils';
 import { lockScroll } from '@/lib/canvas/scroll-lock';
 
-type SelectionState = 'idle' | 'drawing' | 'selected' | 'dragging';
+type SelectionState = 'idle' | 'drawing' | 'selected' | 'dragging' | 'resizing';
+
+type ResizeHandle = 'tl' | 'tc' | 'tr' | 'ml' | 'mr' | 'bl' | 'bc' | 'br';
 
 interface UseSelectionOptions {
   activeTool: CanvasTool;
@@ -21,7 +23,20 @@ interface UseSelectionOptions {
     pageId: string,
     movedStrokes: { id: string; points: Stroke['points']; bbox: BBox }[],
   ) => void;
-  onTextBoxMove?: (pageId: string, textBoxId: string, dx: number, dy: number) => void;
+  onTextBoxMove?: (
+    pageId: string,
+    textBoxId: string,
+    dx: number,
+    dy: number,
+  ) => void;
+  onTextBoxResize?: (
+    pageId: string,
+    textBoxId: string,
+    x: number,
+    y: number,
+    width: number,
+    height: number,
+  ) => void;
   onModeChange?: (mode: CanvasTool) => void;
   onDeleteSelected?: (
     pageId: string,
@@ -41,6 +56,8 @@ interface UseSelectionReturn {
   isRectMode: boolean;
   isDragging: boolean;
   dragOffset: { x: number; y: number };
+  isResizing: boolean;
+  resizeBBox: BBox | null;
   clearSelection: () => void;
   deleteSelected: () => void;
 }
@@ -62,12 +79,58 @@ function getSelectableBBox(tb: TextBox): BBox {
   };
 }
 
+const HANDLE_SIZE = 6;
+const HANDLE_HIT_RADIUS = 8;
+const MIN_RESIZE_SIZE = 20;
+
+const HANDLE_KEYS: ResizeHandle[] = [
+  'tl',
+  'tc',
+  'tr',
+  'ml',
+  'mr',
+  'bl',
+  'bc',
+  'br',
+];
+
+function getHandlePositions(
+  bbox: BBox,
+): Record<ResizeHandle, { x: number; y: number }> {
+  const midX = (bbox.minX + bbox.maxX) / 2;
+  const midY = (bbox.minY + bbox.maxY) / 2;
+  return {
+    tl: { x: bbox.minX, y: bbox.minY },
+    tc: { x: midX, y: bbox.minY },
+    tr: { x: bbox.maxX, y: bbox.minY },
+    ml: { x: bbox.minX, y: midY },
+    mr: { x: bbox.maxX, y: midY },
+    bl: { x: bbox.minX, y: bbox.maxY },
+    bc: { x: midX, y: bbox.maxY },
+    br: { x: bbox.maxX, y: bbox.maxY },
+  };
+}
+
+function hitTestHandle(x: number, y: number, bbox: BBox): ResizeHandle | null {
+  const positions = getHandlePositions(bbox);
+  for (const key of HANDLE_KEYS) {
+    const pos = positions[key];
+    if (Math.hypot(x - pos.x, y - pos.y) <= HANDLE_HIT_RADIUS) {
+      return key;
+    }
+  }
+  return null;
+}
+
+export { HANDLE_SIZE };
+
 export function useSelection({
   activeTool,
   getPageStrokes,
   getPageTextBoxes,
   onStrokesMove,
   onTextBoxMove,
+  onTextBoxResize,
   onModeChange,
   onDeleteSelected,
 }: UseSelectionOptions): UseSelectionReturn {
@@ -84,6 +147,8 @@ export function useSelection({
   const [isRectMode, setIsRectMode] = useState(true);
   const [isDragging, setIsDragging] = useState(false);
   const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
+  const [isResizing, setIsResizing] = useState(false);
+  const [resizeBBox, setResizeBBox] = useState<BBox | null>(null);
 
   const stateRef = useRef<SelectionState>('idle');
   const activePageIdRef = useRef<string | null>(null);
@@ -94,6 +159,9 @@ export function useSelection({
   const lastTapRef = useRef<{ time: number; x: number; y: number } | null>(
     null,
   );
+  const resizeHandleRef = useRef<ResizeHandle | null>(null);
+  const resizeStartBBoxRef = useRef<BBox | null>(null);
+  const resizeBBoxRef = useRef<BBox | null>(null);
   const unlockScrollRef = useRef<(() => void) | null>(null);
 
   const screenToPageCoords = (
@@ -117,11 +185,16 @@ export function useSelection({
     setSelectionBBox(null);
     setIsDragging(false);
     setDragOffset({ x: 0, y: 0 });
+    setIsResizing(false);
+    setResizeBBox(null);
     selectedStrokesRef.current = [];
     selectedTextBoxIdsRef.current = new Set();
     activePageIdRef.current = null;
     startPointRef.current = null;
     dragStartRef.current = null;
+    resizeHandleRef.current = null;
+    resizeStartBBoxRef.current = null;
+    resizeBBoxRef.current = null;
     if (unlockScrollRef.current) {
       unlockScrollRef.current();
       unlockScrollRef.current = null;
@@ -130,7 +203,11 @@ export function useSelection({
 
   const deleteSelected = useCallback(() => {
     if (!activePageIdRef.current) return;
-    if (selectedStrokesRef.current.length === 0 && selectedTextBoxIdsRef.current.size === 0) return;
+    if (
+      selectedStrokesRef.current.length === 0 &&
+      selectedTextBoxIdsRef.current.size === 0
+    )
+      return;
     onDeleteSelected?.(
       activePageIdRef.current,
       selectedStrokesRef.current.map((s) => s.id),
@@ -173,8 +250,21 @@ export function useSelection({
 
       const { x, y } = screenToPageCoords(e);
 
-      // If we have a selection, check if clicking inside the bbox to start dragging
+      // If we have a selection, check for handle hit (resize) or interior drag
       if (stateRef.current === 'selected' && selectionBBox) {
+        // Check handles first (resize)
+        const handle = hitTestHandle(x, y, selectionBBox);
+        if (handle) {
+          stateRef.current = 'resizing';
+          resizeHandleRef.current = handle;
+          resizeStartBBoxRef.current = { ...selectionBBox };
+          resizeBBoxRef.current = { ...selectionBBox };
+          setIsResizing(true);
+          setResizeBBox({ ...selectionBBox });
+          return;
+        }
+
+        // Check interior (drag)
         if (
           x >= selectionBBox.minX &&
           x <= selectionBBox.maxX &&
@@ -219,6 +309,49 @@ export function useSelection({
         const dx = x - dragStartRef.current.x;
         const dy = y - dragStartRef.current.y;
         setDragOffset({ x: dx, y: dy });
+      } else if (
+        stateRef.current === 'resizing' &&
+        resizeHandleRef.current &&
+        resizeStartBBoxRef.current
+      ) {
+        e.preventDefault();
+        const orig = resizeStartBBoxRef.current;
+        let { minX, minY, maxX, maxY } = orig;
+        const handle = resizeHandleRef.current;
+
+        // Adjust edges based on which handle is being dragged
+        if (handle === 'tl' || handle === 'ml' || handle === 'bl') {
+          minX = x;
+        }
+        if (handle === 'tr' || handle === 'mr' || handle === 'br') {
+          maxX = x;
+        }
+        if (handle === 'tl' || handle === 'tc' || handle === 'tr') {
+          minY = y;
+        }
+        if (handle === 'bl' || handle === 'bc' || handle === 'br') {
+          maxY = y;
+        }
+
+        // Enforce minimum size (prevent inversion)
+        if (maxX - minX < MIN_RESIZE_SIZE) {
+          if (handle === 'tl' || handle === 'ml' || handle === 'bl') {
+            minX = maxX - MIN_RESIZE_SIZE;
+          } else {
+            maxX = minX + MIN_RESIZE_SIZE;
+          }
+        }
+        if (maxY - minY < MIN_RESIZE_SIZE) {
+          if (handle === 'tl' || handle === 'tc' || handle === 'tr') {
+            minY = maxY - MIN_RESIZE_SIZE;
+          } else {
+            maxY = minY + MIN_RESIZE_SIZE;
+          }
+        }
+
+        const newBBox = { minX, minY, maxX, maxY };
+        resizeBBoxRef.current = newBBox;
+        setResizeBBox(newBBox);
       }
     },
     [activeTool],
@@ -275,8 +408,10 @@ export function useSelection({
           const tappedTextBox = textBoxes.find((tb) => {
             const bbox = getSelectableBBox(tb);
             return (
-              x >= bbox.minX && x <= bbox.maxX &&
-              y >= bbox.minY && y <= bbox.maxY
+              x >= bbox.minX &&
+              x <= bbox.maxX &&
+              y >= bbox.minY &&
+              y <= bbox.maxY
             );
           });
           if (tappedTextBox) {
@@ -369,16 +504,12 @@ export function useSelection({
           if (selectedStrokes.length > 0 || selectedTbIds.length > 0) {
             stateRef.current = 'selected';
             activePageIdRef.current = targetPageId;
-            setSelectedStrokeIds(
-              new Set(selectedStrokes.map((s) => s.id)),
-            );
+            setSelectedStrokeIds(new Set(selectedStrokes.map((s) => s.id)));
             selectedStrokesRef.current = selectedStrokes;
             const tbIdSet = new Set(selectedTbIds);
             setSelectedTextBoxIds(tbIdSet);
             selectedTextBoxIdsRef.current = tbIdSet;
-            setSelectionBBox(
-              computeUnionBBox(selectedStrokes, selectedTbs),
-            );
+            setSelectionBBox(computeUnionBBox(selectedStrokes, selectedTbs));
             setSelectionPath(null);
           } else {
             clearSelection();
@@ -450,6 +581,87 @@ export function useSelection({
         setDragOffset({ x: 0, y: 0 });
         stateRef.current = 'selected';
         dragStartRef.current = null;
+      } else if (stateRef.current === 'resizing') {
+        // Commit the resize
+        const targetPageId = activePageIdRef.current ?? pageId;
+        const origBBox = resizeStartBBoxRef.current;
+        const newBBox = resizeBBoxRef.current;
+
+        if (origBBox && newBBox) {
+          const origW = origBBox.maxX - origBBox.minX;
+          const origH = origBBox.maxY - origBBox.minY;
+          const newW = newBBox.maxX - newBBox.minX;
+          const newH = newBBox.maxY - newBBox.minY;
+
+          // Scale strokes proportionally
+          if (selectedStrokesRef.current.length > 0 && origW > 0 && origH > 0) {
+            const movedStrokes = selectedStrokesRef.current.map((stroke) => {
+              const newPoints = stroke.points.map(
+                ([px, py, pressure]) =>
+                  [
+                    newBBox.minX + ((px - origBBox.minX) / origW) * newW,
+                    newBBox.minY + ((py - origBBox.minY) / origH) * newH,
+                    pressure,
+                  ] as Stroke['points'][0],
+              );
+              return {
+                id: stroke.id,
+                points: newPoints,
+                bbox: computeBBox(newPoints),
+              };
+            });
+            onStrokesMove(targetPageId, movedStrokes);
+
+            // Update cached strokes
+            selectedStrokesRef.current = selectedStrokesRef.current.map(
+              (stroke) => {
+                const newPoints = stroke.points.map(
+                  ([px, py, pressure]) =>
+                    [
+                      newBBox.minX + ((px - origBBox.minX) / origW) * newW,
+                      newBBox.minY + ((py - origBBox.minY) / origH) * newH,
+                      pressure,
+                    ] as Stroke['points'][0],
+                );
+                return {
+                  ...stroke,
+                  points: newPoints,
+                  bbox: computeBBox(newPoints),
+                };
+              },
+            );
+          }
+
+          // Scale text boxes proportionally
+          if (
+            selectedTextBoxIdsRef.current.size > 0 &&
+            origW > 0 &&
+            origH > 0
+          ) {
+            const allTextBoxes = getPageTextBoxes(targetPageId);
+            for (const tbId of selectedTextBoxIdsRef.current) {
+              const tb = allTextBoxes.find((t) => t.id === tbId);
+              if (!tb) continue;
+              const newX =
+                newBBox.minX + ((tb.x - origBBox.minX) / origW) * newW;
+              const newY =
+                newBBox.minY + ((tb.y - origBBox.minY) / origH) * newH;
+              const newTbW = (tb.width / origW) * newW;
+              const newTbH = (tb.height / origH) * newH;
+              onTextBoxResize?.(targetPageId, tbId, newX, newY, newTbW, newTbH);
+            }
+          }
+
+          // Update selection bbox to the new bbox
+          setSelectionBBox(newBBox);
+        }
+
+        setIsResizing(false);
+        setResizeBBox(null);
+        resizeHandleRef.current = null;
+        resizeStartBBoxRef.current = null;
+        resizeBBoxRef.current = null;
+        stateRef.current = 'selected';
       }
 
       // Unlock scroll after any pointer-up
@@ -467,6 +679,7 @@ export function useSelection({
       getPageTextBoxes,
       onStrokesMove,
       onTextBoxMove,
+      onTextBoxResize,
       onModeChange,
       clearSelection,
     ],
@@ -483,6 +696,8 @@ export function useSelection({
     isRectMode,
     isDragging,
     dragOffset,
+    isResizing,
+    resizeBBox,
     clearSelection,
     deleteSelected,
   };
