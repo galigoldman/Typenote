@@ -17,6 +17,7 @@
 ### Task 1: Update TextBox type and CanvasTool
 
 **Files:**
+
 - Modify: `src/types/canvas.ts:24-31` (TextBox interface)
 - Modify: `src/types/canvas.ts:52` (CanvasTool type)
 - Modify: `src/types/database.test.ts` (add type assertions)
@@ -69,6 +70,7 @@ git commit -m "feat: add select tool type and extend TextBox with isFullPage, zI
 ### Task 2: Replace StrokeAction with CanvasAction
 
 **Files:**
+
 - Modify: `src/components/canvas/canvas-editor.tsx:195-200` (action type)
 - Modify: `src/components/canvas/canvas-editor.tsx:248-293` (undo/redo handlers)
 
@@ -82,9 +84,31 @@ type CanvasAction =
   | { type: 'stroke-remove'; pageId: string; stroke: Stroke }
   | { type: 'textbox-add'; pageId: string; textBox: TextBox }
   | { type: 'textbox-remove'; pageId: string; textBox: TextBox }
-  | { type: 'textbox-move'; pageId: string; textBoxId: string; fromX: number; fromY: number; toX: number; toY: number }
-  | { type: 'textbox-resize'; pageId: string; textBoxId: string; fromWidth: number; fromHeight: number; toWidth: number; toHeight: number }
-  | { type: 'textbox-split'; pageId: string; originalId: string; topBox: TextBox; bottomBox: TextBox };
+  | {
+      type: 'textbox-move';
+      pageId: string;
+      textBoxId: string;
+      fromX: number;
+      fromY: number;
+      toX: number;
+      toY: number;
+    }
+  | {
+      type: 'textbox-resize';
+      pageId: string;
+      textBoxId: string;
+      fromWidth: number;
+      fromHeight: number;
+      toWidth: number;
+      toHeight: number;
+    }
+  | {
+      type: 'textbox-split';
+      pageId: string;
+      originalId: string;
+      topBox: TextBox;
+      bottomBox: TextBox;
+    };
 ```
 
 - [ ] **Step 2: Update undo handler**
@@ -118,6 +142,7 @@ git commit -m "refactor: replace StrokeAction with polymorphic CanvasAction for 
 ### Task 3: Add Select button to toolbar
 
 **Files:**
+
 - Modify: `src/components/canvas/canvas-editor.tsx` (toolbar section, ~lines 735-830)
 
 - [ ] **Step 1: Import MousePointer2 icon**
@@ -133,29 +158,44 @@ import { ..., MousePointer2 } from 'lucide-react';
 In the toolbar's mode toggle section, add a Select button. The three buttons should be:
 
 ```tsx
-{/* Draw button */}
+{
+  /* Draw button */
+}
 <button
-  onPointerDown={(e) => { e.stopPropagation(); if (!isDrawMode) setActiveTool('pen'); }}
+  onPointerDown={(e) => {
+    e.stopPropagation();
+    if (!isDrawMode) setActiveTool('pen');
+  }}
   className={`... ${isDrawMode ? 'bg-primary text-primary-foreground' : 'hover:bg-accent text-muted-foreground'}`}
 >
   <Pen className="h-4 w-4" /> Draw
-</button>
+</button>;
 
-{/* Select button */}
+{
+  /* Select button */
+}
 <button
-  onPointerDown={(e) => { e.stopPropagation(); setActiveTool('select'); }}
+  onPointerDown={(e) => {
+    e.stopPropagation();
+    setActiveTool('select');
+  }}
   className={`... ${activeTool === 'select' ? 'bg-primary text-primary-foreground' : 'hover:bg-accent text-muted-foreground'}`}
 >
   <MousePointer2 className="h-4 w-4" /> Select
-</button>
+</button>;
 
-{/* Type button */}
+{
+  /* Type button */
+}
 <button
-  onPointerDown={(e) => { e.stopPropagation(); setActiveTool('text'); }}
+  onPointerDown={(e) => {
+    e.stopPropagation();
+    setActiveTool('text');
+  }}
   className={`... ${activeTool === 'text' ? 'bg-primary text-primary-foreground' : 'hover:bg-accent text-muted-foreground'}`}
 >
   <Type className="h-4 w-4" /> Type
-</button>
+</button>;
 ```
 
 - [ ] **Step 3: Update isDrawMode check**
@@ -183,6 +223,7 @@ git commit -m "feat: add Select button to toolbar as third top-level mode"
 ### Task 4: Update interaction layer for Select mode
 
 **Files:**
+
 - Modify: `src/components/canvas/canvas-page.tsx:69-72` (isInteractionMode)
 
 - [ ] **Step 1: Add select to isInteractionMode**
@@ -216,6 +257,7 @@ git commit -m "feat: route pointer events through interaction layer in Select mo
 ### Task 5: Update useSelection hook for select tool
 
 **Files:**
+
 - Modify: `src/hooks/use-selection.ts`
 
 - [ ] **Step 1: Fix tool name check**
@@ -233,10 +275,20 @@ Add `getPageTextBoxes` to the options interface:
 ```typescript
 interface UseSelectionOptions {
   activeTool: CanvasTool;
-  onStrokeMove?: (pageId: string, strokeId: string, dx: number, dy: number) => void;
+  onStrokeMove?: (
+    pageId: string,
+    strokeId: string,
+    dx: number,
+    dy: number,
+  ) => void;
   getPageStrokes: (pageId: string) => Stroke[];
   getPageTextBoxes: (pageId: string) => TextBox[];
-  onTextBoxMove?: (pageId: string, textBoxId: string, dx: number, dy: number) => void;
+  onTextBoxMove?: (
+    pageId: string,
+    textBoxId: string,
+    dx: number,
+    dy: number,
+  ) => void;
   onModeChange?: (mode: CanvasTool) => void;
 }
 ```
@@ -250,7 +302,12 @@ After the existing stroke hit detection, check if any text boxes intersect the s
 ```typescript
 const textBoxes = getPageTextBoxes(pageId);
 const hitTextBoxes = textBoxes.filter((tb) => {
-  const tbBox: BBox = { minX: tb.x, minY: tb.y, maxX: tb.x + tb.width, maxY: tb.y + tb.height };
+  const tbBox: BBox = {
+    minX: tb.x,
+    minY: tb.y,
+    maxX: tb.x + tb.width,
+    maxY: tb.y + tb.height,
+  };
   return aabbIntersectsRect(tbBox, selectionRect);
 });
 ```
@@ -263,9 +320,12 @@ When the selection rectangle is very small (< 5px), treat it as a tap. Check str
 const isTap = selectionWidth < 5 && selectionHeight < 5;
 if (isTap) {
   // Check text boxes first (they render on top)
-  const tappedTextBox = textBoxes.find(tb =>
-    tapX >= tb.x && tapX <= tb.x + tb.width &&
-    tapY >= tb.y && tapY <= tb.y + tb.height
+  const tappedTextBox = textBoxes.find(
+    (tb) =>
+      tapX >= tb.x &&
+      tapX <= tb.x + tb.width &&
+      tapY >= tb.y &&
+      tapY <= tb.y + tb.height,
   );
   // Then check strokes
 }
@@ -280,7 +340,11 @@ const lastTapRef = useRef<{ time: number; x: number; y: number } | null>(null);
 // In handlePointerUp, when isTap:
 const now = Date.now();
 const last = lastTapRef.current;
-if (last && now - last.time < 300 && Math.hypot(tapX - last.x, tapY - last.y) < 15) {
+if (
+  last &&
+  now - last.time < 300 &&
+  Math.hypot(tapX - last.x, tapY - last.y) < 15
+) {
   // Double-tap detected — if on a text box, call onModeChange('text')
 }
 lastTapRef.current = { time: now, x: tapX, y: tapY };
@@ -307,6 +371,7 @@ git commit -m "feat: extend useSelection for all pointer types, text box selecti
 ### Task 6: Wire SelectionOverlay into CanvasPage
 
 **Files:**
+
 - Modify: `src/components/canvas/canvas-page.tsx`
 - Modify: `src/components/canvas/selection-overlay.tsx` (if needed)
 
@@ -333,15 +398,17 @@ dragOffset?: { x: number; y: number };
 Add after the eraser cursor layer, before the interaction layer:
 
 ```tsx
-{activeTool === 'select' && (
-  <SelectionOverlay
-    selectionPath={selectionPath ?? null}
-    isRectMode={isRectMode ?? true}
-    selectionBBox={selectionBBox ?? null}
-    isDragging={isDragging ?? false}
-    dragOffset={dragOffset ?? { x: 0, y: 0 }}
-  />
-)}
+{
+  activeTool === 'select' && (
+    <SelectionOverlay
+      selectionPath={selectionPath ?? null}
+      isRectMode={isRectMode ?? true}
+      selectionBBox={selectionBBox ?? null}
+      isDragging={isDragging ?? false}
+      dragOffset={dragOffset ?? { x: 0, y: 0 }}
+    />
+  );
+}
 ```
 
 - [ ] **Step 4: Run app and verify**
@@ -362,6 +429,7 @@ git commit -m "feat: render SelectionOverlay in canvas page during Select mode"
 ### Task 7: Render text boxes on the canvas page
 
 **Files:**
+
 - Modify: `src/components/canvas/canvas-page.tsx` (add text box rendering)
 - Modify: `src/components/canvas/text-box.tsx` (update props)
 
@@ -374,15 +442,19 @@ Add `isFullPage` and `activeTool` props. For full-page boxes, use `minHeight` (a
 In the text layer (layer 4), after the flow content editor, render text boxes:
 
 ```tsx
-{page.textBoxes.map((tb) => (
-  <TextBoxComponent
-    key={tb.id}
-    textBox={tb}
-    isSelected={false} // will be wired to selection state later
-    activeTool={activeTool}
-    onContentUpdate={(id, content) => onTextBoxContentUpdate?.(page.id, id, content)}
-  />
-))}
+{
+  page.textBoxes.map((tb) => (
+    <TextBoxComponent
+      key={tb.id}
+      textBox={tb}
+      isSelected={false} // will be wired to selection state later
+      activeTool={activeTool}
+      onContentUpdate={(id, content) =>
+        onTextBoxContentUpdate?.(page.id, id, content)
+      }
+    />
+  ));
+}
 ```
 
 - [ ] **Step 3: Commit**
@@ -397,6 +469,7 @@ git commit -m "feat: render text boxes on canvas pages"
 ### Task 8: Migrate flowContent to text box on load
 
 **Files:**
+
 - Modify: `src/components/canvas/canvas-editor.tsx` (initializePagesFromDocument)
 
 - [ ] **Step 1: Update initializePagesFromDocument**
@@ -446,6 +519,7 @@ git commit -m "feat: auto-migrate flowContent to full-page text box on load"
 ### Task 9: Create text boxes in Type mode
 
 **Files:**
+
 - Modify: `src/components/canvas/canvas-page.tsx` (tap handler in Type mode)
 - Modify: `src/components/canvas/canvas-editor.tsx` (text box add handler)
 
@@ -457,7 +531,8 @@ When `activeTool === 'text'` and user taps on empty space (not inside an existin
 if (activeTool === 'text' && !tappedExistingTextBox) {
   const newTextBox: TextBox = {
     id: Math.random().toString(36).slice(2) + Date.now().toString(36),
-    x: 40, y: tapY,
+    x: 40,
+    y: tapY,
     width: PAGE_WIDTH - 80,
     height: PAGE_HEIGHT - tapY - 40,
     content: null,
@@ -493,6 +568,7 @@ git commit -m "feat: create text boxes in Type mode and implement mode transitio
 ### Task 10: Move and resize selected objects
 
 **Files:**
+
 - Modify: `src/hooks/use-selection.ts` (drag handlers)
 - Modify: `src/components/canvas/canvas-editor.tsx` (move/resize callbacks)
 
@@ -501,35 +577,58 @@ git commit -m "feat: create text boxes in Type mode and implement mode transitio
 In canvas-editor.tsx, add `handleStrokeMove`:
 
 ```typescript
-const handleStrokeMove = useCallback((pageId: string, strokeId: string, dx: number, dy: number) => {
-  setPages((prev) => prev.map((p) => {
-    if (p.id !== pageId) return p;
-    return { ...p, strokes: p.strokes.map((s) => {
-      if (s.id !== strokeId) return s;
-      return {
-        ...s,
-        points: s.points.map(([x, y, pressure]) => [x + dx, y + dy, pressure] as StrokePoint),
-        bbox: { minX: s.bbox.minX + dx, minY: s.bbox.minY + dy, maxX: s.bbox.maxX + dx, maxY: s.bbox.maxY + dy },
-      };
-    })};
-  }));
-  triggerSave();
-}, [triggerSave]);
+const handleStrokeMove = useCallback(
+  (pageId: string, strokeId: string, dx: number, dy: number) => {
+    setPages((prev) =>
+      prev.map((p) => {
+        if (p.id !== pageId) return p;
+        return {
+          ...p,
+          strokes: p.strokes.map((s) => {
+            if (s.id !== strokeId) return s;
+            return {
+              ...s,
+              points: s.points.map(
+                ([x, y, pressure]) => [x + dx, y + dy, pressure] as StrokePoint,
+              ),
+              bbox: {
+                minX: s.bbox.minX + dx,
+                minY: s.bbox.minY + dy,
+                maxX: s.bbox.maxX + dx,
+                maxY: s.bbox.maxY + dy,
+              },
+            };
+          }),
+        };
+      }),
+    );
+    triggerSave();
+  },
+  [triggerSave],
+);
 ```
 
 - [ ] **Step 2: Implement text box move callback**
 
 ```typescript
-const handleTextBoxMove = useCallback((pageId: string, textBoxId: string, dx: number, dy: number) => {
-  setPages((prev) => prev.map((p) => {
-    if (p.id !== pageId) return p;
-    return { ...p, textBoxes: p.textBoxes.map((tb) => {
-      if (tb.id !== textBoxId) return tb;
-      return { ...tb, x: tb.x + dx, y: tb.y + dy, isFullPage: false }; // Moving converts to custom
-    })};
-  }));
-  triggerSave();
-}, [triggerSave]);
+const handleTextBoxMove = useCallback(
+  (pageId: string, textBoxId: string, dx: number, dy: number) => {
+    setPages((prev) =>
+      prev.map((p) => {
+        if (p.id !== pageId) return p;
+        return {
+          ...p,
+          textBoxes: p.textBoxes.map((tb) => {
+            if (tb.id !== textBoxId) return tb;
+            return { ...tb, x: tb.x + dx, y: tb.y + dy, isFullPage: false }; // Moving converts to custom
+          }),
+        };
+      }),
+    );
+    triggerSave();
+  },
+  [triggerSave],
+);
 ```
 
 Note: Moving a full-page text box converts it to custom (`isFullPage: false`).
@@ -560,24 +659,30 @@ git commit -m "feat: move selected strokes and text boxes with undo support"
 ### Task 11: Delete selected objects
 
 **Files:**
+
 - Modify: `src/components/canvas/canvas-editor.tsx` (delete handler + keyboard)
 
 - [ ] **Step 1: Add delete handler**
 
 ```typescript
-const handleDeleteSelected = useCallback((pageId: string, strokeIds: string[], textBoxIds: string[]) => {
-  // Push undo actions for each deleted object
-  // Remove strokes and text boxes from page
-  setPages((prev) => prev.map((p) => {
-    if (p.id !== pageId) return p;
-    return {
-      ...p,
-      strokes: p.strokes.filter((s) => !strokeIds.includes(s.id)),
-      textBoxes: p.textBoxes.filter((tb) => !textBoxIds.includes(tb.id)),
-    };
-  }));
-  triggerSave();
-}, [triggerSave]);
+const handleDeleteSelected = useCallback(
+  (pageId: string, strokeIds: string[], textBoxIds: string[]) => {
+    // Push undo actions for each deleted object
+    // Remove strokes and text boxes from page
+    setPages((prev) =>
+      prev.map((p) => {
+        if (p.id !== pageId) return p;
+        return {
+          ...p,
+          strokes: p.strokes.filter((s) => !strokeIds.includes(s.id)),
+          textBoxes: p.textBoxes.filter((tb) => !textBoxIds.includes(tb.id)),
+        };
+      }),
+    );
+    triggerSave();
+  },
+  [triggerSave],
+);
 ```
 
 - [ ] **Step 2: Add keyboard listener for Delete/Backspace in Select mode**
@@ -607,6 +712,7 @@ git commit -m "feat: delete selected objects with Delete key"
 ### Task 12: Run full test suite and fix lint
 
 **Files:**
+
 - All modified files
 
 - [ ] **Step 1: Run lint**

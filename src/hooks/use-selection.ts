@@ -651,7 +651,15 @@ export function useSelection({
               const newTbH = (tb.height / origH) * newH;
               const widthRatio = newTbW / tb.width;
               const newFontScale = (tb.fontScale ?? 1) * widthRatio;
-              onTextBoxResize?.(targetPageId, tbId, newX, newY, newTbW, newTbH, newFontScale);
+              onTextBoxResize?.(
+                targetPageId,
+                tbId,
+                newX,
+                newY,
+                newTbW,
+                newTbH,
+                newFontScale,
+              );
             }
           }
 
