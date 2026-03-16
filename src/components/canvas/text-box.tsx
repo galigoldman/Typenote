@@ -83,20 +83,7 @@ export function TextBox({
     }
   }, [editor]);
 
-  // Apply fontScale directly on the ProseMirror DOM element.
-  // TipTap's prose classes use rem units (root-relative), so setting
-  // font-size on a parent div doesn't cascade. Setting it on the
-  // .ProseMirror element overrides the prose class and child elements
-  // scale proportionally since they use em units.
-  useEffect(() => {
-    if (!editor) return;
-    const scale = textBox.fontScale;
-    if (scale && scale !== 1) {
-      editor.view.dom.style.fontSize = `${scale}rem`;
-    } else {
-      editor.view.dom.style.fontSize = '';
-    }
-  }, [editor, textBox.fontScale]);
+  const fontScale = textBox.fontScale;
 
   return (
     <div
@@ -112,7 +99,23 @@ export function TextBox({
         minHeight: textBox.height,
       }}
     >
-      {editor && <EditorContent editor={editor} />}
+      {/* Wrapper that scales font. Uses a CSS variable + inline style on the
+          ProseMirror element via the [style] selector to override rem-based
+          prose classes. The wrapper sets font-size which child elements inherit. */}
+      <div
+        style={
+          fontScale && fontScale !== 1
+            ? { fontSize: `${fontScale}rem` }
+            : undefined
+        }
+        className={
+          fontScale && fontScale !== 1
+            ? '[&_.ProseMirror]:!text-[length:inherit]'
+            : undefined
+        }
+      >
+        {editor && <EditorContent editor={editor} />}
+      </div>
     </div>
   );
 }
