@@ -161,6 +161,8 @@ export function useSelection({
   const handlePointerDown = useCallback(
     (e: React.PointerEvent, pageId: string) => {
       if (activeTool !== 'select') return;
+      // Only pen and mouse trigger selection — finger touch should scroll
+      if (e.pointerType === 'touch') return;
 
       e.preventDefault();
       (e.target as HTMLElement).setPointerCapture(e.pointerId);
@@ -202,6 +204,7 @@ export function useSelection({
   const handlePointerMove = useCallback(
     (e: React.PointerEvent, _pageId: string) => {
       if (activeTool !== 'select') return;
+      if (e.pointerType === 'touch') return;
 
       const { x, y } = screenToPageCoords(e);
 
@@ -224,6 +227,7 @@ export function useSelection({
   const handlePointerUp = useCallback(
     (e: React.PointerEvent, pageId: string) => {
       if (activeTool !== 'select') return;
+      if (e.pointerType === 'touch') return;
 
       e.preventDefault();
 
@@ -353,9 +357,8 @@ export function useSelection({
             }
           }
 
-          // Hit-test text boxes (skip full-page boxes — they're too big for rectangle)
+          // Hit-test text boxes
           for (const tb of textBoxes) {
-            if (tb.isFullPage) continue;
             const tbBox = getSelectableBBox(tb);
             if (aabbIntersectsRect(tbBox, selectionRect)) {
               selectedTbIds.push(tb.id);
