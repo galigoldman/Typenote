@@ -1,4 +1,5 @@
 import { createAdminClient } from '@/lib/supabase/admin';
+import { deleteEmbeddingsBySource } from '@/lib/queries/embeddings';
 import { checkFileExists } from './dedup';
 import type {
   SyncRequestPayload,
@@ -309,6 +310,11 @@ export async function detectChanges(
  */
 export async function flagRemovedFiles(fileIds: string[]): Promise<void> {
   if (fileIds.length === 0) return;
+
+  // Delete embeddings for each removed file
+  for (const fileId of fileIds) {
+    await deleteEmbeddingsBySource('moodle_file', fileId);
+  }
 
   const admin = createAdminClient();
 

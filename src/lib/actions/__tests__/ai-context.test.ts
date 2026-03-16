@@ -93,7 +93,7 @@ vi.mock('@google/genai', () => ({
 }));
 
 vi.mock('@/lib/ai/prompts', () => ({
-  SYSTEM_PROMPT: 'You are a test tutor.',
+  buildSystemPrompt: vi.fn(() => 'You are a test tutor.'),
 }));
 
 import { extractPdfText } from '@/lib/ai/extraction/pdf';

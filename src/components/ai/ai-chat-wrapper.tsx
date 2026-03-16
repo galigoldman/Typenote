@@ -10,9 +10,18 @@ import { AiChatPanel } from './ai-chat-panel';
 interface AiChatWrapperProps {
   courseId: string;
   weekId?: string;
+  courseName?: string;
+  weekLabel?: string;
+  getDocumentContent?: () => string;
 }
 
-export function AiChatWrapper({ courseId, weekId }: AiChatWrapperProps) {
+export function AiChatWrapper({
+  courseId,
+  weekId,
+  courseName,
+  weekLabel,
+  getDocumentContent,
+}: AiChatWrapperProps) {
   const [isOpen, setIsOpen] = useState(false);
 
   return (
@@ -34,6 +43,9 @@ export function AiChatWrapper({ courseId, weekId }: AiChatWrapperProps) {
       <AiChatPanel
         courseId={courseId}
         weekId={weekId}
+        courseName={courseName}
+        weekLabel={weekLabel}
+        getDocumentContent={getDocumentContent}
         isOpen={isOpen}
         onClose={() => setIsOpen(false)}
       />

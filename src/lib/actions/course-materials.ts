@@ -3,6 +3,7 @@
 import { revalidatePath } from 'next/cache';
 import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
+import { deleteEmbeddingsBySource } from '@/lib/queries/embeddings';
 
 export async function createCourseMaterial(data: {
   week_id: string;
@@ -140,6 +141,8 @@ export async function deleteCourseMaterial(id: string) {
     .eq('user_id', user.id)
     .single();
   if (fetchError) throw new Error(fetchError.message);
+
+  await deleteEmbeddingsBySource('course_material', id);
 
   const { error: storageError } = await supabase.storage
     .from('course-materials')

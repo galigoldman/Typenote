@@ -7,7 +7,7 @@ import { GoogleGenAI } from '@google/genai';
 import { chunkText, embedQuery, embedText } from '@/lib/ai/embeddings';
 import { extractDocxText } from '@/lib/ai/extraction/docx';
 import { extractPdfText } from '@/lib/ai/extraction/pdf';
-import { SYSTEM_PROMPT } from '@/lib/ai/prompts';
+import { buildSystemPrompt } from '@/lib/ai/prompts';
 import {
   getContentHash,
   matchEmbeddings,
@@ -65,6 +65,9 @@ export type QuestionParams = {
   weekId?: string;
   documentId?: string;
   mode: 'quick' | 'deep';
+  courseName?: string;
+  weekLabel?: string;
+  documentContent?: string;
   conversationHistory?: Array<{ role: 'user' | 'assistant'; content: string }>;
 };
 
@@ -319,7 +322,23 @@ export async function askQuestion(
   params: QuestionParams,
 ): Promise<QuestionResult> {
   await getAuthUserId(); // validate auth
-  const { question, courseId, mode, conversationHistory } = params;
+  const {
+    question,
+    courseId,
+    mode,
+    courseName,
+    weekLabel,
+    documentContent,
+    conversationHistory,
+  } = params;
+
+  // Build dynamic system prompt with course/week context
+  const hasDocumentContent = !!documentContent?.trim();
+  const systemPrompt = buildSystemPrompt({
+    courseName,
+    weekLabel,
+    hasDocumentContent,
+  });
 
   // RAG search — find relevant text chunks
   const results = await searchContext({
@@ -354,8 +373,33 @@ export async function askQuestion(
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const contents: Array<{ role: string; parts: any[] }> = [];
 
+  // Inject student's document content as first turn (if provided)
+  const MAX_DOC_CHARS = 50_000;
+  if (hasDocumentContent) {
+    const truncated =
+      documentContent!.length > MAX_DOC_CHARS
+        ? documentContent!.slice(0, MAX_DOC_CHARS) + '\n\n[...truncated]'
+        : documentContent!;
+    contents.push({
+      role: 'user',
+      parts: [
+        {
+          text: `Here is the student's current document:\n\n${truncated}\n\nReview it to understand their work.`,
+        },
+      ],
+    });
+    contents.push({
+      role: 'model',
+      parts: [
+        {
+          text: "I have reviewed the student's document. I can see their notes and work.",
+        },
+      ],
+    });
+  }
+
   if (contextTexts.length > 0) {
-    // Turn 1: User provides course materials as text
+    // Provide course materials as text
     const materialsText = contextTexts.join('\n\n');
     contents.push({
       role: 'user',
@@ -366,7 +410,7 @@ export async function askQuestion(
       ],
     });
 
-    // Turn 2: Model acknowledges
+    // Model acknowledges
     contents.push({
       role: 'model',
       parts: [
@@ -418,7 +462,7 @@ export async function askQuestion(
     model: modelName,
     contents,
     config: {
-      systemInstruction: SYSTEM_PROMPT,
+      systemInstruction: systemPrompt,
     },
   });
 

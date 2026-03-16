@@ -38,10 +38,11 @@ Every step of development must follow this git workflow:
 
 ## Active Technologies
 
-- TypeScript 5 / Node.js 22+ + Next.js 16 (App Router), Vercel AI SDK (`ai` + `@ai-sdk/google`), `unpdf`, `mammoth`, `@napi-rs/canvas`, `@google/genai` (005-ai-context-engine)
-- PostgreSQL via Supabase + pgvector extension, Supabase Storage (existing buckets) (005-ai-context-engine)
-- TypeScript 5 / Node.js 22+ + Next.js 16 (App Router), Vercel AI SDK (`ai` + `@ai-sdk/google`), `unpdf`, `mammoth`, `@google/genai` (006-course-context-engine)
+- TypeScript 5 / Node.js 18+ + Next.js 16 (App Router), `@google/genai`, `mammoth`, `react-markdown` (new), `remark-math` (new), `rehype-katex` (new) (007-ai-context-polish)
+- No new storage or migrations — modifies existing AI pipeline and UI components (007-ai-context-polish)
+
 - TypeScript 5 / Node.js 22+ + Next.js 16 (App Router), Vercel AI SDK (`ai` + `@ai-sdk/google`), `mammoth`, `@google/genai` (006-course-context-engine)
+- PostgreSQL via Supabase + pgvector extension, Supabase Storage (existing buckets) (006-course-context-engine)
 
 - TypeScript 5.x / Node.js 18+ + jsPDF (PDF construction), svg2pdf.js (KaTeX SVG embedding), perfect-freehand (stroke outlines, already installed), KaTeX (math rendering, already installed) (005-export-pdf)
 - No new storage — reads existing document data from Supabase `documents` table (005-export-pdf)
@@ -59,6 +60,6 @@ Every step of development must follow this git workflow:
 
 ## Recent Changes
 
-- 001-latex-math-input: Added TypeScript 5 / Node.js 18+ + Next.js 16.1.6, TipTap 3.20.1, Supabase SSR 0.9.0, KaTeX (new), Vercel AI SDK (new), @ai-sdk/google (new)
-- 003-course-materials: Added Supabase Storage for PDF uploads, 3 new DB tables (courses, course_weeks, course_materials), course_id on documents
+- 007-ai-context-polish: Dynamic system prompt with course/week context, document content awareness, markdown+LaTeX rendering in AI chat, embedding cleanup on deletion
+- 006-course-context-engine: Text-based RAG with pgvector, AI chat panel, multimodal embedding infrastructure
 - 001-canvas-editor: Added TypeScript 5.x, React 19, Next.js 16 + TipTap 3 (text editing), `perfect-freehand` (stroke geometry), Pointer Events API (input), Canvas 2D API (rendering)

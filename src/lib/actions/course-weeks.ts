@@ -2,6 +2,7 @@
 
 import { revalidatePath } from 'next/cache';
 import { createClient } from '@/lib/supabase/server';
+import { deleteEmbeddingsBySource } from '@/lib/queries/embeddings';
 
 export async function createCourseWeek(data: {
   course_id: string;
@@ -75,8 +76,12 @@ export async function deleteCourseWeek(id: string) {
 
   const { data: materials } = await supabase
     .from('course_materials')
-    .select('storage_path')
+    .select('id, storage_path')
     .eq('week_id', id);
+
+  for (const material of materials ?? []) {
+    await deleteEmbeddingsBySource('course_material', material.id);
+  }
 
   const storagePaths = (materials ?? [])
     .map((m) => m.storage_path)

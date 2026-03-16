@@ -11,6 +11,11 @@ vi.mock('@/lib/supabase/admin', () => ({
   createAdminClient: vi.fn(),
 }));
 
+// Mock embedding cleanup (called from flagRemovedFiles)
+vi.mock('@/lib/queries/embeddings', () => ({
+  deleteEmbeddingsBySource: vi.fn(async () => {}),
+}));
+
 import { createAdminClient } from '@/lib/supabase/admin';
 
 const mockCreateAdminClient = createAdminClient as ReturnType<typeof vi.fn>;
