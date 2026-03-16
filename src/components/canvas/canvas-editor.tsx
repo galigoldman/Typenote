@@ -1017,9 +1017,7 @@ export function CanvasEditor({
   const handleEditSelection = useCallback(() => {
     // Grab the first selected text box ID before clearing
     const tbId =
-      selectedTextBoxIds.size > 0
-        ? Array.from(selectedTextBoxIds)[0]
-        : null;
+      selectedTextBoxIds.size > 0 ? Array.from(selectedTextBoxIds)[0] : null;
     // Save scroll position before mode switch
     const sc = scrollContainerRef.current;
     const savedScroll = sc ? sc.scrollTop : 0;
