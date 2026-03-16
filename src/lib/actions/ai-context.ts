@@ -477,6 +477,116 @@ export async function askQuestion(
 }
 
 // ---------------------------------------------------------------------------
+// buildAiContext — shared context builder for both streaming and non-streaming
+// ---------------------------------------------------------------------------
+
+export async function buildAiContext(params: QuestionParams): Promise<{
+  systemPrompt: string;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  contents: Array<{ role: string; parts: any[] }>;
+  modelName: string;
+  sources: QuestionResult['sources'];
+}> {
+  await getAuthUserId();
+  const {
+    question,
+    courseId,
+    mode,
+    courseName,
+    weekLabel,
+    documentContent,
+    conversationHistory,
+  } = params;
+
+  const hasDocumentContent = !!documentContent?.trim();
+  const systemPrompt = buildSystemPrompt({
+    courseName,
+    weekLabel,
+    hasDocumentContent,
+  });
+
+  const results = await searchContext({ query: question, courseId, maxResults: 8 });
+
+  const contextTexts: string[] = [];
+  const sources: QuestionResult['sources'] = [];
+  const seen = new Set<string>();
+
+  for (const r of results) {
+    if (r.segmentText && !seen.has(r.sourceId)) {
+      seen.add(r.sourceId);
+      contextTexts.push(`--- ${r.sourceName} ---\n${r.segmentText}`);
+      sources.push({
+        sourceType: r.sourceType,
+        sourceName: r.sourceName,
+        weekId: r.weekId,
+        pageRange: null,
+      });
+    }
+  }
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const contents: Array<{ role: string; parts: any[] }> = [];
+
+  const MAX_DOC_CHARS = 50_000;
+  if (hasDocumentContent) {
+    const truncated =
+      documentContent!.length > MAX_DOC_CHARS
+        ? documentContent!.slice(0, MAX_DOC_CHARS) + '\n\n[...truncated]'
+        : documentContent!;
+    contents.push({
+      role: 'user',
+      parts: [{ text: `Here is the student's current document:\n\n${truncated}\n\nReview it to understand their work.` }],
+    });
+    contents.push({
+      role: 'model',
+      parts: [{ text: "I have reviewed the student's document. I can see their notes and work." }],
+    });
+  }
+
+  if (contextTexts.length > 0) {
+    const materialsText = contextTexts.join('\n\n');
+    contents.push({
+      role: 'user',
+      parts: [{ text: `Here are the relevant course materials:\n\n${materialsText}\n\nReview them to answer my questions.` }],
+    });
+    contents.push({
+      role: 'model',
+      parts: [{ text: 'I have reviewed the course materials. Please ask your question.' }],
+    });
+  }
+
+  if (conversationHistory?.length) {
+    for (const msg of conversationHistory) {
+      const role = msg.role === 'user' ? 'user' : 'model';
+      const lastTurn = contents[contents.length - 1];
+      if (lastTurn && lastTurn.role === role) {
+        lastTurn.parts.push({ text: msg.content });
+      } else {
+        contents.push({ role, parts: [{ text: msg.content }] });
+      }
+    }
+  }
+
+  if (contextTexts.length === 0 && !hasDocumentContent) {
+    contents.push({
+      role: 'user',
+      parts: [{ text: `${question}\n\n(No course materials were loaded. Answer using your own knowledge but note that no materials were found.)` }],
+    });
+  } else {
+    const lastTurn = contents[contents.length - 1];
+    if (lastTurn && lastTurn.role === 'user') {
+      lastTurn.parts.push({ text: question });
+    } else {
+      contents.push({ role: 'user', parts: [{ text: question }] });
+    }
+  }
+
+  const modelName = mode === 'deep' ? 'gemini-2.5-pro' : 'gemini-2.5-flash';
+
+  return { systemPrompt, contents, modelName, sources };
+}
+
+// ---------------------------------------------------------------------------
 // reindexCourse — clear content hashes to force re-embedding on next sync
 // ---------------------------------------------------------------------------
 

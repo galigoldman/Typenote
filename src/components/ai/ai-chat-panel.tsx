@@ -1,7 +1,15 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
-import { BookOpen, Loader2, Send, Sparkles, X, Zap } from 'lucide-react';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import {
+  BookOpen,
+  Loader2,
+  Send,
+  Sparkles,
+  Square,
+  X,
+  Zap,
+} from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { MarkdownResponse } from './markdown-response';
@@ -18,7 +26,6 @@ interface ChatMessage {
   content: string;
   sources?: ChatSource[];
   model?: 'flash' | 'pro';
-  cached?: boolean;
 }
 
 interface AiChatPanelProps {
@@ -43,19 +50,25 @@ export function AiChatPanel({
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
+  const [streamingText, setStreamingText] = useState('');
   const [mode, setMode] = useState<'quick' | 'deep'>('quick');
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const abortRef = useRef<AbortController | null>(null);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages]);
+  }, [messages, streamingText]);
 
   useEffect(() => {
     if (isOpen) {
       setTimeout(() => inputRef.current?.focus(), 100);
     }
   }, [isOpen]);
+
+  const handleStop = useCallback(() => {
+    abortRef.current?.abort();
+  }, []);
 
   async function handleSend() {
     const question = input.trim();
@@ -65,6 +78,14 @@ export function AiChatPanel({
     setMessages((prev) => [...prev, userMessage]);
     setInput('');
     setLoading(true);
+    setStreamingText('');
+
+    const controller = new AbortController();
+    abortRef.current = controller;
+
+    let accumulatedText = '';
+    let sources: ChatSource[] = [];
+    let model: 'flash' | 'pro' = 'flash';
 
     try {
       const conversationHistory = messages.map((m) => ({
@@ -72,7 +93,6 @@ export function AiChatPanel({
         content: m.content,
       }));
 
-      // Get latest document content at question-time
       const documentContent = getDocumentContent?.() || undefined;
 
       const res = await fetch('/api/ai/ask', {
@@ -88,32 +108,93 @@ export function AiChatPanel({
           documentContent,
           conversationHistory,
         }),
+        signal: controller.signal,
       });
 
       if (!res.ok) {
-        const err = await res.json().catch(() => ({ error: 'Request failed' }));
+        const err = await res
+          .json()
+          .catch(() => ({ error: 'Request failed' }));
         throw new Error(err.error || `HTTP ${res.status}`);
       }
 
-      const data = await res.json();
+      const reader = res.body?.getReader();
+      if (!reader) throw new Error('No response stream');
 
-      const assistantMessage: ChatMessage = {
-        role: 'assistant',
-        content: data.answer,
-        sources: data.sources,
-        model: data.model,
-        cached: data.cached,
-      };
+      const decoder = new TextDecoder();
+      let buffer = '';
 
-      setMessages((prev) => [...prev, assistantMessage]);
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+
+        // Parse SSE events from buffer
+        const lines = buffer.split('\n\n');
+        buffer = lines.pop() ?? '';
+
+        for (const line of lines) {
+          if (!line.startsWith('data: ')) continue;
+          const jsonStr = line.slice(6);
+          try {
+            const event = JSON.parse(jsonStr);
+            if (event.type === 'sources') {
+              sources = event.sources ?? [];
+              model = event.model ?? 'flash';
+            } else if (event.type === 'text') {
+              accumulatedText += event.text;
+              setStreamingText(accumulatedText);
+            } else if (event.type === 'error') {
+              throw new Error(event.error);
+            }
+          } catch (e) {
+            if (e instanceof SyntaxError) continue;
+            throw e;
+          }
+        }
+      }
+
+      // Finalize: move streaming text to a proper message
+      setStreamingText('');
+      if (accumulatedText) {
+        setMessages((prev) => [
+          ...prev,
+          {
+            role: 'assistant',
+            content: accumulatedText,
+            sources,
+            model,
+          },
+        ]);
+      }
     } catch (err) {
-      const errorMessage: ChatMessage = {
-        role: 'assistant',
-        content: `Error: ${err instanceof Error ? err.message : 'Something went wrong'}`,
-      };
-      setMessages((prev) => [...prev, errorMessage]);
+      setStreamingText('');
+      if (err instanceof DOMException && err.name === 'AbortError') {
+        // User stopped the generation — keep what we have
+        if (accumulatedText) {
+          setMessages((prev) => [
+            ...prev,
+            {
+              role: 'assistant',
+              content: accumulatedText,
+              sources,
+              model,
+            },
+          ]);
+        }
+      } else {
+        setMessages((prev) => [
+          ...prev,
+          {
+            role: 'assistant',
+            content: `Error: ${err instanceof Error ? err.message : 'Something went wrong'}`,
+          },
+        ]);
+      }
     } finally {
       setLoading(false);
+      abortRef.current = null;
     }
   }
 
@@ -171,7 +252,7 @@ export function AiChatPanel({
 
       {/* Messages */}
       <div className="flex-1 overflow-y-auto px-4 py-4">
-        {messages.length === 0 && (
+        {messages.length === 0 && !streamingText && (
           <div className="flex flex-col items-center justify-center py-12 text-center">
             <Sparkles className="mb-3 h-10 w-10 text-muted-foreground/40" />
             <p className="text-sm font-medium text-muted-foreground">
@@ -223,7 +304,6 @@ export function AiChatPanel({
                   <div className="mt-1.5 flex items-center gap-2">
                     <span className="text-[10px] text-muted-foreground/50">
                       {msg.model === 'flash' ? 'Flash' : 'Pro'}
-                      {msg.cached ? ' · Cached' : ''}
                     </span>
                   </div>
                 )}
@@ -232,10 +312,21 @@ export function AiChatPanel({
           </div>
         ))}
 
-        {loading && (
+        {/* Streaming message */}
+        {streamingText && (
+          <div className="mb-4">
+            <div className="max-w-[95%]">
+              <div className="rounded-2xl rounded-bl-md bg-muted px-4 py-3 text-sm leading-relaxed">
+                <MarkdownResponse content={streamingText} />
+              </div>
+            </div>
+          </div>
+        )}
+
+        {loading && !streamingText && (
           <div className="mb-4 flex items-center gap-2 text-sm text-muted-foreground">
             <Loader2 className="h-4 w-4 animate-spin" />
-            <span>Thinking...</span>
+            <span>Searching materials...</span>
           </div>
         )}
 
@@ -260,14 +351,26 @@ export function AiChatPanel({
             disabled={loading}
             className="flex-1 rounded-lg border bg-background px-3 py-2 text-sm outline-none ring-offset-background placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50"
           />
-          <Button
-            type="submit"
-            size="icon"
-            disabled={loading || !input.trim()}
-            className="h-9 w-9 shrink-0"
-          >
-            <Send className="h-4 w-4" />
-          </Button>
+          {loading ? (
+            <Button
+              type="button"
+              size="icon"
+              variant="destructive"
+              onClick={handleStop}
+              className="h-9 w-9 shrink-0"
+            >
+              <Square className="h-3.5 w-3.5" />
+            </Button>
+          ) : (
+            <Button
+              type="submit"
+              size="icon"
+              disabled={!input.trim()}
+              className="h-9 w-9 shrink-0"
+            >
+              <Send className="h-4 w-4" />
+            </Button>
+          )}
         </form>
       </div>
     </div>

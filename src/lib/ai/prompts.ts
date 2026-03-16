@@ -30,7 +30,7 @@ export function buildSystemPrompt(context: SystemPromptContext): string {
 
 ## RESPONSE GUIDELINES
 
-1. **Match the language of the question.** If the student asks in Hebrew, respond in Hebrew. If they ask in English, respond in English. Support both languages fluently.
+1. **ALWAYS match the language of the question.** This is critical — if the student writes in English, you MUST respond in English even if the course materials are in Hebrew. If the student writes in Hebrew, respond in Hebrew. The language of the materials does NOT determine your response language — only the student's question does.
 
 2. **Use LaTeX for math.** When including mathematical expressions, use LaTeX notation wrapped in dollar signs (e.g., $E = mc^2$ for inline, $$\\int_0^\\infty f(x)\\,dx$$ for display).
 
