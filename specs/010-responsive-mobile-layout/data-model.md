@@ -10,8 +10,8 @@
 
 ### Sidebar Preference (localStorage)
 
-| Key                        | Type    | Default | Description                                         |
-| -------------------------- | ------- | ------- | --------------------------------------------------- |
+| Key                          | Type    | Default | Description                                         |
+| ---------------------------- | ------- | ------- | --------------------------------------------------- |
 | `typenote-sidebar-collapsed` | boolean | `false` | Whether the user has manually collapsed the sidebar |
 
 **Read on**: Component mount (initial sidebar state on desktop)
@@ -20,12 +20,12 @@
 
 ### Runtime State (React)
 
-| State               | Type                      | Scope            | Description                                                  |
-| -------------------- | ------------------------- | ---------------- | ------------------------------------------------------------ |
-| `isOpen`             | `boolean`                 | SidebarContext   | Whether sidebar is currently visible                         |
-| `isMobile`           | `boolean`                 | SidebarContext   | Derived from `useMediaQuery('(min-width: 768px)')` — `true` when viewport <768px |
-| `isSheetOpen`        | `boolean`                 | SidebarLayout    | Controls the Sheet overlay open/close on mobile              |
-| `isChatOpen`         | `boolean`                 | AiChatWrapper    | Existing state — whether AI chat panel is visible            |
+| State         | Type      | Scope          | Description                                                                      |
+| ------------- | --------- | -------------- | -------------------------------------------------------------------------------- |
+| `isOpen`      | `boolean` | SidebarContext | Whether sidebar is currently visible                                             |
+| `isMobile`    | `boolean` | SidebarContext | Derived from `useMediaQuery('(min-width: 768px)')` — `true` when viewport <768px |
+| `isSheetOpen` | `boolean` | SidebarLayout  | Controls the Sheet overlay open/close on mobile                                  |
+| `isChatOpen`  | `boolean` | AiChatWrapper  | Existing state — whether AI chat panel is visible                                |
 
 ### State Interactions
 
@@ -46,20 +46,20 @@ Viewport < 768px (Mobile):
 
 ## New Components
 
-| Component              | Type       | Location                                           | Purpose                                   |
-| ---------------------- | ---------- | -------------------------------------------------- | ----------------------------------------- |
-| `useMediaQuery`        | Hook       | `src/hooks/use-media-query.ts`                     | Detects viewport breakpoint               |
-| `useSwipeDrawer`       | Hook       | `src/hooks/use-swipe-drawer.ts`                    | Detects left-edge swipe gesture           |
+| Component        | Type | Location                        | Purpose                         |
+| ---------------- | ---- | ------------------------------- | ------------------------------- |
+| `useMediaQuery`  | Hook | `src/hooks/use-media-query.ts`  | Detects viewport breakpoint     |
+| `useSwipeDrawer` | Hook | `src/hooks/use-swipe-drawer.ts` | Detects left-edge swipe gesture |
 
 ## Modified Components
 
-| Component              | File                                                | Changes                                                      |
-| ---------------------- | --------------------------------------------------- | ------------------------------------------------------------ |
-| `SidebarLayout`        | `src/components/dashboard/sidebar-layout.tsx`       | Add responsive rendering: inline aside (desktop) vs. Sheet (mobile). Add hamburger button. Integrate swipe gesture. Persist to localStorage. |
-| `SidebarFolderTree`    | `src/components/dashboard/sidebar-folder-tree.tsx`  | Increase touch target sizes (padding). Close sidebar on navigation (mobile). |
-| `DashboardLayout`      | `src/app/(dashboard)/layout.tsx`                    | Pass hamburger button to mobile header area.                 |
-| `AiChatPanel`          | `src/components/ai/ai-chat-panel.tsx`               | Make width responsive: `w-full md:w-[420px]`.                |
-| `DocumentPage`         | `src/app/(dashboard)/dashboard/documents/[docId]/page.tsx` | Ensure back breadcrumb is touch-friendly on mobile.   |
-| `CoursePage`           | `src/app/(dashboard)/dashboard/courses/[courseId]/page.tsx` | Add dashboard breadcrumb. Ensure week sections are collapsible with adequate touch targets. |
-| `CanvasEditor`         | `src/components/canvas/canvas-editor.tsx`           | Increase toolbar button touch targets.                       |
-| `WeekSection`          | `src/components/dashboard/week-section.tsx`         | Increase touch targets for expand/collapse.                  |
+| Component           | File                                                        | Changes                                                                                                                                      |
+| ------------------- | ----------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
+| `SidebarLayout`     | `src/components/dashboard/sidebar-layout.tsx`               | Add responsive rendering: inline aside (desktop) vs. Sheet (mobile). Add hamburger button. Integrate swipe gesture. Persist to localStorage. |
+| `SidebarFolderTree` | `src/components/dashboard/sidebar-folder-tree.tsx`          | Increase touch target sizes (padding). Close sidebar on navigation (mobile).                                                                 |
+| `DashboardLayout`   | `src/app/(dashboard)/layout.tsx`                            | Pass hamburger button to mobile header area.                                                                                                 |
+| `AiChatPanel`       | `src/components/ai/ai-chat-panel.tsx`                       | Make width responsive: `w-full md:w-[420px]`.                                                                                                |
+| `DocumentPage`      | `src/app/(dashboard)/dashboard/documents/[docId]/page.tsx`  | Ensure back breadcrumb is touch-friendly on mobile.                                                                                          |
+| `CoursePage`        | `src/app/(dashboard)/dashboard/courses/[courseId]/page.tsx` | Add dashboard breadcrumb. Ensure week sections are collapsible with adequate touch targets.                                                  |
+| `CanvasEditor`      | `src/components/canvas/canvas-editor.tsx`                   | Increase toolbar button touch targets.                                                                                                       |
+| `WeekSection`       | `src/components/dashboard/week-section.tsx`                 | Increase touch targets for expand/collapse.                                                                                                  |

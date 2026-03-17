@@ -27,12 +27,12 @@ interface SidebarContextValue {
 }
 ```
 
-| Field      | Type       | Description                                                      |
-| ---------- | ---------- | ---------------------------------------------------------------- |
-| `isOpen`   | `boolean`  | Whether the sidebar is currently visible (inline or overlay)     |
-| `isMobile` | `boolean`  | `true` when viewport < 768px — consumers can adapt UI accordingly |
-| `toggle`   | `() => void` | Toggles sidebar open/close                                     |
-| `close`    | `() => void` | Closes the sidebar (used after navigation on mobile)            |
+| Field      | Type         | Description                                                       |
+| ---------- | ------------ | ----------------------------------------------------------------- |
+| `isOpen`   | `boolean`    | Whether the sidebar is currently visible (inline or overlay)      |
+| `isMobile` | `boolean`    | `true` when viewport < 768px — consumers can adapt UI accordingly |
+| `toggle`   | `() => void` | Toggles sidebar open/close                                        |
+| `close`    | `() => void` | Closes the sidebar (used after navigation on mobile)              |
 
 **Breaking change**: None — existing consumers use `isOpen` and `toggle`, both preserved. `isMobile` and `close` are additive.
 
@@ -68,17 +68,17 @@ const isMobile = !isDesktop;
 
 ```ts
 interface UseSwipeDrawerOptions {
-  edgeWidth?: number;     // Default: 20 (pixels from left edge)
-  threshold?: number;     // Default: 50 (minimum swipe distance in px)
+  edgeWidth?: number; // Default: 20 (pixels from left edge)
+  threshold?: number; // Default: 50 (minimum swipe distance in px)
   onOpen: () => void;
   onClose: () => void;
   isOpen: boolean;
-  enabled?: boolean;      // Default: true — set false to disable
+  enabled?: boolean; // Default: true — set false to disable
 }
 
 function useSwipeDrawer(
   ref: React.RefObject<HTMLElement>,
-  options: UseSwipeDrawerOptions
+  options: UseSwipeDrawerOptions,
 ): void;
 ```
 
