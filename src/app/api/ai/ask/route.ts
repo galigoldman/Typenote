@@ -2,6 +2,8 @@ import { NextResponse } from 'next/server';
 import { GoogleGenAI } from '@google/genai';
 
 import { buildAiContext, type QuestionParams } from '@/lib/actions/ai-context';
+import { checkAndIncrementUsage } from '@/lib/ai/rate-limit';
+import { createClient } from '@/lib/supabase/server';
 
 export async function POST(req: Request) {
   try {
@@ -64,6 +66,56 @@ export async function POST(req: Request) {
           );
         }
       }
+    }
+
+    // --- Rate limit check (before any AI work) ---
+    // Authenticate first, then atomically check + increment usage.
+    // Why before buildAiContext? Because buildAiContext calls getAuthUserId()
+    // internally, but we need the userId here for the rate limit RPC.
+    const supabase = await createClient();
+    const {
+      data: { user },
+      error: authError,
+    } = await supabase.auth.getUser();
+
+    if (authError || !user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    // Atomic check + increment. Fail-closed: if this throws, we reject the request.
+    // Why fail-closed? The purpose of rate limiting is cost protection. A database
+    // outage shouldn't become a cost spike.
+    try {
+      const rateLimit = await checkAndIncrementUsage(user.id, mode);
+
+      if (!rateLimit.isAllowed) {
+        // First day of next month
+        const now = new Date();
+        const resetsAt = new Date(
+          Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1),
+        );
+
+        return NextResponse.json(
+          {
+            error: 'rate_limited',
+            message: `You've used all ${rateLimit.monthlyLimit} of your monthly AI questions. Your quota resets on ${resetsAt.toLocaleDateString('en-US', { month: 'long', day: 'numeric', timeZone: 'UTC' })}.`,
+            used: rateLimit.currentCount,
+            limit: rateLimit.monthlyLimit,
+            resetsAt: resetsAt.toISOString(),
+          },
+          { status: 429 },
+        );
+      }
+    } catch (rateLimitError) {
+      console.error('Rate limit check failed:', rateLimitError);
+      return NextResponse.json(
+        {
+          error: 'service_unavailable',
+          message:
+            'AI service is temporarily unavailable. Please try again in a moment.',
+        },
+        { status: 503 },
+      );
     }
 
     const params: QuestionParams = {

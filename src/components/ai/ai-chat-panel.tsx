@@ -28,6 +28,14 @@ interface ChatMessage {
   model?: 'flash' | 'pro';
 }
 
+interface QuotaInfo {
+  used: number;
+  limit: number;
+  remaining: number;
+  tier: string;
+  resetsAt: string;
+}
+
 interface AiChatPanelProps {
   courseId: string;
   weekId?: string;
@@ -52,6 +60,7 @@ export function AiChatPanel({
   const [loading, setLoading] = useState(false);
   const [streamingText, setStreamingText] = useState('');
   const [mode, setMode] = useState<'quick' | 'deep'>('quick');
+  const [quota, setQuota] = useState<QuotaInfo | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const abortRef = useRef<AbortController | null>(null);
@@ -64,6 +73,21 @@ export function AiChatPanel({
     if (isOpen) {
       setTimeout(() => inputRef.current?.focus(), 100);
     }
+  }, [isOpen]);
+
+  // Fetch quota when panel opens
+  useEffect(() => {
+    if (!isOpen) return;
+
+    fetch('/api/ai/quota')
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data: QuotaInfo | null) => {
+        if (data) setQuota(data);
+      })
+      .catch(() => {
+        // Quota display is non-critical — enforcement is server-side
+        setQuota(null);
+      });
   }, [isOpen]);
 
   const handleStop = useCallback(() => {
@@ -113,6 +137,29 @@ export function AiChatPanel({
 
       if (!res.ok) {
         const err = await res.json().catch(() => ({ error: 'Request failed' }));
+
+        // Handle rate limit (429) with friendly message
+        if (res.status === 429 && err.error === 'rate_limited') {
+          setQuota((prev) =>
+            prev
+              ? { ...prev, used: err.used, limit: err.limit, remaining: 0 }
+              : {
+                  used: err.used,
+                  limit: err.limit,
+                  remaining: 0,
+                  tier: 'free',
+                  resetsAt: err.resetsAt,
+                },
+          );
+          setMessages((prev) => [
+            ...prev,
+            { role: 'assistant', content: err.message },
+          ]);
+          setLoading(false);
+          abortRef.current = null;
+          return;
+        }
+
         throw new Error(err.error || `HTTP ${res.status}`);
       }
 
@@ -165,6 +212,17 @@ export function AiChatPanel({
             model,
           },
         ]);
+
+        // Optimistically decrement quota after successful question
+        setQuota((prev) =>
+          prev
+            ? {
+                ...prev,
+                used: prev.used + 1,
+                remaining: Math.max(0, prev.remaining - 1),
+              }
+            : null,
+        );
       }
     } catch (err) {
       setStreamingText('');
@@ -331,8 +389,32 @@ export function AiChatPanel({
         <div ref={messagesEndRef} />
       </div>
 
-      {/* Input */}
+      {/* Quota indicator + Input */}
       <div className="border-t px-4 py-3">
+        {quota && (
+          <div className="mb-2">
+            {quota.remaining === 0 ? (
+              <p className="text-xs text-destructive">
+                No questions remaining this month — resets{' '}
+                {new Date(quota.resetsAt).toLocaleDateString('en-US', {
+                  month: 'long',
+                  day: 'numeric',
+                })}
+              </p>
+            ) : (
+              <p
+                className={`text-xs ${
+                  quota.remaining <= 5
+                    ? 'text-amber-500'
+                    : 'text-muted-foreground'
+                }`}
+              >
+                {quota.remaining} of {quota.limit} questions remaining this
+                month
+              </p>
+            )}
+          </div>
+        )}
         <form
           onSubmit={(e) => {
             e.preventDefault();
@@ -345,8 +427,12 @@ export function AiChatPanel({
             type="text"
             value={input}
             onChange={(e) => setInput(e.target.value)}
-            placeholder="Ask about your course materials..."
-            disabled={loading}
+            placeholder={
+              quota?.remaining === 0
+                ? 'Monthly limit reached'
+                : 'Ask about your course materials...'
+            }
+            disabled={loading || quota?.remaining === 0}
             className="flex-1 rounded-lg border bg-background px-3 py-2 text-sm outline-none ring-offset-background placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50"
           />
           {loading ? (
@@ -363,7 +449,7 @@ export function AiChatPanel({
             <Button
               type="submit"
               size="icon"
-              disabled={!input.trim()}
+              disabled={!input.trim() || quota?.remaining === 0}
               className="h-9 w-9 shrink-0"
             >
               <Send className="h-4 w-4" />
