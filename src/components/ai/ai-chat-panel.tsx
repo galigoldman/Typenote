@@ -395,7 +395,11 @@ export function AiChatPanel({
           <div className="mb-2">
             {quota.remaining === 0 ? (
               <p className="text-xs text-destructive">
-                No questions remaining — resets at midnight UTC
+                No questions remaining this month — resets{' '}
+                {new Date(quota.resetsAt).toLocaleDateString('en-US', {
+                  month: 'long',
+                  day: 'numeric',
+                })}
               </p>
             ) : (
               <p
@@ -405,7 +409,8 @@ export function AiChatPanel({
                     : 'text-muted-foreground'
                 }`}
               >
-                {quota.remaining} of {quota.limit} questions remaining today
+                {quota.remaining} of {quota.limit} questions remaining this
+                month
               </p>
             )}
           </div>
@@ -424,7 +429,7 @@ export function AiChatPanel({
             onChange={(e) => setInput(e.target.value)}
             placeholder={
               quota?.remaining === 0
-                ? 'Daily limit reached'
+                ? 'Monthly limit reached'
                 : 'Ask about your course materials...'
             }
             disabled={loading || quota?.remaining === 0}
