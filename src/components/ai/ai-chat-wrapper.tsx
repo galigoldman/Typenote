@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { Sparkles } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
-import type { PendingAiContext } from './ai-chat-panel';
+import type { AiContextItem } from './ai-chat-panel';
 
 import { AiChatPanel } from './ai-chat-panel';
 
@@ -14,12 +14,14 @@ interface AiChatWrapperProps {
   courseName?: string;
   weekLabel?: string;
   getDocumentContent?: () => string;
-  pendingContext?: PendingAiContext;
-  onContextCleared?: () => void;
-  /** When provided, the parent controls open state. Otherwise internal state is used. */
+  pendingContextItems?: AiContextItem[];
+  onRemoveContextItem?: (index: number) => void;
+  onClearAllContext?: () => void;
   isOpen?: boolean;
   onToggle?: () => void;
   onClose?: () => void;
+  onRequestMarkText?: () => void;
+  onRequestScreenshot?: () => void;
 }
 
 export function AiChatWrapper({
@@ -28,13 +30,15 @@ export function AiChatWrapper({
   courseName,
   weekLabel,
   getDocumentContent,
-  pendingContext,
-  onContextCleared,
+  pendingContextItems = [],
+  onRemoveContextItem,
+  onClearAllContext,
   isOpen: externalIsOpen,
   onToggle: externalOnToggle,
   onClose: externalOnClose,
+  onRequestMarkText,
+  onRequestScreenshot,
 }: AiChatWrapperProps) {
-  // Internal state fallback when parent doesn't control open state
   const [internalIsOpen, setInternalIsOpen] = useState(false);
 
   const isControlled = externalIsOpen !== undefined;
@@ -70,8 +74,11 @@ export function AiChatWrapper({
         getDocumentContent={getDocumentContent}
         isOpen={isOpen}
         onClose={handleClose}
-        pendingContext={pendingContext}
-        onContextCleared={onContextCleared}
+        pendingContextItems={pendingContextItems}
+        onRemoveContextItem={onRemoveContextItem}
+        onClearAllContext={onClearAllContext}
+        onRequestMarkText={onRequestMarkText}
+        onRequestScreenshot={onRequestScreenshot}
       />
     </>
   );
