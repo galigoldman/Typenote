@@ -25,22 +25,22 @@ _GATE: Must pass before Phase 0 research. Re-check after Phase 1 design._
 
 ### Pre-Phase 0 Check
 
-| Principle                       | Status | Notes                                                                                                                                                  |
-| ------------------------------- | ------ | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| I. Incremental Development      | PASS   | Migration first → RPC functions → server route changes → client UI. Each phase produces a testable increment.                                          |
-| II. Test-Driven Quality         | PASS   | Integration tests for RPC functions and migration, unit tests for route handlers, e2e for full enforcement flow.                                       |
-| III. Protected Main Branch      | PASS   | Working on `009-ai-rate-limit` branch. Will PR to main.                                                                                                |
-| IV. Migrations as Code          | PASS   | Single migration `00016_ai_rate_limiting.sql` creates table, adds column, and defines RPC functions. Will verify with `supabase db reset`.              |
-| V. Interview-Ready Architecture | PASS   | Key concepts: atomic upsert, TOCTOU prevention, fail-closed pattern, defense-in-depth (DB-level enforcement). Documented in quickstart.md.             |
+| Principle                       | Status | Notes                                                                                                                                      |
+| ------------------------------- | ------ | ------------------------------------------------------------------------------------------------------------------------------------------ |
+| I. Incremental Development      | PASS   | Migration first → RPC functions → server route changes → client UI. Each phase produces a testable increment.                              |
+| II. Test-Driven Quality         | PASS   | Integration tests for RPC functions and migration, unit tests for route handlers, e2e for full enforcement flow.                           |
+| III. Protected Main Branch      | PASS   | Working on `009-ai-rate-limit` branch. Will PR to main.                                                                                    |
+| IV. Migrations as Code          | PASS   | Single migration `00016_ai_rate_limiting.sql` creates table, adds column, and defines RPC functions. Will verify with `supabase db reset`. |
+| V. Interview-Ready Architecture | PASS   | Key concepts: atomic upsert, TOCTOU prevention, fail-closed pattern, defense-in-depth (DB-level enforcement). Documented in quickstart.md. |
 
 ### Post-Phase 1 Check
 
-| Principle                       | Status | Notes                                                                                                   |
-| ------------------------------- | ------ | ------------------------------------------------------------------------------------------------------- |
-| I. Incremental Development      | PASS   | Data model (migration) → server route (enforcement) → client UI (display). Clean incremental phases.    |
-| II. Test-Driven Quality         | PASS   | Integration tests for both RPC functions. Unit tests for quota route and ask route rate limit logic.     |
-| IV. Migrations as Code          | PASS   | Single migration file with table, column, indexes, RLS, triggers, and 2 RPC functions.                  |
-| V. Interview-Ready Architecture | PASS   | Atomic upsert pattern, fail-closed, env-configurable tiers, defense-in-depth enforcement.               |
+| Principle                       | Status | Notes                                                                                                |
+| ------------------------------- | ------ | ---------------------------------------------------------------------------------------------------- |
+| I. Incremental Development      | PASS   | Data model (migration) → server route (enforcement) → client UI (display). Clean incremental phases. |
+| II. Test-Driven Quality         | PASS   | Integration tests for both RPC functions. Unit tests for quota route and ask route rate limit logic. |
+| IV. Migrations as Code          | PASS   | Single migration file with table, column, indexes, RLS, triggers, and 2 RPC functions.               |
+| V. Interview-Ready Architecture | PASS   | Atomic upsert pattern, fail-closed, env-configurable tiers, defense-in-depth enforcement.            |
 
 ## Project Structure
 
@@ -222,13 +222,13 @@ Phase 2 (Quota API)          Phase 3 (Rate Limit Enforcement)
 
 No constitution violations. All complexity is justified by the feature requirements:
 
-| Decision                       | Why                                                             | Simpler Alternative                                    |
-| ------------------------------ | --------------------------------------------------------------- | ------------------------------------------------------ |
-| Postgres RPC for atomic upsert | Prevents race conditions; single DB round-trip                  | SELECT then UPDATE — TOCTOU race condition              |
-| `subscription_tier` on profiles| Avoids join, only 2 tiers                                       | Separate tiers table — premature for 2 values           |
-| Env var overrides for limits   | Ops can change limits without deploy                            | Hardcoded — would need code change + deploy             |
-| Fail-closed on RPC failure     | Cost protection; AI already depends on Supabase anyway          | Fail-open — turns DB outage into cost spike             |
-| Separate quota endpoint        | Chat panel needs quota before first question                    | Embed in page props — couples quota to page data flow   |
+| Decision                        | Why                                                    | Simpler Alternative                                   |
+| ------------------------------- | ------------------------------------------------------ | ----------------------------------------------------- |
+| Postgres RPC for atomic upsert  | Prevents race conditions; single DB round-trip         | SELECT then UPDATE — TOCTOU race condition            |
+| `subscription_tier` on profiles | Avoids join, only 2 tiers                              | Separate tiers table — premature for 2 values         |
+| Env var overrides for limits    | Ops can change limits without deploy                   | Hardcoded — would need code change + deploy           |
+| Fail-closed on RPC failure      | Cost protection; AI already depends on Supabase anyway | Fail-open — turns DB outage into cost spike           |
+| Separate quota endpoint         | Chat panel needs quota before first question           | Embed in page props — couples quota to page data flow |
 
 ## Interview-Ready Concepts
 

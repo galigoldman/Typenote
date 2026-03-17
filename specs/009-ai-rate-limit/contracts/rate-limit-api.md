@@ -28,13 +28,13 @@ No body or query parameters.
 }
 ```
 
-| Field       | Type   | Description                                        |
-| ----------- | ------ | -------------------------------------------------- |
-| `used`      | number | Questions used today                               |
-| `limit`     | number | Daily limit for this user's tier                   |
-| `remaining` | number | Questions remaining (`limit - used`, min 0)        |
-| `tier`      | string | User's subscription tier (e.g., "free", "pro")     |
-| `resetsAt`  | string | ISO 8601 timestamp of next midnight UTC            |
+| Field       | Type   | Description                                    |
+| ----------- | ------ | ---------------------------------------------- |
+| `used`      | number | Questions used today                           |
+| `limit`     | number | Daily limit for this user's tier               |
+| `remaining` | number | Questions remaining (`limit - used`, min 0)    |
+| `tier`      | string | User's subscription tier (e.g., "free", "pro") |
+| `resetsAt`  | string | ISO 8601 timestamp of next midnight UTC        |
 
 ### Response (401)
 
@@ -73,13 +73,13 @@ Returned instead of starting the SSE stream when the user's quota is exhausted.
 }
 ```
 
-| Field      | Type   | Description                                      |
-| ---------- | ------ | ------------------------------------------------ |
-| `error`    | string | Always `"rate_limited"` for quota exhaustion     |
-| `message`  | string | User-friendly message (can be displayed directly)|
-| `used`     | number | Total questions used today                       |
-| `limit`    | number | Daily limit for this user's tier                 |
-| `resetsAt` | string | ISO 8601 timestamp of next midnight UTC          |
+| Field      | Type   | Description                                       |
+| ---------- | ------ | ------------------------------------------------- |
+| `error`    | string | Always `"rate_limited"` for quota exhaustion      |
+| `message`  | string | User-friendly message (can be displayed directly) |
+| `used`     | number | Total questions used today                        |
+| `limit`    | number | Daily limit for this user's tier                  |
+| `resetsAt` | string | ISO 8601 timestamp of next midnight UTC           |
 
 ### New Error Response (503 — Rate Limit Check Failed)
 

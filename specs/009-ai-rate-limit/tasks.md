@@ -108,13 +108,13 @@ Add Phase 4 (US2) for quota visibility, Phase 5 (US3) for confirmed configurabil
 
 ### Task Summary
 
-| Phase | Story | Tasks | Key Files |
-|-------|-------|-------|-----------|
-| 1 | Setup | 1 | — |
-| 2 | Foundation | 8 | `00016_ai_rate_limiting.sql`, `rate-limit.ts`, `seed.sql`, `ai-usage.integration.test.ts` |
-| 3 | US1: Enforcement | 3 | `ask/route.ts`, `rate-limit.test.ts` |
-| 4 | US2: Quota Display | 5 | `quota/route.ts`, `ai-chat-panel.tsx`, `ai-chat-panel.test.ts` |
-| 5 | US3: Config Tiers | 3 | `rate-limit.ts`, `rate-limit.test.ts` |
-| 6 | US4: Admin Visibility | 2 | `ai-usage.integration.test.ts`, `quickstart.md` |
-| 7 | Polish | 7 | — |
-| **Total** | | **29** | |
+| Phase     | Story                 | Tasks  | Key Files                                                                                 |
+| --------- | --------------------- | ------ | ----------------------------------------------------------------------------------------- |
+| 1         | Setup                 | 1      | —                                                                                         |
+| 2         | Foundation            | 8      | `00016_ai_rate_limiting.sql`, `rate-limit.ts`, `seed.sql`, `ai-usage.integration.test.ts` |
+| 3         | US1: Enforcement      | 3      | `ask/route.ts`, `rate-limit.test.ts`                                                      |
+| 4         | US2: Quota Display    | 5      | `quota/route.ts`, `ai-chat-panel.tsx`, `ai-chat-panel.test.ts`                            |
+| 5         | US3: Config Tiers     | 3      | `rate-limit.ts`, `rate-limit.test.ts`                                                     |
+| 6         | US4: Admin Visibility | 2      | `ai-usage.integration.test.ts`, `quickstart.md`                                           |
+| 7         | Polish                | 7      | —                                                                                         |
+| **Total** |                       | **29** |                                                                                           |
