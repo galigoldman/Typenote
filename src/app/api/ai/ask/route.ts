@@ -89,15 +89,18 @@ export async function POST(req: Request) {
       const rateLimit = await checkAndIncrementUsage(user.id, mode);
 
       if (!rateLimit.isAllowed) {
-        const resetsAt = new Date();
-        resetsAt.setUTCHours(24, 0, 0, 0);
+        // First day of next month
+        const now = new Date();
+        const resetsAt = new Date(
+          Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1),
+        );
 
         return NextResponse.json(
           {
             error: 'rate_limited',
-            message: `You've used all ${rateLimit.dailyLimit} of your daily AI questions. Your quota resets at midnight UTC.`,
+            message: `You've used all ${rateLimit.monthlyLimit} of your monthly AI questions. Your quota resets on ${resetsAt.toLocaleDateString('en-US', { month: 'long', day: 'numeric', timeZone: 'UTC' })}.`,
             used: rateLimit.currentCount,
-            limit: rateLimit.dailyLimit,
+            limit: rateLimit.monthlyLimit,
             resetsAt: resetsAt.toISOString(),
           },
           { status: 429 },

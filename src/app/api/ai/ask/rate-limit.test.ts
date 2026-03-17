@@ -57,10 +57,10 @@ describe('POST /api/ai/ask — rate limiting', () => {
     });
   });
 
-  it('returns 429 when user has exceeded daily limit', async () => {
+  it('returns 429 when user has exceeded monthly limit', async () => {
     mockCheckAndIncrement.mockResolvedValue({
-      currentCount: 31,
-      dailyLimit: 30,
+      currentCount: 51,
+      monthlyLimit: 50,
       tier: 'free',
       isAllowed: false,
     });
@@ -70,9 +70,9 @@ describe('POST /api/ai/ask — rate limiting', () => {
 
     expect(res.status).toBe(429);
     expect(data.error).toBe('rate_limited');
-    expect(data.message).toContain('30');
-    expect(data.used).toBe(31);
-    expect(data.limit).toBe(30);
+    expect(data.message).toContain('50');
+    expect(data.used).toBe(51);
+    expect(data.limit).toBe(50);
     expect(data.resetsAt).toBeDefined();
 
     // buildAiContext should NOT be called when rate limited
@@ -98,7 +98,7 @@ describe('POST /api/ai/ask — rate limiting', () => {
   it('proceeds to AI when user has remaining quota', async () => {
     mockCheckAndIncrement.mockResolvedValue({
       currentCount: 5,
-      dailyLimit: 30,
+      monthlyLimit: 50,
       tier: 'free',
       isAllowed: true,
     });
@@ -122,7 +122,7 @@ describe('POST /api/ai/ask — rate limiting', () => {
   it('passes the correct model to checkAndIncrementUsage', async () => {
     mockCheckAndIncrement.mockResolvedValue({
       currentCount: 1,
-      dailyLimit: 30,
+      monthlyLimit: 50,
       tier: 'free',
       isAllowed: true,
     });

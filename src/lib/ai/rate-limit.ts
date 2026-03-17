@@ -6,7 +6,7 @@ import { createClient } from '@/lib/supabase/server';
 
 export interface RateLimitResult {
   currentCount: number;
-  dailyLimit: number;
+  monthlyLimit: number;
   tier: string;
   isAllowed: boolean;
 }
@@ -23,18 +23,18 @@ export interface QuotaInfo {
 // Tier limit resolution
 // ---------------------------------------------------------------------------
 
-/** Default limits per tier (used when env vars are not set). */
+/** Default monthly limits per tier (used when env vars are not set). */
 const DEFAULT_LIMITS: Record<string, number> = {
-  free: 30,
-  pro: 100,
+  free: 50,
+  pro: 500,
 };
 
 /**
- * Resolve the daily limit for a given tier.
+ * Resolve the monthly limit for a given tier.
  *
  * Priority: environment variable AI_LIMIT_{TIER} > default map > free default.
  *
- * Why env vars? Decouples operational decisions (changing a limit from 30 to 50)
+ * Why env vars? Decouples operational decisions (changing a limit from 50 to 100)
  * from code deployments. This is the twelve-factor app principle of storing
  * config in the environment.
  */
@@ -61,7 +61,7 @@ function resolveLimitForTier(tier: string): number {
 // ---------------------------------------------------------------------------
 
 /**
- * Atomically check and increment a user's daily AI usage.
+ * Atomically check and increment a user's monthly AI usage.
  *
  * Calls the `increment_ai_usage` Postgres RPC which performs an atomic upsert.
  * After getting the DB-level limit, applies env var overrides if configured.
@@ -96,13 +96,13 @@ export async function checkAndIncrementUsage(
   const currentCount = row.current_count as number;
 
   // Apply env var override for the limit
-  const dailyLimit = resolveLimitForTier(tier);
+  const monthlyLimit = resolveLimitForTier(tier);
 
   return {
     currentCount,
-    dailyLimit,
+    monthlyLimit,
     tier,
-    isAllowed: currentCount <= dailyLimit,
+    isAllowed: currentCount <= monthlyLimit,
   };
 }
 

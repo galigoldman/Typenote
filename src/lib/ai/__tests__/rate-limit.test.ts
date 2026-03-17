@@ -54,7 +54,7 @@ describe('checkAndIncrementUsage', () => {
 
     expect(result).toEqual({
       currentCount: 10,
-      dailyLimit: 30,
+      monthlyLimit: 50,
       tier: 'free',
       isAllowed: true,
     });
@@ -62,15 +62,15 @@ describe('checkAndIncrementUsage', () => {
 
   it('returns isAllowed=false when count > limit', async () => {
     mockRpc.mockResolvedValueOnce({
-      data: [{ current_count: 31, tier: 'free' }],
+      data: [{ current_count: 51, tier: 'free' }],
       error: null,
     });
 
     const result = await checkAndIncrementUsage('user-123', 'gemini-2.0-flash');
 
     expect(result).toEqual({
-      currentCount: 31,
-      dailyLimit: 30,
+      currentCount: 51,
+      monthlyLimit: 50,
       tier: 'free',
       isAllowed: false,
     });
@@ -88,17 +88,17 @@ describe('checkAndIncrementUsage', () => {
   });
 
   it('uses AI_LIMIT_FREE env var override when set', async () => {
-    process.env.AI_LIMIT_FREE = '50';
+    process.env.AI_LIMIT_FREE = '100';
 
     mockRpc.mockResolvedValueOnce({
-      data: [{ current_count: 35, tier: 'free' }],
+      data: [{ current_count: 75, tier: 'free' }],
       error: null,
     });
 
     const result = await checkAndIncrementUsage('user-123', 'gemini-2.0-flash');
 
-    // 35 <= 50, so allowed (would be disallowed with default 30)
-    expect(result.dailyLimit).toBe(50);
+    // 75 <= 100, so allowed (would be disallowed with default 50)
+    expect(result.monthlyLimit).toBe(100);
     expect(result.isAllowed).toBe(true);
   });
 
@@ -112,13 +112,13 @@ describe('checkAndIncrementUsage', () => {
 
     const result = await checkAndIncrementUsage('user-123', 'gemini-2.0-flash');
 
-    // Falls back to default free limit of 30
-    expect(result.dailyLimit).toBe(30);
+    // Falls back to default free limit of 50
+    expect(result.monthlyLimit).toBe(50);
     expect(result.isAllowed).toBe(true);
   });
 
   it('uses AI_LIMIT_TEAM env var for team tier', async () => {
-    process.env.AI_LIMIT_TEAM = '200';
+    process.env.AI_LIMIT_TEAM = '1000';
 
     mockRpc.mockResolvedValueOnce({
       data: [{ current_count: 150, tier: 'team' }],
@@ -127,7 +127,7 @@ describe('checkAndIncrementUsage', () => {
 
     const result = await checkAndIncrementUsage('user-123', 'gemini-2.0-flash');
 
-    expect(result.dailyLimit).toBe(200);
+    expect(result.monthlyLimit).toBe(1000);
     expect(result.tier).toBe('team');
     expect(result.isAllowed).toBe(true);
   });
@@ -140,7 +140,7 @@ describe('checkAndIncrementUsage', () => {
 describe('getQuota', () => {
   it('returns correct QuotaInfo structure', async () => {
     mockRpc.mockResolvedValueOnce({
-      data: [{ used: 12, tier: 'pro', resets_at: '2026-03-18T00:00:00Z' }],
+      data: [{ used: 12, tier: 'pro', resets_at: '2026-04-01T00:00:00Z' }],
       error: null,
     });
 
@@ -151,16 +151,16 @@ describe('getQuota', () => {
     });
     expect(result).toEqual({
       used: 12,
-      limit: 100,
-      remaining: 88,
+      limit: 500,
+      remaining: 488,
       tier: 'pro',
-      resetsAt: '2026-03-18T00:00:00Z',
+      resetsAt: '2026-04-01T00:00:00Z',
     });
   });
 
   it('clamps remaining to 0 (never negative)', async () => {
     mockRpc.mockResolvedValueOnce({
-      data: [{ used: 999, tier: 'free', resets_at: '2026-03-18T00:00:00Z' }],
+      data: [{ used: 999, tier: 'free', resets_at: '2026-04-01T00:00:00Z' }],
       error: null,
     });
 
@@ -168,14 +168,14 @@ describe('getQuota', () => {
 
     expect(result.remaining).toBe(0);
     expect(result.used).toBe(999);
-    expect(result.limit).toBe(30);
+    expect(result.limit).toBe(50);
   });
 
   it('applies env var override to displayed limit', async () => {
     process.env.AI_LIMIT_FREE = '75';
 
     mockRpc.mockResolvedValueOnce({
-      data: [{ used: 20, tier: 'free', resets_at: '2026-03-18T00:00:00Z' }],
+      data: [{ used: 20, tier: 'free', resets_at: '2026-04-01T00:00:00Z' }],
       error: null,
     });
 
