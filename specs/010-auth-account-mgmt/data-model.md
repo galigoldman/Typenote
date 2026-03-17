@@ -13,17 +13,18 @@ This feature requires **no new database tables or migrations**. All entities are
 
 Managed entirely by Supabase Auth. Not directly modified by application code.
 
-| Field | Description |
-| ----- | ----------- |
-| id | UUID, primary key |
-| email | User's email address |
-| encrypted_password | Bcrypt-hashed password |
-| email_confirmed_at | Timestamp (null if unverified) |
+| Field              | Description                              |
+| ------------------ | ---------------------------------------- |
+| id                 | UUID, primary key                        |
+| email              | User's email address                     |
+| encrypted_password | Bcrypt-hashed password                   |
+| email_confirmed_at | Timestamp (null if unverified)           |
 | raw_user_meta_data | JSONB — contains `full_name` from signup |
-| created_at | Timestamp |
-| updated_at | Timestamp |
+| created_at         | Timestamp                                |
+| updated_at         | Timestamp                                |
 
 **Relevant auth behaviors**:
+
 - `resetPasswordForEmail()` generates a recovery token stored internally by Supabase
 - `updateUser({ password })` updates `encrypted_password`
 - Recovery tokens are single-use and time-limited (default: 24 hours, configurable in Supabase dashboard)
@@ -32,16 +33,17 @@ Managed entirely by Supabase Auth. Not directly modified by application code.
 
 Application-managed profile data, auto-created by `handle_new_user()` trigger.
 
-| Field | Description |
-| ----- | ----------- |
-| id | UUID, FK → auth.users(id), primary key |
-| email | User's email (denormalized from auth.users) |
-| display_name | User's chosen display name |
-| avatar_url | Profile image URL (not used in this feature) |
-| created_at | Timestamp |
-| updated_at | Timestamp (auto-updated by trigger) |
+| Field        | Description                                  |
+| ------------ | -------------------------------------------- |
+| id           | UUID, FK → auth.users(id), primary key       |
+| email        | User's email (denormalized from auth.users)  |
+| display_name | User's chosen display name                   |
+| avatar_url   | Profile image URL (not used in this feature) |
+| created_at   | Timestamp                                    |
+| updated_at   | Timestamp (auto-updated by trigger)          |
 
 **RLS Policies** (existing, no changes):
+
 - `Users can view their own profile` — SELECT where `auth.uid() = id`
 - `Users can update their own profile` — UPDATE where `auth.uid() = id`
 
@@ -82,6 +84,7 @@ public.profiles (application-managed)
 ## Migration Impact
 
 **None.** No new tables, columns, RLS policies, or triggers required. The feature exclusively uses:
+
 - Existing Supabase Auth SDK methods
 - Existing `public.profiles` table (read-only for this feature)
 - Supabase's internal token management

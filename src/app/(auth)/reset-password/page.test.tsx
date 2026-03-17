@@ -44,9 +44,7 @@ describe('ResetPasswordPage', () => {
     fireEvent.change(screen.getByLabelText(/confirm password/i), {
       target: { value: 'differentpassword' },
     });
-    fireEvent.click(
-      screen.getByRole('button', { name: /reset password/i }),
-    );
+    fireEvent.click(screen.getByRole('button', { name: /reset password/i }));
 
     await waitFor(() => {
       expect(screen.getByRole('alert')).toHaveTextContent(
@@ -66,9 +64,7 @@ describe('ResetPasswordPage', () => {
     fireEvent.change(screen.getByLabelText(/confirm password/i), {
       target: { value: '12345' },
     });
-    fireEvent.click(
-      screen.getByRole('button', { name: /reset password/i }),
-    );
+    fireEvent.click(screen.getByRole('button', { name: /reset password/i }));
 
     await waitFor(() => {
       expect(screen.getByRole('alert')).toHaveTextContent(
@@ -90,9 +86,7 @@ describe('ResetPasswordPage', () => {
     fireEvent.change(screen.getByLabelText(/confirm password/i), {
       target: { value: 'newpassword123' },
     });
-    fireEvent.click(
-      screen.getByRole('button', { name: /reset password/i }),
-    );
+    fireEvent.click(screen.getByRole('button', { name: /reset password/i }));
 
     await waitFor(() => {
       expect(mockUpdateUser).toHaveBeenCalledWith({
@@ -117,9 +111,7 @@ describe('ResetPasswordPage', () => {
     fireEvent.change(screen.getByLabelText(/confirm password/i), {
       target: { value: 'newpassword123' },
     });
-    fireEvent.click(
-      screen.getByRole('button', { name: /reset password/i }),
-    );
+    fireEvent.click(screen.getByRole('button', { name: /reset password/i }));
 
     await waitFor(() => {
       expect(screen.getByRole('alert')).toHaveTextContent(
@@ -130,7 +122,9 @@ describe('ResetPasswordPage', () => {
 
   it('renders link to request new reset', () => {
     render(<ResetPasswordPage />);
-    const link = screen.getByRole('link', { name: /request a new reset link/i });
+    const link = screen.getByRole('link', {
+      name: /request a new reset link/i,
+    });
     expect(link).toBeInTheDocument();
     expect(link).toHaveAttribute('href', '/forgot-password');
   });

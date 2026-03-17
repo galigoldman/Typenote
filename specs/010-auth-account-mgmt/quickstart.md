@@ -19,6 +19,7 @@
 ## Key Files
 
 ### New
+
 - `src/app/(auth)/forgot-password/page.tsx` — forgot password form
 - `src/app/(auth)/forgot-password/page.test.tsx` — tests
 - `src/app/(auth)/reset-password/page.tsx` — reset password form
@@ -26,6 +27,7 @@
 - `src/lib/auth-errors.ts` — error message sanitization utility
 
 ### Modified
+
 - `src/app/(auth)/login/page.tsx` — add "Forgot password?" link + sanitize errors
 - `src/app/(auth)/signup/page.tsx` — sanitize errors
 - `src/app/auth/callback/route.ts` — handle `next` param for recovery redirect
@@ -63,4 +65,5 @@ pnpm test:integration
 For local development, Supabase captures emails at `http://localhost:54324` (Inbucket). Check there for verification and reset emails during testing.
 
 For production, configure email templates in Supabase Dashboard → Authentication → Email Templates:
+
 - **Reset Password**: Customize the email text and set the redirect URL to `https://yourdomain.com/auth/callback?next=/reset-password`

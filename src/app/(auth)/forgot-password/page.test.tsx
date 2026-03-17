@@ -44,9 +44,7 @@ describe('ForgotPasswordPage', () => {
     fireEvent.change(screen.getByLabelText(/email/i), {
       target: { value: 'test@example.com' },
     });
-    fireEvent.click(
-      screen.getByRole('button', { name: /send reset link/i }),
-    );
+    fireEvent.click(screen.getByRole('button', { name: /send reset link/i }));
 
     await waitFor(() => {
       expect(screen.getByText(/check your email/i)).toBeInTheDocument();
@@ -62,9 +60,7 @@ describe('ForgotPasswordPage', () => {
     fireEvent.change(screen.getByLabelText(/email/i), {
       target: { value: 'nonexistent@example.com' },
     });
-    fireEvent.click(
-      screen.getByRole('button', { name: /send reset link/i }),
-    );
+    fireEvent.click(screen.getByRole('button', { name: /send reset link/i }));
 
     await waitFor(() => {
       expect(screen.getByText(/check your email/i)).toBeInTheDocument();
@@ -81,14 +77,10 @@ describe('ForgotPasswordPage', () => {
     fireEvent.change(screen.getByLabelText(/email/i), {
       target: { value: 'test@example.com' },
     });
-    fireEvent.click(
-      screen.getByRole('button', { name: /send reset link/i }),
-    );
+    fireEvent.click(screen.getByRole('button', { name: /send reset link/i }));
 
     await waitFor(() => {
-      expect(
-        screen.getByRole('button', { name: /sending/i }),
-      ).toBeDisabled();
+      expect(screen.getByRole('button', { name: /sending/i })).toBeDisabled();
     });
   });
 
@@ -102,9 +94,7 @@ describe('ForgotPasswordPage', () => {
     fireEvent.change(screen.getByLabelText(/email/i), {
       target: { value: 'test@example.com' },
     });
-    fireEvent.click(
-      screen.getByRole('button', { name: /send reset link/i }),
-    );
+    fireEvent.click(screen.getByRole('button', { name: /send reset link/i }));
 
     await waitFor(() => {
       expect(screen.getByRole('alert')).toHaveTextContent(

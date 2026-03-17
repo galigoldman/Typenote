@@ -120,9 +120,7 @@ describe('LoginPage', () => {
   });
 
   it('shows success banner when ?message=password-reset-success', () => {
-    mockSearchParams = new URLSearchParams(
-      'message=password-reset-success',
-    );
+    mockSearchParams = new URLSearchParams('message=password-reset-success');
 
     render(<LoginPage />);
 

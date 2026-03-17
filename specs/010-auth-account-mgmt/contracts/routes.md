@@ -25,6 +25,7 @@
 ### GET /login
 
 **Changes**:
+
 - Add "Forgot password?" link below the password field, navigating to `/forgot-password`
 - Sanitize error messages — never expose raw Supabase errors
 - Accept `?message=password-reset-success` query param to show success banner after reset
@@ -32,25 +33,27 @@
 ### GET /signup
 
 **Changes**:
+
 - Sanitize error messages — never expose whether email is already registered
 - Improve client-side validation feedback (inline errors for empty fields)
 
 ### GET /auth/callback
 
 **Changes**:
+
 - Support `next` query parameter for post-callback redirect
 - Handle recovery flow: when `next=/reset-password`, redirect to reset page instead of dashboard
 
 ## Route Access Matrix
 
-| Route | Unauth | Auth | Auth (recovery) |
-| ----- | ------ | ---- | --------------- |
-| /login | Allowed | → /dashboard | → /dashboard |
-| /signup | Allowed | → /dashboard | → /dashboard |
-| /forgot-password | Allowed | → /dashboard | → /dashboard |
-| /reset-password | → /login | → /dashboard | Allowed |
-| /auth/callback | Allowed | Allowed | Allowed |
-| /dashboard/* | → /login | Allowed | Allowed |
+| Route            | Unauth   | Auth         | Auth (recovery) |
+| ---------------- | -------- | ------------ | --------------- |
+| /login           | Allowed  | → /dashboard | → /dashboard    |
+| /signup          | Allowed  | → /dashboard | → /dashboard    |
+| /forgot-password | Allowed  | → /dashboard | → /dashboard    |
+| /reset-password  | → /login | → /dashboard | Allowed         |
+| /auth/callback   | Allowed  | Allowed      | Allowed         |
+| /dashboard/\*    | → /login | Allowed      | Allowed         |
 
 ## Middleware Changes
 
