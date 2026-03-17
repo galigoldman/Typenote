@@ -38,6 +38,9 @@ Every step of development must follow this git workflow:
 
 ## Active Technologies
 
+- TypeScript 5 / Node.js 22+ + Next.js 16 (App Router), `@google/genai`, Supabase SSR, Supabase RPC (009-ai-rate-limit)
+- PostgreSQL via Supabase — new `ai_usage` table, modified `profiles` (subscription_tier), 2 RPC functions (increment_ai_usage, get_ai_quota) (009-ai-rate-limit)
+
 - TypeScript 5 / Node.js 22+ + Next.js 16 (App Router), pdfjs-dist (NEW), TipTap 3, perfect-freehand, Supabase SSR (008-inline-material-viewer)
 - PostgreSQL via Supabase (documents table), Supabase Storage (course-materials & moodle-materials buckets) (008-inline-material-viewer)
 
@@ -63,6 +66,7 @@ Every step of development must follow this git workflow:
 
 ## Recent Changes
 
+- 009-ai-rate-limit: Per-user daily AI query caps with subscription tiers, atomic Postgres RPC enforcement, quota display in chat panel
 - 007-ai-context-polish: Dynamic system prompt with course/week context, document content awareness, markdown+LaTeX rendering in AI chat, embedding cleanup on deletion
 - 006-course-context-engine: Text-based RAG with pgvector, AI chat panel, multimodal embedding infrastructure
 - 001-canvas-editor: Added TypeScript 5.x, React 19, Next.js 16 + TipTap 3 (text editing), `perfect-freehand` (stroke geometry), Pointer Events API (input), Canvas 2D API (rendering)
