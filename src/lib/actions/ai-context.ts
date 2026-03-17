@@ -2,16 +2,14 @@
 
 import crypto from 'crypto';
 
-import { generateText } from 'ai';
+import { GoogleGenAI } from '@google/genai';
 
-import { embedFileSegment, embedQuery, embedText } from '@/lib/ai/embeddings';
+import { chunkText, embedQuery, embedText } from '@/lib/ai/embeddings';
 import { extractDocxText } from '@/lib/ai/extraction/docx';
-import { SYSTEM_PROMPT } from '@/lib/ai/prompts';
-import { getFlashModel, getProModel } from '@/lib/ai/provider';
+import { extractPdfText } from '@/lib/ai/extraction/pdf';
+import { buildSystemPrompt } from '@/lib/ai/prompts';
 import {
-  deleteEmbeddingsBySource,
   getContentHash,
-  getWeekFileRefs,
   matchEmbeddings,
   upsertEmbeddings,
   type EmbeddingRow,
@@ -26,7 +24,12 @@ import { createClient } from '@/lib/supabase/server';
 
 export type IndexSource =
   | { type: 'moodle_file'; fileId: string; courseId: string; weekId?: string }
-  | { type: 'course_material'; materialId: string; courseId: string; weekId: string };
+  | {
+      type: 'course_material';
+      materialId: string;
+      courseId: string;
+      weekId: string;
+    };
 
 export type IndexResult = {
   success: boolean;
@@ -47,6 +50,7 @@ export type SearchResult = {
   sourceType: string;
   sourceId: string;
   sourceName: string;
+  segmentText: string | null;
   pageStart: number | null;
   pageEnd: number | null;
   courseId: string;
@@ -61,6 +65,9 @@ export type QuestionParams = {
   weekId?: string;
   documentId?: string;
   mode: 'quick' | 'deep';
+  courseName?: string;
+  weekLabel?: string;
+  documentContent?: string;
   conversationHistory?: Array<{ role: 'user' | 'assistant'; content: string }>;
 };
 
@@ -97,10 +104,8 @@ async function getAuthUserId(): Promise<string> {
   return user.id;
 }
 
-const PAGES_PER_SEGMENT = 6;
-
 // ---------------------------------------------------------------------------
-// indexContent — multimodal embedding for PDFs/PPTX, text for DOCX
+// indexContent — extract text, embed as text, store in segment_text
 // ---------------------------------------------------------------------------
 
 export async function indexContent(source: IndexSource): Promise<IndexResult> {
@@ -130,7 +135,12 @@ export async function indexContent(source: IndexSource): Promise<IndexResult> {
         .single();
 
       if (fileErr || !fileRow?.storage_path) {
-        return { success: false, segmentsIndexed: 0, skipped: false, error: 'Moodle file not found or no storage path' };
+        return {
+          success: false,
+          segmentsIndexed: 0,
+          skipped: false,
+          error: 'Moodle file not found or no storage path',
+        };
       }
 
       sourceName = fileRow.file_name;
@@ -142,7 +152,12 @@ export async function indexContent(source: IndexSource): Promise<IndexResult> {
         .download(fileRow.storage_path);
 
       if (dlErr || !fileData) {
-        return { success: false, segmentsIndexed: 0, skipped: false, error: 'Failed to download moodle file' };
+        return {
+          success: false,
+          segmentsIndexed: 0,
+          skipped: false,
+          error: 'Failed to download moodle file',
+        };
       }
 
       fileBuffer = Buffer.from(await fileData.arrayBuffer());
@@ -161,7 +176,12 @@ export async function indexContent(source: IndexSource): Promise<IndexResult> {
         .single();
 
       if (matErr || !matRow) {
-        return { success: false, segmentsIndexed: 0, skipped: false, error: 'Course material not found' };
+        return {
+          success: false,
+          segmentsIndexed: 0,
+          skipped: false,
+          error: 'Course material not found',
+        };
       }
 
       sourceName = matRow.file_name;
@@ -173,7 +193,12 @@ export async function indexContent(source: IndexSource): Promise<IndexResult> {
         .download(matRow.storage_path);
 
       if (dlErr || !fileData) {
-        return { success: false, segmentsIndexed: 0, skipped: false, error: 'Failed to download course material' };
+        return {
+          success: false,
+          segmentsIndexed: 0,
+          skipped: false,
+          error: 'Failed to download course material',
+        };
       }
 
       fileBuffer = Buffer.from(await fileData.arrayBuffer());
@@ -186,45 +211,47 @@ export async function indexContent(source: IndexSource): Promise<IndexResult> {
       return { success: true, segmentsIndexed: 0, skipped: true };
     }
 
+    // Extract text from file
+    let text = '';
+    if (
+      mimeType === 'application/pdf' ||
+      mimeType.includes('presentationml') ||
+      mimeType.includes('powerpoint')
+    ) {
+      text = await extractPdfText(fileBuffer);
+    } else if (
+      mimeType.includes('wordprocessingml') ||
+      mimeType === 'application/msword'
+    ) {
+      text = await extractDocxText(fileBuffer);
+    } else {
+      return {
+        success: false,
+        segmentsIndexed: 0,
+        skipped: false,
+        error: `Unsupported mime type: ${mimeType}`,
+      };
+    }
+
+    if (!text.trim()) {
+      return { success: true, segmentsIndexed: 0, skipped: true };
+    }
+
+    // Chunk text if too large, then embed each chunk
+    const chunks = chunkText(text);
     const rows: EmbeddingRow[] = [];
 
-    if (mimeType === 'application/pdf' || mimeType.includes('presentationml') || mimeType.includes('powerpoint')) {
-      // Multimodal embedding — embed raw file as one segment
-      // For large PDFs, the Embedding 2 API handles up to 6 pages per call.
-      // We send the full file and let the API process it.
-      // TODO: For 500+ page PDFs, implement page-level splitting with a PDF library
-      const embedding = await embedFileSegment(fileBuffer, mimeType);
+    for (const chunk of chunks) {
+      const embedding = await embedText(chunk.text);
+      if (!embedding.length) continue;
 
       rows.push({
         source_type: sourceType,
         source_id: sourceId,
-        segment_index: 0,
-        page_start: 1,
-        page_end: null, // unknown without parsing — API handles internally
-        segment_text: null,
-        embedding,
-        user_id: userId,
-        course_id: courseId,
-        week_id: weekId,
-        source_name: sourceName,
-        mime_type: mimeType,
-        content_hash: hash,
-      });
-    } else if (mimeType.includes('wordprocessingml') || mimeType === 'application/msword') {
-      // DOCX — extract text, embed as text
-      const text = await extractDocxText(fileBuffer);
-      if (!text.trim()) {
-        return { success: true, segmentsIndexed: 0, skipped: true };
-      }
-
-      const embedding = await embedText(text);
-      rows.push({
-        source_type: sourceType,
-        source_id: sourceId,
-        segment_index: 0,
+        segment_index: chunk.chunkIndex,
         page_start: null,
         page_end: null,
-        segment_text: text.slice(0, 10000), // store first 10K chars for reference
+        segment_text: chunk.text,
         embedding,
         user_id: userId,
         course_id: courseId,
@@ -233,8 +260,10 @@ export async function indexContent(source: IndexSource): Promise<IndexResult> {
         mime_type: mimeType,
         content_hash: hash,
       });
-    } else {
-      return { success: false, segmentsIndexed: 0, skipped: false, error: `Unsupported mime type: ${mimeType}` };
+    }
+
+    if (!rows.length) {
+      return { success: true, segmentsIndexed: 0, skipped: true };
     }
 
     await upsertEmbeddings(rows);
@@ -243,15 +272,22 @@ export async function indexContent(source: IndexSource): Promise<IndexResult> {
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Unknown error';
     console.error('indexContent error:', message);
-    return { success: false, segmentsIndexed: 0, skipped: false, error: message };
+    return {
+      success: false,
+      segmentsIndexed: 0,
+      skipped: false,
+      error: message,
+    };
   }
 }
 
 // ---------------------------------------------------------------------------
-// searchContext — semantic search returning file refs with page ranges
+// searchContext — semantic search returning matched text chunks
 // ---------------------------------------------------------------------------
 
-export async function searchContext(params: SearchParams): Promise<SearchResult[]> {
+export async function searchContext(
+  params: SearchParams,
+): Promise<SearchResult[]> {
   const userId = await getAuthUserId();
   const queryEmbedding = await embedQuery(params.query);
 
@@ -268,6 +304,7 @@ export async function searchContext(params: SearchParams): Promise<SearchResult[
     sourceType: m.source_type,
     sourceId: m.source_id,
     sourceName: m.source_name ?? 'Unknown',
+    segmentText: m.segment_text,
     pageStart: m.page_start,
     pageEnd: m.page_end,
     courseId: params.courseId,
@@ -278,7 +315,169 @@ export async function searchContext(params: SearchParams): Promise<SearchResult[
 }
 
 // ---------------------------------------------------------------------------
-// buildAiContext — text-based RAG context builder for streaming route
+// askQuestion — uses stored text from search results (no file downloads)
+// ---------------------------------------------------------------------------
+
+export async function askQuestion(
+  params: QuestionParams,
+): Promise<QuestionResult> {
+  await getAuthUserId(); // validate auth
+  const {
+    question,
+    courseId,
+    mode,
+    courseName,
+    weekLabel,
+    documentContent,
+    conversationHistory,
+  } = params;
+
+  // Build dynamic system prompt with course/week context
+  const hasDocumentContent = !!documentContent?.trim();
+  const systemPrompt = buildSystemPrompt({
+    courseName,
+    weekLabel,
+    hasDocumentContent,
+  });
+
+  // RAG search — find relevant text chunks
+  const results = await searchContext({
+    query: question,
+    courseId,
+    maxResults: 8,
+  });
+
+  // Collect text context and sources from search results
+  const contextTexts: string[] = [];
+  const sourcesUsed: QuestionResult['sources'] = [];
+  const seen = new Set<string>();
+
+  for (const r of results) {
+    if (r.segmentText && !seen.has(r.sourceId)) {
+      seen.add(r.sourceId);
+      contextTexts.push(`--- ${r.sourceName} ---\n${r.segmentText}`);
+      sourcesUsed.push({
+        sourceType: r.sourceType,
+        sourceName: r.sourceName,
+        weekId: r.weekId,
+        pageRange: null,
+      });
+    }
+  }
+
+  // Build multi-turn contents for Gemini
+  const genai = new GoogleGenAI({
+    apiKey: process.env.GOOGLE_GENERATIVE_AI_API_KEY ?? '',
+  });
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const contents: Array<{ role: string; parts: any[] }> = [];
+
+  // Inject student's document content as first turn (if provided)
+  const MAX_DOC_CHARS = 50_000;
+  if (hasDocumentContent) {
+    const truncated =
+      documentContent!.length > MAX_DOC_CHARS
+        ? documentContent!.slice(0, MAX_DOC_CHARS) + '\n\n[...truncated]'
+        : documentContent!;
+    contents.push({
+      role: 'user',
+      parts: [
+        {
+          text: `Here is the student's current document:\n\n${truncated}\n\nReview it to understand their work.`,
+        },
+      ],
+    });
+    contents.push({
+      role: 'model',
+      parts: [
+        {
+          text: "I have reviewed the student's document. I can see their notes and work.",
+        },
+      ],
+    });
+  }
+
+  if (contextTexts.length > 0) {
+    // Provide course materials as text
+    const materialsText = contextTexts.join('\n\n');
+    contents.push({
+      role: 'user',
+      parts: [
+        {
+          text: `Here are the relevant course materials:\n\n${materialsText}\n\nReview them to answer my questions.`,
+        },
+      ],
+    });
+
+    // Model acknowledges
+    contents.push({
+      role: 'model',
+      parts: [
+        {
+          text: 'I have reviewed the course materials. Please ask your question.',
+        },
+      ],
+    });
+  }
+
+  // Add conversation history with role-alternation guard
+  if (conversationHistory?.length) {
+    for (const msg of conversationHistory) {
+      const role = msg.role === 'user' ? 'user' : 'model';
+      const lastTurn = contents[contents.length - 1];
+      if (lastTurn && lastTurn.role === role) {
+        lastTurn.parts.push({ text: msg.content });
+      } else {
+        contents.push({ role, parts: [{ text: msg.content }] });
+      }
+    }
+  }
+
+  // Final turn: the actual question
+  if (contextTexts.length === 0) {
+    contents.push({
+      role: 'user',
+      parts: [
+        {
+          text: `${question}\n\n(No course materials were loaded. Say you cannot answer without materials.)`,
+        },
+      ],
+    });
+  } else {
+    const lastTurn = contents[contents.length - 1];
+    if (lastTurn && lastTurn.role === 'user') {
+      lastTurn.parts.push({ text: question });
+    } else {
+      contents.push({
+        role: 'user',
+        parts: [{ text: question }],
+      });
+    }
+  }
+
+  const modelName = mode === 'deep' ? 'gemini-2.5-pro' : 'gemini-2.5-flash';
+
+  const result = await genai.models.generateContent({
+    model: modelName,
+    contents,
+    config: {
+      systemInstruction: systemPrompt,
+    },
+  });
+
+  const answer = result.text ?? 'No response generated.';
+
+  return {
+    answer,
+    sources: sourcesUsed,
+    model: mode === 'deep' ? 'pro' : 'flash',
+    cached: false,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// buildAiContext — shared context builder for both streaming and non-streaming
 // ---------------------------------------------------------------------------
 
 export async function buildAiContext(params: QuestionParams): Promise<{
@@ -306,7 +505,11 @@ export async function buildAiContext(params: QuestionParams): Promise<{
     hasDocumentContent,
   });
 
-  const results = await searchContext({ query: question, courseId, maxResults: 8 });
+  const results = await searchContext({
+    query: question,
+    courseId,
+    maxResults: 8,
+  });
 
   const contextTexts: string[] = [];
   const sources: QuestionResult['sources'] = [];
@@ -336,11 +539,19 @@ export async function buildAiContext(params: QuestionParams): Promise<{
         : documentContent!;
     contents.push({
       role: 'user',
-      parts: [{ text: `Here is the student's current document:\n\n${truncated}\n\nReview it to understand their work.` }],
+      parts: [
+        {
+          text: `Here is the student's current document:\n\n${truncated}\n\nReview it to understand their work.`,
+        },
+      ],
     });
     contents.push({
       role: 'model',
-      parts: [{ text: "I have reviewed the student's document. I can see their notes and work." }],
+      parts: [
+        {
+          text: "I have reviewed the student's document. I can see their notes and work.",
+        },
+      ],
     });
   }
 
@@ -348,11 +559,19 @@ export async function buildAiContext(params: QuestionParams): Promise<{
     const materialsText = contextTexts.join('\n\n');
     contents.push({
       role: 'user',
-      parts: [{ text: `Here are the relevant course materials:\n\n${materialsText}\n\nReview them to answer my questions.` }],
+      parts: [
+        {
+          text: `Here are the relevant course materials:\n\n${materialsText}\n\nReview them to answer my questions.`,
+        },
+      ],
     });
     contents.push({
       role: 'model',
-      parts: [{ text: 'I have reviewed the course materials. Please ask your question.' }],
+      parts: [
+        {
+          text: 'I have reviewed the course materials. Please ask your question.',
+        },
+      ],
     });
   }
 
@@ -371,7 +590,11 @@ export async function buildAiContext(params: QuestionParams): Promise<{
   if (contextTexts.length === 0 && !hasDocumentContent) {
     contents.push({
       role: 'user',
-      parts: [{ text: `${question}\n\n(No course materials were loaded. Answer using your own knowledge but note that no materials were found.)` }],
+      parts: [
+        {
+          text: `${question}\n\n(No course materials were loaded. Answer using your own knowledge but note that no materials were found.)`,
+        },
+      ],
     });
   } else {
     const lastTurn = contents[contents.length - 1];
@@ -388,183 +611,21 @@ export async function buildAiContext(params: QuestionParams): Promise<{
 }
 
 // ---------------------------------------------------------------------------
-// askQuestion — downloads raw PDFs, sends to Gemini as file parts
+// reindexCourse — clear content hashes to force re-embedding on next sync
 // ---------------------------------------------------------------------------
 
-export async function askQuestion(params: QuestionParams): Promise<QuestionResult> {
-  const userId = await getAuthUserId();
-  const { question, courseId, weekId, mode, conversationHistory } = params;
+export async function reindexCourse(
+  courseId: string,
+): Promise<{ cleared: number }> {
+  await getAuthUserId();
+  const admin = createAdminClient();
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const fileParts: Array<{ type: 'file'; data: Buffer; mimeType: string }> = [];
-  const sourcesUsed: QuestionResult['sources'] = [];
+  const { data, error } = await admin
+    .from('content_embeddings')
+    .update({ content_hash: null })
+    .eq('course_id', courseId)
+    .select('id');
 
-  if (weekId) {
-    // ----- Full-context mode: download raw files for the week -----
-    const fileRefs = await getWeekFileRefs(courseId, weekId);
-
-    for (const ref of fileRefs) {
-      try {
-        const bucket = ref.source_type === 'moodle_file' ? 'moodle-materials' : 'course-materials';
-        const supabase = ref.source_type === 'moodle_file' ? createAdminClient() : await createClient();
-        const { data: fileData } = await supabase.storage.from(bucket).download(ref.storage_path);
-
-        if (fileData) {
-          const buffer = Buffer.from(await fileData.arrayBuffer());
-          fileParts.push({
-            type: 'file',
-            data: buffer,
-            mimeType: ref.mime_type ?? 'application/pdf',
-          });
-          sourcesUsed.push({
-            sourceType: ref.source_type,
-            sourceName: ref.source_name,
-            weekId,
-            pageRange: null,
-          });
-        }
-      } catch (err) {
-        console.error(`Failed to download ${ref.source_name}:`, err);
-      }
-    }
-
-    // Cross-week RAG supplement
-    const crossWeekResults = await searchContext({
-      query: question,
-      courseId,
-      maxResults: 4,
-    });
-
-    for (const r of crossWeekResults.filter((r) => r.weekId !== weekId)) {
-      sourcesUsed.push({
-        sourceType: r.sourceType,
-        sourceName: r.sourceName,
-        weekId: r.weekId,
-        pageRange: r.pageStart && r.pageEnd ? `pages ${r.pageStart}-${r.pageEnd}` : null,
-      });
-    }
-  } else {
-    // ----- RAG-only mode: search, then download matched files -----
-    const results = await searchContext({
-      query: question,
-      courseId,
-      maxResults: 8,
-    });
-
-    // Deduplicate by sourceId so we don't download the same file twice
-    const seen = new Set<string>();
-    for (const r of results) {
-      sourcesUsed.push({
-        sourceType: r.sourceType,
-        sourceName: r.sourceName,
-        weekId: r.weekId,
-        pageRange: r.pageStart && r.pageEnd ? `pages ${r.pageStart}-${r.pageEnd}` : null,
-      });
-
-      if (seen.has(r.sourceId)) continue;
-      seen.add(r.sourceId);
-
-      // Download the matched source file so Gemini can actually read it
-      try {
-        const bucket = r.sourceType === 'moodle_file' ? 'moodle-materials' : 'course-materials';
-        const supabase = r.sourceType === 'moodle_file' ? createAdminClient() : await createClient();
-
-        // Look up storage_path from the appropriate table
-        const table = r.sourceType === 'moodle_file' ? 'moodle_files' : 'course_materials';
-        const { data: fileRow } = await supabase
-          .from(table)
-          .select('storage_path')
-          .eq('id', r.sourceId)
-          .single();
-
-        if (fileRow?.storage_path) {
-          const dlClient = r.sourceType === 'moodle_file' ? createAdminClient() : supabase;
-          const { data: fileData } = await dlClient.storage.from(bucket).download(fileRow.storage_path);
-          if (fileData) {
-            const buffer = Buffer.from(await fileData.arrayBuffer());
-            fileParts.push({
-              type: 'file',
-              data: buffer,
-              mimeType: r.mimeType ?? 'application/pdf',
-            });
-          }
-        }
-      } catch (err) {
-        console.error(`Failed to download RAG result ${r.sourceName}:`, err);
-      }
-    }
-  }
-
-  // Build messages
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const contentParts: any[] = [];
-
-  // Add file parts (raw PDFs for Gemini to read)
-  for (const fp of fileParts) {
-    contentParts.push({
-      type: 'file',
-      data: fp.data,
-      mimeType: fp.mimeType,
-    });
-  }
-
-  // Add source reference text for RAG results (no file download for cross-week)
-  if (sourcesUsed.length > 0 && fileParts.length === 0) {
-    const sourceList = sourcesUsed
-      .map((s) => `- ${s.sourceName}${s.pageRange ? ` (${s.pageRange})` : ''}${s.weekId ? ` [Week: ${s.weekId}]` : ''}`)
-      .join('\n');
-    contentParts.push({
-      type: 'text',
-      text: `Relevant course materials found:\n${sourceList}\n\nPlease answer based on the provided documents.`,
-    });
-  }
-
-  // Build conversation
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const messages: any[] = [
-    { role: 'system', content: SYSTEM_PROMPT },
-  ];
-
-  // Add context message with file parts
-  if (contentParts.length > 0) {
-    contentParts.push({
-      type: 'text',
-      text: 'I have attached the course materials above. Please review them to answer my question.',
-    });
-
-    messages.push({ role: 'user', content: contentParts });
-    messages.push({
-      role: 'assistant',
-      content: 'I have reviewed the course materials. Please ask your question.',
-    });
-  }
-
-  // Add conversation history
-  if (conversationHistory?.length) {
-    for (const msg of conversationHistory) {
-      messages.push({ role: msg.role, content: msg.content });
-    }
-  }
-
-  // Add the current question
-  messages.push({ role: 'user', content: question });
-
-  // Select model
-  const modelFn = mode === 'deep' ? getProModel : getFlashModel;
-
-  // Context caching disabled for MVP — files sent directly via messages each request.
-  // TODO: Enable shared context caching when usage scales (10+ students per course).
-  const cached = false;
-
-  const { text: answer } = await generateText({
-    model: modelFn(),
-    messages,
-  });
-
-  return {
-    answer,
-    sources: sourcesUsed,
-    model: mode === 'deep' ? 'pro' : 'flash',
-    cached,
-  };
+  if (error) throw new Error(`Failed to clear hashes: ${error.message}`);
+  return { cleared: data?.length ?? 0 };
 }

@@ -74,38 +74,6 @@ export async function embedText(text: string): Promise<number[]> {
 }
 
 /**
- * Embed a file segment (binary data like PDFs) for storage.
- */
-export async function embedFileSegment(
-  buffer: Buffer,
-  mimeType: string,
-): Promise<number[]> {
-  const genai = getGenAI();
-  const base64Data = buffer.toString('base64');
-
-  const response = await genai.models.embedContent({
-    model: EMBEDDING_MODEL,
-    contents: [
-      {
-        parts: [
-          {
-            inlineData: {
-              mimeType,
-              data: base64Data,
-            },
-          },
-        ],
-      },
-    ],
-    config: {
-      outputDimensionality: EMBEDDING_DIMENSIONS,
-    },
-  });
-
-  return response.embeddings?.[0]?.values ?? [];
-}
-
-/**
  * Embed a search query (query side of asymmetric retrieval).
  */
 export async function embedQuery(text: string): Promise<number[]> {
