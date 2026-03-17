@@ -39,11 +39,11 @@ CREATE TABLE ai_usage (
 -- Unique constraint: one row per user per month (also serves as the lookup index)
 CREATE UNIQUE INDEX ai_usage_user_month_idx ON ai_usage (user_id, usage_month);
 
--- Auto-update timestamp trigger (reuses existing function from 00001_initial_schema)
-CREATE TRIGGER set_ai_usage_updated_at
+-- Auto-update timestamp trigger (reuses handle_updated_at from 00001_initial_schema)
+CREATE TRIGGER ai_usage_updated_at
   BEFORE UPDATE ON ai_usage
   FOR EACH ROW
-  EXECUTE FUNCTION update_updated_at_column();
+  EXECUTE FUNCTION public.handle_updated_at();
 
 -- Row Level Security
 ALTER TABLE ai_usage ENABLE ROW LEVEL SECURITY;
