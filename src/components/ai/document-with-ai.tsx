@@ -1,9 +1,10 @@
 'use client';
 
-import { useCallback, useRef } from 'react';
+import { useCallback, useRef, useState } from 'react';
 
 import { CanvasEditor } from '@/components/canvas/canvas-editor';
 import type { Document } from '@/types/database';
+import type { PendingAiContext } from './ai-chat-panel';
 
 import { AiChatWrapper } from './ai-chat-wrapper';
 
@@ -24,8 +25,9 @@ export function DocumentWithAi({
   document,
   materialId,
 }: DocumentWithAiProps) {
-  // Ref holds a getter function populated by CanvasEditor
   const getDocumentTextRef = useRef<(() => string) | null>(null);
+  const [pendingContext, setPendingContext] = useState<PendingAiContext>(null);
+  const [isAiOpen, setIsAiOpen] = useState(false);
 
   const handleDocumentTextReady = useCallback((getter: () => string) => {
     getDocumentTextRef.current = getter;
@@ -33,6 +35,22 @@ export function DocumentWithAi({
 
   const getDocumentContent = useCallback(() => {
     return getDocumentTextRef.current?.() ?? '';
+  }, []);
+
+  const handleAskAiWithContext = useCallback(
+    (
+      context:
+        | { type: 'text'; content: string }
+        | { type: 'image'; dataUrl: string },
+    ) => {
+      setPendingContext(context);
+      setIsAiOpen(true);
+    },
+    [],
+  );
+
+  const handleContextCleared = useCallback(() => {
+    setPendingContext(null);
   }, []);
 
   return (
@@ -44,12 +62,18 @@ export function DocumentWithAi({
           weekId={weekId}
           weekLabel={weekLabel}
           getDocumentContent={getDocumentContent}
+          pendingContext={pendingContext}
+          onContextCleared={handleContextCleared}
+          isOpen={isAiOpen}
+          onToggle={() => setIsAiOpen((prev) => !prev)}
+          onClose={() => setIsAiOpen(false)}
         />
       </div>
       <CanvasEditor
         document={document}
         onDocumentTextReady={handleDocumentTextReady}
         materialId={materialId}
+        onAskAiWithContext={handleAskAiWithContext}
       />
     </>
   );
