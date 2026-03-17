@@ -6,15 +6,15 @@
 
 Tracks per-user daily AI question counts.
 
-| Column       | Type        | Nullable | Default | FK             | Description                                     |
-| ------------ | ----------- | -------- | ------- | -------------- | ----------------------------------------------- |
-| `id`         | `bigint`    | NO       | auto    | —              | Auto-incrementing primary key                   |
-| `user_id`    | `uuid`      | NO       | —       | `auth.users`   | The user who made the query                     |
-| `usage_date` | `date`      | NO       | `now()` | —              | Calendar date (UTC) of usage                    |
-| `query_count`| `integer`   | NO       | `0`     | —              | Cumulative questions asked on this date         |
-| `last_model` | `text`      | YES      | `null`  | —              | Last model used (e.g., 'flash', 'pro')          |
-| `created_at` | `timestamptz` | NO    | `now()` | —              | Row creation timestamp                          |
-| `updated_at` | `timestamptz` | NO    | `now()` | —              | Last update timestamp                           |
+| Column        | Type          | Nullable | Default | FK           | Description                             |
+| ------------- | ------------- | -------- | ------- | ------------ | --------------------------------------- |
+| `id`          | `bigint`      | NO       | auto    | —            | Auto-incrementing primary key           |
+| `user_id`     | `uuid`        | NO       | —       | `auth.users` | The user who made the query             |
+| `usage_date`  | `date`        | NO       | `now()` | —            | Calendar date (UTC) of usage            |
+| `query_count` | `integer`     | NO       | `0`     | —            | Cumulative questions asked on this date |
+| `last_model`  | `text`        | YES      | `null`  | —            | Last model used (e.g., 'flash', 'pro')  |
+| `created_at`  | `timestamptz` | NO       | `now()` | —            | Row creation timestamp                  |
+| `updated_at`  | `timestamptz` | NO       | `now()` | —            | Last update timestamp                   |
 
 **Constraints:**
 
@@ -35,9 +35,9 @@ Tracks per-user daily AI question counts.
 
 **New column:**
 
-| Column              | Type   | Nullable | Default   | Description                                         |
-| ------------------- | ------ | -------- | --------- | --------------------------------------------------- |
-| `subscription_tier` | `text` | NO       | `'free'`  | User's subscription level ('free', 'pro', etc.)     |
+| Column              | Type   | Nullable | Default  | Description                                     |
+| ------------------- | ------ | -------- | -------- | ----------------------------------------------- |
+| `subscription_tier` | `text` | NO       | `'free'` | User's subscription level ('free', 'pro', etc.) |
 
 **Why on `profiles`?** The profiles table already stores per-user metadata (email, display_name, avatar_url). Adding a tier column here avoids a new join and keeps user lookups to one table.
 
@@ -99,8 +99,8 @@ Tier limits are stored as a mapping inside the `increment_ai_usage` RPC function
 
 | Tier   | Daily Limit | Environment Variable Override |
 | ------ | ----------- | ----------------------------- |
-| `free` | 30          | `AI_LIMIT_FREE`              |
-| `pro`  | 100         | `AI_LIMIT_PRO`               |
+| `free` | 30          | `AI_LIMIT_FREE`               |
+| `pro`  | 100         | `AI_LIMIT_PRO`                |
 
 **Fallback:** If a user's `subscription_tier` doesn't match any known tier, they get the `free` tier limit.
 
