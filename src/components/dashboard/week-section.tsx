@@ -98,7 +98,7 @@ export function WeekSection({
       <div className="flex items-center justify-between p-4">
         <button
           onClick={() => setExpanded(!expanded)}
-          className="flex items-center gap-2 text-left"
+          className="flex items-center gap-2 text-left min-h-[44px]"
         >
           <ChevronDown
             className={cn(

@@ -36,7 +36,7 @@ export default async function DashboardLayout({
           <Button
             type="submit"
             variant="ghost"
-            className="w-full justify-start"
+            className="w-full justify-start min-h-[44px]"
           >
             <LogOut className="size-4" />
             Sign out

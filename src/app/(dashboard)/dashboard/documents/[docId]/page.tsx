@@ -66,7 +66,7 @@ export default async function DocumentPage({ params }: DocumentPageProps) {
       <div className="flex items-center justify-between px-4 pt-2">
         <Link
           href={`/dashboard/courses/${course.id}`}
-          className="mb-2 inline-flex items-center gap-1 rounded bg-muted px-2 py-1 text-sm text-muted-foreground hover:text-foreground"
+          className="mb-2 inline-flex items-center gap-1 rounded bg-muted px-2 py-1 text-sm text-muted-foreground hover:text-foreground min-h-[44px]"
         >
           <GraduationCap className="size-3.5" />
           {course.name}

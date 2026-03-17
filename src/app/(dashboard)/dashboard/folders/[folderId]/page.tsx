@@ -67,7 +67,7 @@ export default async function FolderPage({
 
   return (
     <div className="h-full overflow-y-auto p-6">
-      <div className="mb-6 flex items-center justify-between">
+      <div className="mb-6 flex flex-wrap items-center justify-between gap-2">
         <Breadcrumb>
           <BreadcrumbList>
             <BreadcrumbItem>
@@ -81,7 +81,7 @@ export default async function FolderPage({
             </BreadcrumbItem>
           </BreadcrumbList>
         </Breadcrumb>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <CreateDocumentDialog folderId={folderId}>
             <Button variant="outline" size="sm">
               New Document

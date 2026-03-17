@@ -257,7 +257,7 @@ export function AiChatPanel({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed right-0 top-0 z-50 flex h-full w-[420px] flex-col border-l bg-background shadow-xl">
+    <div className="fixed inset-0 z-50 flex h-full w-full flex-col border-l bg-background shadow-xl md:inset-auto md:right-0 md:top-0 md:w-[420px]">
       {/* Header */}
       <div className="flex items-center justify-between border-b px-4 py-3">
         <div className="flex items-center gap-2">
@@ -299,7 +299,7 @@ export function AiChatPanel({
             variant="ghost"
             size="icon"
             onClick={onClose}
-            className="h-8 w-8"
+            className="h-8 w-8 min-h-[44px] min-w-[44px]"
           >
             <X className="h-4 w-4" />
           </Button>
@@ -390,7 +390,7 @@ export function AiChatPanel({
       </div>
 
       {/* Quota indicator + Input */}
-      <div className="border-t px-4 py-3">
+      <div className="border-t px-4 py-3 pb-4">
         {quota && (
           <div className="mb-2">
             {quota.remaining === 0 ? (

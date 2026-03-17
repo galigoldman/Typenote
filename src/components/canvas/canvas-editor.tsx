@@ -1150,7 +1150,7 @@ export function CanvasEditor({
       <div className="flex items-center justify-between border-b px-4 py-2">
         <button
           onClick={toggleSidebar}
-          className="flex items-center justify-center h-8 w-8 rounded-lg hover:bg-accent transition-colors text-muted-foreground mr-2 shrink-0"
+          className="flex items-center justify-center h-8 w-8 min-h-[44px] min-w-[44px] rounded-lg hover:bg-accent transition-colors text-muted-foreground mr-2 shrink-0"
           title={sidebarOpen ? 'Hide sidebar' : 'Show sidebar'}
         >
           {sidebarOpen ? (
@@ -1204,7 +1204,7 @@ export function CanvasEditor({
               handleUndo();
             }}
             disabled={isDrawMode ? !canUndoDraw : false}
-            className="flex items-center justify-center h-8 w-8 rounded-lg transition-colors hover:bg-accent disabled:opacity-30 disabled:pointer-events-none text-muted-foreground"
+            className="flex items-center justify-center h-8 w-8 min-h-[44px] min-w-[44px] rounded-lg transition-colors hover:bg-accent disabled:opacity-30 disabled:pointer-events-none text-muted-foreground"
             title="Undo"
           >
             <Undo2 className="h-4 w-4" />
@@ -1215,7 +1215,7 @@ export function CanvasEditor({
               handleRedo();
             }}
             disabled={isDrawMode ? !canRedoDraw : false}
-            className="flex items-center justify-center h-8 w-8 rounded-lg transition-colors hover:bg-accent disabled:opacity-30 disabled:pointer-events-none text-muted-foreground"
+            className="flex items-center justify-center h-8 w-8 min-h-[44px] min-w-[44px] rounded-lg transition-colors hover:bg-accent disabled:opacity-30 disabled:pointer-events-none text-muted-foreground"
             title="Redo"
           >
             <Redo2 className="h-4 w-4" />
@@ -1231,7 +1231,7 @@ export function CanvasEditor({
               e.stopPropagation();
               if (!isDrawMode) setActiveTool('pen');
             }}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
+            className={`flex items-center gap-1.5 px-3 py-1.5 min-h-[44px] min-w-[44px] rounded-md text-sm font-medium transition-colors ${
               isDrawMode
                 ? 'bg-primary text-primary-foreground'
                 : 'hover:bg-accent text-muted-foreground'
@@ -1245,7 +1245,7 @@ export function CanvasEditor({
               e.stopPropagation();
               setActiveTool('select');
             }}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
+            className={`flex items-center gap-1.5 px-3 py-1.5 min-h-[44px] min-w-[44px] rounded-md text-sm font-medium transition-colors ${
               activeTool === 'select'
                 ? 'bg-primary text-primary-foreground'
                 : 'hover:bg-accent text-muted-foreground'
@@ -1259,7 +1259,7 @@ export function CanvasEditor({
               e.stopPropagation();
               setActiveTool('text');
             }}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
+            className={`flex items-center gap-1.5 px-3 py-1.5 min-h-[44px] min-w-[44px] rounded-md text-sm font-medium transition-colors ${
               activeTool === 'text'
                 ? 'bg-primary text-primary-foreground'
                 : 'hover:bg-accent text-muted-foreground'
@@ -1280,7 +1280,7 @@ export function CanvasEditor({
                   e.stopPropagation();
                   setActiveTool('pen');
                 }}
-                className={`flex items-center justify-center h-8 w-8 rounded-lg transition-colors ${
+                className={`flex items-center justify-center h-8 w-8 min-h-[44px] min-w-[44px] rounded-lg transition-colors ${
                   activeTool === 'pen'
                     ? 'bg-accent text-accent-foreground'
                     : 'hover:bg-accent/50 text-muted-foreground'
@@ -1294,7 +1294,7 @@ export function CanvasEditor({
                   e.stopPropagation();
                   setActiveTool('highlighter');
                 }}
-                className={`flex items-center justify-center h-8 w-8 rounded-lg transition-colors ${
+                className={`flex items-center justify-center h-8 w-8 min-h-[44px] min-w-[44px] rounded-lg transition-colors ${
                   activeTool === 'highlighter'
                     ? 'bg-accent text-accent-foreground'
                     : 'hover:bg-accent/50 text-muted-foreground'
@@ -1308,7 +1308,7 @@ export function CanvasEditor({
                   e.stopPropagation();
                   setActiveTool('eraser');
                 }}
-                className={`flex items-center justify-center h-8 w-8 rounded-lg transition-colors ${
+                className={`flex items-center justify-center h-8 w-8 min-h-[44px] min-w-[44px] rounded-lg transition-colors ${
                   activeTool === 'eraser'
                     ? 'bg-accent text-accent-foreground'
                     : 'hover:bg-accent/50 text-muted-foreground'
@@ -1322,7 +1322,7 @@ export function CanvasEditor({
                   e.stopPropagation();
                   handleAddTextBox();
                 }}
-                className="flex items-center justify-center h-8 w-8 rounded-lg transition-colors hover:bg-accent/50 text-muted-foreground"
+                className="flex items-center justify-center h-8 w-8 min-h-[44px] min-w-[44px] rounded-lg transition-colors hover:bg-accent/50 text-muted-foreground"
                 title="Add text box"
               >
                 <Type className="h-4 w-4" />
@@ -1447,7 +1447,7 @@ export function CanvasEditor({
                             addPagePopoverIndex === index ? null : index,
                           )
                         }
-                        className="p-1 rounded hover:bg-accent transition-colors text-muted-foreground"
+                        className="p-1 min-h-[44px] min-w-[44px] flex items-center justify-center rounded hover:bg-accent transition-colors text-muted-foreground"
                         title="Add page"
                       >
                         <Plus className="h-3.5 w-3.5" />
@@ -1474,7 +1474,7 @@ export function CanvasEditor({
                     {pages.length > 1 && (
                       <button
                         onClick={() => handleDeletePage(page.id)}
-                        className="opacity-0 group-hover:opacity-100 p-1 rounded hover:bg-destructive/10 hover:text-destructive transition-all"
+                        className="opacity-0 group-hover:opacity-100 p-1 min-h-[44px] min-w-[44px] flex items-center justify-center rounded hover:bg-destructive/10 hover:text-destructive transition-all"
                         title="Delete page"
                       >
                         <Trash2 className="h-3 w-3" />
@@ -1507,7 +1507,7 @@ export function CanvasEditor({
                       e.stopPropagation();
                       setPenSize(s.value);
                     }}
-                    className={`flex items-center justify-center h-8 w-8 rounded-lg transition-colors ${
+                    className={`flex items-center justify-center h-8 w-8 min-h-[44px] min-w-[44px] rounded-lg transition-colors ${
                       penSize === s.value
                         ? 'bg-accent ring-1 ring-primary/50'
                         : 'hover:bg-accent/50'
@@ -1535,7 +1535,7 @@ export function CanvasEditor({
                       e.stopPropagation();
                       setPenColor(c);
                     }}
-                    className={`flex items-center justify-center rounded-full transition-transform hover:scale-110 ${
+                    className={`flex items-center justify-center rounded-full transition-transform hover:scale-110 min-h-[44px] min-w-[44px] ${
                       penColor === c
                         ? 'ring-2 ring-primary ring-offset-1 scale-110'
                         : ''
@@ -1568,7 +1568,7 @@ export function CanvasEditor({
                       e.stopPropagation();
                       setHighlighterColor(c);
                     }}
-                    className={`flex items-center justify-center rounded-full transition-transform hover:scale-110 ${
+                    className={`flex items-center justify-center rounded-full transition-transform hover:scale-110 min-h-[44px] min-w-[44px] ${
                       highlighterColor === c
                         ? 'ring-2 ring-primary ring-offset-1 scale-110'
                         : ''
@@ -1595,7 +1595,7 @@ export function CanvasEditor({
                       e.stopPropagation();
                       setEraserSize(s.value);
                     }}
-                    className={`flex items-center justify-center h-8 w-8 rounded-lg transition-colors ${
+                    className={`flex items-center justify-center h-8 w-8 min-h-[44px] min-w-[44px] rounded-lg transition-colors ${
                       eraserSize === s.value
                         ? 'bg-accent ring-1 ring-primary/50'
                         : 'hover:bg-accent/50'
