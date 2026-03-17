@@ -7,6 +7,7 @@ import { PAGE_HEIGHT } from '@/types/canvas';
 /** Subset of pdf.js TextItem — we only use the fields needed for positioning */
 interface PdfTextItem {
   str: string;
+  dir: 'ltr' | 'rtl' | 'ttb';
   transform: number[];
   width?: number;
   height?: number;
@@ -113,9 +114,12 @@ export function PdfTextLayer({
         const top =
           offsetY + scaledContentHeight - tx[5] * scale - scaledFontSize;
 
+        const isRtl = item.dir === 'rtl';
+
         return (
           <span
             key={i}
+            dir={isRtl ? 'rtl' : 'ltr'}
             style={{
               position: 'absolute',
               left,
@@ -127,6 +131,8 @@ export function PdfTextLayer({
               lineHeight: 1,
               transformOrigin: 'left top',
               width: item.width ? item.width * scale : undefined,
+              direction: isRtl ? 'rtl' : 'ltr',
+              unicodeBidi: 'bidi-override',
             }}
           >
             {item.str}
