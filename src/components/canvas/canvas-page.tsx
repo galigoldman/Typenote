@@ -533,16 +533,6 @@ export function CanvasPage({
         style={{ pointerEvents: 'none' }}
       />
 
-      {/* Layer 1.5: PDF text layer (Read tool) */}
-      {page.pdfPage != null && materialId && (
-        <PdfTextLayer
-          pdfPage={page.pdfPage}
-          materialId={materialId}
-          isActive={activeTool === 'read'}
-          onTextSelected={handleTextSelected}
-        />
-      )}
-
       {/* Layer 2: Committed canvas */}
       <canvas
         ref={committedCanvasRef}
@@ -561,7 +551,10 @@ export function CanvasPage({
       <div
         ref={textLayerRef}
         className="absolute inset-0 overflow-hidden"
-        style={{ pointerEvents: isInteractionMode ? 'none' : 'auto' }}
+        style={{
+          pointerEvents:
+            isInteractionMode || activeTool === 'read' ? 'none' : 'auto',
+        }}
       >
         {/* Flow editor — hidden when page has text boxes (text was migrated) */}
         {editor && page.textBoxes.length === 0 && (
@@ -582,6 +575,16 @@ export function CanvasPage({
           />
         ))}
       </div>
+
+      {/* Layer 4.5: PDF text layer (Read tool) — above text content so it's selectable */}
+      {page.pdfPage != null && materialId && (
+        <PdfTextLayer
+          pdfPage={page.pdfPage}
+          materialId={materialId}
+          isActive={activeTool === 'read'}
+          onTextSelected={handleTextSelected}
+        />
+      )}
 
       {/* Layer 5: Eraser cursor circle */}
       {eraserPosition && (
