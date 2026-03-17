@@ -71,7 +71,7 @@ export default async function DashboardPage() {
     <div className="p-6">
       <MoodleSyncPromptWrapper moodleConnection={moodleConnection} />
 
-      <div className="mb-6 mt-4 flex items-center justify-between">
+      <div className="mb-6 mt-4 flex flex-wrap items-center justify-between gap-2">
         <Breadcrumb>
           <BreadcrumbList>
             <BreadcrumbItem>
@@ -79,7 +79,7 @@ export default async function DashboardPage() {
             </BreadcrumbItem>
           </BreadcrumbList>
         </Breadcrumb>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <CreateDocumentDialog folderId={null}>
             <Button variant="outline" size="sm">
               New Document

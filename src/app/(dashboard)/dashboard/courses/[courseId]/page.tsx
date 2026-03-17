@@ -10,6 +10,7 @@ import { WeekDialog } from '@/components/dashboard/week-dialog';
 import { EmptyState } from '@/components/dashboard/empty-state';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { ChevronLeft } from 'lucide-react';
 import {
   Breadcrumb,
   BreadcrumbItem,
@@ -173,9 +174,16 @@ export default async function CoursePage({
 
   return (
     <div className="h-full overflow-y-auto p-6">
-      <div className="mb-6 flex items-center justify-between">
-        <Breadcrumb>
-          <BreadcrumbList>
+      <Link
+        href="/dashboard"
+        className="mb-4 inline-flex items-center gap-1 rounded bg-muted px-2 py-1 text-sm text-muted-foreground hover:text-foreground min-h-[44px]"
+      >
+        <ChevronLeft className="size-3.5" />
+        Dashboard
+      </Link>
+      <div className="mb-6 flex flex-wrap items-center justify-between gap-2">
+        <Breadcrumb className="min-w-0">
+          <BreadcrumbList className="flex-wrap">
             <BreadcrumbItem>
               <BreadcrumbLink asChild>
                 <Link href="/dashboard">Home</Link>
@@ -199,7 +207,7 @@ export default async function CoursePage({
             </BreadcrumbItem>
           </BreadcrumbList>
         </Breadcrumb>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <AiChatWrapper courseId={courseId} courseName={typedCourse.name} />
           <CreateDocumentDialog folderId={null} courseId={courseId}>
             <Button variant="outline" size="sm">

@@ -5,6 +5,7 @@ import { useRouter, usePathname } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { ChevronRight, GraduationCap } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { useSidebar } from '@/components/dashboard/sidebar-layout';
 import type { Course, Folder as FolderType } from '@/types/database';
 
 interface FolderNodeProps {
@@ -18,6 +19,7 @@ function FolderNode({ folder, folders, courses, level }: FolderNodeProps) {
   const [expanded, setExpanded] = useState(false);
   const router = useRouter();
   const pathname = usePathname();
+  const { isMobile, close } = useSidebar();
 
   const children = folders.filter((f) => f.parent_id === folder.id);
   const folderCourses = courses.filter((c) => c.folder_id === folder.id);
@@ -27,9 +29,12 @@ function FolderNode({ folder, folders, courses, level }: FolderNodeProps) {
   return (
     <div>
       <button
-        onClick={() => router.push(`/dashboard/folders/${folder.id}`)}
+        onClick={() => {
+          router.push(`/dashboard/folders/${folder.id}`);
+          if (isMobile) close();
+        }}
         className={cn(
-          'flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm transition-colors hover:bg-accent',
+          'flex w-full items-center gap-2 rounded-md px-2 py-2.5 text-sm transition-colors hover:bg-accent min-h-[44px]',
           isActive && 'bg-accent text-accent-foreground',
         )}
         style={{ paddingLeft: `${level * 12 + 8}px` }}
@@ -94,13 +99,17 @@ interface CourseNodeProps {
 function CourseNode({ course, level }: CourseNodeProps) {
   const router = useRouter();
   const pathname = usePathname();
+  const { isMobile, close } = useSidebar();
   const isActive = pathname === `/dashboard/courses/${course.id}`;
 
   return (
     <button
-      onClick={() => router.push(`/dashboard/courses/${course.id}`)}
+      onClick={() => {
+        router.push(`/dashboard/courses/${course.id}`);
+        if (isMobile) close();
+      }}
       className={cn(
-        'flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm transition-colors hover:bg-accent',
+        'flex w-full items-center gap-2 rounded-md px-2 py-2.5 text-sm transition-colors hover:bg-accent min-h-[44px]',
         isActive && 'bg-accent text-accent-foreground',
       )}
       style={{ paddingLeft: `${level * 12 + 8}px` }}
