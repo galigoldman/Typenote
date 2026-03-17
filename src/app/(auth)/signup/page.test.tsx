@@ -60,7 +60,7 @@ describe('SignupPage', () => {
     expect(link).toHaveAttribute('href', '/login');
   });
 
-  it('shows error message on failed signup', async () => {
+  it('sanitizes "User already registered" error (no email enumeration)', async () => {
     mockSignUp.mockResolvedValueOnce({
       error: { message: 'User already registered' },
     });
@@ -80,7 +80,57 @@ describe('SignupPage', () => {
 
     await waitFor(() => {
       expect(screen.getByRole('alert')).toHaveTextContent(
-        'User already registered',
+        'Unable to create account. Try logging in or resetting your password.',
+      );
+    });
+  });
+
+  it('sanitizes network errors to friendly message', async () => {
+    mockSignUp.mockResolvedValueOnce({
+      error: { message: 'fetch failed' },
+    });
+
+    render(<SignupPage />);
+
+    fireEvent.change(screen.getByLabelText(/display name/i), {
+      target: { value: 'Test User' },
+    });
+    fireEvent.change(screen.getByLabelText(/email/i), {
+      target: { value: 'test@example.com' },
+    });
+    fireEvent.change(screen.getByLabelText(/password/i), {
+      target: { value: 'password123' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: /sign up/i }));
+
+    await waitFor(() => {
+      expect(screen.getByRole('alert')).toHaveTextContent(
+        'Something went wrong. Please try again.',
+      );
+    });
+  });
+
+  it('sanitizes rate limit errors', async () => {
+    mockSignUp.mockResolvedValueOnce({
+      error: { message: 'For security purposes, you can only request this after 60 seconds' },
+    });
+
+    render(<SignupPage />);
+
+    fireEvent.change(screen.getByLabelText(/display name/i), {
+      target: { value: 'Test User' },
+    });
+    fireEvent.change(screen.getByLabelText(/email/i), {
+      target: { value: 'test@example.com' },
+    });
+    fireEvent.change(screen.getByLabelText(/password/i), {
+      target: { value: 'password123' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: /sign up/i }));
+
+    await waitFor(() => {
+      expect(screen.getByRole('alert')).toHaveTextContent(
+        'Too many attempts. Please try again later.',
       );
     });
   });

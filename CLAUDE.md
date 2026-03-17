@@ -37,6 +37,8 @@ Every step of development must follow this git workflow:
 - PRs cannot be merged unless CI passes. This is enforced via GitHub branch protection rules on `main`.
 
 ## Active Technologies
+- TypeScript 5 / Node.js 22+ + Next.js 16 (App Router), @supabase/ssr, shadcn/ui (Card, Button, Input, Label) (010-auth-account-mgmt)
+- PostgreSQL via Supabase — existing tables only, no migrations (010-auth-account-mgmt)
 
 - TypeScript 5 / Node.js 22+ + Next.js 16 (App Router), `@google/genai`, Supabase SSR, Supabase RPC (009-ai-rate-limit)
 - PostgreSQL via Supabase — new `ai_usage` table, modified `profiles` (subscription_tier), 2 RPC functions (increment_ai_usage, get_ai_quota) (009-ai-rate-limit)
