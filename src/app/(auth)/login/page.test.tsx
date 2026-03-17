@@ -6,6 +6,7 @@ const mockPush = vi.fn();
 const mockRefresh = vi.fn();
 const mockSignInWithPassword = vi.fn();
 const mockSignInWithOAuth = vi.fn();
+let mockSearchParams = new URLSearchParams();
 
 vi.mock('@/lib/supabase/client', () => ({
   createClient: () => ({
@@ -19,11 +20,13 @@ vi.mock('@/lib/supabase/client', () => ({
 
 vi.mock('next/navigation', () => ({
   useRouter: () => ({ push: mockPush, refresh: mockRefresh }),
+  useSearchParams: () => mockSearchParams,
 }));
 
 describe('LoginPage', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockSearchParams = new URLSearchParams();
   });
 
   it('renders email input', () => {
@@ -55,7 +58,14 @@ describe('LoginPage', () => {
     expect(link).toHaveAttribute('href', '/signup');
   });
 
-  it('shows error message on failed login', async () => {
+  it('renders "Forgot password?" link pointing to /forgot-password', () => {
+    render(<LoginPage />);
+    const link = screen.getByRole('link', { name: /forgot password/i });
+    expect(link).toBeInTheDocument();
+    expect(link).toHaveAttribute('href', '/forgot-password');
+  });
+
+  it('sanitizes error messages (does not show raw Supabase errors)', async () => {
     mockSignInWithPassword.mockResolvedValueOnce({
       error: { message: 'Invalid login credentials' },
     });
@@ -72,7 +82,7 @@ describe('LoginPage', () => {
 
     await waitFor(() => {
       expect(screen.getByRole('alert')).toHaveTextContent(
-        'Invalid login credentials',
+        'Invalid email or password.',
       );
     });
   });
@@ -107,5 +117,27 @@ describe('LoginPage', () => {
         redirectTo: expect.stringContaining('/auth/callback'),
       },
     });
+  });
+
+  it('shows success banner when ?message=password-reset-success', () => {
+    mockSearchParams = new URLSearchParams(
+      'message=password-reset-success',
+    );
+
+    render(<LoginPage />);
+
+    expect(
+      screen.getByText(/password reset successfully/i),
+    ).toBeInTheDocument();
+  });
+
+  it('does not show success banner without query param', () => {
+    mockSearchParams = new URLSearchParams();
+
+    render(<LoginPage />);
+
+    expect(
+      screen.queryByText(/password reset successfully/i),
+    ).not.toBeInTheDocument();
   });
 });
