@@ -93,26 +93,21 @@ export function PdfTextLayer({
       {items.map((item, i) => {
         if (!item.str || item.str.trim() === '') return null;
 
-        // transform = [a, b, c, d, e, f]  (standard 2D matrix)
-        // a = horizontal scale (≈ fontSize), d = vertical scale (≈ fontSize)
-        // e = x position, f = y position (baseline, from bottom of page)
         const tx = item.transform;
-
-        // Font size from the vertical component of the matrix
         const fontSize = Math.sqrt(tx[2] * tx[2] + tx[3] * tx[3]);
         const scaledFontSize = fontSize * scale;
-
-        // X position: scale and offset to match PDF canvas centering
         const left = tx[4] * scale + offsetX;
-
-        // Y position: convert PDF bottom-up to CSS top-down
-        // tx[5] is baseline Y from page bottom in PDF units
-        // After scaling: scaledY = tx[5] * scale (from bottom of content area)
-        // CSS top = offsetY + (scaledContentHeight - scaledY)
-        // We don't subtract fontSize here because tx[5] is the baseline,
-        // and we want the span positioned at the baseline
         const top =
           offsetY + scaledContentHeight - tx[5] * scale - scaledFontSize;
+
+        // Check if next item is on the same line — if so, add a trailing space
+        // so browser selection includes spaces between words
+        let trailingSpace = false;
+        const next = items[i + 1] as PdfTextItem | undefined;
+        if (next?.str && next.transform) {
+          const sameLine = Math.abs(next.transform[5] - tx[5]) < fontSize * 0.5;
+          if (sameLine) trailingSpace = true;
+        }
 
         const isRtl = item.dir === 'rtl';
 
@@ -136,6 +131,7 @@ export function PdfTextLayer({
             }}
           >
             {item.str}
+            {trailingSpace ? ' ' : ''}
           </span>
         );
       })}
