@@ -15,6 +15,6 @@ export const config = {
      * - public files (svg, png, jpg, etc.)
      * - /test routes (dev/test only pages)
      */
-    '/((?!_next/static|_next/image|favicon.ico|~offline|test/|supabase/|api/|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ttf|woff|woff2)$).*)',
+    '/((?!_next/static|_next/image|favicon.ico|~offline|manifest\\.webmanifest|test/|supabase/|api/|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ttf|woff|woff2)$).*)',
   ],
 };
