@@ -16,6 +16,7 @@ export async function POST(req: Request) {
       weekLabel,
       documentContent,
       conversationHistory,
+      imageData,
     } = body;
 
     // Validate required fields
@@ -66,6 +67,23 @@ export async function POST(req: Request) {
       }
     }
 
+    // Validate imageData if provided
+    if (imageData !== undefined) {
+      if (typeof imageData !== 'string' || !imageData.trim()) {
+        return NextResponse.json(
+          { error: 'imageData must be a non-empty string' },
+          { status: 400 },
+        );
+      }
+      // Max ~4MB base64 ≈ 3MB image
+      if (imageData.length > 5_300_000) {
+        return NextResponse.json(
+          { error: 'imageData exceeds maximum size (4MB)' },
+          { status: 400 },
+        );
+      }
+    }
+
     const params: QuestionParams = {
       question: question.trim(),
       courseId,
@@ -76,6 +94,7 @@ export async function POST(req: Request) {
       weekLabel: weekLabel || undefined,
       documentContent: documentContent || undefined,
       conversationHistory: conversationHistory || undefined,
+      imageData: imageData || undefined,
     };
 
     // Build context (RAG search, prompt, etc.)

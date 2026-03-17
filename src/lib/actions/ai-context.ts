@@ -69,6 +69,7 @@ export type QuestionParams = {
   weekLabel?: string;
   documentContent?: string;
   conversationHistory?: Array<{ role: 'user' | 'assistant'; content: string }>;
+  imageData?: string;
 };
 
 export type QuestionResult = {
@@ -587,21 +588,36 @@ export async function buildAiContext(params: QuestionParams): Promise<{
     }
   }
 
-  if (contextTexts.length === 0 && !hasDocumentContent) {
-    contents.push({
-      role: 'user',
-      parts: [
-        {
-          text: `${question}\n\n(No course materials were loaded. Answer using your own knowledge but note that no materials were found.)`,
-        },
-      ],
+  // Build the user's question parts (optionally with image)
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const questionParts: any[] = [];
+
+  if (params.imageData) {
+    // Multimodal: include image as inline data for Gemini
+    questionParts.push({
+      inlineData: { mimeType: 'image/png', data: params.imageData },
     });
+    questionParts.push({
+      text: `The student has shared a screenshot from their course material. Analyze the visual content and reference it in your response.\n\n${question}`,
+    });
+  } else if (contextTexts.length === 0 && !hasDocumentContent) {
+    questionParts.push({
+      text: `${question}\n\n(No course materials were loaded. Answer using your own knowledge but note that no materials were found.)`,
+    });
+  } else {
+    questionParts.push({ text: question });
+  }
+
+  // Append question parts to contents (merging if last turn is also 'user')
+  if (params.imageData || (contextTexts.length === 0 && !hasDocumentContent)) {
+    // Always create a new user turn for image queries or no-context queries
+    contents.push({ role: 'user', parts: questionParts });
   } else {
     const lastTurn = contents[contents.length - 1];
     if (lastTurn && lastTurn.role === 'user') {
-      lastTurn.parts.push({ text: question });
+      lastTurn.parts.push(...questionParts);
     } else {
-      contents.push({ role: 'user', parts: [{ text: question }] });
+      contents.push({ role: 'user', parts: questionParts });
     }
   }
 

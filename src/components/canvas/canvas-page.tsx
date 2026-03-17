@@ -1,6 +1,6 @@
 'use client';
 
-import { useRef, useEffect, useCallback } from 'react';
+import { useRef, useEffect, useCallback, useState } from 'react';
 import { useEditor, EditorContent } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
 import UnderlineExt from '@tiptap/extension-underline';
@@ -11,7 +11,8 @@ import LinkExt from '@tiptap/extension-link';
 import HighlightExt from '@tiptap/extension-highlight';
 import { AutoDirection } from '@/lib/editor/rtl-extension';
 import { Indent } from '@/lib/editor/indent-extension';
-import { Pencil, Trash2 } from 'lucide-react';
+import { Pencil, Sparkles, Trash2 } from 'lucide-react';
+import { PdfTextLayer } from './pdf-text-layer';
 import type {
   CanvasPage as CanvasPageData,
   CanvasTool,
@@ -69,6 +70,14 @@ interface CanvasPageProps {
   onEditSelection?: () => void;
   hasSelectedTextBoxes?: boolean;
   renderPdfPage?: (pageNum: number, canvas: HTMLCanvasElement) => Promise<void>;
+  materialId?: string | null;
+  onAskAiWithText?: (text: string) => void;
+  onAskAiWithRegion?: (bbox: BBox, pageId: string) => void;
+  onCanvasRefsReady?: (
+    pageId: string,
+    pdfCanvas: HTMLCanvasElement | null,
+    strokesCanvas: HTMLCanvasElement | null,
+  ) => void;
 }
 
 export function CanvasPage({
@@ -99,6 +108,10 @@ export function CanvasPage({
   onEditSelection,
   hasSelectedTextBoxes = false,
   renderPdfPage,
+  materialId,
+  onAskAiWithText,
+  onAskAiWithRegion,
+  onCanvasRefsReady,
 }: CanvasPageProps) {
   const pdfCanvasRef = useRef<HTMLCanvasElement>(null);
   const committedCanvasRef = useRef<HTMLCanvasElement>(null);
@@ -109,6 +122,22 @@ export function CanvasPage({
   const workingCtxRef = useRef<CanvasRenderingContext2D | null>(null);
   const overflowNotifiedRef = useRef(false);
   const isSplittingRef = useRef(false);
+
+  // Track text selection state for floating action bar (Read tool)
+  const selectedTextRef = useRef<string>('');
+  const selectedRectRef = useRef<DOMRect | null>(null);
+  const [textSelectionRect, setTextSelectionRect] = useState<DOMRect | null>(
+    null,
+  );
+
+  const handleTextSelected = useCallback(
+    (text: string, rect: DOMRect | null) => {
+      selectedTextRef.current = text;
+      selectedRectRef.current = rect;
+      setTextSelectionRect(text ? rect : null);
+    },
+    [],
+  );
 
   const isInteractionMode =
     activeTool === 'pen' ||
@@ -133,6 +162,15 @@ export function CanvasPage({
       );
     }
   }, []);
+
+  // Expose canvas refs to parent for region capture
+  useEffect(() => {
+    onCanvasRefsReady?.(
+      page.id,
+      pdfCanvasRef.current,
+      committedCanvasRef.current,
+    );
+  }, [page.id, onCanvasRefsReady]);
 
   // Render PDF background when pdfPage is set
   useEffect(() => {
@@ -476,8 +514,8 @@ export function CanvasPage({
       style={{
         width: PAGE_WIDTH,
         height: PAGE_HEIGHT,
-        userSelect: 'none',
-        WebkitUserSelect: 'none',
+        userSelect: activeTool === 'read' ? 'text' : 'none',
+        WebkitUserSelect: activeTool === 'read' ? 'text' : 'none',
       }}
     >
       {/* Layer 0: PDF background (material-backed documents only) */}
@@ -494,6 +532,16 @@ export function CanvasPage({
         className={`absolute inset-0 ${canvasClass ?? ''}`}
         style={{ pointerEvents: 'none' }}
       />
+
+      {/* Layer 1.5: PDF text layer (Read tool) */}
+      {page.pdfPage != null && materialId && (
+        <PdfTextLayer
+          pdfPage={page.pdfPage}
+          materialId={materialId}
+          isActive={activeTool === 'read'}
+          onTextSelected={handleTextSelected}
+        />
+      )}
 
       {/* Layer 2: Committed canvas */}
       <canvas
@@ -593,6 +641,18 @@ export function CanvasPage({
                 <Pencil className="h-3.5 w-3.5" />
               </button>
             )}
+            {materialId && onAskAiWithRegion && selectionBBox && (
+              <button
+                onPointerDown={(e) => {
+                  e.stopPropagation();
+                  onAskAiWithRegion(selectionBBox, page.id);
+                }}
+                className="flex items-center justify-center h-7 w-7 rounded-full hover:bg-purple-50 hover:text-purple-600 transition-colors text-gray-600"
+                title="Ask AI about selection"
+              >
+                <Sparkles className="h-3.5 w-3.5" />
+              </button>
+            )}
             <button
               onPointerDown={(e) => {
                 e.stopPropagation();
@@ -605,6 +665,34 @@ export function CanvasPage({
             </button>
           </div>
         )}
+
+      {/* Layer 5.7: Floating action bar for Read mode text selection */}
+      {activeTool === 'read' && textSelectionRect && (
+        <div
+          className="fixed z-[100] flex items-center gap-1 rounded-full border bg-white px-2 py-1 shadow-lg"
+          style={{
+            left: textSelectionRect.left + textSelectionRect.width / 2,
+            top: textSelectionRect.top - 40,
+            transform: 'translateX(-50%)',
+            pointerEvents: 'auto',
+          }}
+        >
+          <button
+            onMouseDown={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              const text = selectedTextRef.current;
+              if (text && onAskAiWithText) {
+                onAskAiWithText(text);
+              }
+            }}
+            className="flex items-center gap-1.5 rounded-full px-3 py-1 text-sm font-medium text-purple-700 transition-colors hover:bg-purple-50"
+          >
+            <Sparkles className="h-3.5 w-3.5" />
+            Ask AI
+          </button>
+        </div>
+      )}
 
       {/* Layer 6: Interaction layer — ALWAYS present
           In draw/erase mode: captures all events (pointer-events: auto, touch-action: none)
@@ -621,7 +709,12 @@ export function CanvasPage({
             : 'auto',
           userSelect: 'none',
           WebkitUserSelect: 'none',
-          pointerEvents: isInteractionMode ? 'auto' : 'none',
+          pointerEvents:
+            activeTool === 'read'
+              ? 'none'
+              : isInteractionMode
+                ? 'auto'
+                : 'none',
         }}
         onPointerDown={handlePointerDown}
         onPointerMove={handlePointerMove}

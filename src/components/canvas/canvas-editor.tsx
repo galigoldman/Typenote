@@ -15,6 +15,7 @@ import type { Document } from '@/types/database';
 import type { SaveStatus } from '@/hooks/use-auto-save';
 import type { ConnectionStatus } from '@/hooks/use-realtime-sync';
 import {
+  BookOpen,
   Pen,
   Type,
   Eraser,
@@ -55,6 +56,11 @@ interface CanvasEditorProps {
   document: Document;
   onDocumentTextReady?: (getter: () => string) => void;
   materialId?: string | null;
+  onAskAiWithContext?: (
+    context:
+      | { type: 'text'; content: string }
+      | { type: 'image'; dataUrl: string },
+  ) => void;
 }
 
 const CANVAS_CLASSES: Record<string, string> = {
@@ -233,6 +239,7 @@ export function CanvasEditor({
   document,
   onDocumentTextReady,
   materialId,
+  onAskAiWithContext,
 }: CanvasEditorProps) {
   const { isOpen: sidebarOpen, toggle: toggleSidebar } = useSidebar();
   const [title, setTitle] = useState(document.title);
@@ -1139,10 +1146,78 @@ export function CanvasEditor({
     unlockEditor();
   };
 
+  // Canvas refs for region capture (per page)
+  const pageCanvasRefsMap = useRef<
+    Map<
+      string,
+      { pdf: HTMLCanvasElement | null; strokes: HTMLCanvasElement | null }
+    >
+  >(new Map());
+
+  const handleCanvasRefsReady = useCallback(
+    (
+      pageId: string,
+      pdfCanvas: HTMLCanvasElement | null,
+      strokesCanvas: HTMLCanvasElement | null,
+    ) => {
+      pageCanvasRefsMap.current.set(pageId, {
+        pdf: pdfCanvas,
+        strokes: strokesCanvas,
+      });
+    },
+    [],
+  );
+
+  // Ask AI callbacks: text selection and region capture
+  const handleAskAiWithText = useCallback(
+    (text: string) => {
+      onAskAiWithContext?.({ type: 'text', content: text });
+    },
+    [onAskAiWithContext],
+  );
+
+  const handleAskAiWithRegion = useCallback(
+    (bbox: BBox, pageId: string) => {
+      const refs = pageCanvasRefsMap.current.get(pageId);
+      if (!refs) return;
+
+      const dpr = window.devicePixelRatio || 1;
+
+      // Create offscreen canvas at the region size
+      const w = bbox.maxX - bbox.minX;
+      const h = bbox.maxY - bbox.minY;
+      if (w < 20 || h < 20) return;
+
+      const offscreen = window.document.createElement('canvas');
+      const outW = Math.round(w * dpr);
+      const outH = Math.round(h * dpr);
+      offscreen.width = outW;
+      offscreen.height = outH;
+
+      const ctx = offscreen.getContext('2d');
+      if (!ctx) return;
+
+      const sx = Math.round(bbox.minX * dpr);
+      const sy = Math.round(bbox.minY * dpr);
+
+      if (refs.pdf) {
+        ctx.drawImage(refs.pdf, sx, sy, outW, outH, 0, 0, outW, outH);
+      }
+      if (refs.strokes) {
+        ctx.drawImage(refs.strokes, sx, sy, outW, outH, 0, 0, outW, outH);
+      }
+
+      const dataUrl = offscreen.toDataURL('image/png');
+      onAskAiWithContext?.({ type: 'image', dataUrl });
+    },
+    [onAskAiWithContext],
+  );
+
   const isDrawMode =
     activeTool === 'pen' ||
     activeTool === 'highlighter' ||
     activeTool === 'eraser';
+  const isReadMode = activeTool === 'read';
 
   return (
     <div className="flex flex-col h-full min-h-0">
@@ -1268,6 +1343,22 @@ export function CanvasEditor({
             <Type className="h-4 w-4" />
             Type
           </button>
+          {materialId && (
+            <button
+              onPointerDown={(e) => {
+                e.stopPropagation();
+                setActiveTool('read');
+              }}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
+                isReadMode
+                  ? 'bg-primary text-primary-foreground'
+                  : 'hover:bg-accent text-muted-foreground'
+              }`}
+            >
+              <BookOpen className="h-4 w-4" />
+              Read
+            </button>
+          )}
         </div>
 
         {/* Draw mode: sub-tool icons */}
@@ -1367,16 +1458,17 @@ export function CanvasEditor({
           data-scroll-container
           style={{
             overflowY:
-              activeTool === 'text' || activeTool === 'select'
+              activeTool === 'text' || activeTool === 'select' || isReadMode
                 ? 'auto'
                 : 'hidden',
             touchAction:
-              activeTool === 'text' || activeTool === 'select'
+              activeTool === 'text' || activeTool === 'select' || isReadMode
                 ? 'auto'
                 : 'none',
             overscrollBehavior: 'none',
-            userSelect:
-              activeTool === 'text' || activeTool === 'select'
+            userSelect: isReadMode
+              ? 'text'
+              : activeTool === 'text' || activeTool === 'select'
                 ? 'auto'
                 : 'none',
             WebkitUserSelect:
@@ -1429,6 +1521,10 @@ export function CanvasEditor({
                     onEditSelection={handleEditSelection}
                     hasSelectedTextBoxes={selectedTextBoxIds.size > 0}
                     renderPdfPage={renderPdfPage}
+                    materialId={materialId}
+                    onAskAiWithText={handleAskAiWithText}
+                    onAskAiWithRegion={handleAskAiWithRegion}
+                    onCanvasRefsReady={handleCanvasRefsReady}
                   />
                   {/* Page break divider */}
                   <div

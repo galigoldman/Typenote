@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   BookOpen,
+  ImageIcon,
   Loader2,
   Send,
   Sparkles,
@@ -28,6 +29,11 @@ interface ChatMessage {
   model?: 'flash' | 'pro';
 }
 
+export type PendingAiContext =
+  | { type: 'text'; content: string }
+  | { type: 'image'; dataUrl: string }
+  | null;
+
 interface AiChatPanelProps {
   courseId: string;
   weekId?: string;
@@ -36,6 +42,8 @@ interface AiChatPanelProps {
   getDocumentContent?: () => string;
   isOpen: boolean;
   onClose: () => void;
+  pendingContext?: PendingAiContext;
+  onContextCleared?: () => void;
 }
 
 export function AiChatPanel({
@@ -46,6 +54,8 @@ export function AiChatPanel({
   getDocumentContent,
   isOpen,
   onClose,
+  pendingContext,
+  onContextCleared,
 }: AiChatPanelProps) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState('');
@@ -74,9 +84,35 @@ export function AiChatPanel({
     const question = input.trim();
     if (!question || loading) return;
 
-    const userMessage: ChatMessage = { role: 'user', content: question };
+    // Build the full question with context (if any)
+    let fullQuestion = question;
+    let imageData: string | undefined;
+    let displayContent = question;
+
+    if (pendingContext?.type === 'text') {
+      fullQuestion = `Regarding this text:\n"${pendingContext.content}"\n\n${question}`;
+      displayContent = question; // Store just the question for display
+    } else if (pendingContext?.type === 'image') {
+      // Strip the data:image/png;base64, prefix for the API
+      const base64 = pendingContext.dataUrl.replace(
+        /^data:image\/[a-z]+;base64,/,
+        '',
+      );
+      imageData = base64;
+    }
+
+    const userMessage: ChatMessage = {
+      role: 'user',
+      content:
+        pendingContext?.type === 'text'
+          ? `> ${pendingContext.content.length > 200 ? pendingContext.content.slice(0, 200) + '...' : pendingContext.content}\n\n${displayContent}`
+          : pendingContext?.type === 'image'
+            ? `[Screenshot attached]\n\n${displayContent}`
+            : displayContent,
+    };
     setMessages((prev) => [...prev, userMessage]);
     setInput('');
+    onContextCleared?.();
     setLoading(true);
     setStreamingText('');
 
@@ -99,7 +135,7 @@ export function AiChatPanel({
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          question,
+          question: fullQuestion,
           courseId,
           weekId,
           mode,
@@ -107,6 +143,7 @@ export function AiChatPanel({
           weekLabel,
           documentContent,
           conversationHistory,
+          ...(imageData ? { imageData } : {}),
         }),
         signal: controller.signal,
       });
@@ -333,6 +370,40 @@ export function AiChatPanel({
 
       {/* Input */}
       <div className="border-t px-4 py-3">
+        {/* Pending context block (quote/image preview) */}
+        {pendingContext && (
+          <div className="mb-2 flex items-start gap-2 rounded-lg border bg-muted/50 p-2">
+            {pendingContext.type === 'text' ? (
+              <div className="flex-1 min-w-0 border-l-2 border-purple-400 pl-2">
+                <p className="text-xs font-medium text-muted-foreground mb-0.5">
+                  Selected text
+                </p>
+                <p className="text-xs text-foreground line-clamp-3">
+                  {pendingContext.content}
+                </p>
+              </div>
+            ) : (
+              <div className="flex-1 min-w-0">
+                <p className="text-xs font-medium text-muted-foreground mb-1">
+                  <ImageIcon className="inline h-3 w-3 mr-1" />
+                  Screenshot
+                </p>
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={pendingContext.dataUrl}
+                  alt="Region capture"
+                  className="max-h-24 rounded border object-contain"
+                />
+              </div>
+            )}
+            <button
+              onClick={() => onContextCleared?.()}
+              className="shrink-0 rounded-full p-0.5 text-muted-foreground hover:bg-background hover:text-foreground"
+            >
+              <X className="h-3.5 w-3.5" />
+            </button>
+          </div>
+        )}
         <form
           onSubmit={(e) => {
             e.preventDefault();
