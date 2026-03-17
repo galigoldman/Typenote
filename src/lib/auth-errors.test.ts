@@ -15,7 +15,10 @@ describe('sanitizeAuthError', () => {
   });
 
   it('maps rate limit errors to friendly message', () => {
-    const error = { message: 'For security purposes, you can only request this after 60 seconds' };
+    const error = {
+      message:
+        'For security purposes, you can only request this after 60 seconds',
+    };
     expect(sanitizeAuthError(error)).toBe(
       'Too many attempts. Please try again later.',
     );
@@ -50,7 +53,9 @@ describe('sanitizeAuthError', () => {
   });
 
   it('maps "New password should be different" to friendly message', () => {
-    const error = { message: 'New password should be different from the old password.' };
+    const error = {
+      message: 'New password should be different from the old password.',
+    };
     expect(sanitizeAuthError(error)).toBe(
       'New password should be different from the old password.',
     );

@@ -23,13 +23,13 @@ Harden the existing auth system by adding a password-reset flow (forgot password
 
 _GATE: Must pass before Phase 0 research. Re-check after Phase 1 design._
 
-| Principle | Status | Notes |
-| --------- | ------ | ----- |
-| I. Incremental Development | PASS | Auth is foundational infrastructure — no AI or advanced features involved. Feature adds to existing working auth. |
-| II. Test-Driven Quality | PASS | Plan includes unit tests for all new pages and updated tests for modified pages. Integration tests for callback route. |
-| III. Protected Main Branch | PASS | Work on `010-auth-account-mgmt` branch. PR required for merge. |
-| IV. Migrations as Code | PASS | No migrations needed — feature uses existing schema. |
-| V. Interview-Ready Architecture | PASS | Error sanitization (OWASP email enumeration), Supabase PKCE flow, and middleware route protection are all interview-relevant patterns. |
+| Principle                       | Status | Notes                                                                                                                                  |
+| ------------------------------- | ------ | -------------------------------------------------------------------------------------------------------------------------------------- |
+| I. Incremental Development      | PASS   | Auth is foundational infrastructure — no AI or advanced features involved. Feature adds to existing working auth.                      |
+| II. Test-Driven Quality         | PASS   | Plan includes unit tests for all new pages and updated tests for modified pages. Integration tests for callback route.                 |
+| III. Protected Main Branch      | PASS   | Work on `010-auth-account-mgmt` branch. PR required for merge.                                                                         |
+| IV. Migrations as Code          | PASS   | No migrations needed — feature uses existing schema.                                                                                   |
+| V. Interview-Ready Architecture | PASS   | Error sanitization (OWASP email enumeration), Supabase PKCE flow, and middleware route protection are all interview-relevant patterns. |
 
 **Post-Phase 1 Re-check**: PASS — no new data model or migrations introduced. All design decisions documented in research.md.
 
@@ -90,6 +90,7 @@ src/
 **Goal**: Create the shared error-mapping module that all auth pages will use.
 
 **Files**:
+
 - `src/lib/auth-errors.ts` — `sanitizeAuthError(error: AuthError): string` function
 - `src/lib/auth-errors.test.ts` — unit tests covering all error mappings
 
@@ -102,11 +103,13 @@ src/
 **Goal**: New page at `/forgot-password` with email submission form.
 
 **Files**:
+
 - `src/app/(auth)/forgot-password/page.tsx` — form component
 - `src/app/(auth)/forgot-password/page.test.tsx` — tests
 - `src/lib/supabase/middleware.ts` — add `/forgot-password` to public routes
 
 **Behavior**:
+
 - Email input + submit button
 - Calls `supabase.auth.resetPasswordForEmail(email, { redirectTo: origin + '/auth/callback?next=/reset-password' })`
 - Shows same "Check your email" message regardless of whether email exists
@@ -118,10 +121,12 @@ src/
 **Goal**: Update callback route to support recovery redirect.
 
 **Files**:
+
 - `src/app/auth/callback/route.ts` — add `next` query param handling
 - `src/app/auth/callback/route.test.ts` — tests for OAuth and recovery paths
 
 **Behavior**:
+
 - Read `next` query parameter from URL
 - After successful code exchange, redirect to `next` param value (default: `/dashboard`)
 - Validate `next` param is a relative path (prevent open redirect)
@@ -133,10 +138,12 @@ src/
 **Goal**: New page at `/reset-password` where user sets new password after clicking email link.
 
 **Files**:
+
 - `src/app/(auth)/reset-password/page.tsx` — form component
 - `src/app/(auth)/reset-password/page.test.tsx` — tests
 
 **Behavior**:
+
 - New password + confirm password inputs
 - Client-side validation: min 6 chars, passwords must match
 - Calls `supabase.auth.updateUser({ password })`
@@ -149,10 +156,12 @@ src/
 **Goal**: Add "Forgot password?" link and sanitize error messages.
 
 **Files**:
+
 - `src/app/(auth)/login/page.tsx` — add link + error sanitization
 - `src/app/(auth)/login/page.test.tsx` — update tests
 
 **Changes**:
+
 - Add "Forgot password?" link below password field → navigates to `/forgot-password`
 - Replace `setError(error.message)` with `setError(sanitizeAuthError(error))`
 - Show success banner when `?message=password-reset-success` is in URL
@@ -163,10 +172,12 @@ src/
 **Goal**: Sanitize signup error messages to prevent email enumeration.
 
 **Files**:
+
 - `src/app/(auth)/signup/page.tsx` — error sanitization
 - `src/app/(auth)/signup/page.test.tsx` — update tests
 
 **Changes**:
+
 - Replace `setError(error.message)` with `setError(sanitizeAuthError(error))`
 - Verify inline validation works for all required fields
 - Test: verify "User already registered" is never exposed to UI
@@ -176,6 +187,7 @@ src/
 **Goal**: Ensure all flows work end-to-end with local Supabase.
 
 **Actions**:
+
 - Run full test suite: `pnpm test`
 - Run integration tests: `pnpm test:integration`
 - Run linting: `pnpm lint`

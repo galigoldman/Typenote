@@ -112,7 +112,10 @@ describe('SignupPage', () => {
 
   it('sanitizes rate limit errors', async () => {
     mockSignUp.mockResolvedValueOnce({
-      error: { message: 'For security purposes, you can only request this after 60 seconds' },
+      error: {
+        message:
+          'For security purposes, you can only request this after 60 seconds',
+      },
     });
 
     render(<SignupPage />);
