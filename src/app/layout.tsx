@@ -1,4 +1,4 @@
-import type { Metadata } from 'next';
+import type { Metadata, Viewport } from 'next';
 import { Geist, Geist_Mono } from 'next/font/google';
 import { Toaster } from '@/components/ui/sonner';
 import { TooltipProvider } from '@/components/ui/tooltip';
@@ -17,6 +17,23 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: 'Typenote',
   description: 'Smart notes for STEM students',
+  applicationName: 'Typenote',
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: 'default',
+    title: 'Typenote',
+  },
+  formatDetection: {
+    telephone: false,
+  },
+  icons: {
+    icon: '/favicon.ico',
+    apple: '/icons/apple-touch-icon.png',
+  },
+};
+
+export const viewport: Viewport = {
+  themeColor: '#0a0a0a',
 };
 
 export default function RootLayout({
