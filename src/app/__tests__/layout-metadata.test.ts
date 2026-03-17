@@ -11,7 +11,7 @@ describe('Root layout PWA metadata', () => {
       expect.objectContaining({
         capable: true,
         title: 'Typenote',
-      })
+      }),
     );
   });
 
@@ -26,7 +26,7 @@ describe('Root layout PWA metadata', () => {
 
   it('disables telephone format detection', () => {
     expect(metadata.formatDetection).toEqual(
-      expect.objectContaining({ telephone: false })
+      expect.objectContaining({ telephone: false }),
     );
   });
 });

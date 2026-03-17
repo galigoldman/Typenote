@@ -17,7 +17,7 @@ export default defineConfig({
       '@': path.resolve(__dirname, './src'),
       'next/font/google': path.resolve(
         __dirname,
-        './src/test/__mocks__/next-font.ts'
+        './src/test/__mocks__/next-font.ts',
       ),
     },
   },
