@@ -12,21 +12,21 @@
 
 ## File Structure
 
-| Action | Path | Responsibility |
-|--------|------|----------------|
-| Create | `src/app/manifest.ts` | Web app manifest (name, icons, display, colors) |
-| Create | `src/app/(offline)/~offline/page.tsx` | Branded offline fallback page |
-| Create | `public/icons/icon-192x192.png` | Standard PWA icon (192px) |
-| Create | `public/icons/icon-512x512.png` | Standard PWA icon (512px) |
-| Create | `public/icons/icon-maskable-512x512.png` | Maskable icon for Android adaptive shapes |
-| Create | `public/icons/apple-touch-icon.png` | Apple touch icon (180x180) |
-| Create | `src/app/(offline)/~offline/__tests__/page.test.tsx` | Tests for offline page |
-| Create | `src/lib/pwa/__tests__/manifest.test.ts` | Tests for manifest output |
-| Create | `src/app/__tests__/layout-metadata.test.ts` | Tests for PWA metadata in layout |
-| Modify | `src/app/layout.tsx` | Add PWA metadata, apple-web-app tags, viewport theme color |
-| Modify | `next.config.ts` | Wrap config with `withPWA` from `@ducanh2912/next-pwa` |
-| Modify | `src/middleware.ts` | Exclude `~offline` route from auth middleware |
-| Modify | `.gitignore` | Ignore generated service worker files in `public/` |
+| Action | Path                                                 | Responsibility                                             |
+| ------ | ---------------------------------------------------- | ---------------------------------------------------------- |
+| Create | `src/app/manifest.ts`                                | Web app manifest (name, icons, display, colors)            |
+| Create | `src/app/(offline)/~offline/page.tsx`                | Branded offline fallback page                              |
+| Create | `public/icons/icon-192x192.png`                      | Standard PWA icon (192px)                                  |
+| Create | `public/icons/icon-512x512.png`                      | Standard PWA icon (512px)                                  |
+| Create | `public/icons/icon-maskable-512x512.png`             | Maskable icon for Android adaptive shapes                  |
+| Create | `public/icons/apple-touch-icon.png`                  | Apple touch icon (180x180)                                 |
+| Create | `src/app/(offline)/~offline/__tests__/page.test.tsx` | Tests for offline page                                     |
+| Create | `src/lib/pwa/__tests__/manifest.test.ts`             | Tests for manifest output                                  |
+| Create | `src/app/__tests__/layout-metadata.test.ts`          | Tests for PWA metadata in layout                           |
+| Modify | `src/app/layout.tsx`                                 | Add PWA metadata, apple-web-app tags, viewport theme color |
+| Modify | `next.config.ts`                                     | Wrap config with `withPWA` from `@ducanh2912/next-pwa`     |
+| Modify | `src/middleware.ts`                                  | Exclude `~offline` route from auth middleware              |
+| Modify | `.gitignore`                                         | Ignore generated service worker files in `public/`         |
 
 ---
 
@@ -35,6 +35,7 @@
 ### Task 1: Install `@ducanh2912/next-pwa` and configure Next.js
 
 **Files:**
+
 - Modify: `next.config.ts`
 - Modify: `package.json` (via pnpm)
 - Modify: `.gitignore`
@@ -107,6 +108,7 @@ git commit -m "feat: add @ducanh2912/next-pwa plugin with offline fallback confi
 ### Task 2: Create the web app manifest
 
 **Files:**
+
 - Create: `src/app/manifest.ts`
 - Create: `src/lib/pwa/__tests__/manifest.test.ts`
 
@@ -224,6 +226,7 @@ git commit -m "feat: add web app manifest with icon and display config"
 ### Task 3: Update root layout with PWA metadata
 
 **Files:**
+
 - Modify: `src/app/layout.tsx`
 - Create: `src/app/__tests__/layout-metadata.test.ts`
 
@@ -245,7 +248,7 @@ describe('Root layout PWA metadata', () => {
       expect.objectContaining({
         capable: true,
         title: 'Typenote',
-      })
+      }),
     );
   });
 
@@ -260,7 +263,7 @@ describe('Root layout PWA metadata', () => {
 
   it('disables telephone format detection', () => {
     expect(metadata.formatDetection).toEqual(
-      expect.objectContaining({ telephone: false })
+      expect.objectContaining({ telephone: false }),
     );
   });
 });
@@ -374,6 +377,7 @@ git commit -m "feat: add PWA metadata and iOS web app tags to root layout"
 ### Task 4: Exclude `~offline` route from auth middleware
 
 **Files:**
+
 - Modify: `src/middleware.ts`
 
 The auth middleware intercepts all routes and runs Supabase session checks. When the PWA is offline, the service worker serves `/~offline` — but the middleware would try to call Supabase (which fails without network), causing a redirect loop or error instead of showing the offline page.
@@ -383,11 +387,13 @@ The auth middleware intercepts all routes and runs Supabase session checks. When
 In `src/middleware.ts`, add `~offline` to the exclusion pattern in the matcher regex:
 
 Change:
+
 ```typescript
 '/((?!_next/static|_next/image|favicon.ico|test/|supabase/|api/|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ttf|woff|woff2)$).*)',
 ```
 
 To:
+
 ```typescript
 '/((?!_next/static|_next/image|favicon.ico|~offline|test/|supabase/|api/|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ttf|woff|woff2)$).*)',
 ```
@@ -404,6 +410,7 @@ git commit -m "fix: exclude ~offline route from auth middleware for PWA fallback
 ### Task 5: Create the offline fallback page
 
 **Files:**
+
 - Create: `src/app/(offline)/~offline/page.tsx`
 - Create: `src/app/(offline)/~offline/__tests__/page.test.tsx`
 
@@ -420,18 +427,22 @@ describe('Offline fallback page', () => {
   it('renders a heading indicating offline status', () => {
     render(<OfflinePage />);
     expect(
-      screen.getByRole('heading', { name: /offline/i })
+      screen.getByRole('heading', { name: /offline/i }),
     ).toBeInTheDocument();
   });
 
   it('renders a message asking the user to check their connection', () => {
     render(<OfflinePage />);
-    expect(screen.getByText(/check your internet connection/i)).toBeInTheDocument();
+    expect(
+      screen.getByText(/check your internet connection/i),
+    ).toBeInTheDocument();
   });
 
   it('renders a retry button', () => {
     render(<OfflinePage />);
-    expect(screen.getByRole('button', { name: /try again/i })).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: /try again/i }),
+    ).toBeInTheDocument();
   });
 });
 ```
@@ -457,8 +468,8 @@ export default function OfflinePage() {
       <div className="text-6xl">📡</div>
       <h1 className="text-2xl font-bold">You're Offline</h1>
       <p className="text-muted-foreground max-w-md">
-        Please check your internet connection and try again. Your notes are
-        safe — they'll be available once you're back online.
+        Please check your internet connection and try again. Your notes are safe
+        — they'll be available once you're back online.
       </p>
       <button
         onClick={() => window.location.reload()}
@@ -493,6 +504,7 @@ git commit -m "feat: add branded offline fallback page"
 ### Task 6: Add placeholder icon files
 
 **Files:**
+
 - Create: `public/icons/icon-192x192.png`
 - Create: `public/icons/icon-512x512.png`
 - Create: `public/icons/icon-maskable-512x512.png`
