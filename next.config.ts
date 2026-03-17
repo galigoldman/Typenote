@@ -8,6 +8,8 @@ const withPWA = withPWAInit({
 
 const nextConfig: NextConfig = {
   /* config options here */
+  // Required: next-pwa uses webpack, so turbopack must be explicitly configured
+  // to avoid a conflict error in Next.js 16
   turbopack: {},
 };
 
