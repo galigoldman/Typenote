@@ -69,6 +69,7 @@ interface CanvasEditorProps {
       | { type: 'text'; content: string }
       | { type: 'image'; dataUrl: string },
   ) => void;
+  onToolSwitchReady?: (switcher: (tool: CanvasTool) => void) => void;
 }
 
 const CANVAS_CLASSES: Record<string, string> = {
@@ -292,6 +293,7 @@ export function CanvasEditor({
   onDocumentTextReady,
   materialId,
   onAskAiWithContext,
+  onToolSwitchReady,
 }: CanvasEditorProps) {
   const { isOpen: sidebarOpen, toggle: toggleSidebar } = useSidebar();
   const [title, setTitle] = useState(document.title);
@@ -315,6 +317,12 @@ export function CanvasEditor({
     }
     setActiveToolRaw(tool);
   }, []);
+
+  // Expose tool switcher to parent (for AI panel's Mark Text / Screenshot buttons)
+  useEffect(() => {
+    onToolSwitchReady?.(setActiveTool);
+  }, [onToolSwitchReady, setActiveTool]);
+
   const [activeEditor, setActiveEditor] = useState<Editor | null>(null);
   const [remoteUpdateCounter, setRemoteUpdateCounter] = useState(0);
 

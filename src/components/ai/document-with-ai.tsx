@@ -4,7 +4,8 @@ import { useCallback, useRef, useState } from 'react';
 
 import { CanvasEditor } from '@/components/canvas/canvas-editor';
 import type { Document } from '@/types/database';
-import type { PendingAiContext } from './ai-chat-panel';
+import type { AiContextItem } from './ai-chat-panel';
+import type { CanvasTool } from '@/types/canvas';
 
 import { AiChatWrapper } from './ai-chat-wrapper';
 
@@ -26,7 +27,8 @@ export function DocumentWithAi({
   materialId,
 }: DocumentWithAiProps) {
   const getDocumentTextRef = useRef<(() => string) | null>(null);
-  const [pendingContext, setPendingContext] = useState<PendingAiContext>(null);
+  const toolSwitcherRef = useRef<((tool: CanvasTool) => void) | null>(null);
+  const [contextItems, setContextItems] = useState<AiContextItem[]>([]);
   const [isAiOpen, setIsAiOpen] = useState(false);
 
   const handleDocumentTextReady = useCallback((getter: () => string) => {
@@ -37,20 +39,40 @@ export function DocumentWithAi({
     return getDocumentTextRef.current?.() ?? '';
   }, []);
 
+  const handleToolSwitchReady = useCallback(
+    (switcher: (tool: CanvasTool) => void) => {
+      toolSwitcherRef.current = switcher;
+    },
+    [],
+  );
+
+  // Append a new context item — accumulates, doesn't replace
   const handleAskAiWithContext = useCallback(
     (
       context:
         | { type: 'text'; content: string }
         | { type: 'image'; dataUrl: string },
     ) => {
-      setPendingContext(context);
+      setContextItems((prev) => [...prev, context]);
       setIsAiOpen(true);
     },
     [],
   );
 
-  const handleContextCleared = useCallback(() => {
-    setPendingContext(null);
+  const handleRemoveContextItem = useCallback((index: number) => {
+    setContextItems((prev) => prev.filter((_, i) => i !== index));
+  }, []);
+
+  const handleClearAllContext = useCallback(() => {
+    setContextItems([]);
+  }, []);
+
+  const handleRequestMarkText = useCallback(() => {
+    toolSwitcherRef.current?.('read');
+  }, []);
+
+  const handleRequestScreenshot = useCallback(() => {
+    toolSwitcherRef.current?.('select');
   }, []);
 
   return (
@@ -62,11 +84,14 @@ export function DocumentWithAi({
           weekId={weekId}
           weekLabel={weekLabel}
           getDocumentContent={getDocumentContent}
-          pendingContext={pendingContext}
-          onContextCleared={handleContextCleared}
+          pendingContextItems={contextItems}
+          onRemoveContextItem={handleRemoveContextItem}
+          onClearAllContext={handleClearAllContext}
           isOpen={isAiOpen}
           onToggle={() => setIsAiOpen((prev) => !prev)}
           onClose={() => setIsAiOpen(false)}
+          onRequestMarkText={handleRequestMarkText}
+          onRequestScreenshot={handleRequestScreenshot}
         />
       </div>
       <CanvasEditor
@@ -74,6 +99,7 @@ export function DocumentWithAi({
         onDocumentTextReady={handleDocumentTextReady}
         materialId={materialId}
         onAskAiWithContext={handleAskAiWithContext}
+        onToolSwitchReady={handleToolSwitchReady}
       />
     </>
   );

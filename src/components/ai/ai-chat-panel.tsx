@@ -3,11 +3,13 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   BookOpen,
+  Camera,
   ImageIcon,
   Loader2,
   Send,
   Sparkles,
   Square,
+  Type as TypeIcon,
   X,
   Zap,
 } from 'lucide-react';
@@ -29,10 +31,9 @@ interface ChatMessage {
   model?: 'flash' | 'pro';
 }
 
-export type PendingAiContext =
+export type AiContextItem =
   | { type: 'text'; content: string }
-  | { type: 'image'; dataUrl: string }
-  | null;
+  | { type: 'image'; dataUrl: string };
 
 interface AiChatPanelProps {
   courseId: string;
@@ -42,8 +43,11 @@ interface AiChatPanelProps {
   getDocumentContent?: () => string;
   isOpen: boolean;
   onClose: () => void;
-  pendingContext?: PendingAiContext;
-  onContextCleared?: () => void;
+  pendingContextItems: AiContextItem[];
+  onRemoveContextItem?: (index: number) => void;
+  onClearAllContext?: () => void;
+  onRequestMarkText?: () => void;
+  onRequestScreenshot?: () => void;
 }
 
 export function AiChatPanel({
@@ -54,17 +58,22 @@ export function AiChatPanel({
   getDocumentContent,
   isOpen,
   onClose,
-  pendingContext,
-  onContextCleared,
+  pendingContextItems,
+  onRemoveContextItem,
+  onClearAllContext,
+  onRequestMarkText,
+  onRequestScreenshot,
 }: AiChatPanelProps) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
   const [streamingText, setStreamingText] = useState('');
   const [mode, setMode] = useState<'quick' | 'deep'>('quick');
+  const [showCropMenu, setShowCropMenu] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const abortRef = useRef<AbortController | null>(null);
+  const cropMenuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -76,6 +85,21 @@ export function AiChatPanel({
     }
   }, [isOpen]);
 
+  // Close crop menu on outside click
+  useEffect(() => {
+    if (!showCropMenu) return;
+    const handleClick = (e: MouseEvent) => {
+      if (
+        cropMenuRef.current &&
+        !cropMenuRef.current.contains(e.target as Node)
+      ) {
+        setShowCropMenu(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClick);
+    return () => document.removeEventListener('mousedown', handleClick);
+  }, [showCropMenu]);
+
   const handleStop = useCallback(() => {
     abortRef.current?.abort();
   }, []);
@@ -84,35 +108,57 @@ export function AiChatPanel({
     const question = input.trim();
     if (!question || loading) return;
 
-    // Build the full question with context (if any)
-    let fullQuestion = question;
-    let imageData: string | undefined;
-    let displayContent = question;
+    const hasContext = pendingContextItems.length > 0;
+    const textContexts = pendingContextItems.filter(
+      (c) => c.type === 'text',
+    ) as Array<{ type: 'text'; content: string }>;
+    const imageContexts = pendingContextItems.filter(
+      (c) => c.type === 'image',
+    ) as Array<{ type: 'image'; dataUrl: string }>;
 
-    if (pendingContext?.type === 'text') {
-      fullQuestion = `Regarding this text:\n"${pendingContext.content}"\n\n${question}`;
-      displayContent = question; // Store just the question for display
-    } else if (pendingContext?.type === 'image') {
-      // Strip the data:image/png;base64, prefix for the API
-      const base64 = pendingContext.dataUrl.replace(
+    // Build full question with all text contexts
+    let fullQuestion = question;
+    if (textContexts.length > 0) {
+      const quotedTexts = textContexts
+        .map((c, i) =>
+          textContexts.length > 1
+            ? `[Selection ${i + 1}]:\n"${c.content}"`
+            : `"${c.content}"`,
+        )
+        .join('\n\n');
+      fullQuestion = `Regarding this text:\n${quotedTexts}\n\n${question}`;
+    }
+
+    // Use the first image context (Gemini accepts one image per turn)
+    let imageData: string | undefined;
+    if (imageContexts.length > 0) {
+      imageData = imageContexts[0].dataUrl.replace(
         /^data:image\/[a-z]+;base64,/,
         '',
       );
-      imageData = base64;
     }
 
-    const userMessage: ChatMessage = {
-      role: 'user',
-      content:
-        pendingContext?.type === 'text'
-          ? `> ${pendingContext.content.length > 200 ? pendingContext.content.slice(0, 200) + '...' : pendingContext.content}\n\n${displayContent}`
-          : pendingContext?.type === 'image'
-            ? `[Screenshot attached]\n\n${displayContent}`
-            : displayContent,
-    };
+    // Build display content for the message bubble
+    const contextSummary: string[] = [];
+    for (const ctx of pendingContextItems) {
+      if (ctx.type === 'text') {
+        const preview =
+          ctx.content.length > 100
+            ? ctx.content.slice(0, 100) + '...'
+            : ctx.content;
+        contextSummary.push(`> ${preview}`);
+      } else {
+        contextSummary.push('[Screenshot attached]');
+      }
+    }
+    const displayContent = hasContext
+      ? `${contextSummary.join('\n')}\n\n${question}`
+      : question;
+
+    const userMessage: ChatMessage = { role: 'user', content: displayContent };
     setMessages((prev) => [...prev, userMessage]);
     setInput('');
-    onContextCleared?.();
+    onClearAllContext?.();
     setLoading(true);
     setStreamingText('');
 
@@ -165,7 +211,6 @@ export function AiChatPanel({
 
         buffer += decoder.decode(value, { stream: true });
 
-        // Parse SSE events from buffer
         const lines = buffer.split('\n\n');
         buffer = lines.pop() ?? '';
 
@@ -190,32 +235,20 @@ export function AiChatPanel({
         }
       }
 
-      // Finalize: move streaming text to a proper message
       setStreamingText('');
       if (accumulatedText) {
         setMessages((prev) => [
           ...prev,
-          {
-            role: 'assistant',
-            content: accumulatedText,
-            sources,
-            model,
-          },
+          { role: 'assistant', content: accumulatedText, sources, model },
         ]);
       }
     } catch (err) {
       setStreamingText('');
       if (err instanceof DOMException && err.name === 'AbortError') {
-        // User stopped the generation — keep what we have
         if (accumulatedText) {
           setMessages((prev) => [
             ...prev,
-            {
-              role: 'assistant',
-              content: accumulatedText,
-              sources,
-              model,
-            },
+            { role: 'assistant', content: accumulatedText, sources, model },
           ]);
         }
       } else {
@@ -309,7 +342,7 @@ export function AiChatPanel({
             className={`mb-4 ${msg.role === 'user' ? 'flex justify-end' : ''}`}
           >
             {msg.role === 'user' ? (
-              <div className="max-w-[85%] rounded-2xl rounded-br-md bg-primary px-4 py-2.5 text-sm text-primary-foreground">
+              <div className="max-w-[85%] rounded-2xl rounded-br-md bg-primary px-4 py-2.5 text-sm text-primary-foreground whitespace-pre-line">
                 {msg.content}
               </div>
             ) : (
@@ -318,7 +351,6 @@ export function AiChatPanel({
                   <MarkdownResponse content={msg.content} />
                 </div>
 
-                {/* Sources */}
                 {msg.sources && msg.sources.length > 0 && (
                   <div className="mt-2 flex flex-wrap gap-1.5">
                     {msg.sources.map((src, j) => (
@@ -334,7 +366,6 @@ export function AiChatPanel({
                   </div>
                 )}
 
-                {/* Model badge */}
                 {msg.model && (
                   <div className="mt-1.5 flex items-center gap-2">
                     <span className="text-[10px] text-muted-foreground/50">
@@ -347,7 +378,6 @@ export function AiChatPanel({
           </div>
         ))}
 
-        {/* Streaming message */}
         {streamingText && (
           <div className="mb-4">
             <div className="max-w-[95%]">
@@ -368,42 +398,51 @@ export function AiChatPanel({
         <div ref={messagesEndRef} />
       </div>
 
-      {/* Input */}
+      {/* Input area */}
       <div className="border-t px-4 py-3">
-        {/* Pending context block (quote/image preview) */}
-        {pendingContext && (
-          <div className="mb-2 flex items-start gap-2 rounded-lg border bg-muted/50 p-2">
-            {pendingContext.type === 'text' ? (
-              <div className="flex-1 min-w-0 border-l-2 border-purple-400 pl-2">
-                <p className="text-xs font-medium text-muted-foreground mb-0.5">
-                  Selected text
-                </p>
-                <p className="text-xs text-foreground line-clamp-3">
-                  {pendingContext.content}
-                </p>
+        {/* Pending context items (accumulated) */}
+        {pendingContextItems.length > 0 && (
+          <div className="mb-2 space-y-1.5">
+            {pendingContextItems.map((ctx, idx) => (
+              <div
+                key={idx}
+                className="flex items-start gap-2 rounded-lg border bg-muted/50 p-2"
+              >
+                {ctx.type === 'text' ? (
+                  <div className="flex-1 min-w-0 border-l-2 border-purple-400 pl-2">
+                    <p className="text-xs font-medium text-muted-foreground mb-0.5">
+                      Selected text
+                    </p>
+                    <p className="text-xs text-foreground line-clamp-2">
+                      {ctx.content}
+                    </p>
+                  </div>
+                ) : (
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs font-medium text-muted-foreground mb-1">
+                      <ImageIcon className="inline h-3 w-3 mr-1" />
+                      Screenshot
+                    </p>
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={ctx.dataUrl}
+                      alt="Region capture"
+                      className="max-h-20 rounded border object-contain"
+                    />
+                  </div>
+                )}
+                <button
+                  onClick={() => onRemoveContextItem?.(idx)}
+                  className="shrink-0 rounded-full p-0.5 text-muted-foreground hover:bg-background hover:text-foreground"
+                >
+                  <X className="h-3.5 w-3.5" />
+                </button>
               </div>
-            ) : (
-              <div className="flex-1 min-w-0">
-                <p className="text-xs font-medium text-muted-foreground mb-1">
-                  <ImageIcon className="inline h-3 w-3 mr-1" />
-                  Screenshot
-                </p>
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                  src={pendingContext.dataUrl}
-                  alt="Region capture"
-                  className="max-h-24 rounded border object-contain"
-                />
-              </div>
-            )}
-            <button
-              onClick={() => onContextCleared?.()}
-              className="shrink-0 rounded-full p-0.5 text-muted-foreground hover:bg-background hover:text-foreground"
-            >
-              <X className="h-3.5 w-3.5" />
-            </button>
+            ))}
           </div>
         )}
+
+        {/* Input row with Ask AI button */}
         <form
           onSubmit={(e) => {
             e.preventDefault();
@@ -411,6 +450,48 @@ export function AiChatPanel({
           }}
           className="flex gap-2"
         >
+          {/* Ask AI crop button */}
+          <div className="relative" ref={cropMenuRef}>
+            <Button
+              type="button"
+              size="icon"
+              variant="outline"
+              onClick={() => setShowCropMenu((prev) => !prev)}
+              className="h-9 w-9 shrink-0 text-purple-600 border-purple-200 hover:bg-purple-50"
+              title="Ask AI about content"
+            >
+              <Sparkles className="h-4 w-4" />
+            </Button>
+
+            {/* Dropdown menu */}
+            {showCropMenu && (
+              <div className="absolute bottom-full left-0 mb-2 w-44 rounded-lg border bg-popover p-1 shadow-lg">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowCropMenu(false);
+                    onRequestMarkText?.();
+                  }}
+                  className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-sm hover:bg-accent transition-colors"
+                >
+                  <TypeIcon className="h-4 w-4 text-purple-500" />
+                  Mark Text
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowCropMenu(false);
+                    onRequestScreenshot?.();
+                  }}
+                  className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-sm hover:bg-accent transition-colors"
+                >
+                  <Camera className="h-4 w-4 text-purple-500" />
+                  Screenshot
+                </button>
+              </div>
+            )}
+          </div>
+
           <input
             ref={inputRef}
             type="text"
