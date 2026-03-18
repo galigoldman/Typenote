@@ -699,7 +699,7 @@ export function CanvasPage({
                 <Pencil className="h-3.5 w-3.5" />
               </button>
             )}
-            {materialId && onAskAiWithRegion && selectionBBox && (
+            {onAskAiWithRegion && selectionBBox && (
               <button
                 onPointerDown={(e) => {
                   e.stopPropagation();
