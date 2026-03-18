@@ -125,8 +125,8 @@ export function CanvasPage({
 
   // Crop tool state: draw a rectangle to screenshot
   const [cropRect, setCropRect] = useState<BBox | null>(null);
+  const [isCropping, setIsCropping] = useState(false);
   const cropStartRef = useRef<{ x: number; y: number } | null>(null);
-  const isCroppingRef = useRef(false);
 
   const handleCropPointerDown = useCallback(
     (e: React.PointerEvent) => {
@@ -136,7 +136,7 @@ export function CanvasPage({
       const x = e.clientX - rect.left;
       const y = e.clientY - rect.top;
       cropStartRef.current = { x, y };
-      isCroppingRef.current = true;
+      setIsCropping(true);
       setCropRect(null);
       e.preventDefault();
       (e.target as HTMLElement).setPointerCapture(e.pointerId);
@@ -145,7 +145,7 @@ export function CanvasPage({
   );
 
   const handleCropPointerMove = useCallback((e: React.PointerEvent) => {
-    if (!isCroppingRef.current || !cropStartRef.current) return;
+    if (!cropStartRef.current) return;
     const el = e.currentTarget as HTMLElement;
     const rect = el.getBoundingClientRect();
     const x = e.clientX - rect.left;
@@ -160,7 +160,7 @@ export function CanvasPage({
   }, []);
 
   const handleCropPointerUp = useCallback(() => {
-    isCroppingRef.current = false;
+    setIsCropping(false);
     cropStartRef.current = null;
     // Keep cropRect visible so user can click "Ask AI"
   }, []);
@@ -759,7 +759,7 @@ export function CanvasPage({
           )}
           {/* Floating "Ask AI" button above crop rect */}
           {cropRect &&
-            !isCroppingRef.current &&
+            !isCropping &&
             cropRect.maxX - cropRect.minX > 20 &&
             cropRect.maxY - cropRect.minY > 20 && (
               <div
