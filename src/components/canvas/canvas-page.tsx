@@ -77,6 +77,7 @@ interface CanvasPageProps {
     pageId: string,
     pdfCanvas: HTMLCanvasElement | null,
     strokesCanvas: HTMLCanvasElement | null,
+    pageElement: HTMLDivElement | null,
   ) => void;
 }
 
@@ -113,6 +114,7 @@ export function CanvasPage({
   onAskAiWithRegion,
   onCanvasRefsReady,
 }: CanvasPageProps) {
+  const pageRootRef = useRef<HTMLDivElement>(null);
   const pdfCanvasRef = useRef<HTMLCanvasElement>(null);
   const committedCanvasRef = useRef<HTMLCanvasElement>(null);
   const workingCanvasRef = useRef<HTMLCanvasElement>(null);
@@ -224,6 +226,7 @@ export function CanvasPage({
       page.id,
       pdfCanvasRef.current,
       committedCanvasRef.current,
+      pageRootRef.current,
     );
   }, [page.id, onCanvasRefsReady]);
 
@@ -565,6 +568,7 @@ export function CanvasPage({
 
   return (
     <div
+      ref={pageRootRef}
       className="relative bg-white shadow-md mx-auto"
       style={{
         width: PAGE_WIDTH,

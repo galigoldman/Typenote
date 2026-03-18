@@ -1241,7 +1241,11 @@ export function CanvasEditor({
   const pageCanvasRefsMap = useRef<
     Map<
       string,
-      { pdf: HTMLCanvasElement | null; strokes: HTMLCanvasElement | null }
+      {
+        pdf: HTMLCanvasElement | null;
+        strokes: HTMLCanvasElement | null;
+        element: HTMLDivElement | null;
+      }
     >
   >(new Map());
 
@@ -1250,10 +1254,12 @@ export function CanvasEditor({
       pageId: string,
       pdfCanvas: HTMLCanvasElement | null,
       strokesCanvas: HTMLCanvasElement | null,
+      pageElement: HTMLDivElement | null,
     ) => {
       pageCanvasRefsMap.current.set(pageId, {
         pdf: pdfCanvas,
         strokes: strokesCanvas,
+        element: pageElement,
       });
     },
     [],
@@ -1268,38 +1274,40 @@ export function CanvasEditor({
   );
 
   const handleAskAiWithRegion = useCallback(
-    (bbox: BBox, pageId: string) => {
+    async (bbox: BBox, pageId: string) => {
       const refs = pageCanvasRefsMap.current.get(pageId);
-      if (!refs) return;
+      if (!refs?.element) return;
 
-      const dpr = window.devicePixelRatio || 1;
-
-      // Create offscreen canvas at the region size
       const w = bbox.maxX - bbox.minX;
       const h = bbox.maxY - bbox.minY;
       if (w < 20 || h < 20) return;
 
-      const offscreen = window.document.createElement('canvas');
-      const outW = Math.round(w * dpr);
-      const outH = Math.round(h * dpr);
-      offscreen.width = outW;
-      offscreen.height = outH;
-
-      const ctx = offscreen.getContext('2d');
-      if (!ctx) return;
-
-      const sx = Math.round(bbox.minX * dpr);
-      const sy = Math.round(bbox.minY * dpr);
-
-      if (refs.pdf) {
-        ctx.drawImage(refs.pdf, sx, sy, outW, outH, 0, 0, outW, outH);
+      try {
+        const { toPng } = await import('html-to-image');
+        const dpr = window.devicePixelRatio || 1;
+        const dataUrl = await toPng(refs.element, {
+          pixelRatio: dpr,
+          canvasWidth: Math.round(w * dpr),
+          canvasHeight: Math.round(h * dpr),
+          width: w,
+          height: h,
+          style: {
+            transform: `translate(-${bbox.minX}px, -${bbox.minY}px)`,
+            transformOrigin: 'top left',
+          },
+          filter: (node) => {
+            // Exclude the crop overlay and floating bars from the screenshot
+            if (node instanceof HTMLElement) {
+              const z = node.style?.zIndex;
+              if (z === '8' || z === '10' || z === '100') return false;
+            }
+            return true;
+          },
+        });
+        onAskAiWithContext?.({ type: 'image', dataUrl });
+      } catch (err) {
+        console.error('Region capture failed:', err);
       }
-      if (refs.strokes) {
-        ctx.drawImage(refs.strokes, sx, sy, outW, outH, 0, 0, outW, outH);
-      }
-
-      const dataUrl = offscreen.toDataURL('image/png');
-      onAskAiWithContext?.({ type: 'image', dataUrl });
     },
     [onAskAiWithContext],
   );
