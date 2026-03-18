@@ -697,6 +697,7 @@ export function useSelection({
       onTextBoxMove,
       onTextBoxResize,
       onModeChange,
+      onEmptyRectSelection,
       clearSelection,
     ],
   );
