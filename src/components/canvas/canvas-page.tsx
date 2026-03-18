@@ -123,6 +123,61 @@ export function CanvasPage({
   const overflowNotifiedRef = useRef(false);
   const isSplittingRef = useRef(false);
 
+  // Crop tool state: draw a rectangle to screenshot
+  const [cropRect, setCropRect] = useState<BBox | null>(null);
+  const cropStartRef = useRef<{ x: number; y: number } | null>(null);
+  const isCroppingRef = useRef(false);
+
+  const handleCropPointerDown = useCallback(
+    (e: React.PointerEvent) => {
+      if (activeTool !== 'crop' || e.pointerType === 'touch') return;
+      const el = e.currentTarget as HTMLElement;
+      const rect = el.getBoundingClientRect();
+      const x = e.clientX - rect.left;
+      const y = e.clientY - rect.top;
+      cropStartRef.current = { x, y };
+      isCroppingRef.current = true;
+      setCropRect(null);
+      e.preventDefault();
+      (e.target as HTMLElement).setPointerCapture(e.pointerId);
+    },
+    [activeTool],
+  );
+
+  const handleCropPointerMove = useCallback((e: React.PointerEvent) => {
+    if (!isCroppingRef.current || !cropStartRef.current) return;
+    const el = e.currentTarget as HTMLElement;
+    const rect = el.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+    const s = cropStartRef.current;
+    setCropRect({
+      minX: Math.min(s.x, x),
+      minY: Math.min(s.y, y),
+      maxX: Math.max(s.x, x),
+      maxY: Math.max(s.y, y),
+    });
+  }, []);
+
+  const handleCropPointerUp = useCallback(() => {
+    isCroppingRef.current = false;
+    cropStartRef.current = null;
+    // Keep cropRect visible so user can click "Ask AI"
+  }, []);
+
+  const handleCropAskAi = useCallback(() => {
+    if (!cropRect || !onAskAiWithRegion) return;
+    onAskAiWithRegion(cropRect, page.id);
+    setCropRect(null);
+  }, [cropRect, onAskAiWithRegion, page.id]);
+
+  // Clear crop rect when switching away from crop tool
+  useEffect(() => {
+    if (activeTool !== 'crop') {
+      setCropRect(null);
+    }
+  }, [activeTool]);
+
   // Track text selection state for floating action bar (Read tool)
   const selectedTextRef = useRef<string>('');
   const selectedRectRef = useRef<DOMRect | null>(null);
@@ -669,7 +724,70 @@ export function CanvasPage({
           </div>
         )}
 
-      {/* Layer 5.7: Floating action bar for Read mode text selection */}
+      {/* Layer 5.7: Crop tool overlay + interaction */}
+      {activeTool === 'crop' && (
+        <div
+          className="absolute inset-0"
+          style={{
+            pointerEvents: 'auto',
+            cursor: 'crosshair',
+            touchAction: 'none',
+            zIndex: 8,
+          }}
+          onPointerDown={handleCropPointerDown}
+          onPointerMove={handleCropPointerMove}
+          onPointerUp={handleCropPointerUp}
+        >
+          {/* Crop rectangle */}
+          {cropRect && (
+            <svg
+              className="absolute inset-0"
+              viewBox={`0 0 ${PAGE_WIDTH} ${PAGE_HEIGHT}`}
+              style={{ pointerEvents: 'none' }}
+            >
+              <rect
+                x={cropRect.minX}
+                y={cropRect.minY}
+                width={cropRect.maxX - cropRect.minX}
+                height={cropRect.maxY - cropRect.minY}
+                fill="rgba(139, 92, 246, 0.08)"
+                stroke="#8b5cf6"
+                strokeWidth={2}
+                strokeDasharray="6 3"
+              />
+            </svg>
+          )}
+          {/* Floating "Ask AI" button above crop rect */}
+          {cropRect &&
+            !isCroppingRef.current &&
+            cropRect.maxX - cropRect.minX > 20 &&
+            cropRect.maxY - cropRect.minY > 20 && (
+              <div
+                className="absolute flex items-center gap-1 bg-white rounded-full shadow-lg border px-2 py-1"
+                style={{
+                  left: (cropRect.minX + cropRect.maxX) / 2,
+                  top: cropRect.minY - 40,
+                  transform: 'translateX(-50%)',
+                  pointerEvents: 'auto',
+                  zIndex: 10,
+                }}
+              >
+                <button
+                  onPointerDown={(e) => {
+                    e.stopPropagation();
+                    handleCropAskAi();
+                  }}
+                  className="flex items-center gap-1.5 rounded-full px-3 py-1 text-sm font-medium text-purple-700 transition-colors hover:bg-purple-50"
+                >
+                  <Sparkles className="h-3.5 w-3.5" />
+                  Ask AI
+                </button>
+              </div>
+            )}
+        </div>
+      )}
+
+      {/* Layer 5.8: Floating action bar for Read mode text selection */}
       {activeTool === 'read' && textSelectionRect && (
         <div
           className="fixed z-[100] flex items-center gap-1 rounded-full border bg-white px-2 py-1 shadow-lg"
@@ -713,7 +831,7 @@ export function CanvasPage({
           userSelect: 'none',
           WebkitUserSelect: 'none',
           pointerEvents:
-            activeTool === 'read'
+            activeTool === 'read' || activeTool === 'crop'
               ? 'none'
               : isInteractionMode
                 ? 'auto'
