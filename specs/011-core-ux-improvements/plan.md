@@ -13,6 +13,7 @@
 **Stack**: TypeScript 5 / Next.js 16 (App Router) / Supabase (Postgres + Auth + Realtime + Storage) / shadcn/ui / Tailwind CSS 4 / Vitest / Playwright
 
 **Existing infrastructure leveraged**:
+
 - `useAutoSave` hook — debounced save with status tracking (needs retry extension)
 - `useDocumentSync` hook — coordinates auto-save + realtime sync
 - `useRealtimeSync` hook — Supabase Postgres Changes subscription
@@ -25,6 +26,7 @@
 - RLS on all tables — standard pattern for user isolation
 
 **Key constraints**:
+
 - DB constraint: `documents` cannot have both `folder_id` AND `course_id`
 - DB constraint: `week_id` requires `course_id` to be set
 - AI rate limiting is monthly, enforced atomically via Postgres RPC
@@ -34,12 +36,12 @@
 
 ## Constitution Check
 
-| Principle | Status | Notes |
-|-----------|--------|-------|
-| I. Incremental Development | **PASS** | Plan follows bottom-up: DB migration → server actions → hooks → UI. Each phase produces testable increments. |
-| II. Test-Driven Quality | **PASS** | Every phase includes tests. Integration tests for DB operations, unit tests for hooks/actions, component tests for UI. |
-| III. Protected Main Branch | **PASS** | All work on `011-core-ux-improvements` branch. PR required to merge to `main`. |
-| IV. Migrations as Code | **PASS** | New migration `00017_ai_conversations.sql`. Seed data updated. `supabase db reset` validates full chain. |
+| Principle                       | Status   | Notes                                                                                                                                                |
+| ------------------------------- | -------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
+| I. Incremental Development      | **PASS** | Plan follows bottom-up: DB migration → server actions → hooks → UI. Each phase produces testable increments.                                         |
+| II. Test-Driven Quality         | **PASS** | Every phase includes tests. Integration tests for DB operations, unit tests for hooks/actions, component tests for UI.                               |
+| III. Protected Main Branch      | **PASS** | All work on `011-core-ux-improvements` branch. PR required to merge to `main`.                                                                       |
+| IV. Migrations as Code          | **PASS** | New migration `00017_ai_conversations.sql`. Seed data updated. `supabase db reset` validates full chain.                                             |
 | V. Interview-Ready Architecture | **PASS** | Explanations included for key decisions: error classification, atomic operations, cascade behavior, normalized vs denormalized conversation storage. |
 
 ---
@@ -55,6 +57,7 @@
 #### Tasks
 
 **1.1 Create migration `00017_ai_conversations.sql`**
+
 - `ai_conversations` table: id, user_id, course_id, title, created_at, updated_at
 - `ai_messages` table: id, conversation_id, role, content, sources_json, model, created_at
 - Foreign keys with CASCADE deletes
@@ -63,17 +66,20 @@
 - Trigger: `handle_updated_at()` on `ai_conversations`
 
 **1.2 Update seed data**
+
 - Add 2-3 test conversations with messages to `supabase/seed.sql`
 - Link to existing seeded courses (CS101, Linear Algebra)
 
 **1.3 Add TypeScript types**
+
 - Add `AiConversation` and `AiMessage` interfaces to `src/types/database.ts`
 
 **1.4 Validate migration**
+
 - Run `supabase db reset` — verify full migration chain replays cleanly
 - Write integration test: insert conversation + messages, verify RLS, verify cascade delete on course deletion
 
-**Interview talking point**: *Why normalized tables (conversations + messages) instead of a JSONB array of messages in a single conversations table? Answer: Normalized design allows efficient pagination, individual message queries, and future search indexing. JSONB arrays grow unbounded, can't be indexed for text search, and require full-document reads for any access.*
+**Interview talking point**: _Why normalized tables (conversations + messages) instead of a JSONB array of messages in a single conversations table? Answer: Normalized design allows efficient pagination, individual message queries, and future search indexing. JSONB arrays grow unbounded, can't be indexed for text search, and require full-document reads for any access._
 
 ---
 
@@ -84,6 +90,7 @@
 #### Tasks
 
 **2.1 Create `src/lib/actions/conversations.ts`**
+
 - `createConversation(courseId, title)` — insert new conversation
 - `getConversations(courseId)` — list conversations sorted by `updated_at DESC`
 - `getMessages(conversationId)` — load all messages sorted by `created_at ASC`
@@ -94,6 +101,7 @@
 - All functions: authenticate via `createClient()`, scope to `user_id`
 
 **2.2 Extend `moveDocument` in `src/lib/actions/documents.ts`**
+
 - Change signature to accept `MoveDestination` type
 - Handle three cases: folder, course (+ optional week), root
 - Clear `material_id` when moving to a different course or to a folder (if `material_id` was set)
@@ -102,11 +110,12 @@
 - Write integration test verifying DB constraint enforcement
 
 **2.3 Write tests**
+
 - `conversations.test.ts` — unit tests for action logic
 - `conversations.integration.test.ts` — DB round-trip: create, list, add messages, delete, verify cascade
 - `documents.test.ts` — extended move: folder→course, course→folder, week→week, material-linked move
 
-**Interview talking point**: *Why a `MoveDestination` discriminated union instead of optional parameters? Answer: Type safety — the compiler enforces that when `type: 'folder'`, only `folderId` is present. This prevents bugs like accidentally passing both `folderId` and `courseId`, which would violate the DB constraint.*
+**Interview talking point**: _Why a `MoveDestination` discriminated union instead of optional parameters? Answer: Type safety — the compiler enforces that when `type: 'folder'`, only `folderId` is present. This prevents bugs like accidentally passing both `folderId` and `courseId`, which would violate the DB constraint._
 
 ---
 
@@ -117,6 +126,7 @@
 #### Tasks
 
 **3.1 Create conversation API routes**
+
 - `GET /api/ai/conversations?courseId=X` — list conversations
 - `GET /api/ai/conversations/[conversationId]/messages` — load messages
 - `DELETE /api/ai/conversations/[conversationId]` — delete conversation
@@ -124,6 +134,7 @@
 - All routes: authenticate, verify ownership
 
 **3.2 Modify `POST /api/ai/ask`**
+
 - Accept optional `conversationId` in request body
 - If no `conversationId`: create new conversation, set title from first ~50 chars of question
 - Persist user message before calling AI
@@ -133,12 +144,13 @@
 - Update conversation `updated_at` after each message
 
 **3.3 Write tests**
+
 - Route handler tests for each endpoint
 - AI ask integration test: verify messages are persisted after streaming
 - Test conversation creation flow (no conversationId → new conversation returned)
 - Test continuation flow (with conversationId → messages appended)
 
-**Interview talking point**: *Why load conversation history server-side instead of trusting client-sent history? Answer: Security — the client could send fabricated history to manipulate AI responses. Server-side loading from the database is the source of truth. It also simplifies the client since it doesn't need to manage history serialization.*
+**Interview talking point**: _Why load conversation history server-side instead of trusting client-sent history? Answer: Security — the client could send fabricated history to manipulate AI responses. Server-side loading from the database is the source of truth. It also simplifies the client since it doesn't need to manage history serialization._
 
 ---
 
@@ -151,6 +163,7 @@
 #### Tasks
 
 **4.1 Extend `useAutoSave` hook**
+
 - Add new states: `'retrying'` and `'error'`
 - Implement exponential backoff: 1s → 2s → 4s (3 retries max)
 - Classify errors:
@@ -162,24 +175,28 @@
 - Reset retry state on successful save or new `trigger()` call
 
 **4.2 Add reconnection-triggered retry to `useDocumentSync`**
+
 - Watch `connectionStatus` transitions: `disconnected` → `connected`
 - Listen to `window.addEventListener('online', ...)`
 - On either event: if status is `'error'` or `'retrying'`, call `retryNow()`
 - Deduplicate: use a flag to prevent double-retry if both events fire
 
 **4.3 Add `beforeunload` confirmation**
+
 - Existing `beforeunload` handler calls `flush()`. Extend it to also set `event.returnValue` when status is `'unsaved'`, `'retrying'`, or `'error'`.
 
 **4.4 Add `manualSave` to `useDocumentSync`**
+
 - Wraps `flushSave()` — exposed for the Save button
 - Returns the same promise for button loading state
 
 **4.5 Write tests**
+
 - `use-auto-save.test.ts`: test retry with mock timers, error classification, state transitions, reconnection retry
 - Test that auth errors don't trigger retry
 - Test that retryCount resets after success
 
-**Interview talking point**: *Exponential backoff is a standard distributed systems pattern. Why not linear backoff? Answer: Exponential backoff reduces server load during outages by spacing retries further apart. If 1000 users hit a network issue simultaneously, linear retry would hammer the server at a fixed rate, while exponential backoff naturally distributes the retry load.*
+**Interview talking point**: _Exponential backoff is a standard distributed systems pattern. Why not linear backoff? Answer: Exponential backoff reduces server load during outages by spacing retries further apart. If 1000 users hit a network issue simultaneously, linear retry would hammer the server at a fixed rate, while exponential backoff naturally distributes the retry load._
 
 ---
 
@@ -190,6 +207,7 @@
 #### Tasks
 
 **5.1 Update `SaveIndicator` in `canvas-editor.tsx`**
+
 - Add `'retrying'` and `'error'` to the label/color map
   - retrying: amber, "Retrying..."
   - error: red, "Error"
@@ -200,6 +218,7 @@
 - Make the `[Retry]` text clickable, calling `retryNow()`
 
 **5.2 Add Save button to editor header**
+
 - Small ghost button with `Save` icon (from lucide-react), left of `SaveIndicator`
 - Calls `manualSave()` on click
 - Disabled when status is `'saved'` or `'saving'`
@@ -207,6 +226,7 @@
 - Add `Ctrl+S` / `Cmd+S` keyboard shortcut via `useEffect` with `keydown` listener
 
 **5.3 Write component tests**
+
 - `SaveIndicator` renders correct labels/colors for all 5 states
 - Error tooltip appears on click/hover when in error state
 - Save button disabled states
@@ -221,6 +241,7 @@
 #### Tasks
 
 **6.1 Create `MoveDocumentDialog` component**
+
 - Props: `{ documentId, document, open, onOpenChange }`
 - Fetches courses (with weeks) and folders on open
 - Renders a tree:
@@ -246,16 +267,18 @@
 - Follow existing dialog patterns (controlled via `open`/`onOpenChange`)
 
 **6.2 Wire up `DocumentCard` and dashboard pages**
+
 - In dashboard pages (`page.tsx`, `folders/[folderId]/page.tsx`, `courses/[courseId]/page.tsx`):
   - Add state: `moveDocId` and `moveDoc` to track which document is being moved
   - Pass `onMove={(id) => { setMoveDocId(id); setMoveDoc(doc) }}` to `DocumentCard`
   - Render `<MoveDocumentDialog>` controlled by `moveDocId` state
 
 **6.3 Write tests**
+
 - `move-document-dialog.test.tsx`: tree rendering, selection, material warning, new folder inline
 - Integration test: move document between course and folder, verify DB state
 
-**Interview talking point**: *The tree uses a discriminated union for destinations. In the dialog, each tree node carries metadata about what type it is (folder vs course vs week). This maps directly to the `MoveDestination` type on the server, so the client doesn't need to construct the update manually — it just sends the selected node's destination.*
+**Interview talking point**: _The tree uses a discriminated union for destinations. In the dialog, each tree node carries metadata about what type it is (folder vs course vs week). This maps directly to the `MoveDestination` type on the server, so the client doesn't need to construct the update manually — it just sends the selected node's destination._
 
 ---
 
@@ -268,6 +291,7 @@ This is the largest phase. It modifies the existing `AiChatPanel` substantially.
 #### Tasks
 
 **7.1 Create `ConversationList` component**
+
 - Props: `{ courseId, onSelect(conversationId), onNew(), onDelete(conversationId) }`
 - Fetches conversations via `GET /api/ai/conversations?courseId=X`
 - Renders list items: title (truncated), relative timestamp ("2 hours ago"), delete button
@@ -276,6 +300,7 @@ This is the largest phase. It modifies the existing `AiChatPanel` substantially.
 - Empty state for courses with no conversations (shouldn't normally happen since panel auto-creates)
 
 **7.2 Refactor `AiChatPanel` state management**
+
 - Add state: `currentConversationId`, `view: 'chat' | 'list'`
 - On panel open:
   1. Fetch conversations for `courseId`
@@ -286,6 +311,7 @@ This is the largest phase. It modifies the existing `AiChatPanel` substantially.
 - On delete from list: call delete API, remove from local state
 
 **7.3 Modify `handleSend` in `AiChatPanel`**
+
 - Include `conversationId` in the POST body to `/api/ai/ask`
 - On first message (no `conversationId`): the API creates a conversation and returns `conversationId` via SSE event
 - Parse the new `{ type: 'conversation', conversationId, messageId }` SSE event
@@ -293,21 +319,24 @@ This is the largest phase. It modifies the existing `AiChatPanel` substantially.
 - Remove client-side `conversationHistory` from request body (server loads it now)
 
 **7.4 Add conversation list toggle to panel header**
+
 - History icon button (e.g., `MessageSquare` or `List` from lucide-react)
 - Toggles `view` between `'chat'` and `'list'`
 - Active state styling when list is shown
 
 **7.5 Add conversation title editing**
+
 - In conversation list: double-click or edit icon on title
 - Calls `PATCH /api/ai/conversations/[id]`
 - In chat view header: show conversation title (truncated), editable on click
 
 **7.6 Write tests**
+
 - `conversation-list.test.tsx`: rendering, selection, deletion, empty state
 - `ai-chat-panel.test.tsx`: conversation loading on open, message persistence, view toggle, new conversation flow
 - Integration: end-to-end flow — open panel, send message, close, reopen, verify restoration
 
-**Interview talking point**: *Why toggle between views instead of a sidebar? Answer: The AI panel is 420px on desktop. A sidebar within it would leave ~200px for content — too narrow for readable chat. A full-view toggle gives 100% of the panel width to whichever view is active. On mobile (full-screen panel), this is even more important.*
+**Interview talking point**: _Why toggle between views instead of a sidebar? Answer: The AI panel is 420px on desktop. A sidebar within it would leave ~200px for content — too narrow for readable chat. A full-view toggle gives 100% of the panel width to whichever view is active. On mobile (full-screen panel), this is even more important._
 
 ---
 
@@ -318,11 +347,13 @@ This is the largest phase. It modifies the existing `AiChatPanel` substantially.
 #### Tasks
 
 **8.1 Cross-feature integration tests**
+
 - Auto-save retry + reconnection: simulate disconnect, verify retry on reconnect
 - Document move + AI panel: move document to different course, verify AI panel still shows correct course conversations
 - Conversation persistence + rate limiting: verify rate limit still enforced when continuing a conversation
 
 **8.2 Edge case testing**
+
 - Move material-linked document: verify warning dialog, verify `material_id` cleared
 - Move to same location: verify no-op
 - Delete course: verify conversations cascade-deleted
@@ -330,12 +361,14 @@ This is the largest phase. It modifies the existing `AiChatPanel` substantially.
 - Very long conversation: verify 20-message window in AI prompt
 
 **8.3 Polish**
+
 - Verify all states have appropriate loading indicators
 - Verify keyboard navigation in move dialog tree
 - Verify mobile responsiveness of conversation list and move dialog
 - Run full linting pass: `pnpm lint` and `pnpm format:check`
 
 **8.4 Final CI validation**
+
 - `pnpm test` — all unit tests pass
 - `pnpm test:integration` — all integration tests pass (with Supabase)
 - `pnpm build` — production build succeeds
@@ -369,10 +402,10 @@ Phase 1 (DB Migration)
 
 ## Risk Assessment
 
-| Risk | Likelihood | Impact | Mitigation |
-|------|-----------|--------|------------|
-| SSE event ordering: `conversation` event arrives after first `text` chunk | Medium | Client misses conversationId | Buffer text chunks until `conversation` event arrives, then flush |
-| Concurrent saves from auto-save retry and manual save button | Medium | Duplicate saves, race condition | Use a mutex flag — if a save is in flight, queue the next one |
-| Move dialog tree is slow to render with many courses/weeks | Low | Slow dialog open | Lazy-load weeks on course expansion |
-| Conversation list grows very large (100+) | Low | Slow load, poor UX | Paginate or virtual scroll if needed (defer to v2) |
-| RLS policy on `ai_messages` uses subquery (slower than direct check) | Low | Slower message queries | The subquery hits a small table (`ai_conversations`) with a PK lookup — fast enough |
+| Risk                                                                      | Likelihood | Impact                          | Mitigation                                                                          |
+| ------------------------------------------------------------------------- | ---------- | ------------------------------- | ----------------------------------------------------------------------------------- |
+| SSE event ordering: `conversation` event arrives after first `text` chunk | Medium     | Client misses conversationId    | Buffer text chunks until `conversation` event arrives, then flush                   |
+| Concurrent saves from auto-save retry and manual save button              | Medium     | Duplicate saves, race condition | Use a mutex flag — if a save is in flight, queue the next one                       |
+| Move dialog tree is slow to render with many courses/weeks                | Low        | Slow dialog open                | Lazy-load weeks on course expansion                                                 |
+| Conversation list grows very large (100+)                                 | Low        | Slow load, poor UX              | Paginate or virtual scroll if needed (defer to v2)                                  |
+| RLS policy on `ai_messages` uses subquery (slower than direct check)      | Low        | Slower message queries          | The subquery hits a small table (`ai_conversations`) with a PK lookup — fast enough |

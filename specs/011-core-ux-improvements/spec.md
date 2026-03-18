@@ -40,6 +40,7 @@ A student is editing a document and wants to explicitly save their work before s
 **Why this priority**: Data loss is the single most destructive UX failure. A manual save button gives students confidence and control. Silent save failures erode trust — visible-on-demand errors strike the right balance between clean UI and transparency.
 
 **Independent Test**:
+
 1. Edit a document, click "Save" manually, verify the save completes and indicator shows "Saved."
 2. Simulate a network interruption. Verify auto-save retries 3 times. After retries fail, verify the indicator changes to an error state. Click the indicator and verify error details are shown. Restore the network and verify pending changes are saved.
 

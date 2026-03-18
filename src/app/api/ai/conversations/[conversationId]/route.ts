@@ -7,7 +7,9 @@ export async function DELETE(
 ) {
   const { conversationId } = await params;
   const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
 
   if (!user) {
     return NextResponse.json({ error: 'Not authenticated' }, { status: 401 });
@@ -32,7 +34,9 @@ export async function PATCH(
 ) {
   const { conversationId } = await params;
   const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
 
   if (!user) {
     return NextResponse.json({ error: 'Not authenticated' }, { status: 401 });
@@ -58,7 +62,10 @@ export async function PATCH(
   }
 
   if (!data) {
-    return NextResponse.json({ error: 'Conversation not found' }, { status: 404 });
+    return NextResponse.json(
+      { error: 'Conversation not found' },
+      { status: 404 },
+    );
   }
 
   return NextResponse.json({ id: data.id, title: data.title });

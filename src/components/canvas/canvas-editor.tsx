@@ -40,7 +40,12 @@ import { ZoomIndicator } from './zoom-indicator';
 import { EditorToolbar } from '@/components/editor/editor-toolbar';
 import { CanvasPage } from './canvas-page';
 import { usePdfBackground } from '@/hooks/use-pdf-background';
-import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from '@/components/ui/tooltip';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+  TooltipProvider,
+} from '@/components/ui/tooltip';
 import type { SaveErrorType } from '@/hooks/use-auto-save';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any

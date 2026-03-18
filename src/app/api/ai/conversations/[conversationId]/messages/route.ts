@@ -7,7 +7,9 @@ export async function GET(
 ) {
   const { conversationId } = await params;
   const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
 
   if (!user) {
     return NextResponse.json({ error: 'Not authenticated' }, { status: 401 });
@@ -22,7 +24,10 @@ export async function GET(
     .single();
 
   if (!conversation) {
-    return NextResponse.json({ error: 'Conversation not found' }, { status: 404 });
+    return NextResponse.json(
+      { error: 'Conversation not found' },
+      { status: 404 },
+    );
   }
 
   // Fetch messages in chronological order
