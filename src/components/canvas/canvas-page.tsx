@@ -73,6 +73,7 @@ interface CanvasPageProps {
   materialId?: string | null;
   onAskAiWithText?: (text: string) => void;
   onAskAiWithRegion?: (bbox: BBox, pageId: string) => void;
+  autoCropToAi?: boolean;
   onCanvasRefsReady?: (
     pageId: string,
     pdfCanvas: HTMLCanvasElement | null,
@@ -111,6 +112,7 @@ export function CanvasPage({
   materialId,
   onAskAiWithText,
   onAskAiWithRegion,
+  autoCropToAi = false,
   onCanvasRefsReady,
 }: CanvasPageProps) {
   const pdfCanvasRef = useRef<HTMLCanvasElement>(null);
@@ -616,6 +618,20 @@ export function CanvasPage({
           resizeBBox={selectionResizeBBox}
         />
       )}
+
+      {/* Auto-crop: when Crop button was pressed, auto-trigger "Ask AI" as soon as selection is made */}
+      {activeTool === 'select' &&
+        autoCropToAi &&
+        selectionBBox &&
+        !isSelectionDragging &&
+        !isSelectionResizing &&
+        materialId &&
+        onAskAiWithRegion &&
+        (() => {
+          // Fire on next tick to avoid setState-during-render
+          setTimeout(() => onAskAiWithRegion(selectionBBox, page.id), 0);
+          return null;
+        })()}
 
       {/* Layer 5.6: Floating action bar above selection */}
       {activeTool === 'select' &&
