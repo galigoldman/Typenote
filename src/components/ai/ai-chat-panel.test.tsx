@@ -42,6 +42,7 @@ const defaultProps = {
   courseId: 'course-1',
   isOpen: true,
   onClose: vi.fn(),
+  pendingContextItems: [],
 };
 
 /**

@@ -2,6 +2,8 @@ import { NextResponse } from 'next/server';
 import { GoogleGenAI } from '@google/genai';
 
 import { buildAiContext, type QuestionParams } from '@/lib/actions/ai-context';
+import { checkAndIncrementUsage } from '@/lib/ai/rate-limit';
+import { createClient } from '@/lib/supabase/server';
 
 export async function POST(req: Request) {
   try {
@@ -16,6 +18,7 @@ export async function POST(req: Request) {
       weekLabel,
       documentContent,
       conversationHistory,
+      conversationId,
       imageData,
     } = body;
 
@@ -75,13 +78,141 @@ export async function POST(req: Request) {
           { status: 400 },
         );
       }
-      // Max ~4MB base64 ≈ 3MB image
       if (imageData.length > 5_300_000) {
         return NextResponse.json(
           { error: 'imageData exceeds maximum size (4MB)' },
           { status: 400 },
         );
       }
+    }
+
+    // --- Rate limit check (before any AI work) ---
+    // Authenticate first, then atomically check + increment usage.
+    // Why before buildAiContext? Because buildAiContext calls getAuthUserId()
+    // internally, but we need the userId here for the rate limit RPC.
+    const supabase = await createClient();
+    const {
+      data: { user },
+      error: authError,
+    } = await supabase.auth.getUser();
+
+    if (authError || !user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    // Atomic check + increment. Fail-closed: if this throws, we reject the request.
+    // Why fail-closed? The purpose of rate limiting is cost protection. A database
+    // outage shouldn't become a cost spike.
+    try {
+      const rateLimit = await checkAndIncrementUsage(user.id, mode);
+
+      if (!rateLimit.isAllowed) {
+        // First day of next month
+        const now = new Date();
+        const resetsAt = new Date(
+          Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1),
+        );
+
+        return NextResponse.json(
+          {
+            error: 'rate_limited',
+            message: `You've used all ${rateLimit.monthlyLimit} of your monthly AI questions. Your quota resets on ${resetsAt.toLocaleDateString('en-US', { month: 'long', day: 'numeric', timeZone: 'UTC' })}.`,
+            used: rateLimit.currentCount,
+            limit: rateLimit.monthlyLimit,
+            resetsAt: resetsAt.toISOString(),
+          },
+          { status: 429 },
+        );
+      }
+    } catch (rateLimitError) {
+      console.error('Rate limit check failed:', rateLimitError);
+      return NextResponse.json(
+        {
+          error: 'service_unavailable',
+          message:
+            'AI service is temporarily unavailable. Please try again in a moment.',
+        },
+        { status: 503 },
+      );
+    }
+
+    // --- Conversation persistence ---
+    let activeConversationId = conversationId as string | undefined;
+    let serverHistory: Array<{ role: string; content: string }> = [];
+
+    // If continuing an existing conversation, load recent messages
+    if (activeConversationId) {
+      // Verify ownership
+      const { data: conv } = await supabase
+        .from('ai_conversations')
+        .select('id')
+        .eq('id', activeConversationId)
+        .eq('user_id', user.id)
+        .single();
+
+      if (!conv) {
+        return new Response(
+          JSON.stringify({ error: 'Conversation not found' }),
+          {
+            status: 404,
+            headers: { 'Content-Type': 'application/json' },
+          },
+        );
+      }
+
+      // Load last 20 messages as server-side history
+      const { data: recentMsgs } = await supabase
+        .from('ai_messages')
+        .select('role, content')
+        .eq('conversation_id', activeConversationId)
+        .order('created_at', { ascending: false })
+        .limit(20);
+
+      if (recentMsgs) {
+        serverHistory = recentMsgs
+          .reverse()
+          .map((m) => ({ role: m.role, content: m.content }));
+      }
+    } else {
+      // Create new conversation with title from first ~50 chars
+      const title = question.slice(0, 50);
+      const { data: newConv, error: convError } = await supabase
+        .from('ai_conversations')
+        .insert({
+          user_id: user.id,
+          course_id: courseId,
+          title,
+        })
+        .select()
+        .single();
+
+      if (convError || !newConv) {
+        console.error('Failed to create conversation:', convError);
+        // Non-fatal — continue without persistence
+      } else {
+        activeConversationId = newConv.id;
+      }
+    }
+
+    // Persist user message
+    let userMessageId: string | undefined;
+    if (activeConversationId) {
+      const { data: userMsg } = await supabase
+        .from('ai_messages')
+        .insert({
+          conversation_id: activeConversationId,
+          role: 'user',
+          content: question,
+        })
+        .select('id')
+        .single();
+      userMessageId = userMsg?.id;
+
+      // Bump conversation updated_at
+      await supabase
+        .from('ai_conversations')
+        .update({ updated_at: new Date().toISOString() })
+        .eq('id', activeConversationId);
     }
 
     const params: QuestionParams = {
@@ -93,7 +224,11 @@ export async function POST(req: Request) {
       courseName: courseName || undefined,
       weekLabel: weekLabel || undefined,
       documentContent: documentContent || undefined,
-      conversationHistory: conversationHistory || undefined,
+      // Use server-loaded history if available, otherwise fall back to client-sent history
+      conversationHistory:
+        serverHistory.length > 0
+          ? serverHistory
+          : conversationHistory || undefined,
       imageData: imageData || undefined,
     };
 
@@ -116,6 +251,7 @@ export async function POST(req: Request) {
 
     // Create a streaming response using SSE-like format
     const encoder = new TextEncoder();
+    let fullResponse = '';
     const stream = new ReadableStream({
       async start(controller) {
         try {
@@ -126,9 +262,19 @@ export async function POST(req: Request) {
             ),
           );
 
+          // Send conversation metadata so the client can track the conversation
+          if (activeConversationId) {
+            controller.enqueue(
+              encoder.encode(
+                `data: ${JSON.stringify({ type: 'conversation', conversationId: activeConversationId, messageId: userMessageId })}\n\n`,
+              ),
+            );
+          }
+
           for await (const chunk of streamResult) {
             const text = chunk.text ?? '';
             if (text) {
+              fullResponse += text;
               controller.enqueue(
                 encoder.encode(
                   `data: ${JSON.stringify({ type: 'text', text })}\n\n`,
@@ -140,6 +286,23 @@ export async function POST(req: Request) {
           controller.enqueue(
             encoder.encode(`data: ${JSON.stringify({ type: 'done' })}\n\n`),
           );
+
+          // Persist assistant message
+          if (activeConversationId && fullResponse) {
+            await supabase.from('ai_messages').insert({
+              conversation_id: activeConversationId,
+              role: 'assistant',
+              content: fullResponse,
+              sources_json: sources || null,
+              model: mode === 'deep' ? 'pro' : 'flash',
+            });
+
+            // Bump conversation updated_at
+            await supabase
+              .from('ai_conversations')
+              .update({ updated_at: new Date().toISOString() })
+              .eq('id', activeConversationId);
+          }
         } catch (err) {
           const message = err instanceof Error ? err.message : 'Stream error';
           controller.enqueue(
