@@ -49,6 +49,38 @@ ${documentContext}`;
  */
 export const SYSTEM_PROMPT = buildSystemPrompt({ hasDocumentContent: false });
 
+export function buildQuestionSplitPrompt(descriptionHtml: string): string {
+  return `You are a precise text parser. Analyze the following assignment description HTML and identify individual questions.
+
+For each question, return its boundary positions (character offsets within the HTML string), a label, and whether it's a subquestion.
+
+IMPORTANT:
+- Boundaries MUST align to complete HTML element boundaries (opening/closing tags of <p>, <li>, <tr>, <div>, etc.)
+- Never split mid-element
+- Preserve shared preamble/context text by including preamble boundaries for questions that share context
+- If no clear question structure exists, return a single question spanning the entire text
+- Flag boundaries where you are uncertain with "low_confidence": true
+
+Return ONLY valid JSON in this exact format:
+{
+  "questions": [
+    {
+      "label": "1",
+      "position": 0,
+      "boundary_start": 0,
+      "boundary_end": 42,
+      "parent_label": null,
+      "preamble_start": null,
+      "preamble_end": null,
+      "low_confidence": false
+    }
+  ]
+}
+
+Assignment HTML:
+${descriptionHtml}`;
+}
+
 export const LATEX_SYSTEM_PROMPT = `You are a LaTeX conversion assistant.
 Convert the user's natural language mathematical expression into valid LaTeX markup.
 Return ONLY the LaTeX code, with no explanation, no surrounding text, no dollar signs, and no code blocks.

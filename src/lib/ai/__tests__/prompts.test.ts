@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { buildSystemPrompt } from '../prompts';
+import { buildQuestionSplitPrompt, buildSystemPrompt } from '../prompts';
 
 describe('buildSystemPrompt', () => {
   it('returns generic prompt with no context', () => {
@@ -65,5 +65,14 @@ describe('buildSystemPrompt', () => {
     expect(prompt).toContain('[Sources]');
     expect(prompt).toContain('primary source');
     expect(prompt).toContain('smart AI');
+  });
+});
+
+describe('buildQuestionSplitPrompt', () => {
+  it('produces a prompt that instructs the AI to return JSON boundaries', () => {
+    const prompt = buildQuestionSplitPrompt('<p>1. Solve x+2=5</p><p>2. Find the derivative</p>');
+    expect(prompt).toContain('boundary_start');
+    expect(prompt).toContain('boundary_end');
+    expect(prompt).toContain('JSON');
   });
 });
