@@ -1,10 +1,11 @@
-import { describe, it, expectTypeOf } from 'vitest';
+import { describe, it, expect, expectTypeOf } from 'vitest';
 import type {
   Profile,
   Folder,
   Document,
   Subject,
   CanvasType,
+  MoodleAssignment,
 } from './database';
 
 describe('Database types', () => {
@@ -50,5 +51,22 @@ describe('Database types', () => {
     expectTypeOf<'grid'>().toMatchTypeOf<CanvasType>();
     // @ts-expect-error - invalid canvas type
     expectTypeOf<'dots'>().toMatchTypeOf<CanvasType>();
+  });
+
+  it('MoodleAssignment interface has required fields', () => {
+    const assignment: MoodleAssignment = {
+      id: 'test',
+      section_id: 'section-1',
+      moodle_url: 'https://moodle.example.com/mod/assign/view.php?id=1',
+      moodle_module_id: '1',
+      title: 'Homework 1',
+      description_html: '<p>Question 1...</p>',
+      due_date: '2026-04-01T23:59:00Z',
+      is_removed: false,
+      content_version: 1,
+      created_at: '2026-03-18T00:00:00Z',
+      updated_at: '2026-03-18T00:00:00Z',
+    };
+    expect(assignment.id).toBe('test');
   });
 });

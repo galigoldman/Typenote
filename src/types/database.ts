@@ -186,3 +186,41 @@ export interface AiMessage {
   model: 'flash' | 'pro' | null;
   created_at: string;
 }
+
+export interface MoodleAssignment {
+  id: string;
+  section_id: string;
+  moodle_url: string;
+  moodle_module_id: string | null;
+  title: string;
+  description_html: string;
+  due_date: string | null;
+  is_removed: boolean;
+  content_version: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface AssignmentSplit {
+  id: string;
+  assignment_id: string;
+  creator_type: 'ai' | 'student';
+  creator_id: string | null;
+  is_personal: boolean;
+  content_version: number;
+  created_at: string;
+}
+
+export interface SplitQuestion {
+  id: string;
+  split_id: string;
+  parent_id: string | null;
+  label: string;
+  position: number;
+  boundary_start: number;
+  boundary_end: number;
+  preamble_start: number | null;
+  preamble_end: number | null;
+  low_confidence: boolean;
+  created_at: string;
+}
