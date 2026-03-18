@@ -67,7 +67,8 @@ export type ExtensionRequest =
   | ScrapeCourseContentRequest
   | DownloadAndUploadRequest
   | CheckPermissionRequest
-  | RequestPermissionRequest;
+  | RequestPermissionRequest
+  | ScrapeAssignmentRequest;
 
 // ============================================
 // Response types (Extension -> Web App)
@@ -110,12 +111,26 @@ export interface ScrapedCoursesData {
 }
 
 export interface ScrapedItem {
-  type: 'file' | 'link';
+  type: 'file' | 'link' | 'assignment';
   name: string;
   moodleUrl: string;
   externalUrl?: string;
   fileSize?: number;
   mimeType?: string;
+}
+
+export interface ScrapeAssignmentRequest {
+  type: 'SCRAPE_ASSIGNMENT';
+  payload: {
+    assignmentUrl: string;
+  };
+}
+
+export interface ScrapedAssignmentData {
+  title: string;
+  descriptionHtml: string;
+  dueDate: string | null;
+  moodleModuleId: string;
 }
 
 export interface ScrapedSection {

@@ -230,10 +230,10 @@ function parseActivity(activity: HTMLElement): ScrapedItem | null {
     return null;
   }
 
-  // Assignments are not downloadable files — treat them as links
+  // Assignments are not downloadable files — scrape them for full content
   if (baseModType === 'assign' || moodleUrl.includes('/mod/assign/')) {
     return {
-      type: 'link',
+      type: 'assignment' as const,
       name,
       moodleUrl,
       externalUrl: moodleUrl,

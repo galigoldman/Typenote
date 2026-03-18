@@ -17,6 +17,7 @@ import type {
   LoginStatusData,
   ScrapedCoursesData,
   ScrapedCourseContentData,
+  ScrapedAssignmentData,
 } from '../types/messages';
 
 const EXTENSION_VERSION = '0.1.0';
@@ -83,6 +84,9 @@ async function handleMessage(
         return { success: false, error: String(err) };
       }
     }
+
+    case 'SCRAPE_ASSIGNMENT':
+      return await handleScrapeAssignment(message.payload.assignmentUrl);
 
     default:
       return { success: false, error: `Unknown message type` };
@@ -462,5 +466,41 @@ async function handleDownloadAndUpload(
     };
   } catch (err) {
     return { success: false, error: `Download/upload failed: ${String(err)}` };
+  }
+}
+
+// ============================================
+// Handler: SCRAPE_ASSIGNMENT
+// ============================================
+
+/**
+ * Navigates to an assignment page and extracts title, description HTML,
+ * due date, and Moodle module ID using the assignment-scraper content script.
+ */
+async function handleScrapeAssignment(
+  assignmentUrl: string,
+): Promise<ExtensionResponse> {
+  try {
+    const tabId = await getOrCreateMoodleTab(new URL(assignmentUrl).origin);
+    await chrome.tabs.update(tabId, { url: assignmentUrl });
+    await waitForTabLoad(tabId);
+
+    await chrome.scripting.executeScript({
+      target: { tabId },
+      files: ['content/assignment-scraper.js'],
+    });
+
+    const [scraped] = await chrome.scripting.executeScript({
+      target: { tabId },
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      func: () => (window as any).__typenote_assignment_scraper(),
+    });
+
+    return { success: true, data: scraped.result as ScrapedAssignmentData };
+  } catch (err) {
+    return {
+      success: false,
+      error: `Assignment scraping failed: ${String(err)}`,
+    };
   }
 }
