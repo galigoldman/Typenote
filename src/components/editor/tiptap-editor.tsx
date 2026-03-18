@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { useEditor, EditorContent } from '@tiptap/react';
+import { useEditor, EditorContent, ReactNodeViewRenderer } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
 import Underline from '@tiptap/extension-underline';
 import TextAlign from '@tiptap/extension-text-align';
@@ -16,6 +16,8 @@ import { AutoDirection } from '@/lib/editor/rtl-extension';
 import { Indent } from '@/lib/editor/indent-extension';
 import { MathExpression } from '@/lib/editor/math-extension';
 import { MathInputBox } from '@/lib/editor/math-input-box';
+import { QuestionContextNode } from '@/lib/editor/question-context-node';
+import { QuestionContextBlockView } from '@/components/assignments/question-context-block';
 import { EditorToolbar } from './editor-toolbar';
 import { toast } from 'sonner';
 import 'katex/dist/katex.min.css';
@@ -113,6 +115,11 @@ export function TiptapEditor({ document }: TiptapEditorProps) {
       AutoDirection,
       Indent,
       MathExpression,
+      QuestionContextNode.extend({
+        addNodeView() {
+          return ReactNodeViewRenderer(QuestionContextBlockView);
+        },
+      }),
     ],
     content: document.content as Record<string, unknown>,
     editorProps: {
