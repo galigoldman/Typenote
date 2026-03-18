@@ -215,12 +215,32 @@ export async function openMaterialAsDocument(
   // Check for existing document linked to this material
   const { data: existing } = await supabase
     .from('documents')
-    .select('id')
+    .select('id, pages')
     .eq('material_id', materialId)
     .eq('user_id', user.id)
     .maybeSingle();
 
   if (existing) {
+    // If the document has fewer pages than the PDF, add the missing ones
+    const existingPages =
+      (existing.pages as { pages?: Array<{ pdfPage?: number }> })?.pages ?? [];
+    if (existingPages.length < pageCount) {
+      const newPages = [...existingPages];
+      for (let i = existingPages.length; i < pageCount; i++) {
+        newPages.push({
+          id: Math.random().toString(36).slice(2) + Date.now().toString(36),
+          order: i,
+          pdfPage: i,
+          strokes: [],
+          textBoxes: [],
+          flowContent: null,
+        });
+      }
+      await supabase
+        .from('documents')
+        .update({ pages: { pages: newPages } })
+        .eq('id', existing.id);
+    }
     return { documentId: existing.id, created: false };
   }
 
