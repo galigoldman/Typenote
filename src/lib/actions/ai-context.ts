@@ -68,6 +68,7 @@ export type QuestionParams = {
   courseName?: string;
   weekLabel?: string;
   documentContent?: string;
+  documentJsonContent?: Record<string, unknown> | null;
   conversationHistory?: Array<{ role: 'user' | 'assistant'; content: string }>;
   imageData?: string;
 };
@@ -103,6 +104,21 @@ async function getAuthUserId(): Promise<string> {
   } = await supabase.auth.getUser();
   if (error || !user) throw new Error('Unauthorized');
   return user.id;
+}
+
+// ---------------------------------------------------------------------------
+// extractQuestionContext — parse TipTap JSON for questionContext node
+// ---------------------------------------------------------------------------
+
+export function extractQuestionContext(
+  content: Record<string, unknown> | null,
+): { label: string; html: string } | null {
+  if (!content || !Array.isArray((content as any).content)) return null;
+  const nodes = (content as any).content as Array<Record<string, unknown>>;
+  const questionNode = nodes.find((n) => n.type === 'questionContext');
+  if (!questionNode || !questionNode.attrs) return null;
+  const attrs = questionNode.attrs as Record<string, string>;
+  return { label: attrs.label ?? '', html: attrs.html ?? '' };
 }
 
 // ---------------------------------------------------------------------------
@@ -330,15 +346,18 @@ export async function askQuestion(
     courseName,
     weekLabel,
     documentContent,
+    documentJsonContent,
     conversationHistory,
   } = params;
 
   // Build dynamic system prompt with course/week context
   const hasDocumentContent = !!documentContent?.trim();
+  const questionContext = extractQuestionContext(documentJsonContent ?? null);
   const systemPrompt = buildSystemPrompt({
     courseName,
     weekLabel,
     hasDocumentContent,
+    questionContext,
   });
 
   // RAG search — find relevant text chunks
@@ -496,14 +515,17 @@ export async function buildAiContext(params: QuestionParams): Promise<{
     courseName,
     weekLabel,
     documentContent,
+    documentJsonContent,
     conversationHistory,
   } = params;
 
   const hasDocumentContent = !!documentContent?.trim();
+  const questionContext = extractQuestionContext(documentJsonContent ?? null);
   const systemPrompt = buildSystemPrompt({
     courseName,
     weekLabel,
     hasDocumentContent,
+    questionContext,
   });
 
   const results = await searchContext({

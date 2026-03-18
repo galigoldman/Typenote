@@ -99,7 +99,7 @@ vi.mock('@/lib/ai/prompts', () => ({
 import { extractPdfText } from '@/lib/ai/extraction/pdf';
 import { getContentHash, upsertEmbeddings } from '@/lib/queries/embeddings';
 
-import { askQuestion, indexContent, searchContext } from '../ai-context';
+import { askQuestion, extractQuestionContext, indexContent, searchContext } from '../ai-context';
 
 afterEach(() => {
   vi.clearAllMocks();
@@ -252,5 +252,31 @@ describe('askQuestion', () => {
         model: 'gemini-2.5-pro',
       }),
     );
+  });
+});
+
+describe('extractQuestionContext', () => {
+  it('extracts question context from TipTap document JSON', () => {
+    const content = {
+      type: 'doc',
+      content: [
+        { type: 'paragraph', content: [{ type: 'text', text: 'My answer' }] },
+        { type: 'questionContext', attrs: { label: '3a', html: '<p>Find derivative</p>', preambleHtml: null } },
+      ],
+    };
+    const result = extractQuestionContext(content);
+    expect(result).toEqual({ label: '3a', html: '<p>Find derivative</p>' });
+  });
+
+  it('returns null when no question context block exists', () => {
+    const content = {
+      type: 'doc',
+      content: [{ type: 'paragraph', content: [{ type: 'text', text: 'Just notes' }] }],
+    };
+    expect(extractQuestionContext(content)).toBeNull();
+  });
+
+  it('returns null for null content', () => {
+    expect(extractQuestionContext(null)).toBeNull();
   });
 });

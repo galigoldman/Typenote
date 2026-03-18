@@ -2,10 +2,11 @@ export interface SystemPromptContext {
   courseName?: string;
   weekLabel?: string;
   hasDocumentContent: boolean;
+  questionContext?: { label: string; html: string } | null;
 }
 
 export function buildSystemPrompt(context: SystemPromptContext): string {
-  const { courseName, weekLabel, hasDocumentContent } = context;
+  const { courseName, weekLabel, hasDocumentContent, questionContext } = context;
 
   const courseContext = courseName
     ? `You are a tutor for **${courseName}**.`
@@ -19,7 +20,7 @@ export function buildSystemPrompt(context: SystemPromptContext): string {
     ? `\n\n## STUDENT'S DOCUMENT\nThe student has shared their current document with you. You can see their notes and work. When they ask about their own writing (e.g., "is my solution correct?", "what am I missing?"), refer to the content of their document specifically.`
     : '';
 
-  return `${courseContext}${weekContext} You are a knowledgeable, friendly tutor and study partner. You have deep expertise in the subject matter AND access to the student's course materials.
+  let prompt = `${courseContext}${weekContext} You are a knowledgeable, friendly tutor and study partner. You have deep expertise in the subject matter AND access to the student's course materials.
 
 ## HOW TO USE COURSE MATERIALS
 
@@ -42,6 +43,12 @@ export function buildSystemPrompt(context: SystemPromptContext): string {
 [Sources]
 - Week X — Material Name: brief description of what was referenced
 ${documentContext}`;
+
+  if (questionContext) {
+    prompt += `\n\nHOMEWORK QUESTION:\nThe student is working on Question ${questionContext.label} of their assignment. Here is the question:\n${questionContext.html}\n\nFocus your answers on helping them solve this specific question.`;
+  }
+
+  return prompt;
 }
 
 /**

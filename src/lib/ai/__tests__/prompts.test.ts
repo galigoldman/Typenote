@@ -57,6 +57,34 @@ describe('buildSystemPrompt', () => {
     expect(prompt).toContain('working on **Week 7**');
   });
 
+  it('includes homework question context when provided', () => {
+    const prompt = buildSystemPrompt({
+      courseName: 'Calculus I',
+      hasDocumentContent: true,
+      questionContext: { label: '3a', html: '<p>Find the derivative of f(x)=x^2</p>' },
+    });
+    expect(prompt).toContain('HOMEWORK QUESTION');
+    expect(prompt).toContain('Question 3a');
+    expect(prompt).toContain('derivative');
+  });
+
+  it('omits homework question section when questionContext is not provided', () => {
+    const prompt = buildSystemPrompt({
+      courseName: 'Calculus I',
+      hasDocumentContent: false,
+    });
+    expect(prompt).not.toContain('HOMEWORK QUESTION');
+  });
+
+  it('omits homework question section when questionContext is null', () => {
+    const prompt = buildSystemPrompt({
+      courseName: 'Calculus I',
+      hasDocumentContent: false,
+      questionContext: null,
+    });
+    expect(prompt).not.toContain('HOMEWORK QUESTION');
+  });
+
   it('always includes core guidelines', () => {
     const prompt = buildSystemPrompt({ hasDocumentContent: false });
     expect(prompt).toContain('Never fabricate citations');
