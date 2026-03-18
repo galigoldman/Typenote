@@ -222,8 +222,9 @@ export async function openMaterialAsDocument(
 
   if (existing) {
     // If the document has fewer pages than the PDF, add the missing ones
-    const existingPages =
-      (existing.pages as { pages?: Array<{ pdfPage?: number }> })?.pages ?? [];
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const existingPages: any[] =
+      (existing.pages as { pages?: any[] })?.pages ?? [];
     if (existingPages.length < pageCount) {
       const newPages = [...existingPages];
       for (let i = existingPages.length; i < pageCount; i++) {
