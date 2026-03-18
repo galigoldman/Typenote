@@ -343,7 +343,29 @@ export function CanvasEditor({
     renderPage: renderPdfPage,
     isLoading: pdfLoading,
     error: pdfError,
+    pageCount: pdfPageCount,
   } = usePdfBackground(materialId ?? null);
+
+  // Auto-add missing pages when PDF has more pages than the document.
+  // Tracked via ref so we only expand once per pageCount change.
+  const lastSyncedPageCount = useRef(0);
+  if (pdfPageCount > 0 && pdfPageCount > lastSyncedPageCount.current) {
+    lastSyncedPageCount.current = pdfPageCount;
+    if (pages.length < pdfPageCount) {
+      const newPages = [...pages];
+      for (let i = pages.length; i < pdfPageCount; i++) {
+        newPages.push({
+          id: Math.random().toString(36).slice(2) + Date.now().toString(36),
+          order: i,
+          pdfPage: i,
+          strokes: [],
+          textBoxes: [],
+          flowContent: null,
+        });
+      }
+      setPages(newPages);
+    }
+  }
 
   // Derived values based on active tool
   const currentColor =
