@@ -62,7 +62,8 @@ export type CanvasTool =
   | 'eraser'
   | 'select'
   | 'text'
-  | 'read';
+  | 'read'
+  | 'crop';
 
 /** Current zoom and pan state (view-only, not persisted) */
 export interface ViewTransform {

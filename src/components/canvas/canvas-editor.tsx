@@ -317,13 +317,6 @@ export function CanvasEditor({
     setActiveToolRaw(tool);
   }, []);
 
-  // Crop-to-AI mode: next selection rectangle auto-captures to AI
-  const [autoCropToAi, setAutoCropToAi] = useState(false);
-  const handleCropToAi = useCallback(() => {
-    setAutoCropToAi(true);
-    setActiveTool('select');
-  }, [setActiveTool]);
-
   const [activeEditor, setActiveEditor] = useState<Editor | null>(null);
   const [remoteUpdateCounter, setRemoteUpdateCounter] = useState(0);
 
@@ -870,11 +863,6 @@ export function CanvasEditor({
     onTextBoxResize: handleTextBoxResize,
     onModeChange: setActiveTool,
     onDeleteSelected: handleDeleteSelected,
-    onEmptyRectSelection: autoCropToAi
-      ? (pageId: string, bbox: BBox) => {
-          handleAskAiWithRegion(bbox, pageId);
-        }
-      : undefined,
   });
 
   // Drawing hook
@@ -1293,10 +1281,8 @@ export function CanvasEditor({
 
       const dataUrl = offscreen.toDataURL('image/png');
       onAskAiWithContext?.({ type: 'image', dataUrl });
-      setAutoCropToAi(false);
-      clearSelection();
     },
-    [onAskAiWithContext, clearSelection],
+    [onAskAiWithContext],
   );
 
   const isDrawMode =
@@ -1468,9 +1454,13 @@ export function CanvasEditor({
               <button
                 onPointerDown={(e) => {
                   e.stopPropagation();
-                  handleCropToAi();
+                  setActiveTool('crop');
                 }}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-colors hover:bg-purple-50 text-purple-600"
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
+                  activeTool === 'crop'
+                    ? 'bg-primary text-primary-foreground'
+                    : 'hover:bg-purple-50 text-purple-600'
+                }`}
                 title="Draw a rectangle to capture and send to AI"
               >
                 <Scissors className="h-4 w-4" />
@@ -1577,11 +1567,17 @@ export function CanvasEditor({
           data-scroll-container
           style={{
             overflowY:
-              activeTool === 'text' || activeTool === 'select' || isReadMode
+              activeTool === 'text' ||
+              activeTool === 'select' ||
+              isReadMode ||
+              activeTool === 'crop'
                 ? 'auto'
                 : 'hidden',
             touchAction:
-              activeTool === 'text' || activeTool === 'select' || isReadMode
+              activeTool === 'text' ||
+              activeTool === 'select' ||
+              isReadMode ||
+              activeTool === 'crop'
                 ? 'auto'
                 : 'none',
             overscrollBehavior: 'none',
