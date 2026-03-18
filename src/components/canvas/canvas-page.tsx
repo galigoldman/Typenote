@@ -165,6 +165,28 @@ export function CanvasPage({
     }
   }, []);
 
+  // Auto-crop to AI: when crop mode is active and a selection bbox appears,
+  // auto-capture the region directly (no need to click "Ask AI" button)
+  const autoCropFiredRef = useRef(false);
+  useEffect(() => {
+    if (
+      autoCropToAi &&
+      activeTool === 'select' &&
+      selectionBBox &&
+      !isSelectionDragging &&
+      !isSelectionResizing &&
+      materialId &&
+      onAskAiWithRegion &&
+      !autoCropFiredRef.current
+    ) {
+      autoCropFiredRef.current = true;
+      onAskAiWithRegion(selectionBBox, page.id);
+    }
+    if (!selectionBBox) {
+      autoCropFiredRef.current = false;
+    }
+  });
+
   // Expose canvas refs to parent for region capture
   useEffect(() => {
     onCanvasRefsReady?.(
@@ -618,20 +640,6 @@ export function CanvasPage({
           resizeBBox={selectionResizeBBox}
         />
       )}
-
-      {/* Auto-crop: when Crop button was pressed, auto-trigger "Ask AI" as soon as selection is made */}
-      {activeTool === 'select' &&
-        autoCropToAi &&
-        selectionBBox &&
-        !isSelectionDragging &&
-        !isSelectionResizing &&
-        materialId &&
-        onAskAiWithRegion &&
-        (() => {
-          // Fire on next tick to avoid setState-during-render
-          setTimeout(() => onAskAiWithRegion(selectionBBox, page.id), 0);
-          return null;
-        })()}
 
       {/* Layer 5.6: Floating action bar above selection */}
       {activeTool === 'select' &&
