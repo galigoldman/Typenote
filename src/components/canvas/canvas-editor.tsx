@@ -28,6 +28,7 @@ import {
   PanelLeftClose,
   MousePointer2,
   Save,
+  Scissors,
 } from 'lucide-react';
 import { useSidebar } from '@/components/dashboard/sidebar-layout';
 import { CANVAS_TYPES } from '@/lib/constants/subjects';
@@ -69,7 +70,6 @@ interface CanvasEditorProps {
       | { type: 'text'; content: string }
       | { type: 'image'; dataUrl: string },
   ) => void;
-  onToolSwitchReady?: (switcher: (tool: CanvasTool) => void) => void;
 }
 
 const CANVAS_CLASSES: Record<string, string> = {
@@ -293,7 +293,6 @@ export function CanvasEditor({
   onDocumentTextReady,
   materialId,
   onAskAiWithContext,
-  onToolSwitchReady,
 }: CanvasEditorProps) {
   const { isOpen: sidebarOpen, toggle: toggleSidebar } = useSidebar();
   const [title, setTitle] = useState(document.title);
@@ -318,10 +317,12 @@ export function CanvasEditor({
     setActiveToolRaw(tool);
   }, []);
 
-  // Expose tool switcher to parent (for AI panel's Mark Text / Screenshot buttons)
-  useEffect(() => {
-    onToolSwitchReady?.(setActiveTool);
-  }, [onToolSwitchReady, setActiveTool]);
+  // Crop-to-AI mode: next selection rectangle auto-captures to AI
+  const [autoCropToAi, setAutoCropToAi] = useState(false);
+  const handleCropToAi = useCallback(() => {
+    setAutoCropToAi(true);
+    setActiveTool('select');
+  }, [setActiveTool]);
 
   const [activeEditor, setActiveEditor] = useState<Editor | null>(null);
   const [remoteUpdateCounter, setRemoteUpdateCounter] = useState(0);
@@ -1287,8 +1288,10 @@ export function CanvasEditor({
 
       const dataUrl = offscreen.toDataURL('image/png');
       onAskAiWithContext?.({ type: 'image', dataUrl });
+      setAutoCropToAi(false);
+      clearSelection();
     },
-    [onAskAiWithContext],
+    [onAskAiWithContext, clearSelection],
   );
 
   const isDrawMode =
@@ -1442,20 +1445,33 @@ export function CanvasEditor({
             Type
           </button>
           {materialId && (
-            <button
-              onPointerDown={(e) => {
-                e.stopPropagation();
-                setActiveTool('read');
-              }}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
-                isReadMode
-                  ? 'bg-primary text-primary-foreground'
-                  : 'hover:bg-accent text-muted-foreground'
-              }`}
-            >
-              <BookOpen className="h-4 w-4" />
-              Read
-            </button>
+            <>
+              <button
+                onPointerDown={(e) => {
+                  e.stopPropagation();
+                  setActiveTool('read');
+                }}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
+                  isReadMode
+                    ? 'bg-primary text-primary-foreground'
+                    : 'hover:bg-accent text-muted-foreground'
+                }`}
+              >
+                <BookOpen className="h-4 w-4" />
+                Read
+              </button>
+              <button
+                onPointerDown={(e) => {
+                  e.stopPropagation();
+                  handleCropToAi();
+                }}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-colors hover:bg-purple-50 text-purple-600"
+                title="Draw a rectangle to capture and send to AI"
+              >
+                <Scissors className="h-4 w-4" />
+                Crop
+              </button>
+            </>
           )}
         </div>
 
@@ -1622,6 +1638,7 @@ export function CanvasEditor({
                     materialId={materialId}
                     onAskAiWithText={handleAskAiWithText}
                     onAskAiWithRegion={handleAskAiWithRegion}
+                    autoCropToAi={autoCropToAi}
                     onCanvasRefsReady={handleCanvasRefsReady}
                   />
                   {/* Page break divider */}

@@ -3,13 +3,11 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   BookOpen,
-  Camera,
   ImageIcon,
   Loader2,
   Send,
   Sparkles,
   Square,
-  Type as TypeIcon,
   X,
   Zap,
 } from 'lucide-react';
@@ -46,8 +44,6 @@ interface AiChatPanelProps {
   pendingContextItems: AiContextItem[];
   onRemoveContextItem?: (index: number) => void;
   onClearAllContext?: () => void;
-  onRequestMarkText?: () => void;
-  onRequestScreenshot?: () => void;
 }
 
 export function AiChatPanel({
@@ -61,19 +57,15 @@ export function AiChatPanel({
   pendingContextItems,
   onRemoveContextItem,
   onClearAllContext,
-  onRequestMarkText,
-  onRequestScreenshot,
 }: AiChatPanelProps) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
   const [streamingText, setStreamingText] = useState('');
   const [mode, setMode] = useState<'quick' | 'deep'>('quick');
-  const [showCropMenu, setShowCropMenu] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const abortRef = useRef<AbortController | null>(null);
-  const cropMenuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -84,21 +76,6 @@ export function AiChatPanel({
       setTimeout(() => inputRef.current?.focus(), 100);
     }
   }, [isOpen]);
-
-  // Close crop menu on outside click
-  useEffect(() => {
-    if (!showCropMenu) return;
-    const handleClick = (e: MouseEvent) => {
-      if (
-        cropMenuRef.current &&
-        !cropMenuRef.current.contains(e.target as Node)
-      ) {
-        setShowCropMenu(false);
-      }
-    };
-    document.addEventListener('mousedown', handleClick);
-    return () => document.removeEventListener('mousedown', handleClick);
-  }, [showCropMenu]);
 
   const handleStop = useCallback(() => {
     abortRef.current?.abort();
@@ -450,48 +427,6 @@ export function AiChatPanel({
           }}
           className="flex gap-2"
         >
-          {/* Ask AI crop button */}
-          <div className="relative" ref={cropMenuRef}>
-            <Button
-              type="button"
-              size="icon"
-              variant="outline"
-              onClick={() => setShowCropMenu((prev) => !prev)}
-              className="h-9 w-9 shrink-0 text-purple-600 border-purple-200 hover:bg-purple-50"
-              title="Ask AI about content"
-            >
-              <Sparkles className="h-4 w-4" />
-            </Button>
-
-            {/* Dropdown menu */}
-            {showCropMenu && (
-              <div className="absolute bottom-full left-0 mb-2 w-44 rounded-lg border bg-popover p-1 shadow-lg">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setShowCropMenu(false);
-                    onRequestMarkText?.();
-                  }}
-                  className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-sm hover:bg-accent transition-colors"
-                >
-                  <TypeIcon className="h-4 w-4 text-purple-500" />
-                  Mark Text
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setShowCropMenu(false);
-                    onRequestScreenshot?.();
-                  }}
-                  className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-sm hover:bg-accent transition-colors"
-                >
-                  <Camera className="h-4 w-4 text-purple-500" />
-                  Screenshot
-                </button>
-              </div>
-            )}
-          </div>
-
           <input
             ref={inputRef}
             type="text"

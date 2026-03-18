@@ -20,8 +20,6 @@ interface AiChatWrapperProps {
   isOpen?: boolean;
   onToggle?: () => void;
   onClose?: () => void;
-  onRequestMarkText?: () => void;
-  onRequestScreenshot?: () => void;
 }
 
 export function AiChatWrapper({
@@ -36,8 +34,6 @@ export function AiChatWrapper({
   isOpen: externalIsOpen,
   onToggle: externalOnToggle,
   onClose: externalOnClose,
-  onRequestMarkText,
-  onRequestScreenshot,
 }: AiChatWrapperProps) {
   const [internalIsOpen, setInternalIsOpen] = useState(false);
 
@@ -77,8 +73,6 @@ export function AiChatWrapper({
         pendingContextItems={pendingContextItems}
         onRemoveContextItem={onRemoveContextItem}
         onClearAllContext={onClearAllContext}
-        onRequestMarkText={onRequestMarkText}
-        onRequestScreenshot={onRequestScreenshot}
       />
     </>
   );
