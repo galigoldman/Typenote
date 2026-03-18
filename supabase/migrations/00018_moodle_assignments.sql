@@ -35,6 +35,11 @@ CREATE TABLE assignment_splits (
 CREATE INDEX idx_assignment_splits_assignment
   ON assignment_splits (assignment_id, created_at DESC);
 
+-- FR-014: at most one personal split per assignment per student
+CREATE UNIQUE INDEX idx_assignment_splits_one_personal
+  ON assignment_splits (assignment_id, creator_id)
+  WHERE is_personal = true;
+
 ALTER TABLE assignment_splits ENABLE ROW LEVEL SECURITY;
 
 CREATE POLICY "Read shared splits or own personal splits"
