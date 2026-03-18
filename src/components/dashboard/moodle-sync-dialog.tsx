@@ -557,6 +557,17 @@ export function MoodleSyncDialog({
         setError(`${failed} file(s) failed:\n${errors.join('\n')}`);
       }
       setPhase('done');
+
+      // Trigger AI question splitting for new/changed assignments (best-effort, non-blocking)
+      for (const assignment of (result as { assignmentResults?: Array<{ assignmentId: string; isNew: boolean; contentChanged: boolean }> }).assignmentResults ?? []) {
+        if (assignment.isNew || assignment.contentChanged) {
+          fetch('/api/moodle/assignments/split', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ assignmentId: assignment.assignmentId }),
+          }).catch(() => {}); // Best-effort, don't block sync
+        }
+      }
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Sync failed';
       setError(message);
