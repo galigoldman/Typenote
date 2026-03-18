@@ -4,7 +4,6 @@ import { useEffect, useState } from 'react';
 import { ChevronDown, Copy, Loader2, Plus, X } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
-import { cn } from '@/lib/utils';
 
 interface SplitQuestion {
   id: string;
@@ -116,7 +115,8 @@ export function QuestionBrowserPanel({
   );
 
   const questions: SplitQuestion[] = (
-    (selectedSplit as any)?.split_questions ?? []
+    (selectedSplit as unknown as { split_questions?: SplitQuestion[] })
+      ?.split_questions ?? []
   )
     .slice()
     .sort((a: SplitQuestion, b: SplitQuestion) => a.position - b.position);

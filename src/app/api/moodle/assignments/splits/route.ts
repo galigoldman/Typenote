@@ -48,7 +48,9 @@ export async function GET(req: NextRequest) {
   }
 
   // --- Deferred AI split: create one inline if none exists yet ---
-  const hasAiSplit = splits?.some((s: any) => s.creator_type === 'ai');
+  const hasAiSplit = splits?.some(
+    (s: { creator_type: string }) => s.creator_type === 'ai',
+  );
   if (!hasAiSplit) {
     try {
       const { checkAndIncrementUsage } = await import('@/lib/ai/rate-limit');
