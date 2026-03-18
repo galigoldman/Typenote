@@ -16,6 +16,7 @@ import type { Editor } from '@tiptap/core';
 interface TextBoxProps {
   textBox: TextBoxData;
   isSelected: boolean;
+  readOnly?: boolean;
   onContentUpdate: (id: string, content: Record<string, unknown>) => void;
   onEditorReady?: (editor: Editor) => void;
   onHeightMeasured?: (id: string, height: number) => void;
@@ -24,6 +25,7 @@ interface TextBoxProps {
 export function TextBox({
   textBox,
   isSelected,
+  readOnly = false,
   onContentUpdate,
   onEditorReady,
   onHeightMeasured,
@@ -87,6 +89,15 @@ export function TextBox({
       onEditorReadyRef.current?.(editor);
     }
   }, [editor]);
+
+  // In Read mode, make the editor non-editable (text is selectable but not modifiable)
+  useEffect(() => {
+    if (!editor) return;
+    const shouldBeEditable = !readOnly;
+    if (editor.isEditable !== shouldBeEditable) {
+      editor.setEditable(shouldBeEditable);
+    }
+  }, [readOnly, editor]);
 
   // Auto-measure content height so the selection bbox stays tight.
   // Uses ResizeObserver to detect when content changes size.
