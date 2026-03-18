@@ -136,6 +136,7 @@ export function useSelection({
   onTextBoxResize,
   onModeChange,
   onDeleteSelected,
+  onEmptyRectSelection,
 }: UseSelectionOptions): UseSelectionReturn {
   const [selectionPath, setSelectionPath] = useState<[number, number][] | null>(
     null,
@@ -516,7 +517,7 @@ export function useSelection({
             setSelectionPath(null);
           } else {
             // No objects found — fire empty rect callback (used for crop-to-AI)
-            options.onEmptyRectSelection?.(targetPageId, selectionRect);
+            onEmptyRectSelection?.(targetPageId, selectionRect);
             clearSelection();
           }
         } else {
