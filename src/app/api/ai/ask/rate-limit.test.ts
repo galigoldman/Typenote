@@ -21,12 +21,10 @@ vi.mock('@/lib/supabase/server', () => ({
       }),
       insert: vi.fn().mockReturnValue({
         select: vi.fn().mockReturnValue({
-          single: vi
-            .fn()
-            .mockResolvedValue({
-              data: { id: 'conv-mock', title: 'test' },
-              error: null,
-            }),
+          single: vi.fn().mockResolvedValue({
+            data: { id: 'conv-mock', title: 'test' },
+            error: null,
+          }),
         }),
       }),
       update: vi.fn().mockReturnValue({
