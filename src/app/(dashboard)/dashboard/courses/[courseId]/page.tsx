@@ -3,7 +3,7 @@ import Link from 'next/link';
 import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { AiChatWrapper } from '@/components/ai/ai-chat-wrapper';
-import { DocumentCard } from '@/components/dashboard/document-card';
+import { DocumentListWithMove } from '@/components/dashboard/document-list-with-move';
 import { CreateDocumentDialog } from '@/components/dashboard/create-document-dialog';
 import { WeekSection } from '@/components/dashboard/week-section';
 import { WeekDialog } from '@/components/dashboard/week-dialog';
@@ -239,9 +239,7 @@ export default async function CoursePage({
                 Documents
               </h2>
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
-                {courseDocuments.map((doc) => (
-                  <DocumentCard key={doc.id} document={doc} />
-                ))}
+                <DocumentListWithMove documents={courseDocuments} />
               </div>
             </div>
           )}

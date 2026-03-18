@@ -5,7 +5,7 @@ import { FolderCard } from '@/components/dashboard/folder-card';
 import { FolderDialog } from '@/components/dashboard/folder-dialog';
 import { CourseCard } from '@/components/dashboard/course-card';
 import { CourseDialog } from '@/components/dashboard/course-dialog';
-import { DocumentCard } from '@/components/dashboard/document-card';
+import { DocumentListWithMove } from '@/components/dashboard/document-list-with-move';
 import { CreateDocumentDialog } from '@/components/dashboard/create-document-dialog';
 import { EmptyState } from '@/components/dashboard/empty-state';
 import { Button } from '@/components/ui/button';
@@ -132,9 +132,7 @@ export default async function FolderPage({
                 Documents
               </h2>
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
-                {typedDocuments.map((doc) => (
-                  <DocumentCard key={doc.id} document={doc} />
-                ))}
+                <DocumentListWithMove documents={typedDocuments} />
               </div>
             </div>
           )}

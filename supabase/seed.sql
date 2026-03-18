@@ -278,3 +278,179 @@ ON CONFLICT (id) DO NOTHING;
 INSERT INTO public.user_file_imports (id, user_id, moodle_file_id, sync_id, status)
 VALUES ('66000000-0000-0000-0000-000000000002', 'ac3be77d-4566-406c-9ac0-7c410634ad41', '63000000-0000-0000-0000-000000000002', '65000000-0000-0000-0000-000000000001', 'imported')
 ON CONFLICT (id) DO NOTHING;
+
+-- ============================================
+-- AI CONVERSATIONS (test data for conversation persistence)
+-- ============================================
+
+-- Conversation 1: CS101 — about variables
+INSERT INTO public.ai_conversations (id, user_id, course_id, title, created_at, updated_at)
+VALUES (
+  '70000000-0000-0000-0000-000000000001',
+  'ac3be77d-4566-406c-9ac0-7c410634ad41',
+  '30000000-0000-0000-0000-000000000001',
+  'What are variables and how do they',
+  '2026-03-10 10:00:00+00',
+  '2026-03-10 10:05:00+00'
+) ON CONFLICT (id) DO NOTHING;
+
+-- Conversation 2: CS101 — about control flow
+INSERT INTO public.ai_conversations (id, user_id, course_id, title, created_at, updated_at)
+VALUES (
+  '70000000-0000-0000-0000-000000000002',
+  'ac3be77d-4566-406c-9ac0-7c410634ad41',
+  '30000000-0000-0000-0000-000000000001',
+  'Explain the difference between for and',
+  '2026-03-12 14:00:00+00',
+  '2026-03-12 14:10:00+00'
+) ON CONFLICT (id) DO NOTHING;
+
+-- Conversation 3: Linear Algebra — about vectors
+INSERT INTO public.ai_conversations (id, user_id, course_id, title, created_at, updated_at)
+VALUES (
+  '70000000-0000-0000-0000-000000000003',
+  'ac3be77d-4566-406c-9ac0-7c410634ad41',
+  '30000000-0000-0000-0000-000000000002',
+  'How do I calculate the dot product of',
+  '2026-03-15 09:00:00+00',
+  '2026-03-15 09:08:00+00'
+) ON CONFLICT (id) DO NOTHING;
+
+-- ============================================
+-- AI MESSAGES (test data)
+-- ============================================
+
+-- Conversation 1 messages (CS101 — variables)
+INSERT INTO public.ai_messages (id, conversation_id, role, content, sources_json, model, created_at)
+VALUES (
+  '71000000-0000-0000-0000-000000000001',
+  '70000000-0000-0000-0000-000000000001',
+  'user',
+  'What are variables and how do they work in programming?',
+  NULL,
+  NULL,
+  '2026-03-10 10:00:00+00'
+) ON CONFLICT (id) DO NOTHING;
+
+INSERT INTO public.ai_messages (id, conversation_id, role, content, sources_json, model, created_at)
+VALUES (
+  '71000000-0000-0000-0000-000000000002',
+  '70000000-0000-0000-0000-000000000001',
+  'assistant',
+  'A variable is a named container that stores a value in your program''s memory. Think of it like a labeled box — you give it a name and put data inside.\n\nIn most languages, you declare a variable and assign it a value:\n```python\nage = 25\nname = "Alice"\n```\n\nThe key concepts are:\n1. **Declaration** — telling the program a variable exists\n2. **Assignment** — putting a value into the variable\n3. **Type** — what kind of data the variable holds (number, string, etc.)',
+  '[{"sourceType":"course_material","sourceName":"lecture-1-slides.pdf","weekId":"40000000-0000-0000-0000-000000000001","pageRange":"5-8"}]',
+  'flash',
+  '2026-03-10 10:00:05+00'
+) ON CONFLICT (id) DO NOTHING;
+
+INSERT INTO public.ai_messages (id, conversation_id, role, content, sources_json, model, created_at)
+VALUES (
+  '71000000-0000-0000-0000-000000000003',
+  '70000000-0000-0000-0000-000000000001',
+  'user',
+  'Can a variable change its type in Python?',
+  NULL,
+  NULL,
+  '2026-03-10 10:03:00+00'
+) ON CONFLICT (id) DO NOTHING;
+
+INSERT INTO public.ai_messages (id, conversation_id, role, content, sources_json, model, created_at)
+VALUES (
+  '71000000-0000-0000-0000-000000000004',
+  '70000000-0000-0000-0000-000000000001',
+  'assistant',
+  'Yes! Python is **dynamically typed**, which means a variable can hold different types at different times:\n\n```python\nx = 42        # x is an integer\nx = "hello"   # now x is a string\n```\n\nThis is different from **statically typed** languages like Java or C++, where the type is fixed at declaration.',
+  NULL,
+  'flash',
+  '2026-03-10 10:05:00+00'
+) ON CONFLICT (id) DO NOTHING;
+
+-- Conversation 2 messages (CS101 — control flow)
+INSERT INTO public.ai_messages (id, conversation_id, role, content, sources_json, model, created_at)
+VALUES (
+  '71000000-0000-0000-0000-000000000005',
+  '70000000-0000-0000-0000-000000000002',
+  'user',
+  'Explain the difference between for and while loops',
+  NULL,
+  NULL,
+  '2026-03-12 14:00:00+00'
+) ON CONFLICT (id) DO NOTHING;
+
+INSERT INTO public.ai_messages (id, conversation_id, role, content, sources_json, model, created_at)
+VALUES (
+  '71000000-0000-0000-0000-000000000006',
+  '70000000-0000-0000-0000-000000000002',
+  'assistant',
+  'Great question! Both are loops, but they serve different purposes:\n\n**For loop** — use when you know how many times to iterate:\n```python\nfor i in range(5):\n    print(i)  # prints 0, 1, 2, 3, 4\n```\n\n**While loop** — use when the number of iterations depends on a condition:\n```python\ncount = 0\nwhile count < 5:\n    print(count)\n    count += 1\n```\n\nThe key difference: `for` iterates over a sequence, `while` continues until a condition is false.',
+  '[{"sourceType":"course_material","sourceName":"lecture-2-slides.pdf","weekId":"40000000-0000-0000-0000-000000000002","pageRange":"12-15"}]',
+  'flash',
+  '2026-03-12 14:00:08+00'
+) ON CONFLICT (id) DO NOTHING;
+
+INSERT INTO public.ai_messages (id, conversation_id, role, content, sources_json, model, created_at)
+VALUES (
+  '71000000-0000-0000-0000-000000000007',
+  '70000000-0000-0000-0000-000000000002',
+  'user',
+  'When would I use a while True loop?',
+  NULL,
+  NULL,
+  '2026-03-12 14:05:00+00'
+) ON CONFLICT (id) DO NOTHING;
+
+INSERT INTO public.ai_messages (id, conversation_id, role, content, sources_json, model, created_at)
+VALUES (
+  '71000000-0000-0000-0000-000000000008',
+  '70000000-0000-0000-0000-000000000002',
+  'assistant',
+  'A `while True` loop runs forever until you explicitly `break` out of it. Common use cases:\n\n1. **Menu systems** — keep showing options until user quits\n2. **Game loops** — run until game over\n3. **Server listeners** — wait for incoming connections\n\n```python\nwhile True:\n    choice = input("Enter command (q to quit): ")\n    if choice == "q":\n        break\n    process(choice)\n```\n\nBe careful — forgetting the `break` condition creates an infinite loop!',
+  NULL,
+  'flash',
+  '2026-03-12 14:10:00+00'
+) ON CONFLICT (id) DO NOTHING;
+
+-- Conversation 3 messages (Linear Algebra — dot product)
+INSERT INTO public.ai_messages (id, conversation_id, role, content, sources_json, model, created_at)
+VALUES (
+  '71000000-0000-0000-0000-000000000009',
+  '70000000-0000-0000-0000-000000000003',
+  'user',
+  'How do I calculate the dot product of two vectors?',
+  NULL,
+  NULL,
+  '2026-03-15 09:00:00+00'
+) ON CONFLICT (id) DO NOTHING;
+
+INSERT INTO public.ai_messages (id, conversation_id, role, content, sources_json, model, created_at)
+VALUES (
+  '71000000-0000-0000-0000-000000000010',
+  '70000000-0000-0000-0000-000000000003',
+  'assistant',
+  'The **dot product** (also called scalar product) of two vectors is calculated by multiplying corresponding components and summing the results.\n\nFor vectors **a** = (a₁, a₂, ..., aₙ) and **b** = (b₁, b₂, ..., bₙ):\n\n**a · b** = a₁b₁ + a₂b₂ + ... + aₙbₙ\n\nExample:\n- **a** = (2, 3)\n- **b** = (4, -1)\n- **a · b** = (2)(4) + (3)(-1) = 8 - 3 = **5**\n\nThe dot product tells you how much two vectors point in the same direction. If the result is 0, the vectors are perpendicular (orthogonal).',
+  NULL,
+  'pro',
+  '2026-03-15 09:00:10+00'
+) ON CONFLICT (id) DO NOTHING;
+
+INSERT INTO public.ai_messages (id, conversation_id, role, content, sources_json, model, created_at)
+VALUES (
+  '71000000-0000-0000-0000-000000000011',
+  '70000000-0000-0000-0000-000000000003',
+  'user',
+  'What is the geometric interpretation?',
+  NULL,
+  NULL,
+  '2026-03-15 09:05:00+00'
+) ON CONFLICT (id) DO NOTHING;
+
+INSERT INTO public.ai_messages (id, conversation_id, role, content, sources_json, model, created_at)
+VALUES (
+  '71000000-0000-0000-0000-000000000012',
+  '70000000-0000-0000-0000-000000000003',
+  'assistant',
+  'Geometrically, the dot product relates to the angle θ between two vectors:\n\n**a · b** = |a| × |b| × cos(θ)\n\nThis gives us powerful insights:\n- **Positive** dot product → vectors point in similar directions (θ < 90°)\n- **Zero** dot product → vectors are perpendicular (θ = 90°)\n- **Negative** dot product → vectors point in opposite directions (θ > 90°)\n\nYou can also find the angle between two vectors:\n\ncos(θ) = (a · b) / (|a| × |b|)',
+  NULL,
+  'pro',
+  '2026-03-15 09:08:00+00'
+) ON CONFLICT (id) DO NOTHING;

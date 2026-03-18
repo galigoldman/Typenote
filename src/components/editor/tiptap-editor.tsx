@@ -35,12 +35,16 @@ function SaveIndicator({ status }: { status: SaveStatus }) {
     saved: 'Saved',
     saving: 'Saving...',
     unsaved: 'Unsaved',
+    retrying: 'Retrying...',
+    error: 'Error',
   };
 
   const colors: Record<SaveStatus, string> = {
     saved: 'text-green-600',
     saving: 'text-yellow-600',
     unsaved: 'text-red-600',
+    retrying: 'text-amber-600',
+    error: 'text-red-600',
   };
 
   return <span className={`text-sm ${colors[status]}`}>{labels[status]}</span>;

@@ -80,23 +80,81 @@ export async function deleteDocument(id: string) {
   revalidatePath('/dashboard');
 }
 
-export async function moveDocument(id: string, folderId: string | null) {
+export type MoveDestination =
+  | { type: 'folder'; folderId: string }
+  | { type: 'course'; courseId: string; weekId?: string }
+  | { type: 'root' };
+
+export async function moveDocument(id: string, destination: MoveDestination) {
   const supabase = await createClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) throw new Error('Not authenticated');
 
+  let updateData: Record<string, unknown>;
+
+  switch (destination.type) {
+    case 'folder':
+      updateData = {
+        folder_id: destination.folderId,
+        course_id: null,
+        week_id: null,
+        material_id: null,
+      };
+      break;
+
+    case 'course': {
+      updateData = {
+        course_id: destination.courseId,
+        week_id: destination.weekId ?? null,
+        folder_id: null,
+      };
+
+      // If the course is changing and material_id is set, clear material_id
+      const { data: current, error: readError } = await supabase
+        .from('documents')
+        .select('course_id, material_id')
+        .eq('id', id)
+        .eq('user_id', user.id)
+        .single();
+
+      if (readError) throw new Error(readError.message);
+
+      if (
+        current.material_id &&
+        current.course_id !== destination.courseId
+      ) {
+        updateData.material_id = null;
+      }
+      break;
+    }
+
+    case 'root':
+      updateData = {
+        folder_id: null,
+        course_id: null,
+        week_id: null,
+        material_id: null,
+      };
+      break;
+  }
+
   const { data: doc, error } = await supabase
     .from('documents')
-    .update({ folder_id: folderId })
+    .update(updateData)
     .eq('id', id)
     .eq('user_id', user.id)
     .select()
     .single();
 
   if (error) throw new Error(error.message);
+
   revalidatePath('/dashboard');
+  if (destination.type === 'course') {
+    revalidatePath('/dashboard/courses/' + destination.courseId);
+  }
+
   return doc;
 }
 

@@ -26,6 +26,7 @@ import {
   PanelLeftOpen,
   PanelLeftClose,
   MousePointer2,
+  Save,
 } from 'lucide-react';
 import { useSidebar } from '@/components/dashboard/sidebar-layout';
 import { CANVAS_TYPES } from '@/lib/constants/subjects';
@@ -39,6 +40,8 @@ import { ZoomIndicator } from './zoom-indicator';
 import { EditorToolbar } from '@/components/editor/editor-toolbar';
 import { CanvasPage } from './canvas-page';
 import { usePdfBackground } from '@/hooks/use-pdf-background';
+import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from '@/components/ui/tooltip';
+import type { SaveErrorType } from '@/hooks/use-auto-save';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function extractNodeText(node: any): string {
@@ -107,18 +110,62 @@ const ERASER_SIZES = [
   { label: 'L', value: 24 },
 ];
 
-function SaveIndicator({ status }: { status: SaveStatus }) {
+function SaveIndicator({
+  status,
+  errorDetails,
+  errorType,
+  retryNow,
+}: {
+  status: SaveStatus;
+  errorDetails?: string | null;
+  errorType?: SaveErrorType;
+  retryNow?: () => void;
+}) {
   const labels: Record<SaveStatus, string> = {
     saved: 'Saved',
     saving: 'Saving...',
     unsaved: 'Unsaved',
+    retrying: 'Retrying...',
+    error: 'Error',
   };
   const colors: Record<SaveStatus, string> = {
     saved: 'text-green-600',
     saving: 'text-yellow-600',
     unsaved: 'text-red-600',
+    retrying: 'text-amber-600',
+    error: 'text-red-600',
   };
-  return <span className={`text-sm ${colors[status]}`}>{labels[status]}</span>;
+
+  const indicator = (
+    <span
+      className={`text-sm ${colors[status]} ${status === 'error' ? 'cursor-pointer underline decoration-dotted' : ''}`}
+    >
+      {labels[status]}
+    </span>
+  );
+
+  if (status === 'error' && errorDetails) {
+    return (
+      <TooltipProvider>
+        <Tooltip>
+          <TooltipTrigger asChild>{indicator}</TooltipTrigger>
+          <TooltipContent side="bottom" className="max-w-xs">
+            <p className="text-sm">{errorDetails}</p>
+            {errorType === 'network' && retryNow && (
+              <button
+                onClick={retryNow}
+                className="mt-1 text-sm font-medium text-blue-600 hover:text-blue-800 underline"
+              >
+                Retry now
+              </button>
+            )}
+          </TooltipContent>
+        </Tooltip>
+      </TooltipProvider>
+    );
+  }
+
+  return indicator;
 }
 
 function ConnectionIndicator({
@@ -348,6 +395,10 @@ export function CanvasEditor({
     unlockEditor,
     triggerSave,
     saveTitle,
+    manualSave,
+    errorDetails,
+    errorType,
+    retryNow,
   } = useDocumentSync({
     documentId: document.id,
     editor: null,
@@ -355,6 +406,20 @@ export function CanvasEditor({
     getPagesData,
     onRemotePagesUpdate,
   });
+
+  // Ctrl+S / Cmd+S keyboard shortcut for manual save
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === 's') {
+        e.preventDefault();
+        if (saveStatus !== 'saved' && saveStatus !== 'saving') {
+          manualSave();
+        }
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [saveStatus, manualSave]);
 
   // Stroke management (with undo history + auto-add page)
   const handleStrokeAdd = useCallback(
@@ -1177,7 +1242,27 @@ export function CanvasEditor({
             status={connectionStatus}
             isLockedByRemote={isLockedByRemote}
           />
-          <SaveIndicator status={saveStatus} />
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button
+                  onClick={() => manualSave()}
+                  disabled={saveStatus === 'saved' || saveStatus === 'saving'}
+                  className="p-1 rounded hover:bg-muted disabled:opacity-40 disabled:cursor-not-allowed"
+                  aria-label="Save now"
+                >
+                  <Save className="h-4 w-4" />
+                </button>
+              </TooltipTrigger>
+              <TooltipContent side="bottom">Save now (Ctrl+S)</TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+          <SaveIndicator
+            status={saveStatus}
+            errorDetails={errorDetails}
+            errorType={errorType}
+            retryNow={retryNow}
+          />
         </div>
       </div>
 

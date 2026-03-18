@@ -160,3 +160,29 @@ export interface UserFileImport {
   created_at: string;
   updated_at: string;
 }
+
+export interface AiConversation {
+  id: string;
+  user_id: string;
+  course_id: string;
+  title: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ChatSource {
+  sourceType: string;
+  sourceName: string;
+  weekId: string | null;
+  pageRange: string | null;
+}
+
+export interface AiMessage {
+  id: string;
+  conversation_id: string;
+  role: 'user' | 'assistant';
+  content: string;
+  sources_json: ChatSource[] | null;
+  model: 'flash' | 'pro' | null;
+  created_at: string;
+}
