@@ -338,30 +338,31 @@ export function CanvasEditor({
     containerRef: scrollContainerRef,
   });
 
+  // Auto-add missing pages when PDF has more pages than the document.
+  const lastSyncedPageCount = useRef(0);
+  const expandPagesIfNeeded = useCallback((count: number) => {
+    if (count <= 0 || count <= lastSyncedPageCount.current) return;
+    lastSyncedPageCount.current = count;
+    setPages((prev) => {
+      if (prev.length >= count) return prev;
+      const expanded = [...prev];
+      for (let i = prev.length; i < count; i++) {
+        const page = createEmptyPage(i);
+        expanded.push({ ...page, pdfPage: i });
+      }
+      return expanded;
+    });
+  }, []);
+
   // PDF background for material-backed documents
   const {
     renderPage: renderPdfPage,
     isLoading: pdfLoading,
     error: pdfError,
     pageCount: pdfPageCount,
-  } = usePdfBackground(materialId ?? null);
-
-  // Auto-add missing pages when PDF has more pages than the document.
-  const lastSyncedPageCount = useRef(0);
-  useEffect(() => {
-    if (pdfPageCount > 0 && pdfPageCount > lastSyncedPageCount.current) {
-      lastSyncedPageCount.current = pdfPageCount;
-      setPages((prev) => {
-        if (prev.length >= pdfPageCount) return prev;
-        const expanded = [...prev];
-        for (let i = prev.length; i < pdfPageCount; i++) {
-          const page = createEmptyPage(i);
-          expanded.push({ ...page, pdfPage: i });
-        }
-        return expanded;
-      });
-    }
-  }, [pdfPageCount]);
+  } = usePdfBackground(materialId ?? null, {
+    onPageCountReady: expandPagesIfNeeded,
+  });
 
   // Derived values based on active tool
   const currentColor =

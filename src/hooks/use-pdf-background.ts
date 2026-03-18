@@ -18,12 +18,19 @@ export interface PdfBackground {
   pageCount: number;
 }
 
+interface UsePdfBackgroundOptions {
+  onPageCountReady?: (count: number) => void;
+}
+
 /**
  * Loads a PDF from Supabase Storage and provides a function to render
  * individual pages onto canvas elements. Used by the canvas editor to
  * display PDF content as page backgrounds for material-backed documents.
  */
-export function usePdfBackground(materialId: string | null): PdfBackground {
+export function usePdfBackground(
+  materialId: string | null,
+  options?: UsePdfBackgroundOptions,
+): PdfBackground {
   const [isLoading, setIsLoading] = useState(!!materialId);
   const [error, setError] = useState<string | null>(null);
   const [pageCount, setPageCount] = useState(0);
@@ -90,6 +97,7 @@ export function usePdfBackground(materialId: string | null): PdfBackground {
 
         pdfDocRef.current = pdfDoc;
         setPageCount(pdfDoc.numPages);
+        options?.onPageCountReady?.(pdfDoc.numPages);
         setIsLoading(false);
       } catch (err) {
         if (!cancelled) {
