@@ -130,6 +130,7 @@ export interface ScrapedAssignmentData {
   title: string;
   descriptionHtml: string;
   dueDate: string | null;
+  submissionStatus: string | null;
   moodleModuleId: string;
 }
 

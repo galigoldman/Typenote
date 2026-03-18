@@ -45,4 +45,43 @@ describe('scrapeAssignmentPage', () => {
     const result = scrapeAssignmentPage();
     expect(result.title).toBe('Assignment 5');
   });
+
+  it('extracts submission status from status table', () => {
+    document.body.innerHTML = `
+      <table class="submissionstatustable"><tr>
+        <td class="cell c0">Submission status</td>
+        <td class="cell c1">Submitted for grading</td>
+      </tr></table>
+    `;
+    const result = scrapeAssignmentPage();
+    expect(result.submissionStatus).toBe('Submitted for grading');
+  });
+
+  it('returns null submission status when not present', () => {
+    document.body.innerHTML = '<div></div>';
+    const result = scrapeAssignmentPage();
+    expect(result.submissionStatus).toBeNull();
+  });
+
+  it('returns null due date when no due date row exists', () => {
+    document.body.innerHTML = `
+      <table class="submissionstatustable"><tr>
+        <td class="cell c0">Submission status</td>
+        <td class="cell c1">Not submitted</td>
+      </tr></table>
+    `;
+    const result = scrapeAssignmentPage();
+    expect(result.dueDate).toBeNull();
+  });
+
+  it('extracts due date with Hebrew label', () => {
+    document.body.innerHTML = `
+      <table class="submissionstatustable"><tr>
+        <td class="cell c0">תאריך הגשה</td>
+        <td class="cell c1">1 April 2026, 11:59 PM</td>
+      </tr></table>
+    `;
+    const result = scrapeAssignmentPage();
+    expect(result.dueDate).not.toBeNull();
+  });
 });

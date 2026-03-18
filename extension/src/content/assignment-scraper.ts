@@ -14,6 +14,7 @@ export function scrapeAssignmentPage(): {
   title: string;
   descriptionHtml: string;
   dueDate: string | null;
+  submissionStatus: string | null;
   moodleModuleId: string;
 } {
   const title =
@@ -29,6 +30,7 @@ export function scrapeAssignmentPage(): {
   const descriptionHtml = descriptionEl?.innerHTML?.trim() ?? '';
 
   let dueDate: string | null = null;
+  let submissionStatus: string | null = null;
   const rows = document.querySelectorAll('.submissionstatustable tr');
   for (const row of rows) {
     const header = row.querySelector('td.cell.c0')?.textContent?.trim();
@@ -39,12 +41,15 @@ export function scrapeAssignmentPage(): {
         dueDate = isNaN(parsed.getTime()) ? null : parsed.toISOString();
       }
     }
+    if (header === 'Submission status' || header === 'מצב ההגשה') {
+      submissionStatus = row.querySelector('td.cell.c1')?.textContent?.trim() ?? null;
+    }
   }
 
   const urlParams = new URLSearchParams(window.location.search);
   const moodleModuleId = urlParams.get('id') ?? '';
 
-  return { title, descriptionHtml, dueDate, moodleModuleId };
+  return { title, descriptionHtml, dueDate, submissionStatus, moodleModuleId };
 }
 
 (window as unknown as Record<string, unknown>).__typenote_assignment_scraper = scrapeAssignmentPage;
