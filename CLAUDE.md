@@ -38,6 +38,9 @@ Every step of development must follow this git workflow:
 
 ## Active Technologies
 
+- TypeScript 5 / Node.js 22+ + Next.js 16 (App Router), @supabase/ssr, shadcn/ui (Dialog, Tooltip, Card, Button, Input, Label) (011-core-ux-improvements)
+- PostgreSQL via Supabase — new tables: `ai_conversations`, `ai_messages` + extended `moveDocument` server action (011-core-ux-improvements)
+
 - TypeScript 5 / Node.js 22+ + Next.js 16 (App Router), @supabase/ssr, shadcn/ui (Card, Button, Input, Label) (010-auth-account-mgmt)
 - PostgreSQL via Supabase — existing tables only, no migrations (010-auth-account-mgmt)
 
@@ -69,6 +72,7 @@ Every step of development must follow this git workflow:
 
 ## Recent Changes
 
+- 011-core-ux-improvements: Auto-save retry with manual save button, document move dialog with course/folder tree, AI conversation persistence per course with conversation list
 - 009-ai-rate-limit: Per-user daily AI query caps with subscription tiers, atomic Postgres RPC enforcement, quota display in chat panel
 - 007-ai-context-polish: Dynamic system prompt with course/week context, document content awareness, markdown+LaTeX rendering in AI chat, embedding cleanup on deletion
 - 006-course-context-engine: Text-based RAG with pgvector, AI chat panel, multimodal embedding infrastructure

@@ -2,12 +2,38 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 // Mock supabase server client
 const mockGetUser = vi.fn();
+const mockSupabaseFrom = vi.fn();
 vi.mock('@/lib/supabase/server', () => ({
-  createClient: vi.fn(() =>
-    Promise.resolve({
+  createClient: vi.fn(() => {
+    // Chain mock for .from().select().eq().single(), .from().insert().select().single(), .from().update().eq()
+    const chainMock = {
+      select: vi.fn().mockReturnValue({
+        eq: vi.fn().mockReturnValue({
+          eq: vi.fn().mockReturnValue({
+            single: vi.fn().mockResolvedValue({ data: null, error: null }),
+            order: vi.fn().mockReturnValue({
+              limit: vi.fn().mockResolvedValue({ data: [], error: null }),
+            }),
+          }),
+          single: vi.fn().mockResolvedValue({ data: null, error: null }),
+        }),
+        single: vi.fn().mockResolvedValue({ data: null, error: null }),
+      }),
+      insert: vi.fn().mockReturnValue({
+        select: vi.fn().mockReturnValue({
+          single: vi.fn().mockResolvedValue({ data: { id: 'conv-mock', title: 'test' }, error: null }),
+        }),
+      }),
+      update: vi.fn().mockReturnValue({
+        eq: vi.fn().mockResolvedValue({ error: null }),
+      }),
+    };
+    mockSupabaseFrom.mockReturnValue(chainMock);
+    return Promise.resolve({
       auth: { getUser: mockGetUser },
-    }),
-  ),
+      from: mockSupabaseFrom,
+    });
+  }),
 }));
 
 // Mock rate-limit helper

@@ -18,6 +18,7 @@ export async function POST(req: Request) {
       weekLabel,
       documentContent,
       conversationHistory,
+      conversationId,
     } = body;
 
     // Validate required fields
@@ -118,6 +119,85 @@ export async function POST(req: Request) {
       );
     }
 
+    // --- Conversation persistence ---
+    let activeConversationId = conversationId as string | undefined;
+    let serverHistory: Array<{ role: string; content: string }> = [];
+
+    // If continuing an existing conversation, load recent messages
+    if (activeConversationId) {
+      // Verify ownership
+      const { data: conv } = await supabase
+        .from('ai_conversations')
+        .select('id')
+        .eq('id', activeConversationId)
+        .eq('user_id', user.id)
+        .single();
+
+      if (!conv) {
+        return new Response(
+          JSON.stringify({ error: 'Conversation not found' }),
+          {
+            status: 404,
+            headers: { 'Content-Type': 'application/json' },
+          },
+        );
+      }
+
+      // Load last 20 messages as server-side history
+      const { data: recentMsgs } = await supabase
+        .from('ai_messages')
+        .select('role, content')
+        .eq('conversation_id', activeConversationId)
+        .order('created_at', { ascending: false })
+        .limit(20);
+
+      if (recentMsgs) {
+        serverHistory = recentMsgs
+          .reverse()
+          .map((m) => ({ role: m.role, content: m.content }));
+      }
+    } else {
+      // Create new conversation with title from first ~50 chars
+      const title = question.slice(0, 50);
+      const { data: newConv, error: convError } = await supabase
+        .from('ai_conversations')
+        .insert({
+          user_id: user.id,
+          course_id: courseId,
+          title,
+        })
+        .select()
+        .single();
+
+      if (convError || !newConv) {
+        console.error('Failed to create conversation:', convError);
+        // Non-fatal — continue without persistence
+      } else {
+        activeConversationId = newConv.id;
+      }
+    }
+
+    // Persist user message
+    let userMessageId: string | undefined;
+    if (activeConversationId) {
+      const { data: userMsg } = await supabase
+        .from('ai_messages')
+        .insert({
+          conversation_id: activeConversationId,
+          role: 'user',
+          content: question,
+        })
+        .select('id')
+        .single();
+      userMessageId = userMsg?.id;
+
+      // Bump conversation updated_at
+      await supabase
+        .from('ai_conversations')
+        .update({ updated_at: new Date().toISOString() })
+        .eq('id', activeConversationId);
+    }
+
     const params: QuestionParams = {
       question: question.trim(),
       courseId,
@@ -127,7 +207,11 @@ export async function POST(req: Request) {
       courseName: courseName || undefined,
       weekLabel: weekLabel || undefined,
       documentContent: documentContent || undefined,
-      conversationHistory: conversationHistory || undefined,
+      // Use server-loaded history if available, otherwise fall back to client-sent history
+      conversationHistory:
+        serverHistory.length > 0
+          ? serverHistory
+          : (conversationHistory || undefined),
     };
 
     // Build context (RAG search, prompt, etc.)
@@ -149,6 +233,7 @@ export async function POST(req: Request) {
 
     // Create a streaming response using SSE-like format
     const encoder = new TextEncoder();
+    let fullResponse = '';
     const stream = new ReadableStream({
       async start(controller) {
         try {
@@ -159,9 +244,19 @@ export async function POST(req: Request) {
             ),
           );
 
+          // Send conversation metadata so the client can track the conversation
+          if (activeConversationId) {
+            controller.enqueue(
+              encoder.encode(
+                `data: ${JSON.stringify({ type: 'conversation', conversationId: activeConversationId, messageId: userMessageId })}\n\n`,
+              ),
+            );
+          }
+
           for await (const chunk of streamResult) {
             const text = chunk.text ?? '';
             if (text) {
+              fullResponse += text;
               controller.enqueue(
                 encoder.encode(
                   `data: ${JSON.stringify({ type: 'text', text })}\n\n`,
@@ -173,6 +268,23 @@ export async function POST(req: Request) {
           controller.enqueue(
             encoder.encode(`data: ${JSON.stringify({ type: 'done' })}\n\n`),
           );
+
+          // Persist assistant message
+          if (activeConversationId && fullResponse) {
+            await supabase.from('ai_messages').insert({
+              conversation_id: activeConversationId,
+              role: 'assistant',
+              content: fullResponse,
+              sources_json: sources || null,
+              model: mode === 'deep' ? 'pro' : 'flash',
+            });
+
+            // Bump conversation updated_at
+            await supabase
+              .from('ai_conversations')
+              .update({ updated_at: new Date().toISOString() })
+              .eq('id', activeConversationId);
+          }
         } catch (err) {
           const message = err instanceof Error ? err.message : 'Stream error';
           controller.enqueue(
