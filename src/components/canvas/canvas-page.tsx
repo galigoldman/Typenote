@@ -196,6 +196,35 @@ export function CanvasPage({
     [],
   );
 
+  // Listen for text selection in text boxes (Read mode on non-PDF docs)
+  useEffect(() => {
+    if (activeTool !== 'read') return;
+    // Skip if this page has a PDF text layer (PdfTextLayer handles selection)
+    if (page.pdfPage != null && materialId) return;
+
+    const handleSelectionChange = () => {
+      const sel = window.getSelection();
+      if (!sel || sel.isCollapsed || !sel.rangeCount) {
+        handleTextSelected('', null);
+        return;
+      }
+      const range = sel.getRangeAt(0);
+      const layer = textLayerRef.current;
+      if (!layer || !layer.contains(range.commonAncestorContainer)) return;
+
+      const text = sel.toString().trim();
+      if (text) {
+        handleTextSelected(text, range.getBoundingClientRect());
+      } else {
+        handleTextSelected('', null);
+      }
+    };
+
+    document.addEventListener('selectionchange', handleSelectionChange);
+    return () =>
+      document.removeEventListener('selectionchange', handleSelectionChange);
+  }, [activeTool, page.pdfPage, materialId, handleTextSelected]);
+
   const isInteractionMode =
     activeTool === 'pen' ||
     activeTool === 'highlighter' ||
@@ -612,7 +641,10 @@ export function CanvasPage({
         className="absolute inset-0 overflow-hidden"
         style={{
           pointerEvents:
-            isInteractionMode || activeTool === 'read' ? 'none' : 'auto',
+            isInteractionMode ||
+            (activeTool === 'read' && page.pdfPage != null && !!materialId)
+              ? 'none'
+              : 'auto',
         }}
       >
         {/* Flow editor — hidden when page has text boxes (text was migrated) */}

@@ -1462,22 +1462,20 @@ export function CanvasEditor({
             <Type className="h-4 w-4" />
             Type
           </button>
-          {materialId && (
-            <button
-              onPointerDown={(e) => {
-                e.stopPropagation();
-                setActiveTool('read');
-              }}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
-                isReadMode
-                  ? 'bg-primary text-primary-foreground'
-                  : 'hover:bg-accent text-muted-foreground'
-              }`}
-            >
-              <BookOpen className="h-4 w-4" />
-              Read
-            </button>
-          )}
+          <button
+            onPointerDown={(e) => {
+              e.stopPropagation();
+              setActiveTool('read');
+            }}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
+              isReadMode
+                ? 'bg-primary text-primary-foreground'
+                : 'hover:bg-accent text-muted-foreground'
+            }`}
+          >
+            <BookOpen className="h-4 w-4" />
+            Read
+          </button>
           <button
             onPointerDown={(e) => {
               e.stopPropagation();
