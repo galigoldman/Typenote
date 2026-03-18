@@ -96,9 +96,7 @@ export function AiChatPanel({
     async function loadMostRecent() {
       setLoadingConversation(true);
       try {
-        const res = await fetch(
-          `/api/ai/conversations?courseId=${courseId}`,
-        );
+        const res = await fetch(`/api/ai/conversations?courseId=${courseId}`);
         if (!res.ok) return;
         const data = await res.json();
         const conversations = data.conversations || [];
@@ -113,9 +111,7 @@ export function AiChatPanel({
           );
           if (msgRes.ok) {
             const msgData = await msgRes.json();
-            const loadedMessages: ChatMessage[] = (
-              msgData.messages || []
-            ).map(
+            const loadedMessages: ChatMessage[] = (msgData.messages || []).map(
               (m: {
                 role: 'user' | 'assistant';
                 content: string;
@@ -164,39 +160,36 @@ export function AiChatPanel({
   }, []);
 
   // Load a specific conversation by ID
-  const loadConversation = useCallback(
-    async (conversationId: string) => {
-      setLoadingConversation(true);
-      try {
-        const res = await fetch(
-          `/api/ai/conversations/${conversationId}/messages`,
-        );
-        if (!res.ok) throw new Error('Failed to load messages');
-        const data = await res.json();
-        const loadedMessages: ChatMessage[] = (data.messages || []).map(
-          (m: {
-            role: 'user' | 'assistant';
-            content: string;
-            sources_json?: ChatSource[] | null;
-            model?: 'flash' | 'pro' | null;
-          }) => ({
-            role: m.role,
-            content: m.content,
-            sources: m.sources_json || undefined,
-            model: m.model || undefined,
-          }),
-        );
-        setMessages(loadedMessages);
-        setCurrentConversationId(conversationId);
-        setView('chat');
-      } catch (err) {
-        console.error('Failed to load conversation:', err);
-      } finally {
-        setLoadingConversation(false);
-      }
-    },
-    [],
-  );
+  const loadConversation = useCallback(async (conversationId: string) => {
+    setLoadingConversation(true);
+    try {
+      const res = await fetch(
+        `/api/ai/conversations/${conversationId}/messages`,
+      );
+      if (!res.ok) throw new Error('Failed to load messages');
+      const data = await res.json();
+      const loadedMessages: ChatMessage[] = (data.messages || []).map(
+        (m: {
+          role: 'user' | 'assistant';
+          content: string;
+          sources_json?: ChatSource[] | null;
+          model?: 'flash' | 'pro' | null;
+        }) => ({
+          role: m.role,
+          content: m.content,
+          sources: m.sources_json || undefined,
+          model: m.model || undefined,
+        }),
+      );
+      setMessages(loadedMessages);
+      setCurrentConversationId(conversationId);
+      setView('chat');
+    } catch (err) {
+      console.error('Failed to load conversation:', err);
+    } finally {
+      setLoadingConversation(false);
+    }
+  }, []);
 
   const handleNewConversation = useCallback(() => {
     setCurrentConversationId(null);
@@ -255,9 +248,7 @@ export function AiChatPanel({
       });
 
       if (!res.ok) {
-        const err = await res
-          .json()
-          .catch(() => ({ error: 'Request failed' }));
+        const err = await res.json().catch(() => ({ error: 'Request failed' }));
 
         // Handle rate limit (429) with friendly message
         if (res.status === 429 && err.error === 'rate_limited') {
@@ -390,7 +381,10 @@ export function AiChatPanel({
           <Sparkles className="h-5 w-5 text-purple-500" />
           <span className="font-semibold">AI Tutor</span>
           {currentConversationId && messages.length > 0 && (
-            <span className="text-xs text-muted-foreground truncate max-w-[120px]" title={messages[0]?.content?.slice(0, 50)}>
+            <span
+              className="text-xs text-muted-foreground truncate max-w-[120px]"
+              title={messages[0]?.content?.slice(0, 50)}
+            >
               {messages[0]?.content?.slice(0, 30)}...
             </span>
           )}

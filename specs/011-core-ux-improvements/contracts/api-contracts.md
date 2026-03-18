@@ -16,6 +16,7 @@ List all conversations for a course.
 | `courseId` | `string` | Yes | Course to list conversations for |
 
 **Response 200**:
+
 ```json
 {
   "conversations": [
@@ -41,6 +42,7 @@ List all conversations for a course.
 Load all messages for a conversation.
 
 **Response 200**:
+
 ```json
 {
   "messages": [
@@ -91,6 +93,7 @@ Delete a conversation and all its messages.
 Update conversation title.
 
 **Request Body**:
+
 ```json
 {
   "title": "New title here"
@@ -113,6 +116,7 @@ Update conversation title.
 | `conversationId` | `string` | No | Existing conversation to continue. If omitted, a new conversation is created. |
 
 **Modified behavior**:
+
 1. If `conversationId` is provided: verify ownership, load last 20 messages as history (ignore client-sent `conversationHistory`)
 2. If `conversationId` is omitted: create a new `ai_conversations` row, set title from first ~50 chars of question
 3. After rate limit check passes: insert user message into `ai_messages`
@@ -120,9 +124,11 @@ Update conversation title.
 5. Update conversation `updated_at`
 
 **Added SSE events**:
+
 ```
 data: {"type":"conversation","conversationId":"uuid","messageId":"uuid"}
 ```
+
 Sent immediately after the user message is persisted, before streaming begins. Client uses this to track the conversation for subsequent requests.
 
 **Unchanged**: All existing fields, rate limiting, auth, streaming behavior remain identical.
@@ -134,11 +140,13 @@ Sent immediately after the user message is persisted, before streaming begins. C
 ### moveDocument (existing — extended)
 
 **Old signature**:
+
 ```typescript
 moveDocument(id: string, folderId: string | null)
 ```
 
 **New signature**:
+
 ```typescript
 moveDocument(id: string, destination: MoveDestination)
 
@@ -149,6 +157,7 @@ type MoveDestination =
 ```
 
 **Behavior**:
+
 - `type: 'folder'`: Set `folder_id`, clear `course_id`, `week_id`, `material_id`
 - `type: 'course'`: Set `course_id` (+ optional `week_id`), clear `folder_id`. If `course_id` changes and `material_id` is set, clear `material_id`.
 - `type: 'root'`: Clear `folder_id`, `course_id`, `week_id`, `material_id`
@@ -196,11 +205,13 @@ getRecentMessages(conversationId: string, limit?: number): Promise<AiMessage[]>
 ### useAutoSave (extended)
 
 **New SaveStatus type**:
+
 ```typescript
 export type SaveStatus = 'saved' | 'saving' | 'unsaved' | 'retrying' | 'error';
 ```
 
 **New return fields**:
+
 ```typescript
 {
   // ...existing fields...
@@ -214,9 +225,10 @@ export type SaveStatus = 'saved' | 'saving' | 'unsaved' | 'retrying' | 'error';
 ### useDocumentSync (extended)
 
 **New return fields**:
+
 ```typescript
 {
   // ...existing fields...
-  manualSave: () => Promise<void>;  // Explicit save triggered by button
+  manualSave: () => Promise<void>; // Explicit save triggered by button
 }
 ```

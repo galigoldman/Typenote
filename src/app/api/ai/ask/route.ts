@@ -211,7 +211,7 @@ export async function POST(req: Request) {
       conversationHistory:
         serverHistory.length > 0
           ? serverHistory
-          : (conversationHistory || undefined),
+          : conversationHistory || undefined,
     };
 
     // Build context (RAG search, prompt, etc.)

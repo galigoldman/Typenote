@@ -32,14 +32,18 @@ export async function GET(request: NextRequest) {
   }
 
   // Transform to include message_count as a flat field
-  const result = (conversations || []).map((conv: Record<string, unknown> & { ai_messages?: { count: number }[] }) => ({
-    id: conv.id,
-    course_id: conv.course_id,
-    title: conv.title,
-    created_at: conv.created_at,
-    updated_at: conv.updated_at,
-    message_count: conv.ai_messages?.[0]?.count ?? 0,
-  }));
+  const result = (conversations || []).map(
+    (
+      conv: Record<string, unknown> & { ai_messages?: { count: number }[] },
+    ) => ({
+      id: conv.id,
+      course_id: conv.course_id,
+      title: conv.title,
+      created_at: conv.created_at,
+      updated_at: conv.updated_at,
+      message_count: conv.ai_messages?.[0]?.count ?? 0,
+    }),
+  );
 
   return NextResponse.json({ conversations: result });
 }

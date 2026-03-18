@@ -37,6 +37,7 @@
 **Independent of Phase 2** — can be worked on in parallel.
 
 **Independent Test**:
+
 1. Edit a document, click "Save" manually, verify the save completes and indicator shows "Saved."
 2. Simulate a network interruption. Verify auto-save retries 3 times. After retries fail, verify the indicator changes to an error state. Click the indicator and verify error details are shown. Restore the network and verify pending changes are saved.
 
@@ -131,18 +132,19 @@ All ──→ Phase 7 (Polish: T031-T034)
 
 ### User Story Completion Order
 
-| Priority | Story | Phase | Can Start After | Independent? |
-|----------|-------|-------|-----------------|-------------|
-| P1 | US1 — Auto-Save Retry | Phase 3 | Phase 1 | Yes — fully independent |
-| P1 | US3 — Conversation Persistence | Phase 4 | Phase 2 | Yes — independent of US1, US2 |
-| P2 | US2 — Document Move | Phase 5 | Phase 2 | Yes — independent of US1, US3 |
-| P3 | US4 — Conversation Titles | Phase 6 | Phase 4 | Depends on US3 |
+| Priority | Story                          | Phase   | Can Start After | Independent?                  |
+| -------- | ------------------------------ | ------- | --------------- | ----------------------------- |
+| P1       | US1 — Auto-Save Retry          | Phase 3 | Phase 1         | Yes — fully independent       |
+| P1       | US3 — Conversation Persistence | Phase 4 | Phase 2         | Yes — independent of US1, US2 |
+| P2       | US2 — Document Move            | Phase 5 | Phase 2         | Yes — independent of US1, US3 |
+| P3       | US4 — Conversation Titles      | Phase 6 | Phase 4         | Depends on US3                |
 
 ---
 
 ## Parallel Execution Opportunities
 
 ### After Phase 1 completes:
+
 ```
 ┌──────────────────────┐    ┌──────────────────────┐
 │ Phase 2 (Foundation) │    │ Phase 3 (US1: Save)  │
@@ -160,13 +162,16 @@ All ──→ Phase 7 (Polish: T031-T034)
 ```
 
 ### Within Phase 2:
+
 - T005 (conversations.ts) and T006 (moveDocument extension) can be done in parallel — different files
 - T007 and T008 (integration tests) can be done in parallel — different files
 
 ### Within Phase 4:
+
 - T015, T016, T017 can be done in parallel — different API route files
 
 ### Within Phase 5:
+
 - T026 and T027 can be done in parallel — different dashboard page files
 
 ---
@@ -174,9 +179,11 @@ All ──→ Phase 7 (Polish: T031-T034)
 ## Implementation Strategy
 
 ### MVP Scope (recommended first delivery)
+
 **Phase 1 + Phase 2 + Phase 3 (US1)**: Auto-save retry with manual save button. This is self-contained, has no DB migration (migration is in Phase 1 but US1 doesn't use it), and directly addresses the data-loss risk from Issue #47.
 
 ### Full Delivery Order
+
 1. Phase 1 → Phase 2 (foundation for US2 + US3)
 2. Phase 3 (US1 — auto-save, can overlap with Phase 2)
 3. Phase 4 (US3 — conversation persistence, the biggest phase)
@@ -185,6 +192,7 @@ All ──→ Phase 7 (Polish: T031-T034)
 6. Phase 7 (integration testing and CI)
 
 ### Task Summary
+
 - **Total tasks**: 34
 - **US1 (Auto-Save Retry)**: 6 tasks (T009-T014)
 - **US2 (Document Move)**: 5 tasks (T024-T028)

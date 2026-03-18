@@ -70,7 +70,9 @@ export function ConversationList({
 
     setDeletingId(id);
     try {
-      const res = await fetch(`/api/ai/conversations/${id}`, { method: 'DELETE' });
+      const res = await fetch(`/api/ai/conversations/${id}`, {
+        method: 'DELETE',
+      });
       if (res.ok) {
         setConversations((prev) => prev.filter((c) => c.id !== id));
         onDelete(id);
@@ -84,13 +86,18 @@ export function ConversationList({
 
   const handleTitleSave = async (id: string) => {
     const newTitle = editTitle.trim();
-    if (!newTitle || newTitle === conversations.find(c => c.id === id)?.title) {
+    if (
+      !newTitle ||
+      newTitle === conversations.find((c) => c.id === id)?.title
+    ) {
       setEditingId(null);
       return;
     }
 
     // Optimistic update
-    setConversations(prev => prev.map(c => c.id === id ? { ...c, title: newTitle } : c));
+    setConversations((prev) =>
+      prev.map((c) => (c.id === id ? { ...c, title: newTitle } : c)),
+    );
     setEditingId(null);
 
     try {
@@ -116,12 +123,7 @@ export function ConversationList({
   return (
     <div className="flex flex-col h-full">
       <div className="p-3 border-b">
-        <Button
-          onClick={onNew}
-          variant="outline"
-          size="sm"
-          className="w-full"
-        >
+        <Button onClick={onNew} variant="outline" size="sm" className="w-full">
           <Plus className="h-4 w-4 mr-2" />
           New conversation
         </Button>
@@ -160,7 +162,9 @@ export function ConversationList({
                     />
                   ) : (
                     <div className="flex items-center gap-1 min-w-0">
-                      <p className="text-sm font-medium truncate">{conv.title}</p>
+                      <p className="text-sm font-medium truncate">
+                        {conv.title}
+                      </p>
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
@@ -176,7 +180,8 @@ export function ConversationList({
                   )}
                   <p className="text-xs text-muted-foreground mt-0.5">
                     {formatRelativeTime(conv.updated_at)}
-                    {conv.message_count > 0 && ` · ${conv.message_count} messages`}
+                    {conv.message_count > 0 &&
+                      ` · ${conv.message_count} messages`}
                   </p>
                 </div>
                 <button

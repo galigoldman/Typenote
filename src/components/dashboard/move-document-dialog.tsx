@@ -212,9 +212,7 @@ export function MoveDocumentDialog({
       // Re-fetch to get the new folder
       await fetchData();
     } catch (err) {
-      setError(
-        err instanceof Error ? err.message : 'Failed to create folder',
-      );
+      setError(err instanceof Error ? err.message : 'Failed to create folder');
     } finally {
       setCreatingFolder(false);
     }

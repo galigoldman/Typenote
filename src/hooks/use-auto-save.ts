@@ -103,7 +103,10 @@ export function useAutoSave(
         setErrorType(classified.errorType);
 
         const delay = 1000 * Math.pow(2, retryCountRef.current - 1);
-        retryTimeoutRef.current = setTimeout(() => performSaveRef.current?.(), delay);
+        retryTimeoutRef.current = setTimeout(
+          () => performSaveRef.current?.(),
+          delay,
+        );
       } else {
         setStatus('error');
         setErrorDetails(classified.message);

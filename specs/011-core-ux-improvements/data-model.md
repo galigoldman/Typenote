@@ -11,22 +11,24 @@
 
 Stores AI chat threads scoped to a user + course.
 
-| Column | Type | Constraints | Notes |
-|--------|------|-------------|-------|
-| `id` | `uuid` | PK, default `gen_random_uuid()` | |
-| `user_id` | `uuid` | NOT NULL, FK `profiles(id)` ON DELETE CASCADE | Owner |
-| `course_id` | `uuid` | NOT NULL, FK `courses(id)` ON DELETE CASCADE | Course scope |
-| `title` | `text` | NOT NULL, default `'New conversation'` | Auto-generated from first message (~50 chars) |
-| `created_at` | `timestamptz` | NOT NULL, default `now()` | |
-| `updated_at` | `timestamptz` | NOT NULL, default `now()` | Bumped on each new message |
+| Column       | Type          | Constraints                                   | Notes                                         |
+| ------------ | ------------- | --------------------------------------------- | --------------------------------------------- |
+| `id`         | `uuid`        | PK, default `gen_random_uuid()`               |                                               |
+| `user_id`    | `uuid`        | NOT NULL, FK `profiles(id)` ON DELETE CASCADE | Owner                                         |
+| `course_id`  | `uuid`        | NOT NULL, FK `courses(id)` ON DELETE CASCADE  | Course scope                                  |
+| `title`      | `text`        | NOT NULL, default `'New conversation'`        | Auto-generated from first message (~50 chars) |
+| `created_at` | `timestamptz` | NOT NULL, default `now()`                     |                                               |
+| `updated_at` | `timestamptz` | NOT NULL, default `now()`                     | Bumped on each new message                    |
 
 **Indexes**:
+
 - `ai_conversations_user_course_idx` on `(user_id, course_id, updated_at DESC)` — list conversations for a course, most recent first
 - `ai_conversations_user_idx` on `(user_id)` — user-level queries
 
 **Trigger**: `ai_conversations_updated_at` → calls `handle_updated_at()` before UPDATE
 
 **RLS Policies**:
+
 - SELECT: `user_id = auth.uid()`
 - INSERT: `user_id = auth.uid()`
 - UPDATE: `user_id = auth.uid()`
@@ -40,20 +42,22 @@ Stores AI chat threads scoped to a user + course.
 
 Stores individual messages within a conversation.
 
-| Column | Type | Constraints | Notes |
-|--------|------|-------------|-------|
-| `id` | `uuid` | PK, default `gen_random_uuid()` | |
-| `conversation_id` | `uuid` | NOT NULL, FK `ai_conversations(id)` ON DELETE CASCADE | Parent conversation |
-| `role` | `text` | NOT NULL, CHECK `(role IN ('user', 'assistant'))` | Message sender |
-| `content` | `text` | NOT NULL | Message text |
-| `sources_json` | `jsonb` | nullable | Citation metadata for assistant messages |
-| `model` | `text` | nullable | `'flash'` or `'pro'` for assistant messages |
-| `created_at` | `timestamptz` | NOT NULL, default `now()` | |
+| Column            | Type          | Constraints                                           | Notes                                       |
+| ----------------- | ------------- | ----------------------------------------------------- | ------------------------------------------- |
+| `id`              | `uuid`        | PK, default `gen_random_uuid()`                       |                                             |
+| `conversation_id` | `uuid`        | NOT NULL, FK `ai_conversations(id)` ON DELETE CASCADE | Parent conversation                         |
+| `role`            | `text`        | NOT NULL, CHECK `(role IN ('user', 'assistant'))`     | Message sender                              |
+| `content`         | `text`        | NOT NULL                                              | Message text                                |
+| `sources_json`    | `jsonb`       | nullable                                              | Citation metadata for assistant messages    |
+| `model`           | `text`        | nullable                                              | `'flash'` or `'pro'` for assistant messages |
+| `created_at`      | `timestamptz` | NOT NULL, default `now()`                             |                                             |
 
 **Indexes**:
+
 - `ai_messages_conversation_idx` on `(conversation_id, created_at ASC)` — load messages in order
 
 **RLS Policies** (via join to `ai_conversations`):
+
 - SELECT: `EXISTS (SELECT 1 FROM ai_conversations WHERE id = conversation_id AND user_id = auth.uid())`
 - INSERT: `EXISTS (SELECT 1 FROM ai_conversations WHERE id = conversation_id AND user_id = auth.uid())`
 - DELETE: `EXISTS (SELECT 1 FROM ai_conversations WHERE id = conversation_id AND user_id = auth.uid())`
@@ -74,6 +78,7 @@ CHECK: week_id IS NULL OR course_id IS NOT NULL
 ```
 
 When moving:
+
 - **To a course/week**: Set `course_id` (+ optional `week_id`), clear `folder_id`. If different course, clear `material_id`.
 - **To a folder**: Set `folder_id`, clear `course_id`, `week_id`, `material_id`.
 - **Between weeks (same course)**: Update `week_id` only.
@@ -89,6 +94,7 @@ ai_conversations (1) ──< (N) ai_messages
 ```
 
 **Full context**:
+
 ```
 profiles ──< courses ──< course_weeks ──< course_materials
     │            │                            │

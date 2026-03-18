@@ -137,7 +137,9 @@ describe('useAutoSave', () => {
   // ---------------------------------------------------------------------------
   describe('retry on network error', () => {
     it('retries on TypeError (network failure) with incrementing retryCount', async () => {
-      const saveFn = vi.fn().mockRejectedValue(new TypeError('Failed to fetch'));
+      const saveFn = vi
+        .fn()
+        .mockRejectedValue(new TypeError('Failed to fetch'));
       const { result } = renderHook(() => useAutoSave(saveFn, 800));
 
       // Trigger and advance past debounce
@@ -158,7 +160,9 @@ describe('useAutoSave', () => {
     });
 
     it('after 3 retries with backoff, status becomes "error"', async () => {
-      const saveFn = vi.fn().mockRejectedValue(new TypeError('Failed to fetch'));
+      const saveFn = vi
+        .fn()
+        .mockRejectedValue(new TypeError('Failed to fetch'));
       const { result } = renderHook(() => useAutoSave(saveFn, 800));
 
       // Trigger and advance past debounce — first call
@@ -233,9 +237,7 @@ describe('useAutoSave', () => {
   // ---------------------------------------------------------------------------
   describe('no retry on auth error', () => {
     it('goes directly to "error" on "Not authenticated"', async () => {
-      const saveFn = vi
-        .fn()
-        .mockRejectedValue(new Error('Not authenticated'));
+      const saveFn = vi.fn().mockRejectedValue(new Error('Not authenticated'));
       const { result } = renderHook(() => useAutoSave(saveFn, 800));
 
       act(() => {
@@ -295,9 +297,7 @@ describe('useAutoSave', () => {
   // ---------------------------------------------------------------------------
   describe('no retry on permanent error', () => {
     it('goes directly to "error" on "400 Bad Request"', async () => {
-      const saveFn = vi
-        .fn()
-        .mockRejectedValue(new Error('400 Bad Request'));
+      const saveFn = vi.fn().mockRejectedValue(new Error('400 Bad Request'));
       const { result } = renderHook(() => useAutoSave(saveFn, 800));
 
       act(() => {
@@ -391,9 +391,7 @@ describe('useAutoSave', () => {
   // ---------------------------------------------------------------------------
   describe('retryNow() manual trigger', () => {
     it('after entering error state, retryNow() calls saveFn again', async () => {
-      const saveFn = vi
-        .fn()
-        .mockRejectedValue(new Error('400 Bad Request'));
+      const saveFn = vi.fn().mockRejectedValue(new Error('400 Bad Request'));
       const { result } = renderHook(() => useAutoSave(saveFn, 800));
 
       // Trigger -> debounce -> save fails permanently
@@ -552,7 +550,9 @@ describe('useAutoSave', () => {
   // ---------------------------------------------------------------------------
   describe('exponential backoff timing', () => {
     it('retries at ~1s, ~2s, ~4s intervals', async () => {
-      const saveFn = vi.fn().mockRejectedValue(new TypeError('Failed to fetch'));
+      const saveFn = vi
+        .fn()
+        .mockRejectedValue(new TypeError('Failed to fetch'));
       const { result } = renderHook(() => useAutoSave(saveFn, 800));
 
       // Initial trigger + debounce

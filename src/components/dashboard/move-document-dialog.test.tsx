@@ -13,9 +13,7 @@ vi.mock('@/lib/supabase/client', () => ({
   createClient: () => ({
     from: mockFrom,
     auth: {
-      getUser: vi
-        .fn()
-        .mockResolvedValue({ data: { user: { id: 'user-1' } } }),
+      getUser: vi.fn().mockResolvedValue({ data: { user: { id: 'user-1' } } }),
     },
   }),
 }));
@@ -117,9 +115,7 @@ function setupSupabaseMock({
       return {
         select: vi.fn().mockReturnValue({
           eq: vi.fn().mockReturnValue({
-            order: vi
-              .fn()
-              .mockResolvedValue({ data: courses, error: null }),
+            order: vi.fn().mockResolvedValue({ data: courses, error: null }),
           }),
         }),
       };
@@ -128,9 +124,7 @@ function setupSupabaseMock({
       return {
         select: vi.fn().mockReturnValue({
           eq: vi.fn().mockReturnValue({
-            order: vi
-              .fn()
-              .mockResolvedValue({ data: weeks, error: null }),
+            order: vi.fn().mockResolvedValue({ data: weeks, error: null }),
           }),
         }),
       };
@@ -140,9 +134,7 @@ function setupSupabaseMock({
         select: vi.fn().mockReturnValue({
           eq: vi.fn().mockReturnValue({
             is: vi.fn().mockReturnValue({
-              order: vi
-                .fn()
-                .mockResolvedValue({ data: folders, error: null }),
+              order: vi.fn().mockResolvedValue({ data: folders, error: null }),
             }),
           }),
         }),
@@ -151,9 +143,7 @@ function setupSupabaseMock({
     return {
       select: vi.fn().mockReturnValue({
         eq: vi.fn().mockReturnValue({
-          order: vi
-            .fn()
-            .mockResolvedValue({ data: [], error: null }),
+          order: vi.fn().mockResolvedValue({ data: [], error: null }),
         }),
       }),
     };
@@ -345,13 +335,7 @@ describe('MoveDocumentDialog', () => {
   });
 
   it('does not render when document is null', () => {
-    render(
-      <MoveDocumentDialog
-        document={null}
-        open
-        onOpenChange={vi.fn()}
-      />,
-    );
+    render(<MoveDocumentDialog document={null} open onOpenChange={vi.fn()} />);
 
     // The dialog shell (DialogContent) still renders because open=true,
     // but the description references document?.title which is undefined,

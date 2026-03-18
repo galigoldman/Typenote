@@ -121,10 +121,7 @@ export async function moveDocument(id: string, destination: MoveDestination) {
 
       if (readError) throw new Error(readError.message);
 
-      if (
-        current.material_id &&
-        current.course_id !== destination.courseId
-      ) {
+      if (current.material_id && current.course_id !== destination.courseId) {
         updateData.material_id = null;
       }
       break;
