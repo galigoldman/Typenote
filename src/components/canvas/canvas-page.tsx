@@ -602,8 +602,8 @@ export function CanvasPage({
       style={{
         width: PAGE_WIDTH,
         height: PAGE_HEIGHT,
-        userSelect: activeTool === 'read' ? 'text' : 'none',
-        WebkitUserSelect: activeTool === 'read' ? 'text' : 'none',
+        userSelect: 'none',
+        WebkitUserSelect: 'none',
       }}
     >
       {/* Layer 0: PDF background (material-backed documents only) */}
@@ -645,6 +645,8 @@ export function CanvasPage({
             (activeTool === 'read' && page.pdfPage != null && !!materialId)
               ? 'none'
               : 'auto',
+          userSelect: activeTool === 'read' ? 'text' : undefined,
+          WebkitUserSelect: activeTool === 'read' ? 'text' : undefined,
         }}
       >
         {/* Flow editor — hidden when page has text boxes (text was migrated) */}
@@ -657,6 +659,7 @@ export function CanvasPage({
             key={tb.id}
             textBox={tb}
             isSelected={selectedTextBoxIds.has(tb.id)}
+            readOnly={activeTool === 'read'}
             onContentUpdate={(id, content) =>
               onTextBoxContentUpdate?.(page.id, id, content)
             }
