@@ -44,6 +44,8 @@ interface UseSelectionOptions {
     strokeIds: string[],
     textBoxIds: string[],
   ) => void;
+  /** Called when user draws a rectangle that contains no objects (empty area crop) */
+  onEmptyRectSelection?: (pageId: string, bbox: BBox) => void;
 }
 
 interface UseSelectionReturn {
@@ -513,6 +515,8 @@ export function useSelection({
             setSelectionBBox(computeUnionBBox(selectedStrokes, selectedTbs));
             setSelectionPath(null);
           } else {
+            // No objects found — fire empty rect callback (used for crop-to-AI)
+            options.onEmptyRectSelection?.(targetPageId, selectionRect);
             clearSelection();
           }
         } else {

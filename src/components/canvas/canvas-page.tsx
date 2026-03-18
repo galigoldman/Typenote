@@ -73,7 +73,6 @@ interface CanvasPageProps {
   materialId?: string | null;
   onAskAiWithText?: (text: string) => void;
   onAskAiWithRegion?: (bbox: BBox, pageId: string) => void;
-  autoCropToAi?: boolean;
   onCanvasRefsReady?: (
     pageId: string,
     pdfCanvas: HTMLCanvasElement | null,
@@ -112,7 +111,6 @@ export function CanvasPage({
   materialId,
   onAskAiWithText,
   onAskAiWithRegion,
-  autoCropToAi = false,
   onCanvasRefsReady,
 }: CanvasPageProps) {
   const pdfCanvasRef = useRef<HTMLCanvasElement>(null);
@@ -164,28 +162,6 @@ export function CanvasPage({
       );
     }
   }, []);
-
-  // Auto-crop to AI: when crop mode is active and a selection bbox appears,
-  // auto-capture the region directly (no need to click "Ask AI" button)
-  const autoCropFiredRef = useRef(false);
-  useEffect(() => {
-    if (
-      autoCropToAi &&
-      activeTool === 'select' &&
-      selectionBBox &&
-      !isSelectionDragging &&
-      !isSelectionResizing &&
-      materialId &&
-      onAskAiWithRegion &&
-      !autoCropFiredRef.current
-    ) {
-      autoCropFiredRef.current = true;
-      onAskAiWithRegion(selectionBBox, page.id);
-    }
-    if (!selectionBBox) {
-      autoCropFiredRef.current = false;
-    }
-  });
 
   // Expose canvas refs to parent for region capture
   useEffect(() => {
