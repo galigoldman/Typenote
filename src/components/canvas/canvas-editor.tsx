@@ -1455,38 +1455,36 @@ export function CanvasEditor({
             Type
           </button>
           {materialId && (
-            <>
-              <button
-                onPointerDown={(e) => {
-                  e.stopPropagation();
-                  setActiveTool('read');
-                }}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
-                  isReadMode
-                    ? 'bg-primary text-primary-foreground'
-                    : 'hover:bg-accent text-muted-foreground'
-                }`}
-              >
-                <BookOpen className="h-4 w-4" />
-                Read
-              </button>
-              <button
-                onPointerDown={(e) => {
-                  e.stopPropagation();
-                  setActiveTool('crop');
-                }}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
-                  activeTool === 'crop'
-                    ? 'bg-primary text-primary-foreground'
-                    : 'hover:bg-purple-50 text-purple-600'
-                }`}
-                title="Draw a rectangle to capture and send to AI"
-              >
-                <Scissors className="h-4 w-4" />
-                Crop
-              </button>
-            </>
+            <button
+              onPointerDown={(e) => {
+                e.stopPropagation();
+                setActiveTool('read');
+              }}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
+                isReadMode
+                  ? 'bg-primary text-primary-foreground'
+                  : 'hover:bg-accent text-muted-foreground'
+              }`}
+            >
+              <BookOpen className="h-4 w-4" />
+              Read
+            </button>
           )}
+          <button
+            onPointerDown={(e) => {
+              e.stopPropagation();
+              setActiveTool('crop');
+            }}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
+              activeTool === 'crop'
+                ? 'bg-primary text-primary-foreground'
+                : 'hover:bg-purple-50 text-purple-600'
+            }`}
+            title="Draw a rectangle to capture and send to AI"
+          >
+            <Scissors className="h-4 w-4" />
+            Crop
+          </button>
         </div>
 
         {/* Draw mode: sub-tool icons */}
