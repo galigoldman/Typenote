@@ -800,6 +800,11 @@ export function CanvasEditor({
     onTextBoxResize: handleTextBoxResize,
     onModeChange: setActiveTool,
     onDeleteSelected: handleDeleteSelected,
+    onEmptyRectSelection: autoCropToAi
+      ? (pageId: string, bbox: BBox) => {
+          handleAskAiWithRegion(bbox, pageId);
+        }
+      : undefined,
   });
 
   // Drawing hook
@@ -1548,7 +1553,6 @@ export function CanvasEditor({
                     materialId={materialId}
                     onAskAiWithText={handleAskAiWithText}
                     onAskAiWithRegion={handleAskAiWithRegion}
-                    autoCropToAi={autoCropToAi}
                     onCanvasRefsReady={handleCanvasRefsReady}
                   />
                   {/* Page break divider */}
