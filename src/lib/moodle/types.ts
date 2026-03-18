@@ -22,12 +22,16 @@ export interface SyncSectionPayload {
 }
 
 export interface SyncItemPayload {
-  type: 'file' | 'link';
+  type: 'file' | 'link' | 'assignment';
   name: string;
   moodleUrl: string;
   externalUrl?: string;
   fileSize?: number;
   mimeType?: string;
+  // Assignment-specific fields (only present when type === 'assignment')
+  moodleModuleId?: string;
+  descriptionHtml?: string;
+  dueDate?: string | null;
 }
 
 export interface SyncRequestPayload {
@@ -47,10 +51,18 @@ export interface SyncFileResult {
   status: FileStatus;
 }
 
+export interface SyncAssignmentResult {
+  moodleUrl: string;
+  id: string;
+  isNew: boolean;
+  contentChanged: boolean;
+}
+
 export interface SyncSectionResult {
   moodleSectionId: string;
   id: string;
   items: SyncFileResult[];
+  assignments: SyncAssignmentResult[];
 }
 
 export interface SyncCourseResult {

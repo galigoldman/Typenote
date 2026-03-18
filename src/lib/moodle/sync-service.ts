@@ -1,12 +1,17 @@
 import { createAdminClient } from '@/lib/supabase/admin';
 import { deleteEmbeddingsBySource } from '@/lib/queries/embeddings';
 import { checkFileExists } from './dedup';
+import {
+  upsertAssignment,
+  flagRemovedAssignments,
+} from './assignment-sync';
 import type {
   SyncRequestPayload,
   SyncResponsePayload,
   SyncCourseResult,
   SyncSectionResult,
   SyncFileResult,
+  SyncAssignmentResult,
 } from './types';
 
 // ============================================
@@ -443,53 +448,78 @@ export async function upsertMoodleData(
         throw new Error(`Section upsert failed: ${sectionError.message}`);
 
       const fileResults: SyncFileResult[] = [];
+      const assignmentResults: SyncAssignmentResult[] = [];
+      const assignmentUrls: string[] = [];
 
       for (const item of section.items) {
-        // Check dedup status
-        const dedupResult = await checkFileExists(
-          admin,
-          dbSection.id,
-          item.moodleUrl,
-          null,
-        );
-
-        if (dedupResult.status === 'new') {
-          // Insert new file record (without storage_path/content_hash — those come during upload)
-          const { data: dbFile, error: fileError } = await admin
-            .from('moodle_files')
-            .insert({
-              section_id: dbSection.id,
-              type: item.type,
-              moodle_url: item.moodleUrl,
-              file_name: item.name,
-              external_url: item.externalUrl ?? null,
-              file_size: item.fileSize ?? null,
-              mime_type: item.mimeType ?? null,
-              position: section.items.indexOf(item),
-            })
-            .select()
-            .single();
-          if (fileError)
-            throw new Error(`File insert failed: ${fileError.message}`);
-
-          fileResults.push({
+        if (item.type === 'assignment') {
+          // Handle assignment items via the assignment-sync module
+          const assignResult = await upsertAssignment({
+            sectionId: dbSection.id,
             moodleUrl: item.moodleUrl,
-            id: dbFile.id,
-            status: 'new',
+            moodleModuleId: item.moodleModuleId ?? '',
+            title: item.name,
+            descriptionHtml: item.descriptionHtml ?? '',
+            dueDate: item.dueDate ?? null,
           });
+          assignmentResults.push({
+            moodleUrl: item.moodleUrl,
+            id: assignResult.assignmentId,
+            isNew: assignResult.isNew,
+            contentChanged: assignResult.contentChanged,
+          });
+          assignmentUrls.push(item.moodleUrl);
         } else {
-          fileResults.push({
-            moodleUrl: item.moodleUrl,
-            id: dedupResult.fileId!,
-            status: dedupResult.status,
-          });
+          // Check dedup status for file/link items
+          const dedupResult = await checkFileExists(
+            admin,
+            dbSection.id,
+            item.moodleUrl,
+            null,
+          );
+
+          if (dedupResult.status === 'new') {
+            // Insert new file record (without storage_path/content_hash — those come during upload)
+            const { data: dbFile, error: fileError } = await admin
+              .from('moodle_files')
+              .insert({
+                section_id: dbSection.id,
+                type: item.type,
+                moodle_url: item.moodleUrl,
+                file_name: item.name,
+                external_url: item.externalUrl ?? null,
+                file_size: item.fileSize ?? null,
+                mime_type: item.mimeType ?? null,
+                position: section.items.indexOf(item),
+              })
+              .select()
+              .single();
+            if (fileError)
+              throw new Error(`File insert failed: ${fileError.message}`);
+
+            fileResults.push({
+              moodleUrl: item.moodleUrl,
+              id: dbFile.id,
+              status: 'new',
+            });
+          } else {
+            fileResults.push({
+              moodleUrl: item.moodleUrl,
+              id: dedupResult.fileId!,
+              status: dedupResult.status,
+            });
+          }
         }
       }
+
+      // Soft-delete assignments that are no longer on Moodle for this section
+      await flagRemovedAssignments(dbSection.id, assignmentUrls);
 
       sectionResults.push({
         moodleSectionId: section.moodleSectionId,
         id: dbSection.id,
         items: fileResults,
+        assignments: assignmentResults,
       });
     }
 
