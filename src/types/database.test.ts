@@ -6,6 +6,8 @@ import type {
   Subject,
   CanvasType,
   MoodleAssignment,
+  AssignmentSplit,
+  SplitQuestion,
 } from './database';
 
 describe('Database types', () => {
@@ -53,20 +55,32 @@ describe('Database types', () => {
     expectTypeOf<'dots'>().toMatchTypeOf<CanvasType>();
   });
 
-  it('MoodleAssignment interface has required fields', () => {
-    const assignment: MoodleAssignment = {
-      id: 'test',
-      section_id: 'section-1',
-      moodle_url: 'https://moodle.example.com/mod/assign/view.php?id=1',
-      moodle_module_id: '1',
-      title: 'Homework 1',
-      description_html: '<p>Question 1...</p>',
-      due_date: '2026-04-01T23:59:00Z',
-      is_removed: false,
-      content_version: 1,
-      created_at: '2026-03-18T00:00:00Z',
-      updated_at: '2026-03-18T00:00:00Z',
-    };
-    expect(assignment.id).toBe('test');
+  it('MoodleAssignment has correct shape', () => {
+    expectTypeOf<MoodleAssignment>().toHaveProperty('id');
+    expectTypeOf<MoodleAssignment>().toHaveProperty('section_id');
+    expectTypeOf<MoodleAssignment>().toHaveProperty('moodle_url');
+    expectTypeOf<MoodleAssignment>().toHaveProperty('description_html');
+    expectTypeOf<MoodleAssignment>().toHaveProperty('due_date');
+    expectTypeOf<MoodleAssignment>().toHaveProperty('is_removed');
+    expectTypeOf<MoodleAssignment>().toHaveProperty('content_version');
+  });
+
+  it('AssignmentSplit has correct shape', () => {
+    expectTypeOf<AssignmentSplit>().toHaveProperty('id');
+    expectTypeOf<AssignmentSplit>().toHaveProperty('assignment_id');
+    expectTypeOf<AssignmentSplit>().toHaveProperty('creator_type');
+    expectTypeOf<AssignmentSplit>().toHaveProperty('creator_id');
+    expectTypeOf<AssignmentSplit>().toHaveProperty('is_personal');
+    expectTypeOf<AssignmentSplit>().toHaveProperty('content_version');
+  });
+
+  it('SplitQuestion has correct shape', () => {
+    expectTypeOf<SplitQuestion>().toHaveProperty('id');
+    expectTypeOf<SplitQuestion>().toHaveProperty('split_id');
+    expectTypeOf<SplitQuestion>().toHaveProperty('parent_id');
+    expectTypeOf<SplitQuestion>().toHaveProperty('label');
+    expectTypeOf<SplitQuestion>().toHaveProperty('boundary_start');
+    expectTypeOf<SplitQuestion>().toHaveProperty('boundary_end');
+    expectTypeOf<SplitQuestion>().toHaveProperty('low_confidence');
   });
 });

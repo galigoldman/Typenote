@@ -1,99 +1,120 @@
--- moodle_assignments (shared, same RLS as moodle_files)
-CREATE TABLE moodle_assignments (
-  id            uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
-  section_id    uuid NOT NULL REFERENCES moodle_sections(id) ON DELETE CASCADE,
-  moodle_url    text NOT NULL,
+-- ============================================
+-- Moodle Assignments: shared assignment entities,
+-- question splits (boundary data), and individual
+-- split questions. Same shared registry pattern
+-- as moodle_files — any authenticated user can read.
+-- ============================================
+
+-- moodle_assignments (shared, same RLS pattern as moodle_files)
+create table public.moodle_assignments (
+  id               uuid primary key default uuid_generate_v4(),
+  section_id       uuid not null references public.moodle_sections(id) on delete cascade,
+  moodle_url       text not null,
   moodle_module_id text,
-  title         text NOT NULL,
-  description_html text NOT NULL DEFAULT '',
-  due_date      timestamptz,
-  is_removed    boolean NOT NULL DEFAULT false,
-  content_version integer NOT NULL DEFAULT 1,
-  created_at    timestamptz NOT NULL DEFAULT now(),
-  updated_at    timestamptz NOT NULL DEFAULT now()
+  title            text not null,
+  description_html text not null default '',
+  due_date         timestamptz,
+  is_removed       boolean not null default false,
+  content_version  integer not null default 1,
+  created_at       timestamptz not null default now(),
+  updated_at       timestamptz not null default now()
 );
 
-CREATE UNIQUE INDEX idx_moodle_assignments_section_url
-  ON moodle_assignments (section_id, moodle_url);
+create unique index idx_moodle_assignments_section_url
+  on public.moodle_assignments (section_id, moodle_url);
 
-ALTER TABLE moodle_assignments ENABLE ROW LEVEL SECURITY;
+create trigger moodle_assignments_updated_at
+  before update on public.moodle_assignments
+  for each row execute function public.handle_updated_at();
 
-CREATE POLICY "Authenticated users can read assignments"
-  ON moodle_assignments FOR SELECT TO authenticated USING (true);
+alter table public.moodle_assignments enable row level security;
+
+create policy "Authenticated users can read assignments"
+  on public.moodle_assignments for select
+  using (auth.role() = 'authenticated');
 
 -- assignment_splits (shared by default, personal splits only visible to creator)
-CREATE TABLE assignment_splits (
-  id              uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
-  assignment_id   uuid NOT NULL REFERENCES moodle_assignments(id) ON DELETE CASCADE,
-  creator_type    text NOT NULL CHECK (creator_type IN ('ai', 'student')),
-  creator_id      uuid REFERENCES profiles(id) ON DELETE SET NULL,
-  is_personal     boolean NOT NULL DEFAULT false,
-  content_version integer NOT NULL DEFAULT 1,
-  created_at      timestamptz NOT NULL DEFAULT now()
+-- Personal splits cannot have a null creator_id.
+create table public.assignment_splits (
+  id              uuid primary key default uuid_generate_v4(),
+  assignment_id   uuid not null references public.moodle_assignments(id) on delete cascade,
+  creator_type    text not null check (creator_type in ('ai', 'student')),
+  creator_id      uuid references public.profiles(id) on delete set null,
+  is_personal     boolean not null default false,
+  content_version integer not null default 1,
+  created_at      timestamptz not null default now(),
+  -- Ensure personal splits always have a creator
+  check (not (is_personal = true and creator_id is null))
 );
 
-CREATE INDEX idx_assignment_splits_assignment
-  ON assignment_splits (assignment_id, created_at DESC);
+create index idx_assignment_splits_assignment
+  on public.assignment_splits (assignment_id, created_at desc);
 
 -- FR-014: at most one personal split per assignment per student
-CREATE UNIQUE INDEX idx_assignment_splits_one_personal
-  ON assignment_splits (assignment_id, creator_id)
-  WHERE is_personal = true;
+create unique index idx_assignment_splits_one_personal
+  on public.assignment_splits (assignment_id, creator_id)
+  where is_personal = true;
 
-ALTER TABLE assignment_splits ENABLE ROW LEVEL SECURITY;
+alter table public.assignment_splits enable row level security;
 
-CREATE POLICY "Read shared splits or own personal splits"
-  ON assignment_splits FOR SELECT TO authenticated
-  USING (is_personal = false OR creator_id = auth.uid());
+-- Shared splits: everyone can read. Personal splits: only the creator.
+create policy "Read shared splits or own personal splits"
+  on public.assignment_splits for select
+  using (is_personal = false or creator_id = auth.uid());
 
-CREATE POLICY "Authenticated users can create splits"
-  ON assignment_splits FOR INSERT TO authenticated
-  WITH CHECK (creator_id = auth.uid() OR creator_type = 'ai');
+-- Students can create splits attributed to themselves only.
+-- AI splits are created via service role (bypasses RLS), not through this policy.
+create policy "Students can create their own splits"
+  on public.assignment_splits for insert
+  with check (creator_type = 'student' and creator_id = auth.uid());
 
-CREATE POLICY "Creators can delete their own splits"
-  ON assignment_splits FOR DELETE TO authenticated
-  USING (creator_id = auth.uid());
+create policy "Creators can delete their own splits"
+  on public.assignment_splits for delete
+  using (creator_id = auth.uid());
 
 -- split_questions (inherit visibility from parent split)
-CREATE TABLE split_questions (
-  id              uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
-  split_id        uuid NOT NULL REFERENCES assignment_splits(id) ON DELETE CASCADE,
-  parent_id       uuid REFERENCES split_questions(id) ON DELETE SET NULL,
-  label           text NOT NULL,
-  position        integer NOT NULL DEFAULT 0,
-  boundary_start  integer NOT NULL,
-  boundary_end    integer NOT NULL,
-  preamble_start  integer,
-  preamble_end    integer,
-  low_confidence  boolean NOT NULL DEFAULT false,
-  created_at      timestamptz NOT NULL DEFAULT now()
+create table public.split_questions (
+  id             uuid primary key default uuid_generate_v4(),
+  split_id       uuid not null references public.assignment_splits(id) on delete cascade,
+  parent_id      uuid references public.split_questions(id) on delete set null,
+  label          text not null,
+  position       integer not null default 0,
+  boundary_start integer not null,
+  boundary_end   integer not null,
+  preamble_start integer,
+  preamble_end   integer,
+  low_confidence boolean not null default false,
+  created_at     timestamptz not null default now()
 );
 
-CREATE INDEX idx_split_questions_split
-  ON split_questions (split_id, position);
+create index idx_split_questions_split
+  on public.split_questions (split_id, position);
 
-ALTER TABLE split_questions ENABLE ROW LEVEL SECURITY;
+alter table public.split_questions enable row level security;
 
-CREATE POLICY "Read questions if can read parent split"
-  ON split_questions FOR SELECT TO authenticated
-  USING (EXISTS (
-    SELECT 1 FROM assignment_splits s
-    WHERE s.id = split_questions.split_id
-      AND (s.is_personal = false OR s.creator_id = auth.uid())
+create policy "Read questions if can read parent split"
+  on public.split_questions for select
+  using (exists (
+    select 1 from public.assignment_splits s
+    where s.id = split_questions.split_id
+      and (s.is_personal = false or s.creator_id = auth.uid())
   ));
 
-CREATE POLICY "Insert questions for own splits"
-  ON split_questions FOR INSERT TO authenticated
-  WITH CHECK (EXISTS (
-    SELECT 1 FROM assignment_splits s
-    WHERE s.id = split_questions.split_id
-      AND (s.creator_id = auth.uid() OR s.creator_type = 'ai')
+-- Students can insert questions for their own splits only.
+-- AI split questions are inserted via service role (bypasses RLS).
+create policy "Insert questions for own splits"
+  on public.split_questions for insert
+  with check (exists (
+    select 1 from public.assignment_splits s
+    where s.id = split_questions.split_id
+      and s.creator_type = 'student'
+      and s.creator_id = auth.uid()
   ));
 
-CREATE POLICY "Delete questions for own splits"
-  ON split_questions FOR DELETE TO authenticated
-  USING (EXISTS (
-    SELECT 1 FROM assignment_splits s
-    WHERE s.id = split_questions.split_id
-      AND s.creator_id = auth.uid()
+create policy "Delete questions for own splits"
+  on public.split_questions for delete
+  using (exists (
+    select 1 from public.assignment_splits s
+    where s.id = split_questions.split_id
+      and s.creator_id = auth.uid()
   ));
