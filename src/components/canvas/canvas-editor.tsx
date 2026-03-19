@@ -1656,7 +1656,11 @@ export function CanvasEditor({
           className="flex-1 bg-gray-200 xl:bg-gray-100"
           data-scroll-container
           style={{
-            overflowX: scale > fitScale + 0.01 ? 'auto' : 'hidden',
+            overflowX:
+              PAGE_WIDTH * scale >
+              (typeof window !== 'undefined' ? window.innerWidth : 9999)
+                ? 'auto'
+                : 'hidden',
             overflowY:
               activeTool === 'text' ||
               activeTool === 'select' ||
@@ -1684,13 +1688,22 @@ export function CanvasEditor({
           }}
         >
           <div
-            className={`py-8 max-xl:py-0 max-xl:flex max-xl:flex-col ${
-              scale <= fitScale + 0.01 ? 'max-xl:items-center' : ''
-            }`}
+            className="py-8 max-xl:py-0"
             style={{
               transform: scale !== 1 ? `scale(${scale})` : undefined,
-              transformOrigin: 'top center',
+              transformOrigin: 'top left',
               willChange: scale !== 1 ? 'transform' : 'auto',
+              // Set explicit width/height so scroll container knows the real scaled size
+              width: scale !== 1 ? PAGE_WIDTH : undefined,
+              minHeight:
+                scale !== 1
+                  ? `${pages.length * PAGE_HEIGHT * scale + 100}px`
+                  : undefined,
+              // Center horizontally when page fits in viewport
+              marginLeft:
+                scale !== 1
+                  ? `max(0px, calc((100% - ${PAGE_WIDTH * scale}px) / 2))`
+                  : undefined,
             }}
           >
             {pages.map((page, index) => {
