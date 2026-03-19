@@ -190,6 +190,74 @@ function HighlightButton({ editor }: { editor: Editor }) {
  * selecting to end of line), pull it back so alignment only affects the
  * paragraphs the user actually selected.
  */
+const FONT_SIZES = [8, 9, 10, 11, 12, 14, 16, 18, 20, 24, 28, 32, 36, 48, 72];
+const DEFAULT_FONT_SIZE = 16;
+
+function getCurrentFontSize(editor: Editor): number {
+  const attrs = editor.getAttributes('textStyle');
+  if (attrs.fontSize) {
+    return parseInt(attrs.fontSize, 10) || DEFAULT_FONT_SIZE;
+  }
+  return DEFAULT_FONT_SIZE;
+}
+
+function FontSizeControl({ editor }: { editor: Editor }) {
+  const currentSize = getCurrentFontSize(editor);
+
+  const decrease = () => {
+    const idx = FONT_SIZES.findIndex((s) => s >= currentSize);
+    const newSize = FONT_SIZES[Math.max(0, (idx > 0 ? idx : 1) - 1)];
+    editor.chain().focus().setFontSize(`${newSize}px`).run();
+  };
+
+  const increase = () => {
+    const idx = FONT_SIZES.findIndex((s) => s >= currentSize);
+    const next = idx >= 0 ? idx + 1 : FONT_SIZES.length - 1;
+    const newSize = FONT_SIZES[Math.min(next, FONT_SIZES.length - 1)];
+    editor.chain().focus().setFontSize(`${newSize}px`).run();
+  };
+
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const val = parseInt(e.target.value, 10);
+    if (val > 0 && val <= 200) {
+      editor.chain().focus().setFontSize(`${val}px`).run();
+    }
+  };
+
+  return (
+    <div className="flex items-center gap-0.5">
+      <Button
+        type="button"
+        variant="ghost"
+        size="icon-xs"
+        onMouseDown={(e) => e.preventDefault()}
+        onClick={decrease}
+        aria-label="Decrease font size"
+      >
+        <span className="text-xs font-bold">−</span>
+      </Button>
+      <input
+        type="text"
+        value={currentSize}
+        onChange={handleInputChange}
+        onMouseDown={(e) => e.stopPropagation()}
+        className="w-8 h-6 text-center text-xs border rounded bg-background"
+        aria-label="Font size"
+      />
+      <Button
+        type="button"
+        variant="ghost"
+        size="icon-xs"
+        onMouseDown={(e) => e.preventDefault()}
+        onClick={increase}
+        aria-label="Increase font size"
+      >
+        <span className="text-xs font-bold">+</span>
+      </Button>
+    </div>
+  );
+}
+
 function trimSelectionToBlock(editor: Editor) {
   const { state } = editor;
   const { from, to } = state.selection;
@@ -245,6 +313,11 @@ export function EditorToolbar({
 
       {/* Block type */}
       <HeadingDropdown editor={editor} />
+
+      <VerticalSeparator />
+
+      {/* Font size */}
+      <FontSizeControl editor={editor} />
 
       <VerticalSeparator />
 

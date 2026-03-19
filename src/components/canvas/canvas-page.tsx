@@ -10,7 +10,9 @@ import TaskItem from '@tiptap/extension-task-item';
 import LinkExt from '@tiptap/extension-link';
 import HighlightExt from '@tiptap/extension-highlight';
 import { AutoDirection } from '@/lib/editor/rtl-extension';
+import { TextStyle } from '@tiptap/extension-text-style';
 import { Indent } from '@/lib/editor/indent-extension';
+import { FontSize } from '@/lib/editor/font-size-extension';
 import { Pencil, Sparkles, Trash2 } from 'lucide-react';
 import { PdfTextLayer } from './pdf-text-layer';
 import type {
@@ -341,6 +343,8 @@ export function CanvasPage({
         HTMLAttributes: { class: 'text-primary underline cursor-pointer' },
       }),
       HighlightExt.configure({ multicolor: true }),
+      TextStyle,
+      FontSize,
       AutoDirection,
       Indent,
     ],

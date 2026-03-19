@@ -8,8 +8,10 @@ import TextAlign from '@tiptap/extension-text-align';
 import TaskList from '@tiptap/extension-task-list';
 import TaskItem from '@tiptap/extension-task-item';
 import LinkExt from '@tiptap/extension-link';
+import { TextStyle } from '@tiptap/extension-text-style';
 import { AutoDirection } from '@/lib/editor/rtl-extension';
 import { Indent } from '@/lib/editor/indent-extension';
+import { FontSize } from '@/lib/editor/font-size-extension';
 import type { TextBox as TextBoxData } from '@/types/canvas';
 import type { Editor } from '@tiptap/core';
 
@@ -63,6 +65,8 @@ export function TextBox({
         openOnClick: false,
         HTMLAttributes: { class: 'text-primary underline cursor-pointer' },
       }),
+      TextStyle,
+      FontSize,
       AutoDirection,
       Indent,
     ],
