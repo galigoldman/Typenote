@@ -1,6 +1,11 @@
 // Polyfill Map.getOrInsertComputed for Safari < 18.4 (used by pdfjs-dist 5.5)
-if (typeof Map !== 'undefined' && !Map.prototype.getOrInsertComputed) {
-  Map.prototype.getOrInsertComputed = function <K, V>(
+if (
+  typeof Map !== 'undefined' &&
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  !(Map.prototype as any).getOrInsertComputed
+) {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  (Map.prototype as any).getOrInsertComputed = function <K, V>(
     this: Map<K, V>,
     key: K,
     callbackfn: (key: K) => V,
