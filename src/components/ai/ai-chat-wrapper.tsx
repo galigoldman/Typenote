@@ -47,14 +47,15 @@ export function AiChatWrapper({
 
   return (
     <>
-      {/* Floating chat bubble — bottom right */}
+      {/* Floating chat bubble — bottom-left to avoid right sidebar overlap */}
       {!isOpen && (
         <button
           onClick={handleToggle}
-          className="fixed bottom-6 right-6 z-40 flex h-14 w-14 items-center justify-center rounded-full bg-purple-600 text-white shadow-lg transition-transform hover:scale-105 hover:bg-purple-700 active:scale-95 max-xl:bottom-4 max-xl:right-auto max-xl:left-20 max-xl:h-11 max-xl:w-11"
+          className="fixed z-40 flex items-center justify-center rounded-full bg-purple-600 text-white shadow-lg transition-transform hover:scale-105 hover:bg-purple-700 active:scale-95"
+          style={{ bottom: 16, right: 64, width: 44, height: 44 }}
           aria-label="Open AI chat"
         >
-          <MessageCircle className="h-6 w-6" />
+          <MessageCircle className="h-5 w-5" />
         </button>
       )}
 
