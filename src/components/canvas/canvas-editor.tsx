@@ -356,7 +356,7 @@ export function CanvasEditor({
 
   // Pinch-to-zoom (scale only — no pan, vertical scroll stays normal)
   const scrollContainerRef = useRef<HTMLDivElement>(null);
-  const { scale, isZooming } = usePinchZoom({
+  const { scale, isZooming, fitScale } = usePinchZoom({
     containerRef: scrollContainerRef,
   });
 
@@ -1519,7 +1519,16 @@ export function CanvasEditor({
               Ask AI
             </button>
             {askAiDropdownOpen && (
-              <div className="absolute top-full left-0 mt-1 w-44 rounded-lg border bg-popover p-1 shadow-lg z-50">
+              <div
+                className="fixed mt-1 w-44 rounded-lg border bg-popover p-1 shadow-lg z-[100]"
+                style={{
+                  top:
+                    (askAiDropdownRef.current?.getBoundingClientRect().bottom ??
+                      0) + 4,
+                  left:
+                    askAiDropdownRef.current?.getBoundingClientRect().left ?? 0,
+                }}
+              >
                 <button
                   onPointerDown={(e) => {
                     e.stopPropagation();
@@ -1647,7 +1656,7 @@ export function CanvasEditor({
           className="flex-1 bg-gray-200 xl:bg-gray-100"
           data-scroll-container
           style={{
-            overflowX: 'hidden',
+            overflowX: scale > fitScale + 0.01 ? 'auto' : 'hidden',
             overflowY:
               activeTool === 'text' ||
               activeTool === 'select' ||
@@ -1675,7 +1684,9 @@ export function CanvasEditor({
           }}
         >
           <div
-            className="py-8 max-xl:py-0 max-xl:flex max-xl:flex-col max-xl:items-center"
+            className={`py-8 max-xl:py-0 max-xl:flex max-xl:flex-col ${
+              scale <= fitScale + 0.01 ? 'max-xl:items-center' : ''
+            }`}
             style={{
               transform: scale !== 1 ? `scale(${scale})` : undefined,
               transformOrigin: 'top center',
