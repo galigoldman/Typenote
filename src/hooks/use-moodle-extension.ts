@@ -155,6 +155,7 @@ export function useMoodleExtension() {
         descriptionHtml: string;
         dueDate: string | null;
         submissionStatus: string | null;
+        attachedFiles: Array<{ name: string; url: string }>;
         moodleModuleId: string;
       };
       error?: string;

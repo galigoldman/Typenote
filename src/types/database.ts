@@ -201,6 +201,14 @@ export interface MoodleAssignment {
   updated_at: string;
 }
 
+export interface MoodleAssignmentFile {
+  id: string;
+  assignment_id: string;
+  moodle_file_id: string;
+  position: number;
+  created_at: string;
+}
+
 export interface AssignmentSplit {
   id: string;
   assignment_id: string;

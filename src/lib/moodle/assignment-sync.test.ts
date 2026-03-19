@@ -138,6 +138,7 @@ describe('upsertAssignment', () => {
       assignmentId: 'assign-uuid-1',
       isNew: true,
       contentChanged: false,
+      filesToDownload: [],
     });
     expect(mock.insert).toHaveBeenCalledTimes(1);
     expect(mock.insert).toHaveBeenCalledWith(
@@ -183,6 +184,7 @@ describe('upsertAssignment', () => {
       assignmentId: 'assign-uuid-1',
       isNew: false,
       contentChanged: true,
+      filesToDownload: [],
     });
     expect(mock.update).toHaveBeenCalledTimes(1);
     expect(mock.update).toHaveBeenCalledWith(
@@ -217,6 +219,7 @@ describe('upsertAssignment', () => {
       assignmentId: 'assign-uuid-1',
       isNew: false,
       contentChanged: false,
+      filesToDownload: [],
     });
     expect(mock.insert).not.toHaveBeenCalled();
     expect(mock.update).not.toHaveBeenCalled();

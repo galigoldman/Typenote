@@ -32,6 +32,7 @@ export interface SyncItemPayload {
   moodleModuleId?: string;
   descriptionHtml?: string;
   dueDate?: string | null;
+  attachedFiles?: Array<{ name: string; url: string }>;
 }
 
 export interface SyncRequestPayload {
@@ -56,6 +57,8 @@ export interface SyncAssignmentResult {
   id: string;
   isNew: boolean;
   contentChanged: boolean;
+  /** Attached files that need to be downloaded via the extension */
+  filesToDownload?: Array<{ name: string; url: string }>;
 }
 
 export interface SyncSectionResult {

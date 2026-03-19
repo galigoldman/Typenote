@@ -59,6 +59,7 @@ interface ScrapedItem {
   dueDate?: string | null;
   submissionStatus?: string | null;
   moodleModuleId?: string;
+  attachedFiles?: Array<{ name: string; url: string }>;
 }
 
 interface CourseWithContent {
@@ -383,6 +384,7 @@ export function MoodleSyncDialog({
                   dueDate: assignmentData.dueDate,
                   submissionStatus: assignmentData.submissionStatus,
                   moodleModuleId: assignmentData.moodleModuleId,
+                  attachedFiles: assignmentData.attachedFiles,
                 };
               } catch {
                 // Assignment scrape failed — keep the item as-is (link-only fallback)
@@ -533,6 +535,16 @@ export function MoodleSyncDialog({
               fileJobs.push({
                 moodleUrl: fileResult.moodleUrl,
                 fileName: payloadItem.name,
+                sectionId: sectionResult.id,
+              });
+            }
+          }
+          // Also download attached files from assignments
+          for (const assignment of sectionResult.assignments ?? []) {
+            for (const file of assignment.filesToDownload ?? []) {
+              fileJobs.push({
+                moodleUrl: file.url,
+                fileName: file.name,
                 sectionId: sectionResult.id,
               });
             }

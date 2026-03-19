@@ -461,12 +461,14 @@ export async function upsertMoodleData(
             title: item.name,
             descriptionHtml: item.descriptionHtml ?? '',
             dueDate: item.dueDate ?? null,
+            attachedFiles: item.attachedFiles,
           });
           assignmentResults.push({
             moodleUrl: item.moodleUrl,
             id: assignResult.assignmentId,
             isNew: assignResult.isNew,
             contentChanged: assignResult.contentChanged,
+            filesToDownload: assignResult.filesToDownload,
           });
           assignmentUrls.push(item.moodleUrl);
         } else {

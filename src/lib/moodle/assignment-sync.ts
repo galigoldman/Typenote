@@ -4,6 +4,11 @@ import { createAdminClient } from '@/lib/supabase/admin';
 // Assignment upsert types & logic
 // ============================================
 
+export interface AttachedFileInfo {
+  name: string;
+  url: string;
+}
+
 export interface UpsertAssignmentParams {
   sectionId: string;
   moodleUrl: string;
@@ -11,12 +16,15 @@ export interface UpsertAssignmentParams {
   title: string;
   descriptionHtml: string;
   dueDate: string | null;
+  attachedFiles?: AttachedFileInfo[];
 }
 
 export interface UpsertAssignmentResult {
   assignmentId: string;
   isNew: boolean;
   contentChanged: boolean;
+  /** Attached file URLs that need to be downloaded via the extension */
+  filesToDownload: AttachedFileInfo[];
 }
 
 /**
@@ -53,7 +61,9 @@ export async function upsertAssignment(
       .select('id, content_version')
       .single();
 
-    return { assignmentId: created!.id, isNew: true, contentChanged: false };
+    // Link attached files (they'll be downloaded in a later step)
+    const filesToDownload = params.attachedFiles ?? [];
+    return { assignmentId: created!.id, isNew: true, contentChanged: false, filesToDownload };
   }
 
   const contentChanged = existing.description_html !== params.descriptionHtml;
@@ -73,10 +83,43 @@ export async function upsertAssignment(
       .select('id, content_version')
       .single();
 
-    return { assignmentId: updated!.id, isNew: false, contentChanged: true };
+    return { assignmentId: updated!.id, isNew: false, contentChanged: true, filesToDownload: params.attachedFiles ?? [] };
   }
 
-  return { assignmentId: existing.id, isNew: false, contentChanged: false };
+  return { assignmentId: existing.id, isNew: false, contentChanged: false, filesToDownload: [] };
+}
+
+/**
+ * Link moodle_files to an assignment after they've been downloaded and stored.
+ * Finds the moodle_file rows by their moodle_url and creates join records.
+ */
+export async function linkFilesToAssignment(
+  assignmentId: string,
+  sectionId: string,
+  fileUrls: string[],
+): Promise<void> {
+  if (fileUrls.length === 0) return;
+  const admin = createAdminClient();
+
+  // Find the moodle_file IDs for these URLs
+  const { data: files } = await admin
+    .from('moodle_files')
+    .select('id, moodle_url')
+    .eq('section_id', sectionId)
+    .in('moodle_url', fileUrls);
+
+  if (!files || files.length === 0) return;
+
+  // Upsert join records (ignore conflicts for idempotency)
+  const rows = files.map((f: { id: string }, i: number) => ({
+    assignment_id: assignmentId,
+    moodle_file_id: f.id,
+    position: i,
+  }));
+
+  await admin
+    .from('moodle_assignment_files')
+    .upsert(rows, { onConflict: 'assignment_id,moodle_file_id' });
 }
 
 // ============================================
