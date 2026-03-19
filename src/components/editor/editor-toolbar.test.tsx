@@ -8,7 +8,9 @@ import TextAlign from '@tiptap/extension-text-align';
 import TaskList from '@tiptap/extension-task-list';
 import TaskItem from '@tiptap/extension-task-item';
 import LinkExt from '@tiptap/extension-link';
+import { TextStyle } from '@tiptap/extension-text-style';
 import { Indent } from '@/lib/editor/indent-extension';
+import { FontSize } from '@/lib/editor/font-size-extension';
 import { EditorToolbar } from './editor-toolbar';
 import { TooltipProvider } from '@/components/ui/tooltip';
 
@@ -22,6 +24,8 @@ function createTestEditor(content = '<p>Hello world</p>') {
       TaskList,
       TaskItem.configure({ nested: true }),
       LinkExt.configure({ openOnClick: false }),
+      TextStyle,
+      FontSize,
       Indent,
     ],
     content,
@@ -64,8 +68,8 @@ describe('EditorToolbar', () => {
         'Bullet list',
         'Numbered list',
         'Task list',
-        'Indent',
-        'Outdent',
+        'Decrease font size',
+        'Increase font size',
         'Link',
         'Code block',
         'Horizontal rule',
