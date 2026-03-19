@@ -32,6 +32,12 @@ export function useDrawing({
   const cachedRectRef = useRef<DOMRect | null>(null);
   const unlockScrollRef = useRef<(() => void) | null>(null);
 
+  // Hold-to-straighten: snap stroke to a straight line after ~400ms of no movement
+  const STRAIGHTEN_DELAY = 400;
+  const holdTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const isSnappedRef = useRef(false);
+  const snapStartPointRef = useRef<StrokePoint | null>(null);
+
   const isDrawTool = activeTool === 'pen' || activeTool === 'highlighter';
 
   const getWorkingCanvas = (pageId: string, target: EventTarget) => {
@@ -55,6 +61,46 @@ export function useDrawing({
       y: Math.round((e.clientY - rect.top) * scaleY * 10) / 10,
     };
   };
+
+  const renderStraightLine = useCallback(
+    (canvas: HTMLCanvasElement, start: StrokePoint, end: StrokePoint) => {
+      const ctx = canvas.getContext('2d');
+      if (!ctx) return;
+
+      ctx.save();
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      ctx.restore();
+
+      // Build a straight line with interpolated points for perfect-freehand
+      const steps = 20;
+      const linePoints: StrokePoint[] = [];
+      for (let i = 0; i <= steps; i++) {
+        const t = i / steps;
+        linePoints.push([
+          start[0] + (end[0] - start[0]) * t,
+          start[1] + (end[1] - start[1]) * t,
+          (start[2] + end[2]) / 2,
+        ]);
+      }
+
+      const outlinePoints = getStroke(linePoints, {
+        size: penSize,
+        simulatePressure: false,
+        last: true,
+      });
+
+      const pathData = getSvgPathFromStroke(outlinePoints);
+      if (!pathData) return;
+
+      const path = new Path2D(pathData);
+      ctx.globalAlpha = penOpacity;
+      ctx.fillStyle = penColor;
+      ctx.fill(path);
+      ctx.globalAlpha = 1;
+    },
+    [penColor, penSize, penOpacity],
+  );
 
   const renderInProgressStroke = useCallback(
     (canvas: HTMLCanvasElement, points: StrokePoint[]) => {
@@ -96,6 +142,12 @@ export function useDrawing({
       isDrawingRef.current = true;
       activePageIdRef.current = pageId;
       firedNearBottomRef.current = false;
+      isSnappedRef.current = false;
+      snapStartPointRef.current = null;
+      if (holdTimerRef.current) {
+        clearTimeout(holdTimerRef.current);
+        holdTimerRef.current = null;
+      }
 
       const canvas = getWorkingCanvas(pageId, e.target);
       workingCanvasRef.current = canvas;
@@ -125,6 +177,22 @@ export function useDrawing({
 
       const { x, y } = screenToPageCoords(e, e.target);
       const pressure = Math.round(e.pressure * 100) / 100;
+
+      if (isSnappedRef.current && snapStartPointRef.current) {
+        // Already snapped — update endpoint, keep rendering straight line
+        const endPoint: StrokePoint = [x, y, pressure];
+        if (workingCanvasRef.current) {
+          renderStraightLine(
+            workingCanvasRef.current,
+            snapStartPointRef.current,
+            endPoint,
+          );
+        }
+        // Update the last point so pointerUp uses it
+        currentPointsRef.current = [snapStartPointRef.current, endPoint];
+        return;
+      }
+
       currentPointsRef.current.push([x, y, pressure]);
 
       if (workingCanvasRef.current) {
@@ -132,6 +200,26 @@ export function useDrawing({
           workingCanvasRef.current,
           currentPointsRef.current,
         );
+      }
+
+      // Reset hold-to-straighten timer on each move
+      if (holdTimerRef.current) {
+        clearTimeout(holdTimerRef.current);
+      }
+      if (currentPointsRef.current.length >= 3) {
+        holdTimerRef.current = setTimeout(() => {
+          if (!isDrawingRef.current) return;
+          // Snap! Replace stroke with straight line
+          const pts = currentPointsRef.current;
+          const start = pts[0];
+          const end = pts[pts.length - 1];
+          isSnappedRef.current = true;
+          snapStartPointRef.current = start;
+          currentPointsRef.current = [start, end];
+          if (workingCanvasRef.current) {
+            renderStraightLine(workingCanvasRef.current, start, end);
+          }
+        }, STRAIGHTEN_DELAY);
       }
 
       if (
@@ -143,7 +231,7 @@ export function useDrawing({
         onNearPageBottom(pageId);
       }
     },
-    [isDrawTool, renderInProgressStroke, onNearPageBottom],
+    [isDrawTool, renderInProgressStroke, renderStraightLine, onNearPageBottom],
   );
 
   const handlePointerUp = useCallback(
@@ -154,9 +242,36 @@ export function useDrawing({
       e.preventDefault();
       isDrawingRef.current = false;
 
+      // Clear hold-to-straighten timer
+      if (holdTimerRef.current) {
+        clearTimeout(holdTimerRef.current);
+        holdTimerRef.current = null;
+      }
+
       // UNLOCK scrolling — pen is up
       unlockScrollRef.current?.();
       unlockScrollRef.current = null;
+
+      // If snapped, build a clean straight line with interpolated points
+      if (isSnappedRef.current && snapStartPointRef.current) {
+        const start = currentPointsRef.current[0] ?? snapStartPointRef.current;
+        const end =
+          currentPointsRef.current[currentPointsRef.current.length - 1] ??
+          start;
+        const steps = 20;
+        const straightPoints: StrokePoint[] = [];
+        for (let i = 0; i <= steps; i++) {
+          const t = i / steps;
+          straightPoints.push([
+            start[0] + (end[0] - start[0]) * t,
+            start[1] + (end[1] - start[1]) * t,
+            (start[2] + end[2]) / 2,
+          ]);
+        }
+        currentPointsRef.current = straightPoints;
+      }
+      isSnappedRef.current = false;
+      snapStartPointRef.current = null;
 
       const points = currentPointsRef.current;
 
