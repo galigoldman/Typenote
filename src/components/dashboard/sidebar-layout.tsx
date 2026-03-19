@@ -133,7 +133,10 @@ export function SidebarLayout({ sidebar, children }: SidebarLayoutProps) {
 
   return (
     <SidebarContext.Provider value={contextValue}>
-      <div ref={layoutRef} className="flex h-dvh min-h-dvh flex-col md:flex-row">
+      <div
+        ref={layoutRef}
+        className="flex h-dvh min-h-dvh flex-col md:flex-row"
+      >
         {/* Navigation header — visible on mobile + iPad, hidden on document pages and xl+ desktop */}
         {!isDocumentPage && (
           <header className="flex h-14 shrink-0 items-center gap-2 border-b bg-muted/30 px-4 xl:hidden">
