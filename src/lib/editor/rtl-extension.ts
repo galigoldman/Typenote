@@ -28,6 +28,27 @@ export const AutoDirection = Extension.create({
     ];
   },
 
+  onCreate({ editor }) {
+    // Run direction detection on initial load so Hebrew text is RTL from the start
+    const { state } = editor;
+    const { tr } = state;
+    let modified = false;
+
+    state.doc.descendants((node, pos) => {
+      if (node.isTextblock && node.textContent.length > 0) {
+        const dir = detectDirection(node.textContent);
+        if (node.attrs.dir !== dir) {
+          tr.setNodeMarkup(pos, undefined, { ...node.attrs, dir });
+          modified = true;
+        }
+      }
+    });
+
+    if (modified) {
+      editor.view.dispatch(tr);
+    }
+  },
+
   addProseMirrorPlugins() {
     return [
       new Plugin({

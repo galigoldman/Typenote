@@ -663,6 +663,7 @@ export function CanvasPage({
             onContentUpdate={(id, content) =>
               onTextBoxContentUpdate?.(page.id, id, content)
             }
+            onEditorReady={(ed) => onEditorReady?.(page.id, ed)}
             onHeightMeasured={(id, height) =>
               onTextBoxHeightMeasured?.(page.id, id, height)
             }
