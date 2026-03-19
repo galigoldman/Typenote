@@ -8,8 +8,8 @@ import {
   useState,
   useSyncExternalStore,
 } from 'react';
-import { usePathname } from 'next/navigation';
-import { Menu } from 'lucide-react';
+import { usePathname, useRouter } from 'next/navigation';
+import { ArrowLeft, Home, Menu } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetTitle } from '@/components/ui/sheet';
 import { useMediaQuery } from '@/hooks/use-media-query';
@@ -56,7 +56,9 @@ interface SidebarLayoutProps {
 
 export function SidebarLayout({ sidebar, children }: SidebarLayoutProps) {
   const pathname = usePathname();
+  const router = useRouter();
   const isDocumentPage = pathname.includes('/documents/');
+  const isDashboardRoot = pathname === '/dashboard';
   const isDesktop = useMediaQuery('(min-width: 768px)');
   const isMobile = !isDesktop;
 
@@ -132,19 +134,41 @@ export function SidebarLayout({ sidebar, children }: SidebarLayoutProps) {
   return (
     <SidebarContext.Provider value={contextValue}>
       <div ref={layoutRef} className="flex h-dvh min-h-dvh flex-col md:flex-row">
-        {/* Mobile header — hidden on document pages (toolbar has back button) */}
-        {isMobile && !isDocumentPage && !isDesktop && (
-          <header className="flex h-14 shrink-0 items-center gap-2 border-b bg-muted/30 px-4">
-            <Button
-              variant="ghost"
-              size="icon"
-              className="min-h-[44px] min-w-[44px]"
-              onClick={() => setIsSheetOpen(true)}
-              aria-label="Open menu"
-            >
-              <Menu className="size-5" />
-            </Button>
-            <h1 className="text-lg font-bold">Typenote</h1>
+        {/* Navigation header — visible on mobile + iPad, hidden on document pages and xl+ desktop */}
+        {!isDocumentPage && (
+          <header className="flex h-14 shrink-0 items-center gap-2 border-b bg-muted/30 px-4 xl:hidden">
+            {isMobile && (
+              <Button
+                variant="ghost"
+                size="icon"
+                className="min-h-[44px] min-w-[44px]"
+                onClick={() => setIsSheetOpen(true)}
+                aria-label="Open menu"
+              >
+                <Menu className="size-5" />
+              </Button>
+            )}
+            {!isDashboardRoot && (
+              <Button
+                variant="ghost"
+                size="icon"
+                className="min-h-[44px] min-w-[44px]"
+                onClick={() => router.back()}
+                aria-label="Go back"
+              >
+                <ArrowLeft className="size-5" />
+              </Button>
+            )}
+            <h1 className="text-lg font-bold flex-1">Typenote</h1>
+            {!isDashboardRoot && (
+              <a
+                href="/dashboard"
+                className="flex items-center justify-center min-h-[44px] min-w-[44px] rounded-md hover:bg-accent transition-colors text-muted-foreground"
+                aria-label="Go to dashboard"
+              >
+                <Home className="size-5" />
+              </a>
+            )}
           </header>
         )}
 
