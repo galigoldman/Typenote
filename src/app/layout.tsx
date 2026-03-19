@@ -34,6 +34,7 @@ export const metadata: Metadata = {
 
 export const viewport: Viewport = {
   themeColor: '#0a0a0a',
+  viewportFit: 'cover',
 };
 
 export default function RootLayout({
@@ -42,9 +43,9 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en">
+    <html lang="en" className="h-full">
       <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased`}
+        className={`${geistSans.variable} ${geistMono.variable} antialiased h-full`}
       >
         <TooltipProvider>{children}</TooltipProvider>
         <Toaster />
