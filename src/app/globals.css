@@ -48,7 +48,8 @@
   --radius-4xl: calc(var(--radius) + 16px);
 }
 
-html, body {
+html,
+body {
   height: 100%;
 }
 
