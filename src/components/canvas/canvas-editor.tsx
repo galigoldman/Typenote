@@ -18,6 +18,7 @@ import {
   ArrowLeft,
   BookOpen,
   Camera,
+  Home,
   Pen,
   Type,
   Eraser,
@@ -1351,6 +1352,13 @@ export function CanvasEditor({
         >
           <ArrowLeft className="h-4 w-4" />
         </button>
+        <a
+          href="/dashboard"
+          className="flex items-center justify-center h-8 w-8 min-h-[44px] min-w-[44px] rounded-lg hover:bg-accent transition-colors text-muted-foreground mr-1 shrink-0"
+          title="Go to dashboard"
+        >
+          <Home className="h-4 w-4" />
+        </a>
         <button
           onClick={toggleSidebar}
           className="flex items-center justify-center h-8 w-8 min-h-[44px] min-w-[44px] rounded-lg hover:bg-accent transition-colors text-muted-foreground mr-2 shrink-0"
@@ -1419,7 +1427,7 @@ export function CanvasEditor({
 
       {/* Toolbar — sticky so it stays visible when zoomed */}
       <div className="flex items-center border-b px-2 py-1 overflow-x-auto bg-background z-20 shrink-0">
-        {/* Mobile: back button + title (hidden on desktop — shown in header) */}
+        {/* Mobile: back + home + title (hidden on desktop — shown in header) */}
         <div className="flex items-center gap-1 mr-2 xl:hidden shrink-0">
           <button
             onClick={() => router.back()}
@@ -1427,6 +1435,13 @@ export function CanvasEditor({
           >
             <ArrowLeft className="h-4 w-4" />
           </button>
+          <a
+            href="/dashboard"
+            className="flex items-center justify-center h-8 w-8 rounded-lg hover:bg-accent transition-colors text-muted-foreground"
+            title="Go to dashboard"
+          >
+            <Home className="h-4 w-4" />
+          </a>
           <span className="text-sm font-medium truncate max-w-[100px]">
             {title || 'Untitled'}
           </span>
