@@ -1341,9 +1341,9 @@ export function CanvasEditor({
   const isReadMode = activeTool === 'read';
 
   return (
-    <div className="flex flex-col h-full min-h-0">
-      {/* Header */}
-      <div className="flex items-center justify-between border-b px-4 py-2">
+    <div className="flex flex-col h-full min-h-0 max-xl:overflow-hidden">
+      {/* Header — hidden on mobile (merged into toolbar) */}
+      <div className="hidden xl:flex items-center justify-between border-b px-4 py-2">
         <button
           onClick={() => router.back()}
           className="flex items-center justify-center h-8 w-8 min-h-[44px] min-w-[44px] rounded-lg hover:bg-accent transition-colors text-muted-foreground mr-1 shrink-0"
@@ -1417,8 +1417,20 @@ export function CanvasEditor({
         </div>
       )}
 
-      {/* Toolbar */}
-      <div className="flex items-center border-b px-2 py-1">
+      {/* Toolbar — sticky so it stays visible when zoomed */}
+      <div className="flex items-center border-b px-2 py-1 overflow-x-auto bg-background z-20 shrink-0">
+        {/* Mobile: back button + title (hidden on desktop — shown in header) */}
+        <div className="flex items-center gap-1 mr-2 xl:hidden shrink-0">
+          <button
+            onClick={() => router.back()}
+            className="flex items-center justify-center h-8 w-8 rounded-lg hover:bg-accent transition-colors text-muted-foreground"
+          >
+            <ArrowLeft className="h-4 w-4" />
+          </button>
+          <span className="text-sm font-medium truncate max-w-[100px]">
+            {title || 'Untitled'}
+          </span>
+        </div>
         {/* Undo / Redo — always visible */}
         <div className="flex items-center gap-0.5 mr-2">
           <button
@@ -1632,9 +1644,10 @@ export function CanvasEditor({
         {/* Canvas scroll area */}
         <div
           ref={scrollContainerRef}
-          className="flex-1 bg-gray-100"
+          className="flex-1 bg-gray-200 xl:bg-gray-100"
           data-scroll-container
           style={{
+            overflowX: 'hidden',
             overflowY:
               activeTool === 'text' ||
               activeTool === 'select' ||
@@ -1662,7 +1675,7 @@ export function CanvasEditor({
           }}
         >
           <div
-            className="py-8"
+            className="py-8 max-xl:py-0 max-xl:flex max-xl:flex-col max-xl:items-center"
             style={{
               transform: scale !== 1 ? `scale(${scale})` : undefined,
               transformOrigin: 'top center',
