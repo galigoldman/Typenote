@@ -15,8 +15,6 @@ import {
   List,
   ListOrdered,
   ListChecks,
-  Indent,
-  Outdent,
   Link,
   Code,
   Minus,
@@ -187,6 +185,23 @@ function HighlightButton({ editor }: { editor: Editor }) {
   );
 }
 
+/**
+ * If the selection end sits at position 0 of the next paragraph (common when
+ * selecting to end of line), pull it back so alignment only affects the
+ * paragraphs the user actually selected.
+ */
+function trimSelectionToBlock(editor: Editor) {
+  const { state } = editor;
+  const { from, to } = state.selection;
+  if (from === to) return; // collapsed cursor — nothing to trim
+
+  const $to = state.doc.resolve(to);
+  // If selection end is at the very start of a textblock, pull back by 1
+  if ($to.parentOffset === 0 && to > from) {
+    editor.commands.setTextSelection({ from, to: to - 1 });
+  }
+}
+
 export function EditorToolbar({
   editor,
   hideUndoRedo,
@@ -265,21 +280,30 @@ export function EditorToolbar({
 
       <VerticalSeparator />
 
-      {/* Alignment */}
+      {/* Alignment — trims selection to avoid bleeding into next paragraph */}
       <ToolbarButton
-        onClick={() => editor.chain().focus().setTextAlign('left').run()}
+        onClick={() => {
+          trimSelectionToBlock(editor);
+          editor.chain().focus().setTextAlign('left').run();
+        }}
         isActive={editor.isActive({ textAlign: 'left' })}
         icon={<AlignLeft />}
         label="Align left"
       />
       <ToolbarButton
-        onClick={() => editor.chain().focus().setTextAlign('center').run()}
+        onClick={() => {
+          trimSelectionToBlock(editor);
+          editor.chain().focus().setTextAlign('center').run();
+        }}
         isActive={editor.isActive({ textAlign: 'center' })}
         icon={<AlignCenter />}
         label="Align center"
       />
       <ToolbarButton
-        onClick={() => editor.chain().focus().setTextAlign('right').run()}
+        onClick={() => {
+          trimSelectionToBlock(editor);
+          editor.chain().focus().setTextAlign('right').run();
+        }}
         isActive={editor.isActive({ textAlign: 'right' })}
         icon={<AlignRight />}
         label="Align right"
@@ -305,40 +329,6 @@ export function EditorToolbar({
         isActive={editor.isActive('taskList')}
         icon={<ListChecks />}
         label="Task list"
-      />
-
-      <VerticalSeparator />
-
-      {/* Indentation — nest list items when in a list, otherwise margin indent */}
-      <ToolbarButton
-        onClick={() => {
-          if (
-            editor.isActive('listItem') &&
-            editor.can().sinkListItem('listItem')
-          ) {
-            editor.chain().focus().sinkListItem('listItem').run();
-          } else {
-            editor.chain().focus().indent().run();
-          }
-        }}
-        icon={<Indent />}
-        label="Indent"
-        shortcut="Tab"
-      />
-      <ToolbarButton
-        onClick={() => {
-          if (
-            editor.isActive('listItem') &&
-            editor.can().liftListItem('listItem')
-          ) {
-            editor.chain().focus().liftListItem('listItem').run();
-          } else {
-            editor.chain().focus().outdent().run();
-          }
-        }}
-        icon={<Outdent />}
-        label="Outdent"
-        shortcut="Shift+Tab"
       />
 
       <VerticalSeparator />
