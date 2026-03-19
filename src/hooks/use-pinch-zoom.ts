@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 
 const MIN_SCALE = 0.5;
 const MAX_SCALE = 4.0;
-const DOUBLE_TAP_DELAY = 300;
+const DOUBLE_TAP_DELAY = 500;
 
 interface UsePinchZoomOptions {
   containerRef: React.RefObject<HTMLElement | null>;
@@ -14,9 +14,23 @@ interface UsePinchZoomOptions {
 export function usePinchZoom({
   containerRef,
   enabled = true,
-}: UsePinchZoomOptions) {
+  pageWidth = 794,
+}: UsePinchZoomOptions & { pageWidth?: number }) {
   const [scale, setScale] = useState(1);
   const [isZooming, setIsZooming] = useState(false);
+
+  // Auto-fit on touch devices: scale page to fill viewport width on mount
+  useEffect(() => {
+    const isTouchDevice =
+      'ontouchstart' in window || navigator.maxTouchPoints > 0;
+    if (!isTouchDevice) return;
+    const availableWidth = window.innerWidth - 16;
+    const fitScale = availableWidth / pageWidth;
+    const newScale = fitScale < 1 ? fitScale : Math.min(fitScale, 1.5);
+    setScale(newScale);
+    initialScaleRef.current = newScale;
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- only on mount
+  }, []);
 
   const scaleRef = useRef(scale);
   useEffect(() => {
@@ -30,10 +44,18 @@ export function usePinchZoom({
   } | null>(null);
 
   const lastTwoTapRef = useRef(0);
+  const lastSingleTapRef = useRef(0);
+  const initialScaleRef = useRef(scaleRef.current);
   const zoomTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  // Store the initial "fit" scale so double-tap can toggle back to it
+  useEffect(() => {
+    initialScaleRef.current = scaleRef.current;
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- only on mount
+  }, []);
+
   const resetZoom = useCallback(() => {
-    setScale(1);
+    setScale(initialScaleRef.current);
   }, []);
 
   useEffect(() => {
@@ -57,11 +79,18 @@ export function usePinchZoom({
         };
         setIsZooming(true);
 
-        // Double-tap detection: two-finger tap
+        // Double-tap detection: two-finger tap toggles between fit and 2x zoom
         const now = Date.now();
         if (now - lastTwoTapRef.current < DOUBLE_TAP_DELAY) {
           gestureRef.current = null;
-          setScale(1);
+          const fitScale = initialScaleRef.current;
+          const zoomedScale = Math.min(fitScale * 2, MAX_SCALE);
+          // Toggle: if close to fit → zoom in, otherwise → fit
+          const isNearFit = Math.abs(scaleRef.current - fitScale) < 0.1;
+          setScale(isNearFit ? zoomedScale : fitScale);
+          setIsZooming(true);
+          if (zoomTimeoutRef.current) clearTimeout(zoomTimeoutRef.current);
+          zoomTimeoutRef.current = setTimeout(() => setIsZooming(false), 1000);
           lastTwoTapRef.current = 0;
           return;
         }
@@ -87,11 +116,36 @@ export function usePinchZoom({
       setScale(newScale);
     };
 
+    // Single-finger double-tap to zoom
+    let singleTapTimer: ReturnType<typeof setTimeout> | null = null;
+    let tapCount = 0;
+
     const handleTouchEnd = (e: TouchEvent) => {
       if (e.touches.length < 2) {
         gestureRef.current = null;
         if (zoomTimeoutRef.current) clearTimeout(zoomTimeoutRef.current);
         zoomTimeoutRef.current = setTimeout(() => setIsZooming(false), 1000);
+      }
+
+      // Single-finger double-tap detection (only when exactly 0 fingers remain)
+      if (e.touches.length === 0 && e.changedTouches.length === 1) {
+        tapCount++;
+        if (tapCount === 1) {
+          singleTapTimer = setTimeout(() => {
+            tapCount = 0;
+          }, DOUBLE_TAP_DELAY);
+        } else if (tapCount === 2) {
+          if (singleTapTimer) clearTimeout(singleTapTimer);
+          tapCount = 0;
+          // Toggle zoom
+          const fitScale = initialScaleRef.current;
+          const zoomedScale = Math.min(fitScale * 2, MAX_SCALE);
+          const isNearFit = Math.abs(scaleRef.current - fitScale) < 0.15;
+          setScale(isNearFit ? zoomedScale : fitScale);
+          setIsZooming(true);
+          if (zoomTimeoutRef.current) clearTimeout(zoomTimeoutRef.current);
+          zoomTimeoutRef.current = setTimeout(() => setIsZooming(false), 1000);
+        }
       }
     };
 

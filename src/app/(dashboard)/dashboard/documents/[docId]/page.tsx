@@ -63,7 +63,7 @@ export default async function DocumentPage({ params }: DocumentPageProps) {
 
   return (
     <div className="flex h-full min-h-0 flex-col overflow-hidden">
-      <div className="flex items-center justify-between px-4 pt-2">
+      <div className="hidden xl:flex items-center justify-between px-4 pt-2">
         <Link
           href={`/dashboard/courses/${course.id}`}
           className="mb-2 inline-flex items-center gap-1 rounded bg-muted px-2 py-1 text-sm text-muted-foreground hover:text-foreground min-h-[44px]"

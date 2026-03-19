@@ -132,8 +132,8 @@ export function SidebarLayout({ sidebar, children }: SidebarLayoutProps) {
   return (
     <SidebarContext.Provider value={contextValue}>
       <div ref={layoutRef} className="flex h-screen flex-col md:flex-row">
-        {/* Mobile header */}
-        {isMobile && (
+        {/* Mobile header — hidden on document pages (toolbar has back button) */}
+        {isMobile && !isDocumentPage && !isDesktop && (
           <header className="flex h-14 shrink-0 items-center gap-2 border-b bg-muted/30 px-4">
             <Button
               variant="ghost"
