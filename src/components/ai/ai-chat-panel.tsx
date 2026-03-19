@@ -505,8 +505,9 @@ export function AiChatPanel({
             size="icon"
             onClick={onClose}
             className="h-8 w-8 min-h-[44px] min-w-[44px]"
+            aria-label="Close chat"
           >
-            <X className="h-4 w-4" />
+            <X className="h-5 w-5" />
           </Button>
         </div>
       </div>

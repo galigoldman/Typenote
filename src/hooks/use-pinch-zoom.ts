@@ -24,9 +24,11 @@ export function usePinchZoom({
     const isTouchDevice =
       'ontouchstart' in window || navigator.maxTouchPoints > 0;
     if (!isTouchDevice) return;
-    const availableWidth = window.innerWidth - 16;
+    // Account for right sidebar (~44px) on iPad
+    const rightSidebar = 44;
+    const availableWidth = window.innerWidth - rightSidebar;
     const fitScale = availableWidth / pageWidth;
-    const newScale = fitScale < 1 ? fitScale : Math.min(fitScale, 1.5);
+    const newScale = Math.min(fitScale, 2);
     setScale(newScale);
     initialScaleRef.current = newScale;
     // eslint-disable-next-line react-hooks/exhaustive-deps -- only on mount
@@ -83,10 +85,12 @@ export function usePinchZoom({
         const now = Date.now();
         if (now - lastTwoTapRef.current < DOUBLE_TAP_DELAY) {
           gestureRef.current = null;
-          const fitScale = initialScaleRef.current;
+          const rightSb = 44;
+          const freshFit = (window.innerWidth - rightSb) / pageWidth;
+          const fitScale = Math.min(freshFit, 2);
+          initialScaleRef.current = fitScale;
           const zoomedScale = Math.min(fitScale * 2, MAX_SCALE);
-          // Toggle: if close to fit → zoom in, otherwise → fit
-          const isNearFit = Math.abs(scaleRef.current - fitScale) < 0.1;
+          const isNearFit = Math.abs(scaleRef.current - fitScale) < 0.15;
           setScale(isNearFit ? zoomedScale : fitScale);
           setIsZooming(true);
           if (zoomTimeoutRef.current) clearTimeout(zoomTimeoutRef.current);
@@ -137,8 +141,11 @@ export function usePinchZoom({
         } else if (tapCount === 2) {
           if (singleTapTimer) clearTimeout(singleTapTimer);
           tapCount = 0;
-          // Toggle zoom
-          const fitScale = initialScaleRef.current;
+          // Toggle zoom: recalculate fit scale fresh for accuracy
+          const rightSb = 44;
+          const freshFitScale = (window.innerWidth - rightSb) / pageWidth;
+          const fitScale = Math.min(freshFitScale, 2);
+          initialScaleRef.current = fitScale;
           const zoomedScale = Math.min(fitScale * 2, MAX_SCALE);
           const isNearFit = Math.abs(scaleRef.current - fitScale) < 0.15;
           setScale(isNearFit ? zoomedScale : fitScale);
@@ -179,5 +186,5 @@ export function usePinchZoom({
     };
   }, [containerRef, enabled]);
 
-  return { scale, isZooming, resetZoom };
+  return { scale, isZooming, resetZoom, fitScale: initialScaleRef.current };
 }
