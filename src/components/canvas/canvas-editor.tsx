@@ -1341,7 +1341,7 @@ export function CanvasEditor({
   const isReadMode = activeTool === 'read';
 
   return (
-    <div className="flex flex-col h-full min-h-0 max-xl:overflow-hidden">
+    <div className="flex flex-col flex-1 min-h-0 max-xl:overflow-hidden">
       {/* Header — hidden on mobile (merged into toolbar) */}
       <div className="hidden xl:flex items-center justify-between border-b px-4 py-2">
         <button

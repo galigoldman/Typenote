@@ -50,7 +50,7 @@ export default async function DocumentPage({ params }: DocumentPageProps) {
   // No course linked — render editor without AI
   if (!course) {
     return (
-      <div className="flex h-full min-h-0 flex-col overflow-hidden">
+      <div className="flex flex-1 min-h-0 flex-col overflow-hidden">
         <CanvasEditor
           document={typedDocument}
           materialId={typedDocument.material_id}
@@ -62,7 +62,7 @@ export default async function DocumentPage({ params }: DocumentPageProps) {
   const weekLabel = week ? `Week ${week.week_number}` : undefined;
 
   return (
-    <div className="flex h-full min-h-0 flex-col overflow-hidden">
+    <div className="flex flex-1 min-h-0 flex-col overflow-hidden">
       <div className="hidden xl:flex items-center justify-between px-4 pt-2">
         <Link
           href={`/dashboard/courses/${course.id}`}

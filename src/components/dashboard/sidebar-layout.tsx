@@ -131,7 +131,7 @@ export function SidebarLayout({ sidebar, children }: SidebarLayoutProps) {
 
   return (
     <SidebarContext.Provider value={contextValue}>
-      <div ref={layoutRef} className="flex h-screen flex-col md:flex-row">
+      <div ref={layoutRef} className="flex h-dvh flex-col md:flex-row">
         {/* Mobile header — hidden on document pages (toolbar has back button) */}
         {isMobile && !isDocumentPage && !isDesktop && (
           <header className="flex h-14 shrink-0 items-center gap-2 border-b bg-muted/30 px-4">
@@ -177,7 +177,7 @@ export function SidebarLayout({ sidebar, children }: SidebarLayoutProps) {
 
         {/* Main content — overflow-hidden only on document pages where the canvas controls its own scroll */}
         <main
-          className={`flex-1 min-h-0 min-w-0 ${
+          className={`flex flex-col flex-1 min-h-0 min-w-0 ${
             isDocumentPage ? 'overflow-hidden' : 'overflow-y-auto'
           }`}
         >
