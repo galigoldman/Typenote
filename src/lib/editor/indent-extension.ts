@@ -11,6 +11,7 @@ declare module '@tiptap/core' {
 
 const INDENT_STEP = 40; // px per indent level
 const MAX_INDENT = 8;
+const TAB_CHAR = '\t';
 
 export const Indent = Extension.create({
   name: 'indent',
@@ -97,8 +98,39 @@ export const Indent = Extension.create({
 
   addKeyboardShortcuts() {
     return {
-      Tab: () => this.editor.commands.indent(),
-      'Shift-Tab': () => this.editor.commands.outdent(),
+      Tab: () => {
+        const { state } = this.editor;
+        const { from, to } = state.selection;
+
+        // If inside a list, nest the list item
+        if (this.editor.isActive('listItem')) {
+          if (this.editor.can().sinkListItem('listItem')) {
+            return this.editor.commands.sinkListItem('listItem');
+          }
+          return false;
+        }
+
+        // If selection spans multiple lines (or full paragraph selected), indent
+        const $from = state.doc.resolve(from);
+        const $to = state.doc.resolve(to);
+        if ($from.parent !== $to.parent || from !== to) {
+          return this.editor.commands.indent();
+        }
+
+        // Collapsed cursor — insert a tab character
+        return this.editor.commands.insertContent(TAB_CHAR);
+      },
+      'Shift-Tab': () => {
+        // If inside a list, lift the list item
+        if (this.editor.isActive('listItem')) {
+          if (this.editor.can().liftListItem('listItem')) {
+            return this.editor.commands.liftListItem('listItem');
+          }
+          return false;
+        }
+
+        return this.editor.commands.outdent();
+      },
     };
   },
 });
