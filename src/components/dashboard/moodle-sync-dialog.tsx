@@ -48,12 +48,17 @@ interface ScrapedSection {
 }
 
 interface ScrapedItem {
-  type: 'file' | 'link';
+  type: 'file' | 'link' | 'assignment';
   name: string;
   moodleUrl: string;
   externalUrl?: string;
   fileSize?: number;
   mimeType?: string;
+  // Assignment-specific fields (populated after SCRAPE_ASSIGNMENT)
+  descriptionHtml?: string;
+  dueDate?: string | null;
+  submissionStatus?: string | null;
+  moodleModuleId?: string;
 }
 
 interface CourseWithContent {
@@ -92,7 +97,7 @@ export function MoodleSyncDialog({
   onOpenChange,
   moodleConnection,
 }: MoodleSyncDialogProps) {
-  const { scrapeCourses, scrapeCourseContent, downloadAndUpload } =
+  const { scrapeCourses, scrapeCourseContent, scrapeAssignment, downloadAndUpload } =
     useMoodleExtension();
   const supabaseRef = useRef(createClient());
 
@@ -360,12 +365,38 @@ export function MoodleSyncDialog({
         );
 
         const content = await scrapeCourseContent(course.moodleUrl);
+        const sections = content?.sections ?? [];
+
+        // Enrich assignment items with full content from their pages
+        for (const section of sections) {
+          for (let j = 0; j < section.items.length; j++) {
+            const item = section.items[j];
+            if (item.type === 'assignment') {
+              try {
+                setProgress(
+                  `Scanning "${course.name}" — fetching assignment "${item.name}"...`,
+                );
+                const assignmentData = await scrapeAssignment(item.moodleUrl);
+                section.items[j] = {
+                  ...item,
+                  descriptionHtml: assignmentData.descriptionHtml,
+                  dueDate: assignmentData.dueDate,
+                  submissionStatus: assignmentData.submissionStatus,
+                  moodleModuleId: assignmentData.moodleModuleId,
+                };
+              } catch {
+                // Assignment scrape failed — keep the item as-is (link-only fallback)
+              }
+            }
+          }
+        }
+
         results.push({
           moodleCourseId: course.moodleCourseId,
           name: course.name,
           moodleUrl: course.moodleUrl,
           status: course.status,
-          sections: content?.sections ?? [],
+          sections,
         });
       }
 
@@ -559,13 +590,17 @@ export function MoodleSyncDialog({
       setPhase('done');
 
       // Trigger AI question splitting for new/changed assignments (best-effort, non-blocking)
-      for (const assignment of (result as { assignmentResults?: Array<{ assignmentId: string; isNew: boolean; contentChanged: boolean }> }).assignmentResults ?? []) {
-        if (assignment.isNew || assignment.contentChanged) {
-          fetch('/api/moodle/assignments/split', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ assignmentId: assignment.assignmentId }),
-          }).catch(() => {}); // Best-effort, don't block sync
+      for (const courseResult of result.courses) {
+        for (const sectionResult of courseResult.sections) {
+          for (const assignment of sectionResult.assignments ?? []) {
+            if (assignment.isNew || assignment.contentChanged) {
+              fetch('/api/moodle/assignments/split', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ assignmentId: assignment.id }),
+              }).catch(() => {}); // Best-effort, don't block sync
+            }
+          }
         }
       }
     } catch (err) {
@@ -838,7 +873,9 @@ export function MoodleSyncDialog({
                                         {item.type === 'file'
                                           ? (item.mimeType?.split('/')[1] ??
                                             'file')
-                                          : 'link'}
+                                          : item.type === 'assignment'
+                                            ? 'assignment'
+                                            : 'link'}
                                       </Badge>
                                     </label>
                                   );

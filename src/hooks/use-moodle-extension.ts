@@ -124,7 +124,7 @@ export function useMoodleExtension() {
           title: string;
           position: number;
           items: Array<{
-            type: 'file' | 'link';
+            type: 'file' | 'link' | 'assignment';
             name: string;
             moodleUrl: string;
             externalUrl?: string;
@@ -142,6 +142,29 @@ export function useMoodleExtension() {
     if (!response.success) {
       throw new Error(
         (response as { error?: string }).error ?? 'Content scraping failed',
+      );
+    }
+    return response.data;
+  }, []);
+
+  const scrapeAssignment = useCallback(async (assignmentUrl: string) => {
+    const response = await sendExtensionMessage<{
+      success: boolean;
+      data: {
+        title: string;
+        descriptionHtml: string;
+        dueDate: string | null;
+        submissionStatus: string | null;
+        moodleModuleId: string;
+      };
+      error?: string;
+    }>({
+      type: 'SCRAPE_ASSIGNMENT',
+      payload: { assignmentUrl },
+    });
+    if (!response?.success) {
+      throw new Error(
+        (response as { error?: string })?.error ?? 'Assignment scraping failed',
       );
     }
     return response.data;
@@ -185,6 +208,7 @@ export function useMoodleExtension() {
     checkMoodleLogin,
     scrapeCourses,
     scrapeCourseContent,
+    scrapeAssignment,
     downloadAndUpload,
   };
 }
