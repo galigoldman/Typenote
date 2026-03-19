@@ -15,7 +15,9 @@ import type { Document } from '@/types/database';
 import type { SaveStatus } from '@/hooks/use-auto-save';
 import type { ConnectionStatus } from '@/hooks/use-realtime-sync';
 import {
+  ArrowLeft,
   BookOpen,
+  Camera,
   Pen,
   Type,
   Eraser,
@@ -28,8 +30,9 @@ import {
   PanelLeftClose,
   MousePointer2,
   Save,
-  Scissors,
+  Sparkles,
 } from 'lucide-react';
+import { useRouter } from 'next/navigation';
 import { useSidebar } from '@/components/dashboard/sidebar-layout';
 import { CANVAS_TYPES } from '@/lib/constants/subjects';
 import { PageTypeThumb } from '@/components/ui/page-type-thumb';
@@ -294,6 +297,7 @@ export function CanvasEditor({
   materialId,
   onAskAiWithContext,
 }: CanvasEditorProps) {
+  const router = useRouter();
   const { isOpen: sidebarOpen, toggle: toggleSidebar } = useSidebar();
   const [title, setTitle] = useState(document.title);
   const [pages, setPages] = useState<CanvasPageData[]>(() =>
@@ -316,6 +320,24 @@ export function CanvasEditor({
     }
     setActiveToolRaw(tool);
   }, []);
+
+  const [askAiDropdownOpen, setAskAiDropdownOpen] = useState(false);
+  const askAiDropdownRef = useRef<HTMLDivElement>(null);
+
+  // Close Ask AI dropdown on click outside
+  useEffect(() => {
+    if (!askAiDropdownOpen) return;
+    const handler = (e: PointerEvent) => {
+      if (
+        askAiDropdownRef.current &&
+        !askAiDropdownRef.current.contains(e.target as Node)
+      ) {
+        setAskAiDropdownOpen(false);
+      }
+    };
+    window.addEventListener('pointerdown', handler);
+    return () => window.removeEventListener('pointerdown', handler);
+  }, [askAiDropdownOpen]);
 
   const [activeEditor, setActiveEditor] = useState<Editor | null>(null);
   const [remoteUpdateCounter, setRemoteUpdateCounter] = useState(0);
@@ -1323,6 +1345,13 @@ export function CanvasEditor({
       {/* Header */}
       <div className="flex items-center justify-between border-b px-4 py-2">
         <button
+          onClick={() => router.back()}
+          className="flex items-center justify-center h-8 w-8 min-h-[44px] min-w-[44px] rounded-lg hover:bg-accent transition-colors text-muted-foreground mr-1 shrink-0"
+          title="Go back"
+        >
+          <ArrowLeft className="h-4 w-4" />
+        </button>
+        <button
           onClick={toggleSidebar}
           className="flex items-center justify-center h-8 w-8 min-h-[44px] min-w-[44px] rounded-lg hover:bg-accent transition-colors text-muted-foreground mr-2 shrink-0"
           title={sidebarOpen ? 'Hide sidebar' : 'Show sidebar'}
@@ -1462,35 +1491,52 @@ export function CanvasEditor({
             <Type className="h-4 w-4" />
             Type
           </button>
-          <button
-            onPointerDown={(e) => {
-              e.stopPropagation();
-              setActiveTool('read');
-            }}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
-              isReadMode
-                ? 'bg-primary text-primary-foreground'
-                : 'hover:bg-accent text-muted-foreground'
-            }`}
-          >
-            <BookOpen className="h-4 w-4" />
-            Read
-          </button>
-          <button
-            onPointerDown={(e) => {
-              e.stopPropagation();
-              setActiveTool('crop');
-            }}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
-              activeTool === 'crop'
-                ? 'bg-primary text-primary-foreground'
-                : 'hover:bg-purple-50 text-purple-600'
-            }`}
-            title="Draw a rectangle to capture and send to AI"
-          >
-            <Scissors className="h-4 w-4" />
-            Crop
-          </button>
+          <div className="relative" ref={askAiDropdownRef}>
+            <button
+              onPointerDown={(e) => {
+                e.stopPropagation();
+                setAskAiDropdownOpen((prev) => !prev);
+              }}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
+                isReadMode || activeTool === 'crop'
+                  ? 'bg-purple-600 text-white'
+                  : 'hover:bg-purple-50 text-purple-600'
+              }`}
+            >
+              <Sparkles className="h-4 w-4" />
+              Ask AI
+            </button>
+            {askAiDropdownOpen && (
+              <div className="absolute top-full left-0 mt-1 w-44 rounded-lg border bg-popover p-1 shadow-lg z-50">
+                <button
+                  onPointerDown={(e) => {
+                    e.stopPropagation();
+                    setAskAiDropdownOpen(false);
+                    setActiveTool('read');
+                  }}
+                  className={`flex w-full items-center gap-2 rounded-md px-3 py-2 text-sm transition-colors ${
+                    isReadMode ? 'bg-accent' : 'hover:bg-accent'
+                  }`}
+                >
+                  <BookOpen className="h-4 w-4 text-purple-500" />
+                  Select Text
+                </button>
+                <button
+                  onPointerDown={(e) => {
+                    e.stopPropagation();
+                    setAskAiDropdownOpen(false);
+                    setActiveTool('crop');
+                  }}
+                  className={`flex w-full items-center gap-2 rounded-md px-3 py-2 text-sm transition-colors ${
+                    activeTool === 'crop' ? 'bg-accent' : 'hover:bg-accent'
+                  }`}
+                >
+                  <Camera className="h-4 w-4 text-purple-500" />
+                  Screenshot
+                </button>
+              </div>
+            )}
+          </div>
         </div>
 
         {/* Draw mode: sub-tool icons */}

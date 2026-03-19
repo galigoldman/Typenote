@@ -1,9 +1,8 @@
 'use client';
 
 import { useState } from 'react';
-import { Sparkles } from 'lucide-react';
+import { MessageCircle, X } from 'lucide-react';
 
-import { Button } from '@/components/ui/button';
 import type { AiContextItem } from './ai-chat-panel';
 
 import { AiChatPanel } from './ai-chat-panel';
@@ -48,19 +47,16 @@ export function AiChatWrapper({
 
   return (
     <>
-      <Button
-        variant="outline"
-        size="sm"
-        onClick={handleToggle}
-        className={
-          isOpen
-            ? 'bg-purple-50 text-purple-700 border-purple-200 dark:bg-purple-950 dark:text-purple-300 dark:border-purple-800'
-            : ''
-        }
-      >
-        <Sparkles className="mr-1.5 h-4 w-4" />
-        Ask AI
-      </Button>
+      {/* Floating chat bubble — bottom right */}
+      {!isOpen && (
+        <button
+          onClick={handleToggle}
+          className="fixed bottom-6 right-6 z-40 flex h-14 w-14 items-center justify-center rounded-full bg-purple-600 text-white shadow-lg transition-transform hover:scale-105 hover:bg-purple-700 active:scale-95"
+          aria-label="Open AI chat"
+        >
+          <MessageCircle className="h-6 w-6" />
+        </button>
+      )}
 
       <AiChatPanel
         courseId={courseId}

@@ -59,21 +59,19 @@ export function DocumentWithAi({
 
   return (
     <>
-      <div className="flex justify-end px-4">
-        <AiChatWrapper
-          courseId={courseId}
-          courseName={courseName}
-          weekId={weekId}
-          weekLabel={weekLabel}
-          getDocumentContent={getDocumentContent}
-          pendingContextItems={contextItems}
-          onRemoveContextItem={handleRemoveContextItem}
-          onClearAllContext={handleClearAllContext}
-          isOpen={isAiOpen}
-          onToggle={() => setIsAiOpen((prev) => !prev)}
-          onClose={() => setIsAiOpen(false)}
-        />
-      </div>
+      <AiChatWrapper
+        courseId={courseId}
+        courseName={courseName}
+        weekId={weekId}
+        weekLabel={weekLabel}
+        getDocumentContent={getDocumentContent}
+        pendingContextItems={contextItems}
+        onRemoveContextItem={handleRemoveContextItem}
+        onClearAllContext={handleClearAllContext}
+        isOpen={isAiOpen}
+        onToggle={() => setIsAiOpen((prev) => !prev)}
+        onClose={() => setIsAiOpen(false)}
+      />
       <CanvasEditor
         document={document}
         onDocumentTextReady={handleDocumentTextReady}

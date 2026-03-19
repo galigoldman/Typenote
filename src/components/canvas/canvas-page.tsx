@@ -544,11 +544,22 @@ export function CanvasPage({
 
   // In Draw/Eraser mode the TipTap editor must be non-editable. This prevents
   // iPadOS Scribble from converting pen strokes into text.
+  // preventScroll avoids the page jumping when switching to text mode.
   useEffect(() => {
     if (!editor) return;
     const shouldBeEditable = activeTool === 'text';
     if (editor.isEditable !== shouldBeEditable) {
+      const scrollContainer = interactionLayerRef.current?.closest(
+        '[data-scroll-container]',
+      ) as HTMLElement | null;
+      const scrollTop = scrollContainer?.scrollTop ?? 0;
       editor.setEditable(shouldBeEditable);
+      // Restore scroll position after editable change
+      if (scrollContainer) {
+        requestAnimationFrame(() => {
+          scrollContainer.scrollTop = scrollTop;
+        });
+      }
     }
   }, [activeTool, editor]);
 
