@@ -12,11 +12,11 @@ import {
   AlignLeft,
   AlignCenter,
   AlignRight,
+  ArrowLeftToLine,
+  ArrowRightToLine,
   List,
   ListOrdered,
   ListChecks,
-  Indent,
-  Outdent,
   Link,
   Code,
   Minus,
@@ -285,6 +285,26 @@ export function EditorToolbar({
         label="Align right"
       />
 
+      {/* Text direction */}
+      <ToolbarButton
+        onClick={() => editor.chain().focus().setDirection('ltr').run()}
+        isActive={
+          editor.getAttributes('paragraph').dir === 'ltr' ||
+          editor.getAttributes('heading').dir === 'ltr'
+        }
+        icon={<ArrowLeftToLine />}
+        label="Left-to-right"
+      />
+      <ToolbarButton
+        onClick={() => editor.chain().focus().setDirection('rtl').run()}
+        isActive={
+          editor.getAttributes('paragraph').dir === 'rtl' ||
+          editor.getAttributes('heading').dir === 'rtl'
+        }
+        icon={<ArrowRightToLine />}
+        label="Right-to-left"
+      />
+
       <VerticalSeparator />
 
       {/* Lists */}
@@ -305,40 +325,6 @@ export function EditorToolbar({
         isActive={editor.isActive('taskList')}
         icon={<ListChecks />}
         label="Task list"
-      />
-
-      <VerticalSeparator />
-
-      {/* Indentation — nest list items when in a list, otherwise margin indent */}
-      <ToolbarButton
-        onClick={() => {
-          if (
-            editor.isActive('listItem') &&
-            editor.can().sinkListItem('listItem')
-          ) {
-            editor.chain().focus().sinkListItem('listItem').run();
-          } else {
-            editor.chain().focus().indent().run();
-          }
-        }}
-        icon={<Indent />}
-        label="Indent"
-        shortcut="Tab"
-      />
-      <ToolbarButton
-        onClick={() => {
-          if (
-            editor.isActive('listItem') &&
-            editor.can().liftListItem('listItem')
-          ) {
-            editor.chain().focus().liftListItem('listItem').run();
-          } else {
-            editor.chain().focus().outdent().run();
-          }
-        }}
-        icon={<Outdent />}
-        label="Outdent"
-        shortcut="Shift+Tab"
       />
 
       <VerticalSeparator />
