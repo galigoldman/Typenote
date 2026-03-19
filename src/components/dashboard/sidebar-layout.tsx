@@ -74,11 +74,13 @@ export function SidebarLayout({ sidebar, children }: SidebarLayoutProps) {
     // eslint-disable-next-line react-hooks/exhaustive-deps -- store is stable per mount
   }, []);
 
-  // Track previous pathname to only sync on route CHANGES, not every render
+  // Track previous pathname to only sync on route CHANGES, not every render.
+  // Deferred via queueMicrotask to avoid setState-during-render warnings.
   const prevIsDocRef = useMemo(() => ({ current: isDocumentPage }), []);
   if (prevIsDocRef.current !== isDocumentPage) {
     prevIsDocRef.current = isDocumentPage;
-    store.set(!isDocumentPage);
+    const nextValue = !isDocumentPage;
+    queueMicrotask(() => store.set(nextValue));
   }
 
   const isOpen = useSyncExternalStore(

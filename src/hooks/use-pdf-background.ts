@@ -37,6 +37,8 @@ export function usePdfBackground(
 
   const pdfDocRef = useRef<PDFDocumentProxy | null>(null);
   const materialInfoRef = useRef<MaterialInfo | null>(null);
+  // Track in-progress renders per canvas to prevent concurrent render() calls
+  const renderingRef = useRef<Set<HTMLCanvasElement>>(new Set());
 
   // Fetch material info and load PDF
   useEffect(() => {
@@ -123,6 +125,10 @@ export function usePdfBackground(
       const pdfDoc = pdfDocRef.current;
       if (!pdfDoc) return;
 
+      // Skip if this canvas is already rendering (React strict mode double-fires)
+      if (renderingRef.current.has(canvas)) return;
+      renderingRef.current.add(canvas);
+
       // pdfjs uses 1-indexed pages, our pdfPage field is 0-indexed
       const page = await pdfDoc.getPage(pageNum + 1);
       const viewport = page.getViewport({ scale: 1 });
@@ -151,11 +157,15 @@ export function usePdfBackground(
       const offsetY = (PAGE_HEIGHT - scaledViewport.height) / 2;
       ctx.translate(offsetX, offsetY);
 
-      await page.render({
-        canvasContext: ctx,
-        viewport: scaledViewport,
-        canvas,
-      }).promise;
+      try {
+        await page.render({
+          canvasContext: ctx,
+          viewport: scaledViewport,
+          canvas,
+        }).promise;
+      } finally {
+        renderingRef.current.delete(canvas);
+      }
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [pageCount],
