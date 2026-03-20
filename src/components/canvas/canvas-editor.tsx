@@ -1938,15 +1938,15 @@ export function CanvasEditor({
                     }}
                     className={`flex items-center justify-center rounded-full transition-transform hover:scale-110 min-h-[44px] min-w-[44px] ${
                       highlighterColor === c
-                        ? 'ring-2 ring-primary ring-offset-1 scale-110'
+                        ? 'ring-2 ring-primary ring-offset-0'
                         : ''
                     }`}
-                    style={{ width: 28, height: 28 }}
+                    style={{ width: 24, height: 24 }}
                     title={c}
                   >
                     <span
                       className="rounded-full"
-                      style={{ width: 22, height: 22, backgroundColor: c }}
+                      style={{ width: 18, height: 18, backgroundColor: c }}
                     />
                   </button>
                 ))}
