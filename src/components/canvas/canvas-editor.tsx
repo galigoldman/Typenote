@@ -120,6 +120,12 @@ const PEN_SIZES = [
   { label: 'XL', value: 8 },
 ];
 
+const HIGHLIGHTER_SIZES = [
+  { label: 'S', value: 16 },
+  { label: 'M', value: 26 },
+  { label: 'L', value: 40 },
+];
+
 const ERASER_SIZES = [
   { label: 'S', value: 6 },
   { label: 'M', value: 14 },
@@ -352,7 +358,7 @@ export function CanvasEditor({
   const [penColor, setPenColor] = useState('#000000');
   const [penSize, setPenSize] = useState(3);
   const [highlighterColor, setHighlighterColor] = useState('#FBBF24');
-  const [highlighterSize] = useState(20);
+  const [highlighterSize, setHighlighterSize] = useState(20);
   const [eraserSize, setEraserSize] = useState(14);
 
   // Pinch-to-zoom (scale only — no pan, vertical scroll stays normal)
@@ -1890,9 +1896,39 @@ export function CanvasEditor({
               </>
             )}
 
-            {/* Highlighter: colors only */}
+            {/* Highlighter: thickness + colors */}
             {activeTool === 'highlighter' && (
               <>
+                {/* Thickness dots */}
+                {HIGHLIGHTER_SIZES.map((s) => (
+                  <button
+                    key={s.label}
+                    onPointerDown={(e) => {
+                      e.stopPropagation();
+                      setHighlighterSize(s.value);
+                    }}
+                    className={`flex items-center justify-center h-8 w-8 min-h-[44px] min-w-[44px] rounded-lg transition-colors ${
+                      highlighterSize === s.value
+                        ? 'bg-accent ring-1 ring-primary/50'
+                        : 'hover:bg-accent/50'
+                    }`}
+                    title={`${s.label} (${s.value}px)`}
+                  >
+                    <span
+                      className="rounded-full"
+                      style={{
+                        width: s.value,
+                        height: s.value,
+                        backgroundColor: highlighterColor,
+                        opacity: 0.5,
+                      }}
+                    />
+                  </button>
+                ))}
+
+                <div className="w-6 h-px bg-border my-1" />
+
+                {/* Color swatches */}
                 {HIGHLIGHTER_COLORS.map((c) => (
                   <button
                     key={c}
