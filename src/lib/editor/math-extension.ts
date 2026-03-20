@@ -108,7 +108,14 @@ export const MathExpression = Node.create({
             }
 
             // Get cursor coordinates for positioning the input box
-            const coords = view.coordsAtPos(selection.from);
+            let coords: { left: number; bottom: number };
+            try {
+              coords = view.coordsAtPos(selection.from);
+            } catch {
+              // Fallback when DOM measurement fails (e.g. missing getClientRects)
+              const rect = view.dom.getBoundingClientRect();
+              coords = { left: rect.left + 16, bottom: rect.top + 40 };
+            }
 
             // Dispatch a custom event that the React wrapper listens for
             const customEvent = new CustomEvent('math-input-trigger', {

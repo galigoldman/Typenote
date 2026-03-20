@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
 // Mock the React NodeView dependencies since we're testing schema only
 vi.mock('@tiptap/react', () => ({
@@ -77,5 +77,108 @@ describe('MathExpression Node', () => {
       expect(result[1]).toHaveProperty('data-type', 'math-expression');
       expect(result[1]).toHaveProperty('data-latex', '\\frac{1}{2}');
     }
+  });
+});
+
+describe('MathExpression handleKeyDown plugin', () => {
+  let dispatchedEvents: CustomEvent[];
+
+  beforeEach(() => {
+    dispatchedEvents = [];
+    vi.spyOn(window, 'dispatchEvent').mockImplementation((event) => {
+      if (event instanceof CustomEvent && event.type === 'math-input-trigger') {
+        dispatchedEvents.push(event);
+      }
+      return true;
+    });
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  function createMockView(overrides?: { coordsAtPosThrows?: boolean }) {
+    return {
+      state: {
+        selection: {
+          from: 0,
+          $from: {
+            parent: { type: { name: 'paragraph' } },
+            marks: () => [],
+          },
+        },
+        schema: {
+          marks: {
+            code: { isInSet: () => false },
+          },
+        },
+      },
+      coordsAtPos: overrides?.coordsAtPosThrows
+        ? () => { throw new Error('getClientRects is not a function'); }
+        : () => ({ left: 100, top: 50, bottom: 70, right: 200 }),
+      dom: {
+        getBoundingClientRect: () => ({
+          left: 0, top: 0, bottom: 600, right: 800,
+        }),
+      },
+    };
+  }
+
+  function getHandleKeyDown() {
+    const addPlugins = MathExpression.config.addProseMirrorPlugins;
+    expect(addPlugins).toBeDefined();
+    const plugins = addPlugins!.call(MathExpression);
+    expect(plugins.length).toBeGreaterThan(0);
+    const props = plugins[0].props;
+    expect(props.handleKeyDown).toBeDefined();
+    return props.handleKeyDown!;
+  }
+
+  it('should dispatch math-input-trigger on $ key press', () => {
+    const handleKeyDown = getHandleKeyDown();
+    const view = createMockView();
+    const event = new KeyboardEvent('keydown', { key: '$' });
+
+    const result = handleKeyDown(view as never, event);
+
+    expect(result).toBe(true);
+    expect(dispatchedEvents).toHaveLength(1);
+    expect(dispatchedEvents[0].detail).toEqual({ x: 100, y: 74 });
+  });
+
+  it('should ignore non-$ keys', () => {
+    const handleKeyDown = getHandleKeyDown();
+    const view = createMockView();
+    const event = new KeyboardEvent('keydown', { key: 'a' });
+
+    const result = handleKeyDown(view as never, event);
+
+    expect(result).toBe(false);
+    expect(dispatchedEvents).toHaveLength(0);
+  });
+
+  it('should not trigger inside code blocks', () => {
+    const handleKeyDown = getHandleKeyDown();
+    const view = createMockView();
+    view.state.selection.$from.parent.type.name = 'codeBlock';
+    const event = new KeyboardEvent('keydown', { key: '$' });
+
+    const result = handleKeyDown(view as never, event);
+
+    expect(result).toBe(false);
+    expect(dispatchedEvents).toHaveLength(0);
+  });
+
+  it('should still dispatch event when coordsAtPos throws (regression)', () => {
+    const handleKeyDown = getHandleKeyDown();
+    const view = createMockView({ coordsAtPosThrows: true });
+    const event = new KeyboardEvent('keydown', { key: '$' });
+
+    const result = handleKeyDown(view as never, event);
+
+    expect(result).toBe(true);
+    expect(dispatchedEvents).toHaveLength(1);
+    // Falls back to editor DOM rect
+    expect(dispatchedEvents[0].detail).toEqual({ x: 16, y: 44 });
   });
 });
