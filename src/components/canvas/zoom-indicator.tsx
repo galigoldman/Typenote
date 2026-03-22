@@ -1,14 +1,12 @@
 'use client';
 
 interface ZoomIndicatorProps {
-  scale: number;
+  percent: number;
   visible: boolean;
 }
 
-export function ZoomIndicator({ scale, visible }: ZoomIndicatorProps) {
-  if (scale === 1 && !visible) return null;
-
-  const percentage = Math.round(scale * 100);
+export function ZoomIndicator({ percent, visible }: ZoomIndicatorProps) {
+  if (percent === 100 && !visible) return null;
 
   return (
     <div
@@ -17,7 +15,7 @@ export function ZoomIndicator({ scale, visible }: ZoomIndicatorProps) {
         transition-opacity duration-500 pointer-events-none
         ${visible ? 'opacity-100' : 'opacity-0'}`}
     >
-      {percentage}%
+      {percent}%
     </div>
   );
 }

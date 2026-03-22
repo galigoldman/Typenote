@@ -13,6 +13,7 @@ import { AutoDirection } from '@/lib/editor/rtl-extension';
 import { TextStyle } from '@tiptap/extension-text-style';
 import { Indent } from '@/lib/editor/indent-extension';
 import { FontSize } from '@/lib/editor/font-size-extension';
+import { MathExpression } from '@/lib/editor/math-extension';
 import { Pencil, Sparkles, Trash2 } from 'lucide-react';
 import { PdfTextLayer } from './pdf-text-layer';
 import type {
@@ -281,18 +282,24 @@ export function CanvasPage({
       '[data-scroll-container]',
     ) as HTMLElement | null;
 
+    let touchStartX = 0;
     let touchStartY = 0;
+    let scrollStartLeft = 0;
     let scrollStartTop = 0;
 
     const handleTouchStart = (e: TouchEvent) => {
       if (e.touches.length !== 1 || !scrollContainer) return;
+      touchStartX = e.touches[0].clientX;
       touchStartY = e.touches[0].clientY;
+      scrollStartLeft = scrollContainer.scrollLeft;
       scrollStartTop = scrollContainer.scrollTop;
     };
 
     const handleTouchMove = (e: TouchEvent) => {
       if (e.touches.length !== 1 || !scrollContainer) return;
+      const deltaX = touchStartX - e.touches[0].clientX;
       const deltaY = touchStartY - e.touches[0].clientY;
+      scrollContainer.scrollLeft = scrollStartLeft + deltaX;
       scrollContainer.scrollTop = scrollStartTop + deltaY;
       e.preventDefault();
     };
@@ -347,6 +354,7 @@ export function CanvasPage({
       FontSize,
       AutoDirection,
       Indent,
+      MathExpression,
     ],
     content: safeContent,
     editorProps: {

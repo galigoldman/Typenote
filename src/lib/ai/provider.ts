@@ -28,9 +28,5 @@ class MockLatexModel {
 }
 
 export function getModel(): LanguageModel {
-  if (process.env.USE_MOCK_AI !== 'false') {
-    return new MockLatexModel() as unknown as LanguageModel;
-  }
-
   return google('gemini-2.5-flash');
 }

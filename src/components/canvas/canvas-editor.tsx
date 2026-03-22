@@ -53,6 +53,7 @@ import {
   TooltipProvider,
 } from '@/components/ui/tooltip';
 import type { SaveErrorType } from '@/hooks/use-auto-save';
+import { MathInputBox } from '@/lib/editor/math-input-box';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function extractNodeText(node: any): string {
@@ -349,6 +350,12 @@ export function CanvasEditor({
   const [activeEditor, setActiveEditor] = useState<Editor | null>(null);
   const [remoteUpdateCounter, setRemoteUpdateCounter] = useState(0);
 
+  // Math input ($ key → LaTeX conversion)
+  const [mathInputPosition, setMathInputPosition] = useState<{
+    x: number;
+    y: number;
+  } | null>(null);
+
   // Add page popover
   const [addPagePopoverIndex, setAddPagePopoverIndex] = useState<number | null>(
     null,
@@ -361,10 +368,11 @@ export function CanvasEditor({
   const [highlighterSize, setHighlighterSize] = useState(20);
   const [eraserSize, setEraserSize] = useState(14);
 
-  // Pinch-to-zoom (scale only — no pan, vertical scroll stays normal)
+  // Pinch-to-zoom: GoodNotes-style — 100% = page fills container width
   const scrollContainerRef = useRef<HTMLDivElement>(null);
-  const { scale, isZooming, fitScale } = usePinchZoom({
+  const { scale, zoom, isZooming, resetZoom, displayPercent } = usePinchZoom({
     containerRef: scrollContainerRef,
+    pageWidth: PAGE_WIDTH,
   });
 
   // Auto-add missing pages when PDF has more pages than the document.
@@ -690,6 +698,43 @@ export function CanvasEditor({
     editorsRef.current.set(pageId, editor);
     setActiveEditor(editor);
   }, []);
+
+  // Listen for math input trigger from ProseMirror plugin ($ key press)
+  useEffect(() => {
+    const handleMathTrigger = (e: Event) => {
+      const detail = (e as CustomEvent).detail as { x: number; y: number };
+      setMathInputPosition(detail);
+    };
+    window.addEventListener('math-input-trigger', handleMathTrigger);
+    return () => {
+      window.removeEventListener('math-input-trigger', handleMathTrigger);
+    };
+  }, []);
+
+  const handleMathSubmit = useCallback(
+    async (text: string) => {
+      if (!activeEditor) return;
+      const res = await fetch('/api/ai/latex', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text }),
+      });
+      if (!res.ok) {
+        setMathInputPosition(null);
+        return;
+      }
+      const data = await res.json();
+      activeEditor.chain().focus().insertMath(data.latex, text).run();
+      setMathInputPosition(null);
+      triggerSave();
+    },
+    [activeEditor, triggerSave],
+  );
+
+  const handleMathCancel = useCallback(() => {
+    setMathInputPosition(null);
+    activeEditor?.commands.focus();
+  }, [activeEditor]);
 
   // Get strokes for a page (used by eraser + selection)
   const getPageStrokes = useCallback((pageId: string): Stroke[] => {
@@ -1677,11 +1722,7 @@ export function CanvasEditor({
           className="flex-1 bg-gray-200 xl:bg-gray-100"
           data-scroll-container
           style={{
-            overflowX:
-              PAGE_WIDTH * scale >
-              (typeof window !== 'undefined' ? window.innerWidth : 9999)
-                ? 'auto'
-                : 'hidden',
+            overflowX: zoom > 1 ? 'auto' : 'hidden',
             overflowY:
               activeTool === 'text' ||
               activeTool === 'select' ||
@@ -1711,20 +1752,15 @@ export function CanvasEditor({
           <div
             className="py-8 max-xl:py-0"
             style={{
-              transform: scale !== 1 ? `scale(${scale})` : undefined,
+              transform: `scale(${scale})`,
               transformOrigin: 'top left',
-              willChange: scale !== 1 ? 'transform' : 'auto',
-              // Set explicit width/height so scroll container knows the real scaled size
-              width: scale !== 1 ? PAGE_WIDTH : undefined,
-              minHeight:
-                scale !== 1
-                  ? `${pages.length * PAGE_HEIGHT * scale + 100}px`
-                  : undefined,
-              // Center horizontally when page fits in viewport
-              marginLeft:
-                scale !== 1
-                  ? `max(0px, calc((100% - ${PAGE_WIDTH * scale}px) / 2))`
-                  : undefined,
+              willChange: 'transform',
+              // Explicit size so the scroll container knows the scaled content size
+              width: PAGE_WIDTH * scale,
+              minHeight: `${pages.length * PAGE_HEIGHT * scale + 100}px`,
+              // Center horizontally when the page fits within the container
+              marginLeft: zoom <= 1 ? 'auto' : undefined,
+              marginRight: zoom <= 1 ? 'auto' : undefined,
             }}
           >
             {pages.map((page, index) => {
@@ -1826,7 +1862,16 @@ export function CanvasEditor({
           </div>
         </div>
 
-        <ZoomIndicator scale={scale} visible={isZooming} />
+        <ZoomIndicator percent={displayPercent} visible={isZooming} />
+
+        {/* Math input box ($ key → LaTeX) */}
+        {mathInputPosition && (
+          <MathInputBox
+            position={mathInputPosition}
+            onSubmit={handleMathSubmit}
+            onCancel={handleMathCancel}
+          />
+        )}
 
         {/* Right sidebar — draw mode settings */}
         {isDrawMode && (
