@@ -52,7 +52,8 @@ export function useDocumentSync({
       : ({} as Record<string, unknown>);
     const pages = getPagesData?.();
     // Send as JSON string to prevent Next.js Server Actions from stripping nested attrs
-    return updateDocumentContent(documentId, JSON.stringify(content), pages);
+    const pagesJson = pages ? JSON.stringify(pages) : undefined;
+    return updateDocumentContent(documentId, JSON.stringify(content), pagesJson);
   }, [editor, documentId, getPagesData]);
 
   const {

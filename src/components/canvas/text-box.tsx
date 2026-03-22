@@ -12,6 +12,7 @@ import { TextStyle } from '@tiptap/extension-text-style';
 import { AutoDirection } from '@/lib/editor/rtl-extension';
 import { Indent } from '@/lib/editor/indent-extension';
 import { FontSize } from '@/lib/editor/font-size-extension';
+import { MathExpression } from '@/lib/editor/math-extension';
 import type { TextBox as TextBoxData } from '@/types/canvas';
 import type { Editor } from '@tiptap/core';
 
@@ -69,6 +70,7 @@ export function TextBox({
       FontSize,
       AutoDirection,
       Indent,
+      MathExpression,
     ],
     content: safeContent,
     editorProps: {
