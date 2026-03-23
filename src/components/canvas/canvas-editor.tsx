@@ -360,7 +360,7 @@ export function CanvasEditor({
   const [activeEditor, setActiveEditor] = useState<Editor | null>(null);
   const [remoteUpdateCounter, setRemoteUpdateCounter] = useState(0);
 
-  // Math input ($ key → LaTeX conversion)
+  // Math input (:{ keys → LaTeX conversion)
   const [mathInputPosition, setMathInputPosition] = useState<{
     x: number;
     y: number;
@@ -1953,7 +1953,7 @@ export function CanvasEditor({
 
         <ZoomIndicator percent={displayPercent} visible={isZooming} />
 
-        {/* Math input box ($ key → LaTeX) */}
+        {/* Math input box (:{ keys → LaTeX) */}
         {mathInputPosition && (
           <MathInputBox
             position={mathInputPosition}
