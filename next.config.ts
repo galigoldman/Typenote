@@ -7,10 +7,23 @@ const withPWA = withPWAInit({
 });
 
 const nextConfig: NextConfig = {
-  /* config options here */
   // Required: next-pwa uses webpack, so turbopack must be explicitly configured
   // to avoid a conflict error in Next.js 16
   turbopack: {},
+  async rewrites() {
+    return [
+      {
+        source: '/ingest/static/:path*',
+        destination: 'https://us-assets.i.posthog.com/static/:path*',
+      },
+      {
+        source: '/ingest/:path*',
+        destination: 'https://us.i.posthog.com/:path*',
+      },
+    ];
+  },
+  // Prevent ad-blockers from blocking the proxy via header sniffing
+  skipTrailingSlashRedirect: true,
 };
 
 export default withPWA(nextConfig);
