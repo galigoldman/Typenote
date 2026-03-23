@@ -294,8 +294,9 @@ function buildDocument(opts: {
 
 // ── Canvas page rendering ──────────────────────────────────────────────
 
+// Canvas coordinates are CSS pixels (96 DPI). Use px everywhere for consistency.
 const PRINT_CSS_CANVAS = `
-  @page { size: ${PAGE_WIDTH}pt ${PAGE_HEIGHT}pt; margin: 0; }
+  @page { size: ${PAGE_WIDTH}px ${PAGE_HEIGHT}px; margin: 0; }
   @media print {
     .canvas-page { break-after: page; }
     .canvas-page:last-child { break-after: auto; }
@@ -343,8 +344,8 @@ export function buildCanvasPageHtml(
       }
 
       return `
-      <div class="canvas-page" style="position: relative; width: ${PAGE_WIDTH}pt; height: ${PAGE_HEIGHT}pt; overflow: hidden; background: white;">
-        <svg width="${PAGE_WIDTH}" height="${PAGE_HEIGHT}" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none;">
+      <div class="canvas-page" style="position: relative; width: ${PAGE_WIDTH}px; height: ${PAGE_HEIGHT}px; overflow: hidden; background: white;">
+        <svg viewBox="0 0 ${PAGE_WIDTH} ${PAGE_HEIGHT}" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none;">
           ${bgSvg}
           ${strokePaths}
         </svg>
@@ -387,7 +388,7 @@ function renderTextBox(tb: TextBox): string {
   const scale = tb.fontScale ?? 1;
   const fontSize = scale !== 1 ? `font-size: ${scale}em;` : '';
 
-  return `<div style="position: absolute; left: ${tb.x}pt; top: ${tb.y}pt; width: ${tb.width}pt; height: ${tb.height}pt; ${fontSize} overflow: visible; box-sizing: border-box; z-index: ${tb.zIndex};">
+  return `<div style="position: absolute; left: ${tb.x}px; top: ${tb.y}px; width: ${tb.width}px; height: ${tb.height}px; ${fontSize} overflow: visible; box-sizing: border-box; z-index: ${tb.zIndex};">
     ${contentHtml}
   </div>`;
 }
@@ -439,8 +440,8 @@ export function buildMixedDocumentHtml(
       }
 
       return `
-      <div class="canvas-page" style="position: relative; width: ${PAGE_WIDTH}pt; height: ${PAGE_HEIGHT}pt; overflow: hidden; background: white;">
-        <svg width="${PAGE_WIDTH}" height="${PAGE_HEIGHT}" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none;">
+      <div class="canvas-page" style="position: relative; width: ${PAGE_WIDTH}px; height: ${PAGE_HEIGHT}px; overflow: hidden; background: white;">
+        <svg viewBox="0 0 ${PAGE_WIDTH} ${PAGE_HEIGHT}" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none;">
           ${bgSvg}
           ${strokePaths}
         </svg>
