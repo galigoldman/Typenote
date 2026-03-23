@@ -1828,6 +1828,7 @@ export function CanvasEditor({
                     selectionDragOffset={selectionDragOffset}
                     isSelectionResizing={isSelectionResizing}
                     selectionResizeBBox={selectionResizeBBox}
+                    selectedStrokeIds={selectedStrokeIds}
                     selectedTextBoxIds={selectedTextBoxIds}
                     onTextBoxContentUpdate={handleTextBoxContentUpdate}
                     onTextBoxHeightMeasured={handleTextBoxHeightMeasured}

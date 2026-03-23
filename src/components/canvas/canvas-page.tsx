@@ -59,6 +59,7 @@ interface CanvasPageProps {
   selectionDragOffset?: { x: number; y: number };
   isSelectionResizing?: boolean;
   selectionResizeBBox?: BBox | null;
+  selectedStrokeIds?: Set<string>;
   selectedTextBoxIds?: Set<string>;
   onTextBoxContentUpdate?: (
     pageId: string,
@@ -112,6 +113,7 @@ export function CanvasPage({
   selectionDragOffset = { x: 0, y: 0 },
   isSelectionResizing = false,
   selectionResizeBBox = null,
+  selectedStrokeIds = new Set<string>(),
   selectedTextBoxIds = new Set<string>(),
   onTextBoxContentUpdate,
   onTextBoxHeightMeasured,
@@ -596,19 +598,49 @@ export function CanvasPage({
     }
   }, [remoteUpdateCounter, editor, page.flowContent]);
 
-  // Re-render committed strokes when page.strokes changes
+  // Re-render committed strokes when page.strokes changes.
+  // During drag, selected strokes are hidden here and drawn at offset on the working canvas.
   const renderCommittedStrokes = useCallback(() => {
     const ctx = committedCtxRef.current;
     if (!ctx) return;
     ctx.clearRect(0, 0, PAGE_WIDTH, PAGE_HEIGHT);
     for (const stroke of page.strokes) {
+      // Skip selected strokes during drag — they're rendered on working canvas at offset
+      if (isSelectionDragging && selectedStrokeIds.has(stroke.id)) continue;
       renderStroke(ctx, stroke.points, {
         color: stroke.color,
         size: stroke.width,
         opacity: stroke.opacity ?? 1,
       });
     }
-  }, [page.strokes]);
+  }, [page.strokes, isSelectionDragging, selectedStrokeIds]);
+
+  // Render selected strokes at drag offset on the working canvas
+  useEffect(() => {
+    const ctx = workingCtxRef.current;
+    if (!ctx) return;
+    ctx.clearRect(0, 0, PAGE_WIDTH, PAGE_HEIGHT);
+    if (!isSelectionDragging || selectedStrokeIds.size === 0) return;
+    const dx = selectionDragOffset.x;
+    const dy = selectionDragOffset.y;
+    for (const stroke of page.strokes) {
+      if (!selectedStrokeIds.has(stroke.id)) continue;
+      const offsetPoints = stroke.points.map(
+        ([px, py, pressure]) =>
+          [px + dx, py + dy, pressure] as [number, number, number],
+      );
+      renderStroke(ctx, offsetPoints, {
+        color: stroke.color,
+        size: stroke.width,
+        opacity: stroke.opacity ?? 1,
+      });
+    }
+  }, [
+    isSelectionDragging,
+    selectedStrokeIds,
+    selectionDragOffset,
+    page.strokes,
+  ]);
 
   useEffect(() => {
     renderCommittedStrokes();
