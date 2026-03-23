@@ -51,7 +51,12 @@ export async function exportDocumentAsPdf(
     const canvasPages = (document.pages as { pages: CanvasPage[] }).pages;
     const sortedPages = [...canvasPages].sort((a, b) => a.order - b.order);
     for (let i = 0; i < sortedPages.length; i++) {
-      renderCanvasPage(doc, sortedPages[i], document.canvas_type, i === 0);
+      await renderCanvasPage(
+        doc,
+        sortedPages[i],
+        document.canvas_type,
+        i === 0,
+      );
     }
   }
 
@@ -61,7 +66,7 @@ export async function exportDocumentAsPdf(
       // before starting text rendering (switches from canvas to A4 format)
       doc.addPage('a4');
     }
-    renderTextDocument(doc, document.content);
+    await renderTextDocument(doc, document.content);
   }
   // If neither: empty document -> already has one blank page from jsPDF constructor
 
@@ -69,5 +74,6 @@ export async function exportDocumentAsPdf(
   // jsPDF.save() uses FileSaver.js internally which handles cross-platform
   // downloads including iOS Safari and Chrome.
   const filename = sanitizeFilename(document.title) + '.pdf';
+
   doc.save(filename);
 }

@@ -48,10 +48,10 @@ const ORPHAN_THRESHOLD = 0.15;
  * @param doc     - The jsPDF instance to render into (first page already added)
  * @param content - A TipTap JSON document (Record with `content` array)
  */
-export function renderTextDocument(
+export async function renderTextDocument(
   doc: jsPDF,
   content: Record<string, unknown>,
-): void {
+): Promise<void> {
   const nodes = content.content as Record<string, unknown>[] | undefined;
 
   if (!nodes || !Array.isArray(nodes) || nodes.length === 0) {
@@ -94,7 +94,7 @@ export function renderTextDocument(
       content: [node],
     };
 
-    renderTiptapContent(
+    await renderTiptapContent(
       doc,
       singleNodeDoc,
       MARGIN,
