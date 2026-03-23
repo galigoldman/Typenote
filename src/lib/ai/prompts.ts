@@ -57,3 +57,15 @@ Examples:
 - "x squared plus y squared" → x^2 + y^2
 - "integral of x from 0 to 1" → \\int_0^1 x \\, dx
 - "square root of a plus b" → \\sqrt{a + b}`;
+
+/**
+ * Build the LaTeX system prompt, optionally with course context.
+ *
+ * When courseName is provided, a brief context line is appended to help the
+ * model choose notation conventions appropriate for the subject (e.g., using
+ * \\det vs |A| in a linear algebra course). Adds ~10-15 tokens.
+ */
+export function buildLatexPrompt(courseName?: string): string {
+  if (!courseName) return LATEX_SYSTEM_PROMPT;
+  return `${LATEX_SYSTEM_PROMPT}\nThe student is in the course: ${courseName}. Use notation conventions appropriate for this subject.`;
+}

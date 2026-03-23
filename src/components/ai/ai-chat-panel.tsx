@@ -9,6 +9,7 @@ import {
   Plus,
   Send,
   Sparkles,
+  Lock,
   Square,
   X,
   Zap,
@@ -33,12 +34,18 @@ interface ChatMessage {
   model?: 'flash' | 'pro';
 }
 
-interface QuotaInfo {
+interface QuotaBucket {
   used: number;
   limit: number;
   remaining: number;
+}
+
+interface QuotaInfo {
+  chat: QuotaBucket;
+  latex: QuotaBucket;
   tier: string;
   resetsAt: string;
+  deepModeAvailable: boolean;
 }
 
 export type AiContextItem =
@@ -160,7 +167,11 @@ export function AiChatPanel({
     fetch('/api/ai/quota')
       .then((res) => (res.ok ? res.json() : null))
       .then((data: QuotaInfo | null) => {
-        if (data) setQuota(data);
+        if (data) {
+          setQuota(data);
+          // Force quick mode if deep is not available for this tier
+          if (!data.deepModeAvailable) setMode('quick');
+        }
       })
       .catch(() => {
         setQuota(null);
@@ -396,13 +407,16 @@ export function AiChatPanel({
           mode,
         });
 
-        // Optimistically decrement quota after successful question
+        // Optimistically decrement chat quota after successful question
         setQuota((prev) =>
           prev
             ? {
                 ...prev,
-                used: prev.used + 1,
-                remaining: Math.max(0, prev.remaining - 1),
+                chat: {
+                  ...prev.chat,
+                  used: prev.chat.used + 1,
+                  remaining: Math.max(0, prev.chat.remaining - 1),
+                },
               }
             : null,
         );
@@ -475,14 +489,27 @@ export function AiChatPanel({
               Quick
             </button>
             <button
-              onClick={() => setMode('deep')}
+              onClick={() => {
+                if (quota?.deepModeAvailable) setMode('deep');
+              }}
+              title={
+                quota?.deepModeAvailable === false
+                  ? 'Deep mode is available on the Pro plan'
+                  : undefined
+              }
               className={`flex items-center gap-1 rounded-md px-2.5 py-1 text-xs font-medium transition-colors ${
-                mode === 'deep'
-                  ? 'bg-background text-foreground shadow-sm'
-                  : 'text-muted-foreground hover:text-foreground'
+                quota?.deepModeAvailable === false
+                  ? 'cursor-not-allowed opacity-50 text-muted-foreground'
+                  : mode === 'deep'
+                    ? 'bg-background text-foreground shadow-sm'
+                    : 'text-muted-foreground hover:text-foreground'
               }`}
             >
-              <BookOpen className="h-3 w-3" />
+              {quota?.deepModeAvailable === false ? (
+                <Lock className="h-3 w-3" />
+              ) : (
+                <BookOpen className="h-3 w-3" />
+              )}
               Deep
             </button>
           </div>
@@ -624,10 +651,10 @@ export function AiChatPanel({
           {/* Quota indicator + Input */}
           <div className="border-t px-4 py-3 pb-4">
             {quota && (
-              <div className="mb-2">
-                {quota.remaining === 0 ? (
+              <div className="mb-2 space-y-0.5">
+                {quota.chat.remaining === 0 ? (
                   <p className="text-xs text-destructive">
-                    No questions remaining this month — resets{' '}
+                    No chat questions remaining — resets{' '}
                     {new Date(quota.resetsAt).toLocaleDateString('en-US', {
                       month: 'long',
                       day: 'numeric',
@@ -636,15 +663,24 @@ export function AiChatPanel({
                 ) : (
                   <p
                     className={`text-xs ${
-                      quota.remaining <= 5
+                      quota.chat.remaining <= 5
                         ? 'text-amber-500'
                         : 'text-muted-foreground'
                     }`}
                   >
-                    {quota.remaining} of {quota.limit} questions remaining this
-                    month
+                    Chat: {quota.chat.remaining} of {quota.chat.limit} remaining
                   </p>
                 )}
+                <p
+                  className={`text-xs ${
+                    quota.latex.remaining <= 5
+                      ? 'text-amber-500'
+                      : 'text-muted-foreground'
+                  }`}
+                >
+                  LaTeX: {quota.latex.remaining} of {quota.latex.limit}{' '}
+                  remaining
+                </p>
               </div>
             )}
             {/* Pending context items (accumulated) */}
@@ -701,11 +737,11 @@ export function AiChatPanel({
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
                 placeholder={
-                  quota?.remaining === 0
+                  quota?.chat.remaining === 0
                     ? 'Monthly limit reached'
                     : 'Ask about your course materials...'
                 }
-                disabled={loading || quota?.remaining === 0}
+                disabled={loading || quota?.chat.remaining === 0}
                 className="flex-1 rounded-lg border bg-background px-3 py-2 text-sm outline-none ring-offset-background placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50"
               />
               {loading ? (
@@ -722,7 +758,7 @@ export function AiChatPanel({
                 <Button
                   type="submit"
                   size="icon"
-                  disabled={!input.trim() || quota?.remaining === 0}
+                  disabled={!input.trim() || quota?.chat.remaining === 0}
                   className="h-9 w-9 shrink-0"
                 >
                   <Send className="h-4 w-4" />

@@ -10,12 +10,16 @@ vi.mock('@/lib/supabase/server', () => ({
 
 vi.mock('@/lib/ai/rate-limit', () => ({
   checkAndIncrementUsage: vi.fn(),
+  recordTokenUsage: vi.fn().mockResolvedValue(undefined),
 }));
 
 import { POST } from './route';
 import { convertToLatex } from '@/lib/ai/latex';
 import { createClient } from '@/lib/supabase/server';
-import { checkAndIncrementUsage } from '@/lib/ai/rate-limit';
+import {
+  checkAndIncrementUsage,
+  recordTokenUsage,
+} from '@/lib/ai/rate-limit';
 
 function createRequest(body: unknown): Request {
   return new Request('http://localhost:3000/api/ai/latex', {
@@ -36,8 +40,8 @@ function setupAuthMocks() {
   } as never);
   vi.mocked(checkAndIncrementUsage).mockResolvedValue({
     currentCount: 1,
-    monthlyLimit: 50,
-    tier: 'free',
+    monthlyLimit: 500,
+    tier: 'beta',
     isAllowed: true,
   });
 }
@@ -56,6 +60,44 @@ describe('POST /api/ai/latex', () => {
 
     expect(res.status).toBe(200);
     expect(data.latex).toBe('\\frac{1}{2} \\times 5');
+  });
+
+  it('should pass latex query type to rate limiter', async () => {
+    vi.mocked(convertToLatex).mockResolvedValue('x^2');
+
+    await POST(createRequest({ text: 'x squared' }));
+
+    expect(checkAndIncrementUsage).toHaveBeenCalledWith('u1', 'flash', 'latex');
+  });
+
+  it('should accept optional courseName', async () => {
+    vi.mocked(convertToLatex).mockResolvedValue('\\det(A)');
+
+    const res = await POST(
+      createRequest({ text: 'determinant of A', courseName: 'Linear Algebra' }),
+    );
+    const data = await res.json();
+
+    expect(res.status).toBe(200);
+    expect(convertToLatex).toHaveBeenCalledWith('determinant of A', 'Linear Algebra');
+    expect(data.latex).toBe('\\det(A)');
+  });
+
+  it('should work without courseName', async () => {
+    vi.mocked(convertToLatex).mockResolvedValue('x^2');
+
+    const res = await POST(createRequest({ text: 'x squared' }));
+
+    expect(res.status).toBe(200);
+    expect(convertToLatex).toHaveBeenCalledWith('x squared', undefined);
+  });
+
+  it('should call recordTokenUsage after conversion', async () => {
+    vi.mocked(convertToLatex).mockResolvedValue('x^2');
+
+    await POST(createRequest({ text: 'x squared' }));
+
+    expect(recordTokenUsage).toHaveBeenCalledWith('u1', 'latex', 0, 0);
   });
 
   it('should return 400 when text is missing', async () => {
@@ -82,6 +124,18 @@ describe('POST /api/ai/latex', () => {
     expect(data.error).toBe('Text must be 500 characters or less');
   });
 
+  it('should return 400 when courseName exceeds 200 characters', async () => {
+    const res = await POST(
+      createRequest({ text: 'test', courseName: 'a'.repeat(201) }),
+    );
+    const data = await res.json();
+
+    expect(res.status).toBe(400);
+    expect(data.error).toBe(
+      'courseName must be a string of 200 characters or less',
+    );
+  });
+
   it('should return 401 when not authenticated', async () => {
     vi.mocked(createClient).mockResolvedValue({
       auth: {
@@ -98,11 +152,11 @@ describe('POST /api/ai/latex', () => {
     expect(data.error).toBe('Unauthorized');
   });
 
-  it('should return 429 when quota exceeded', async () => {
+  it('should return 429 with LaTeX-specific message when quota exceeded', async () => {
     vi.mocked(checkAndIncrementUsage).mockResolvedValue({
-      currentCount: 51,
-      monthlyLimit: 50,
-      tier: 'free',
+      currentCount: 501,
+      monthlyLimit: 500,
+      tier: 'beta',
       isAllowed: false,
     });
 
@@ -110,7 +164,8 @@ describe('POST /api/ai/latex', () => {
     const data = await res.json();
 
     expect(res.status).toBe(429);
-    expect(data.error).toBe('Monthly AI quota exceeded');
+    expect(data.error).toBe('Monthly LaTeX quota exceeded');
+    expect(data.quota.tier).toBe('beta');
   });
 
   it('should return 500 when conversion fails', async () => {

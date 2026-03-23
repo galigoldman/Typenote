@@ -2,8 +2,10 @@ import { NextResponse } from 'next/server';
 import { GoogleGenAI } from '@google/genai';
 
 import { buildAiContext, type QuestionParams } from '@/lib/actions/ai-context';
-import { checkAndIncrementUsage } from '@/lib/ai/rate-limit';
+import { checkAndIncrementUsage, recordTokenUsage } from '@/lib/ai/rate-limit';
 import { createClient } from '@/lib/supabase/server';
+
+const isDebugMode = process.env.AI_RATE_LIMIT_DEBUG === 'true';
 
 export async function POST(req: Request) {
   try {
@@ -100,11 +102,35 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
+    // --- Deep mode restriction ---
+    // Only pro tier users can use deep mode (Gemini Pro).
+    // Beta and free users are restricted to quick mode (Gemini Flash).
+    if (mode === 'deep') {
+      // Get user's tier from profiles
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('subscription_tier')
+        .eq('id', user.id)
+        .single();
+
+      const userTier = profile?.subscription_tier ?? 'free';
+
+      if (userTier !== 'pro') {
+        return NextResponse.json(
+          {
+            error: 'deep_mode_restricted',
+            message: 'Deep mode is available on the Pro plan.',
+            tier: userTier,
+          },
+          { status: 403 },
+        );
+      }
+    }
+
     // Atomic check + increment. Fail-closed: if this throws, we reject the request.
-    // Why fail-closed? The purpose of rate limiting is cost protection. A database
-    // outage shouldn't become a cost spike.
+    let rateLimit;
     try {
-      const rateLimit = await checkAndIncrementUsage(user.id, mode);
+      rateLimit = await checkAndIncrementUsage(user.id, mode, 'chat');
 
       if (!rateLimit.isAllowed) {
         // First day of next month
@@ -215,6 +241,58 @@ export async function POST(req: Request) {
         .eq('id', activeConversationId);
     }
 
+    // --- Debug mode: return mock response without calling Gemini ---
+    // Set AI_RATE_LIMIT_DEBUG=true to test rate limiting without API costs.
+    // The rate limit counter still increments normally above.
+    if (isDebugMode) {
+      const debugResponse = `[DEBUG MODE] Mock response for: "${question.slice(0, 50)}..." (mode: ${mode}, tier: ${rateLimit.tier}, usage: ${rateLimit.currentCount}/${rateLimit.monthlyLimit})`;
+
+      // Persist mock message if conversation is active
+      if (activeConversationId) {
+        await supabase.from('ai_messages').insert({
+          conversation_id: activeConversationId,
+          role: 'assistant',
+          content: debugResponse,
+          model: mode === 'deep' ? 'pro' : 'flash',
+        });
+      }
+
+      const encoder = new TextEncoder();
+      const debugStream = new ReadableStream({
+        start(controller) {
+          controller.enqueue(
+            encoder.encode(
+              `data: ${JSON.stringify({ type: 'sources', sources: [], model: mode === 'deep' ? 'pro' : 'flash' })}\n\n`,
+            ),
+          );
+          if (activeConversationId) {
+            controller.enqueue(
+              encoder.encode(
+                `data: ${JSON.stringify({ type: 'conversation', conversationId: activeConversationId, messageId: userMessageId })}\n\n`,
+              ),
+            );
+          }
+          controller.enqueue(
+            encoder.encode(
+              `data: ${JSON.stringify({ type: 'text', text: debugResponse })}\n\n`,
+            ),
+          );
+          controller.enqueue(
+            encoder.encode(`data: ${JSON.stringify({ type: 'done' })}\n\n`),
+          );
+          controller.close();
+        },
+      });
+
+      return new Response(debugStream, {
+        headers: {
+          'Content-Type': 'text/event-stream',
+          'Cache-Control': 'no-cache',
+          Connection: 'keep-alive',
+        },
+      });
+    }
+
     const params: QuestionParams = {
       question: question.trim(),
       courseId,
@@ -303,6 +381,8 @@ export async function POST(req: Request) {
               .update({ updated_at: new Date().toISOString() })
               .eq('id', activeConversationId);
           }
+          // Fire-and-forget token recording for admin observability
+          recordTokenUsage(user.id, 'chat', 0, 0).catch(() => {});
         } catch (err) {
           const message = err instanceof Error ? err.message : 'Stream error';
           controller.enqueue(

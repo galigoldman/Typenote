@@ -70,6 +70,7 @@ interface CanvasEditorProps {
   document: Document;
   onDocumentTextReady?: (getter: () => string) => void;
   materialId?: string | null;
+  courseName?: string;
   onAskAiWithContext?: (
     context:
       | { type: 'text'; content: string }
@@ -303,6 +304,7 @@ export function CanvasEditor({
   document,
   onDocumentTextReady,
   materialId,
+  courseName,
   onAskAiWithContext,
 }: CanvasEditorProps) {
   const router = useRouter();
@@ -758,7 +760,7 @@ export function CanvasEditor({
       const res = await fetch('/api/ai/latex', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text }),
+        body: JSON.stringify({ text, courseName }),
       });
       if (!res.ok) {
         setMathInputPosition(null);
@@ -769,7 +771,7 @@ export function CanvasEditor({
       setMathInputPosition(null);
       triggerSave();
     },
-    [activeEditor, triggerSave],
+    [activeEditor, triggerSave, courseName],
   );
 
   const handleMathCancel = useCallback(() => {
