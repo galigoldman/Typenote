@@ -1644,8 +1644,7 @@ export function CanvasEditor({
               onPointerDown={(e) => {
                 e.stopPropagation();
                 if (!askAiDropdownOpen && askAiDropdownRef.current) {
-                  const rect =
-                    askAiDropdownRef.current.getBoundingClientRect();
+                  const rect = askAiDropdownRef.current.getBoundingClientRect();
                   setAskAiDropdownPos({
                     top: rect.bottom + 4,
                     left: rect.left,
