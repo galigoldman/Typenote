@@ -115,7 +115,9 @@ export function TiptapEditor({ document, courseName }: TiptapEditorProps) {
       Indent,
       MathExpression,
     ],
-    content: document.content as Record<string, unknown>,
+    content:
+      (document.content as Record<string, unknown>)?._html ??
+      (document.content as Record<string, unknown>),
     editorProps: {
       attributes: {
         class:

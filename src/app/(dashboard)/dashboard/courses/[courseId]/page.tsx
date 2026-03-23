@@ -8,6 +8,13 @@ import { CreateDocumentDialog } from '@/components/dashboard/create-document-dia
 import { WeekSection } from '@/components/dashboard/week-section';
 import { WeekDialog } from '@/components/dashboard/week-dialog';
 import { EmptyState } from '@/components/dashboard/empty-state';
+import { PersonalFileUpload } from '@/components/dashboard/personal-file-upload';
+import { PersonalFileItem } from '@/components/dashboard/personal-file-item';
+import {
+  getPersonalFilesByCourse,
+  getPersonalFilesByWeeks,
+} from '@/lib/queries/personal-files';
+import type { PersonalFile } from '@/types/database';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { ChevronLeft } from 'lucide-react';
@@ -84,6 +91,16 @@ export default async function CoursePage({
       .order('created_at', { ascending: true });
     allMaterials = (materialsData as CourseMaterial[] | null) ?? [];
   }
+
+  // Fetch week-level personal files
+  const allWeekPersonalFiles = (await getPersonalFilesByWeeks(
+    weekIds,
+  )) as PersonalFile[];
+
+  // Fetch course-level personal files (no week)
+  const coursePersonalFiles = (await getPersonalFilesByCourse(
+    courseId,
+  )) as PersonalFile[];
 
   // Fetch linked Moodle data (if this course was created from a Moodle sync)
   const admin = createAdminClient();
@@ -215,6 +232,12 @@ export default async function CoursePage({
             </Button>
           </CreateDocumentDialog>
           <WeekDialog courseId={courseId} />
+          <PersonalFileUpload
+            courseId={courseId}
+            userId={user?.id ?? ''}
+            category="material"
+            label="Import File"
+          />
         </div>
       </div>
 
@@ -225,7 +248,7 @@ export default async function CoursePage({
         </div>
       </div>
 
-      {isEmpty ? (
+      {isEmpty && coursePersonalFiles.length === 0 ? (
         <EmptyState
           title="This course is empty"
           description="Add weeks to organize your materials, or create a document to start taking notes."
@@ -240,6 +263,20 @@ export default async function CoursePage({
               </h2>
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
                 <DocumentListWithMove documents={courseDocuments} />
+              </div>
+            </div>
+          )}
+
+          {/* Course-level imported files */}
+          {coursePersonalFiles.length > 0 && (
+            <div className="mb-6">
+              <h2 className="mb-3 text-sm font-medium text-muted-foreground">
+                Imported Files
+              </h2>
+              <div className="space-y-0.5">
+                {coursePersonalFiles.map((file) => (
+                  <PersonalFileItem key={file.id} file={file} />
+                ))}
               </div>
             </div>
           )}
@@ -265,6 +302,9 @@ export default async function CoursePage({
                     )}
                     documents={weekDocuments.filter(
                       (d) => d.week_id === week.id,
+                    )}
+                    personalFiles={allWeekPersonalFiles.filter(
+                      (f) => f.week_id === week.id,
                     )}
                     moodleFiles={importableMoodleFiles}
                   />

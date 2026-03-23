@@ -32,6 +32,15 @@ type AnalyticsEventMap = {
   document_moved: {
     destination_type: 'folder' | 'course' | 'root';
   };
+  personal_file_uploaded: {
+    file_size: number;
+    mime_type: string;
+    course_id: string;
+  };
+  personal_file_deleted: {
+    file_id: string;
+    course_id: string;
+  };
 };
 
 export type AnalyticsEventName = keyof AnalyticsEventMap;

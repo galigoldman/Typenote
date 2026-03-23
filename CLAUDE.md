@@ -37,6 +37,8 @@ Every step of development must follow this git workflow:
 - PRs cannot be merged unless CI passes. This is enforced via GitHub branch protection rules on `main`.
 
 ## Active Technologies
+- TypeScript 5 / Node.js 22+ + Next.js 16 (App Router), @supabase/ssr, mammoth (already installed), shadcn/ui, TipTap 3, pdfjs-dist (019-personal-file-import)
+- PostgreSQL via Supabase (new `personal_files` table) + Supabase Storage (new `personal-files` bucket) (019-personal-file-import)
 
 - TypeScript 5 / Node.js 22+ / React 19 + Next.js 16, TipTap 3, perfect-freehand, Canvas 2D API (019-improve-document-zoom)
 
