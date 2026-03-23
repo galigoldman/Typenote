@@ -38,6 +38,11 @@ Every step of development must follow this git workflow:
 
 ## Active Technologies
 
+- TypeScript 5 / Node.js 22+ / React 19 + Next.js 16, React 19, `use-pinch-zoom.ts` custom hook (no new deps) (021-fix-pen-zoom)
+- N/A — no data changes, client-side only (021-fix-pen-zoom)
+- TypeScript 5 / Node.js 18+ + React 19, Next.js 16 (App Router), jsPDF, Supabase Realtime (022-fix-undo-pdf-export)
+- PostgreSQL via Supabase (documents table, `pages` JSONB column) (022-fix-undo-pdf-export)
+
 - TypeScript 5 / Node.js 22+ + Next.js 16, TipTap 3, ProseMirror (`@tiptap/pm/state`, `@tiptap/pm/view`) (020-change-latex-trigger)
 - N/A — no data changes (020-change-latex-trigger)
 

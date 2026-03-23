@@ -31,5 +31,5 @@
 
 ## Notes
 
-- FR-005 references `touchType` property which is a platform API detail, but it is included because the bug and fix are inherently about input device detection at the API boundary. This is acceptable as it describes *what* must be detected, not *how* the code should be structured.
+- FR-005 references `touchType` property which is a platform API detail, but it is included because the bug and fix are inherently about input device detection at the API boundary. This is acceptable as it describes _what_ must be detected, not _how_ the code should be structured.
 - All items pass. Spec is ready for `/speckit.clarify` or `/speckit.plan`.
