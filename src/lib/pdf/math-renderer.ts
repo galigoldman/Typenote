@@ -1,22 +1,16 @@
 import type { jsPDF } from 'jspdf';
-import { toPng } from 'html-to-image';
 import katex from 'katex';
-
-/** DPI scale for high-quality rasterisation of math formulas. */
-const RASTER_SCALE = 2;
 
 /**
  * Renders a LaTeX math expression into the PDF at the specified position.
  *
- * Pipeline:
- * 1. Use KaTeX to render the LaTeX string into HTML markup.
- * 2. Insert the markup into a hidden DOM container so the browser lays it out.
- * 3. Measure the rendered dimensions via getBoundingClientRect().
- * 4. Rasterise the container to a PNG via html-to-image (handles CSS styling
- *    and font embedding automatically — no fragile foreignObject workarounds).
- * 5. Embed the PNG into the PDF via doc.addImage().
- * 6. If rasterisation fails, fall back to rendering the raw LaTeX string as text.
- * 7. Clean up all temporary DOM elements.
+ * Strategy: Use KaTeX to render HTML in a hidden DOM element, then walk the
+ * rendered DOM tree and draw each visible text fragment directly with jsPDF
+ * text primitives. This avoids canvas/image-based approaches that fail due
+ * to browser "tainted canvas" security restrictions on cross-origin fonts.
+ *
+ * The output is vector text (not rasterised) positioned according to KaTeX's
+ * CSS layout, producing properly typeset math formulas in the PDF.
  */
 export async function renderMath(
   doc: jsPDF,
@@ -34,67 +28,147 @@ export async function renderMath(
       displayMode: false,
     });
   } catch {
-    // KaTeX itself failed — fall back to plain text immediately
-    renderMathAsText(doc, latex, x, y);
+    renderMathAsText(doc, latex, x, y + 12);
     return;
   }
 
-  // Create a hidden container, insert the KaTeX HTML, and let the browser
-  // perform layout so we can measure the rendered dimensions.
+  // Create a hidden container and let the browser layout the KaTeX HTML.
   const container = document.createElement('div');
   container.style.position = 'absolute';
   container.style.left = '-9999px';
   container.style.top = '-9999px';
-  container.style.fontSize = '16pt';
-  container.style.lineHeight = '1';
-  // Prevent the container from being invisible to html-to-image
-  container.style.backgroundColor = 'white';
+  container.style.fontSize = '16px';
+  container.style.lineHeight = 'normal';
   container.innerHTML = html;
   document.body.appendChild(container);
 
   try {
-    const { width: renderedWidth, height: renderedHeight } =
-      container.getBoundingClientRect();
-
-    // Guard against zero-dimension elements (e.g. empty LaTeX string).
-    if (renderedWidth === 0 || renderedHeight === 0) {
-      renderMathAsText(doc, latex, x, y);
+    const containerRect = container.getBoundingClientRect();
+    if (containerRect.width === 0 || containerRect.height === 0) {
+      renderMathAsText(doc, latex, x, y + 12);
       return;
     }
 
-    // Scale the rendered element so it fits within the caller's bounding box
-    // while preserving aspect ratio. Never upscale.
+    // Scale to fit within the caller's bounding box.
     const scale = Math.min(
-      maxWidth / renderedWidth,
-      maxHeight / renderedHeight,
+      maxWidth / containerRect.width,
+      maxHeight / containerRect.height,
       1,
     );
-    const finalWidth = renderedWidth * scale;
-    const finalHeight = renderedHeight * scale;
 
-    // Rasterise the KaTeX HTML to PNG using html-to-image.
-    // This library handles CSS, fonts, and styling correctly without
-    // relying on foreignObject SVGs (which browsers block for security).
-    try {
-      const dataUrl = await toPng(container, {
-        pixelRatio: RASTER_SCALE,
-        backgroundColor: 'white',
-      });
+    // Walk the DOM and collect all visible text fragments with their positions.
+    const fragments = collectTextFragments(container, containerRect);
 
-      doc.addImage(dataUrl, 'PNG', x, y, finalWidth, finalHeight);
-      return;
-    } catch {
-      // html-to-image failed — fall back to plain text
-      renderMathAsText(doc, latex, x, y + finalHeight * 0.7);
+    // Draw each text fragment as vector text in the PDF.
+    const prevFont = doc.getFont();
+    const prevSize = doc.getFontSize();
+
+    for (const frag of fragments) {
+      const pdfX = x + frag.relX * scale;
+      // Offset y by the fragment's baseline position
+      const pdfY = y + frag.relY * scale;
+      const pdfSize = frag.fontSize * scale;
+
+      // Select appropriate font style
+      if (frag.isItalic) {
+        doc.setFont('GeistSans', 'italic');
+      } else if (frag.isBold) {
+        doc.setFont('GeistSans', 'bold');
+      } else {
+        doc.setFont('GeistSans', 'normal');
+      }
+      doc.setFontSize(pdfSize);
+      doc.setTextColor(0, 0, 0);
+
+      doc.text(frag.text, pdfX, pdfY);
     }
+
+    // Restore previous font state
+    doc.setFont(prevFont.fontName, prevFont.fontStyle);
+    doc.setFontSize(prevSize);
   } finally {
-    // Always clean up the measurement container.
     document.body.removeChild(container);
   }
 }
 
+/** A positioned text fragment extracted from the KaTeX DOM. */
+interface TextFragment {
+  text: string;
+  /** X offset relative to container left */
+  relX: number;
+  /** Y offset relative to container top (at text baseline) */
+  relY: number;
+  fontSize: number;
+  isItalic: boolean;
+  isBold: boolean;
+}
+
 /**
- * Last-resort fallback: render the raw LaTeX string as italic text in the PDF.
+ * Walk the KaTeX DOM tree and collect all visible text nodes with their
+ * positions relative to the container.
+ */
+function collectTextFragments(
+  container: HTMLElement,
+  containerRect: DOMRect,
+): TextFragment[] {
+  const fragments: TextFragment[] = [];
+
+  const walker = document.createTreeWalker(container, NodeFilter.SHOW_TEXT, {
+    acceptNode: (node) => {
+      const text = node.textContent?.trim();
+      if (!text) return NodeFilter.FILTER_REJECT;
+
+      // Skip nodes inside annotation elements (screen-reader only)
+      const parent = node.parentElement;
+      if (!parent) return NodeFilter.FILTER_REJECT;
+      if (parent.tagName === 'ANNOTATION') return NodeFilter.FILTER_REJECT;
+
+      // Skip elements hidden via aria-hidden or display:none
+      const computedStyle = window.getComputedStyle(parent);
+      if (computedStyle.display === 'none') return NodeFilter.FILTER_REJECT;
+      if (computedStyle.visibility === 'hidden')
+        return NodeFilter.FILTER_REJECT;
+
+      return NodeFilter.FILTER_ACCEPT;
+    },
+  });
+
+  let node: Node | null;
+  while ((node = walker.nextNode())) {
+    const text = node.textContent ?? '';
+    if (!text.trim()) continue;
+
+    const parent = node.parentElement;
+    if (!parent) continue;
+
+    // Get the range rect for precise text positioning
+    const range = document.createRange();
+    range.selectNodeContents(node);
+    const rects = range.getClientRects();
+    if (rects.length === 0) continue;
+
+    const rect = rects[0];
+    const computedStyle = window.getComputedStyle(parent);
+    const fontSize = parseFloat(computedStyle.fontSize) || 16;
+    const fontStyle = computedStyle.fontStyle;
+    const fontWeight = computedStyle.fontWeight;
+
+    fragments.push({
+      text: text,
+      relX: rect.left - containerRect.left,
+      // Position at baseline: top + fontSize * ~0.8 (approximate baseline)
+      relY: rect.top - containerRect.top + fontSize * 0.8,
+      fontSize,
+      isItalic: fontStyle === 'italic',
+      isBold: fontWeight === 'bold' || parseInt(fontWeight) >= 700,
+    });
+  }
+
+  return fragments;
+}
+
+/**
+ * Last-resort fallback: render the raw LaTeX string as monospace text.
  */
 function renderMathAsText(
   doc: jsPDF,
@@ -103,8 +177,10 @@ function renderMathAsText(
   y: number,
 ): void {
   const prevFont = doc.getFont();
+  const prevSize = doc.getFontSize();
   doc.setFont('GeistMono', 'normal');
   doc.setFontSize(12);
   doc.text(latex, x, y);
   doc.setFont(prevFont.fontName, prevFont.fontStyle);
+  doc.setFontSize(prevSize);
 }
