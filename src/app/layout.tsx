@@ -64,6 +64,7 @@ export default function RootLayout({
             apiKey={posthogKey}
             clientOptions={{
               api_host: '/ingest',
+              capture_pageview: false,
               capture_exceptions: true,
               session_recording: {
                 maskAllInputs: true,
