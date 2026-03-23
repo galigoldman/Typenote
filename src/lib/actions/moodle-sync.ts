@@ -80,24 +80,36 @@ export async function getExistingFileUrls(
 /**
  * Compare scraped Moodle courses against the shared registry.
  * Called from client to determine each course's sync status.
+ * Returns errors as data to avoid Next.js production error sanitization.
  */
 export async function compareScrapedCourses(
   instanceDomain: string,
   scrapedCourses: Array<{ moodleCourseId: string; name: string; url: string }>,
-) {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) throw new Error('Not authenticated');
+): Promise<
+  | { success: true; data: Awaited<ReturnType<typeof import('@/lib/moodle/sync-service').compareCourses>> }
+  | { success: false; error: string }
+> {
+  try {
+    const supabase = await createClient();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (!user) return { success: false, error: 'Not authenticated' };
 
-  const { compareCourses } = await import('@/lib/moodle/sync-service');
-  return compareCourses(instanceDomain, scrapedCourses, user.id);
+    const { compareCourses } = await import('@/lib/moodle/sync-service');
+    const result = await compareCourses(instanceDomain, scrapedCourses, user.id);
+    return { success: true, data: result };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    console.error('compareScrapedCourses failed:', message);
+    return { success: false, error: message };
+  }
 }
 
 /**
  * Sync selected Moodle courses to the shared registry and
  * create/update user_course_syncs records for the current user.
+ * Returns errors as data to avoid Next.js production error sanitization.
  */
 export async function syncMoodleCourses(
   instanceDomain: string,
@@ -119,78 +131,95 @@ export async function syncMoodleCourses(
       }>;
     }>;
   }>,
-) {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) throw new Error('Not authenticated');
+): Promise<
+  | { success: true; syncedCount: number; courses: Awaited<ReturnType<typeof import('@/lib/moodle/sync-service').upsertMoodleData>>['courses'] }
+  | { success: false; error: string }
+> {
+  try {
+    const supabase = await createClient();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (!user) return { success: false, error: 'Not authenticated' };
 
-  const { upsertMoodleData } = await import('@/lib/moodle/sync-service');
-  const admin = createAdminClient();
+    const { upsertMoodleData } = await import('@/lib/moodle/sync-service');
+    const admin = createAdminClient();
 
-  // Step 1: Upsert course data into shared registry
-  const syncResult = await upsertMoodleData({
-    instanceDomain,
-    courses,
-  });
+    // Step 1: Upsert course data into shared registry
+    const syncResult = await upsertMoodleData({
+      instanceDomain,
+      courses,
+    });
 
-  // Step 2: Create Typenote courses and user_course_syncs for courses with actual content
-  const courseName = (idx: number) => courses[idx]?.name ?? 'Untitled Course';
-  for (let i = 0; i < syncResult.courses.length; i++) {
-    const courseResult = syncResult.courses[i];
-    const hasFiles = courseResult.sections.some((s) => s.items.length > 0);
-    if (!hasFiles) continue;
+    // Step 2: Create Typenote courses and user_course_syncs for courses with actual content
+    const courseName = (idx: number) =>
+      courses[idx]?.name ?? 'Untitled Course';
+    for (let i = 0; i < syncResult.courses.length; i++) {
+      const courseResult = syncResult.courses[i];
+      const hasFiles = courseResult.sections.some((s) => s.items.length > 0);
+      if (!hasFiles) continue;
 
-    // Check if a user_course_syncs record already exists with a linked Typenote course
-    const { data: existingSync } = await admin
-      .from('user_course_syncs')
-      .select('id, course_id')
-      .eq('user_id', user.id)
-      .eq('moodle_course_id', courseResult.id)
-      .single();
-
-    let courseId = existingSync?.course_id ?? null;
-
-    // If no linked Typenote course yet, create one
-    if (!courseId) {
-      const { data: newCourse, error: courseCreateError } = await supabase
-        .from('courses')
-        .insert({
-          user_id: user.id,
-          name: courseName(i),
-          color: '#3B82F6',
-        })
-        .select()
+      // Check if a user_course_syncs record already exists with a linked Typenote course
+      const { data: existingSync } = await admin
+        .from('user_course_syncs')
+        .select('id, course_id')
+        .eq('user_id', user.id)
+        .eq('moodle_course_id', courseResult.id)
         .single();
-      if (courseCreateError) {
-        throw new Error(
-          `Failed to create course: ${courseCreateError.message}`,
-        );
+
+      let courseId = existingSync?.course_id ?? null;
+
+      // If no linked Typenote course yet, create one
+      if (!courseId) {
+        const { data: newCourse, error: courseCreateError } = await supabase
+          .from('courses')
+          .insert({
+            user_id: user.id,
+            name: courseName(i),
+            color: '#3B82F6',
+          })
+          .select()
+          .single();
+        if (courseCreateError) {
+          console.error('Course creation failed:', courseCreateError.message);
+          return {
+            success: false,
+            error: `Failed to create course: ${courseCreateError.message}`,
+          };
+        }
+        courseId = newCourse.id;
       }
-      courseId = newCourse.id;
+
+      const { error } = await admin.from('user_course_syncs').upsert(
+        {
+          user_id: user.id,
+          moodle_course_id: courseResult.id,
+          course_id: courseId,
+          last_synced_at: new Date().toISOString(),
+        },
+        { onConflict: 'user_id,moodle_course_id' },
+      );
+      if (error) {
+        console.error('Sync record creation failed:', error.message);
+        return {
+          success: false,
+          error: `Failed to create sync record: ${error.message}`,
+        };
+      }
     }
 
-    const { error } = await admin.from('user_course_syncs').upsert(
-      {
-        user_id: user.id,
-        moodle_course_id: courseResult.id,
-        course_id: courseId,
-        last_synced_at: new Date().toISOString(),
-      },
-      { onConflict: 'user_id,moodle_course_id' },
-    );
-    if (error) {
-      throw new Error(`Failed to create sync record: ${error.message}`);
-    }
+    revalidatePath('/', 'layout');
+
+    return {
+      success: true,
+      syncedCount: syncResult.courses.length,
+      courses: syncResult.courses,
+    };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    console.error('syncMoodleCourses failed:', message);
+    return { success: false, error: message };
   }
-
-  revalidatePath('/', 'layout');
-
-  return {
-    syncedCount: syncResult.courses.length,
-    courses: syncResult.courses,
-  };
 }
 
 /**

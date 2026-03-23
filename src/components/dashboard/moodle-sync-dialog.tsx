@@ -302,11 +302,18 @@ export function MoodleSyncDialog({
       }
 
       setPhase('comparing');
-      const comparisons = await compareScrapedCourses(
+      const compareResult = await compareScrapedCourses(
         moodleConnection.domain,
         scrapeResult.courses,
       );
 
+      if (!compareResult.success) {
+        setError(compareResult.error);
+        setPhase('error');
+        return;
+      }
+
+      const comparisons = compareResult.data;
       setCourses(comparisons);
 
       // Pre-select new or updated courses
@@ -480,6 +487,12 @@ export function MoodleSyncDialog({
         coursePayloads,
       );
 
+      if (!result.success) {
+        setError(result.error);
+        setPhase('error');
+        return;
+      }
+
       // Step 2: Download files via extension, upload from web app
       const fileJobs: Array<{
         moodleUrl: string;
@@ -550,7 +563,7 @@ export function MoodleSyncDialog({
         }
       }
 
-      setSyncedCount(result.syncedCount);
+      setSyncedCount(result.syncedCount ?? 0);
       setDownloadedCount(downloaded);
       setFailedCount(failed);
       if (errors.length > 0) {
