@@ -55,7 +55,10 @@ interface UseSelectionReturn {
   selectionPath: [number, number][] | null;
   selectedStrokeIds: Set<string>;
   selectedTextBoxIds: Set<string>;
+  /** Container-based selection bbox (used for resize handles and drag) */
   selectionBBox: BBox | null;
+  /** Tight content-based selection bbox (used for selection highlight border) */
+  tightSelectionBBox: BBox | null;
   isRectMode: boolean;
   isDragging: boolean;
   dragOffset: { x: number; y: number };
@@ -69,11 +72,40 @@ const TAP_THRESHOLD = 5;
 const DOUBLE_TAP_DELAY = 300;
 const DOUBLE_TAP_DISTANCE = 15;
 
+const SELECTION_PADDING = 4;
+const MIN_SELECTABLE_SIZE = 24;
+
 /**
- * Get selectable bounds for a text box.
- * Uses the stored height (which should be content-sized for full-page boxes).
+ * Get tight selectable bounds for a text box based on actual rendered content.
+ * Falls back to a minimum 24x24 area for empty text boxes.
  */
 function getSelectableBBox(tb: TextBox): BBox {
+  if (tb.contentBounds) {
+    return {
+      minX: tb.x + tb.contentBounds.offsetX - SELECTION_PADDING,
+      minY: tb.y - SELECTION_PADDING,
+      maxX:
+        tb.x +
+        tb.contentBounds.offsetX +
+        tb.contentBounds.width +
+        SELECTION_PADDING,
+      maxY: tb.y + tb.height + SELECTION_PADDING,
+    };
+  }
+  // Empty or unmeasured — use minimum selectable area
+  return {
+    minX: tb.x,
+    minY: tb.y,
+    maxX: tb.x + Math.max(tb.width, MIN_SELECTABLE_SIZE),
+    maxY: tb.y + Math.max(tb.height, MIN_SELECTABLE_SIZE),
+  };
+}
+
+/**
+ * Get the full container bounds for a text box (used for resize handles,
+ * drag detection, and selection display — not for hit-testing).
+ */
+function getContainerBBox(tb: TextBox): BBox {
   return {
     minX: tb.x,
     minY: tb.y,
@@ -148,6 +180,9 @@ export function useSelection({
     new Set(),
   );
   const [selectionBBox, setSelectionBBox] = useState<BBox | null>(null);
+  const [tightSelectionBBox, setTightSelectionBBox] = useState<BBox | null>(
+    null,
+  );
   const [isRectMode, setIsRectMode] = useState(true);
   const [isDragging, setIsDragging] = useState(false);
   const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
@@ -187,6 +222,7 @@ export function useSelection({
     setSelectedStrokeIds(new Set());
     setSelectedTextBoxIds(new Set());
     setSelectionBBox(null);
+    setTightSelectionBBox(null);
     setIsDragging(false);
     setDragOffset({ x: 0, y: 0 });
     setIsResizing(false);
@@ -227,8 +263,26 @@ export function useSelection({
     const bboxes: BBox[] = [];
     for (const s of strokes) bboxes.push(s.bbox);
     for (const tb of textBoxes) {
-      const tbBBox = getSelectableBBox(tb);
-      if (tbBBox) bboxes.push(tbBBox);
+      // Use container bounds for display/resize (not tight selection bounds)
+      bboxes.push(getContainerBBox(tb));
+    }
+    if (bboxes.length === 0) return null;
+    return {
+      minX: Math.min(...bboxes.map((b) => b.minX)),
+      minY: Math.min(...bboxes.map((b) => b.minY)),
+      maxX: Math.max(...bboxes.map((b) => b.maxX)),
+      maxY: Math.max(...bboxes.map((b) => b.maxY)),
+    };
+  };
+
+  const computeTightUnionBBox = (
+    strokes: Stroke[],
+    textBoxes: TextBox[],
+  ): BBox | null => {
+    const bboxes: BBox[] = [];
+    for (const s of strokes) bboxes.push(s.bbox);
+    for (const tb of textBoxes) {
+      bboxes.push(getSelectableBBox(tb));
     }
     if (bboxes.length === 0) return null;
     return {
@@ -408,7 +462,7 @@ export function useSelection({
           }
           lastTapRef.current = { time: now, x, y };
 
-          // Single tap — select one object at tap point
+          // Single tap — select one object at tap point (tight bounds for hit-testing)
           const tappedTextBox = textBoxes.find((tb) => {
             const bbox = getSelectableBBox(tb);
             return (
@@ -426,8 +480,10 @@ export function useSelection({
             selectedTextBoxIdsRef.current = tbIds;
             setSelectedStrokeIds(new Set());
             selectedStrokesRef.current = [];
-            const tbBBox = getSelectableBBox(tappedTextBox);
+            // Use container bounds for resize, tight bounds for highlight
+            const tbBBox = getContainerBBox(tappedTextBox);
             setSelectionBBox(tbBBox);
+            setTightSelectionBBox(getSelectableBBox(tappedTextBox));
             setSelectionPath(null);
             return;
           }
@@ -452,7 +508,9 @@ export function useSelection({
             selectedStrokesRef.current = [tappedStroke];
             setSelectedTextBoxIds(new Set());
             selectedTextBoxIdsRef.current = new Set();
-            setSelectionBBox(getSelectionBBox([tappedStroke]));
+            const strokeBBox = getSelectionBBox([tappedStroke]);
+            setSelectionBBox(strokeBBox);
+            setTightSelectionBBox(strokeBBox);
             setSelectionPath(null);
             return;
           }
@@ -514,6 +572,9 @@ export function useSelection({
             setSelectedTextBoxIds(tbIdSet);
             selectedTextBoxIdsRef.current = tbIdSet;
             setSelectionBBox(computeUnionBBox(selectedStrokes, selectedTbs));
+            setTightSelectionBBox(
+              computeTightUnionBBox(selectedStrokes, selectedTbs),
+            );
             setSelectionPath(null);
           } else {
             // No objects found — fire empty rect callback (used for crop-to-AI)
@@ -572,13 +633,21 @@ export function useSelection({
             onTextBoxMove?.(targetPageId, tbId, dx, dy);
           }
 
-          // Update selection bbox
+          // Update selection bboxes
           if (selectionBBox) {
             setSelectionBBox({
               minX: selectionBBox.minX + dx,
               minY: selectionBBox.minY + dy,
               maxX: selectionBBox.maxX + dx,
               maxY: selectionBBox.maxY + dy,
+            });
+          }
+          if (tightSelectionBBox) {
+            setTightSelectionBBox({
+              minX: tightSelectionBBox.minX + dx,
+              minY: tightSelectionBBox.minY + dy,
+              maxX: tightSelectionBBox.maxX + dx,
+              maxY: tightSelectionBBox.maxY + dy,
             });
           }
         }
@@ -670,6 +739,8 @@ export function useSelection({
 
           // Update selection bbox to the new bbox
           setSelectionBBox(newBBox);
+          // Tight bbox will be recalculated when content re-renders after resize
+          setTightSelectionBBox(newBBox);
         }
 
         setIsResizing(false);
@@ -690,6 +761,7 @@ export function useSelection({
       activeTool,
       selectionPath,
       selectionBBox,
+      tightSelectionBBox,
       dragOffset,
       getPageStrokes,
       getPageTextBoxes,
@@ -710,6 +782,7 @@ export function useSelection({
     selectedStrokeIds,
     selectedTextBoxIds,
     selectionBBox,
+    tightSelectionBBox,
     isRectMode,
     isDragging,
     dragOffset,

@@ -6,6 +6,12 @@ import type { CanvasTool, Stroke, StrokePoint } from '@/types/canvas';
 import { PAGE_WIDTH, PAGE_HEIGHT } from '@/types/canvas';
 import { getSvgPathFromStroke, computeBBox } from '@/lib/canvas/stroke-utils';
 import { lockScroll } from '@/lib/canvas/scroll-lock';
+import type { ShapeDetectionResult } from '@/lib/canvas/shape-detection';
+import {
+  classifyShape,
+  generateShapePoints,
+  renderSnappedShape,
+} from '@/lib/canvas/shape-detection';
 
 interface UseDrawingOptions {
   activeTool: CanvasTool;
@@ -32,11 +38,14 @@ export function useDrawing({
   const cachedRectRef = useRef<DOMRect | null>(null);
   const unlockScrollRef = useRef<(() => void) | null>(null);
 
-  // Hold-to-straighten: snap stroke to a straight line after ~400ms of no movement
+  // Hold-to-snap: snap stroke to a shape (line, circle, rect, triangle)
+  // after ~400ms of no movement
   const STRAIGHTEN_DELAY = 400;
   const holdTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const isSnappedRef = useRef(false);
   const snapStartPointRef = useRef<StrokePoint | null>(null);
+  // Shape snap state: tracks the detected shape for adjustment + commit
+  const snapShapeRef = useRef<ShapeDetectionResult | null>(null);
 
   const isDrawTool = activeTool === 'pen' || activeTool === 'highlighter';
 
@@ -132,6 +141,21 @@ export function useDrawing({
     [penColor, penSize, penOpacity],
   );
 
+  /**
+   * Re-render a snapped shape with adjusted parameters.
+   * Used when the user moves the pen after a shape snap to resize it.
+   */
+  const renderAdjustedShape = useCallback(
+    (canvas: HTMLCanvasElement, shape: ShapeDetectionResult) => {
+      renderSnappedShape(canvas, shape, {
+        size: penSize,
+        color: penColor,
+        opacity: penOpacity,
+      });
+    },
+    [penColor, penSize, penOpacity],
+  );
+
   const handlePointerDown = useCallback(
     (e: React.PointerEvent, pageId: string) => {
       if (e.pointerType !== 'pen') return;
@@ -144,6 +168,7 @@ export function useDrawing({
       firedNearBottomRef.current = false;
       isSnappedRef.current = false;
       snapStartPointRef.current = null;
+      snapShapeRef.current = null;
       if (holdTimerRef.current) {
         clearTimeout(holdTimerRef.current);
         holdTimerRef.current = null;
@@ -178,8 +203,57 @@ export function useDrawing({
       const { x, y } = screenToPageCoords(e, e.target);
       const pressure = Math.round(e.pressure * 100) / 100;
 
+      // Already snapped to a shape — adjust it
+      if (isSnappedRef.current && snapShapeRef.current) {
+        const shape = snapShapeRef.current;
+
+        if (shape.type === 'circle' && shape.center) {
+          // Circle: radius = distance from center to pen
+          const dx = x - shape.center.x;
+          const dy = y - shape.center.y;
+          const newRadius = Math.sqrt(dx * dx + dy * dy);
+          snapShapeRef.current = { ...shape, radius: newRadius };
+        } else if (shape.type === 'rectangle' && shape.corners) {
+          // Rectangle: opposite corner fixed, dragged corner follows pen
+          const opposite = shape.corners[0]; // top-left stays fixed
+          const newCorners = [
+            opposite,
+            { x, y: opposite.y },
+            { x, y },
+            { x: opposite.x, y },
+          ];
+          snapShapeRef.current = { ...shape, corners: newCorners };
+        } else if (shape.type === 'triangle' && shape.corners) {
+          // Triangle: uniform scale from centroid
+          const cx =
+            (shape.corners[0].x + shape.corners[1].x + shape.corners[2].x) / 3;
+          const cy =
+            (shape.corners[0].y + shape.corners[1].y + shape.corners[2].y) / 3;
+          const distToPen = Math.sqrt((x - cx) ** 2 + (y - cy) ** 2);
+          // Original max distance from centroid
+          const origMaxDist = Math.max(
+            ...shape.corners.map((c) =>
+              Math.sqrt((c.x - cx) ** 2 + (c.y - cy) ** 2),
+            ),
+          );
+          if (origMaxDist > 1) {
+            const scale = distToPen / origMaxDist;
+            const newCorners = shape.corners.map((c) => ({
+              x: cx + (c.x - cx) * scale,
+              y: cy + (c.y - cy) * scale,
+            }));
+            snapShapeRef.current = { ...shape, corners: newCorners };
+          }
+        }
+
+        if (workingCanvasRef.current) {
+          renderAdjustedShape(workingCanvasRef.current, snapShapeRef.current);
+        }
+        return;
+      }
+
+      // Already snapped to a straight line — adjust endpoint
       if (isSnappedRef.current && snapStartPointRef.current) {
-        // Already snapped — update endpoint, keep rendering straight line
         const endPoint: StrokePoint = [x, y, pressure];
         if (workingCanvasRef.current) {
           renderStraightLine(
@@ -188,7 +262,6 @@ export function useDrawing({
             endPoint,
           );
         }
-        // Update the last point so pointerUp uses it
         currentPointsRef.current = [snapStartPointRef.current, endPoint];
         return;
       }
@@ -202,15 +275,32 @@ export function useDrawing({
         );
       }
 
-      // Reset hold-to-straighten timer on each move
+      // Reset hold-to-snap timer on each move
       if (holdTimerRef.current) {
         clearTimeout(holdTimerRef.current);
       }
       if (currentPointsRef.current.length >= 3) {
         holdTimerRef.current = setTimeout(() => {
           if (!isDrawingRef.current) return;
-          // Snap! Replace stroke with straight line
+
           const pts = currentPointsRef.current;
+
+          // Try shape detection first (circle, rectangle, triangle)
+          const shapeResult = classifyShape(pts);
+          if (shapeResult) {
+            isSnappedRef.current = true;
+            snapShapeRef.current = shapeResult;
+            if (workingCanvasRef.current) {
+              renderSnappedShape(workingCanvasRef.current, shapeResult, {
+                size: penSize,
+                color: penColor,
+                opacity: penOpacity,
+              });
+            }
+            return;
+          }
+
+          // Fall through to straight line snap
           const start = pts[0];
           const end = pts[pts.length - 1];
           isSnappedRef.current = true;
@@ -231,7 +321,16 @@ export function useDrawing({
         onNearPageBottom(pageId);
       }
     },
-    [isDrawTool, renderInProgressStroke, renderStraightLine, onNearPageBottom],
+    [
+      isDrawTool,
+      renderInProgressStroke,
+      renderStraightLine,
+      renderAdjustedShape,
+      penSize,
+      penColor,
+      penOpacity,
+      onNearPageBottom,
+    ],
   );
 
   const handlePointerUp = useCallback(
@@ -242,7 +341,7 @@ export function useDrawing({
       e.preventDefault();
       isDrawingRef.current = false;
 
-      // Clear hold-to-straighten timer
+      // Clear hold-to-snap timer
       if (holdTimerRef.current) {
         clearTimeout(holdTimerRef.current);
         holdTimerRef.current = null;
@@ -252,8 +351,12 @@ export function useDrawing({
       unlockScrollRef.current?.();
       unlockScrollRef.current = null;
 
-      // If snapped, build a clean straight line with interpolated points
-      if (isSnappedRef.current && snapStartPointRef.current) {
+      // If snapped to a shape, generate the final shape points
+      if (isSnappedRef.current && snapShapeRef.current) {
+        currentPointsRef.current = generateShapePoints(snapShapeRef.current);
+      }
+      // If snapped to a straight line, build interpolated points
+      else if (isSnappedRef.current && snapStartPointRef.current) {
         const start = currentPointsRef.current[0] ?? snapStartPointRef.current;
         const end =
           currentPointsRef.current[currentPointsRef.current.length - 1] ??
@@ -270,8 +373,10 @@ export function useDrawing({
         }
         currentPointsRef.current = straightPoints;
       }
+
       isSnappedRef.current = false;
       snapStartPointRef.current = null;
+      snapShapeRef.current = null;
 
       const points = currentPointsRef.current;
 

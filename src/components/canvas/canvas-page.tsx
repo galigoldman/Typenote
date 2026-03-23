@@ -54,6 +54,7 @@ interface CanvasPageProps {
   selectionPath?: [number, number][] | null;
   isRectMode?: boolean;
   selectionBBox?: BBox | null;
+  tightSelectionBBox?: BBox | null;
   isSelectionDragging?: boolean;
   selectionDragOffset?: { x: number; y: number };
   isSelectionResizing?: boolean;
@@ -68,6 +69,11 @@ interface CanvasPageProps {
     pageId: string,
     textBoxId: string,
     height: number,
+  ) => void;
+  onTextBoxContentBoundsMeasured?: (
+    pageId: string,
+    textBoxId: string,
+    bounds: { offsetX: number; width: number } | undefined,
   ) => void;
   onDeleteSelection?: () => void;
   onEditSelection?: () => void;
@@ -101,6 +107,7 @@ export function CanvasPage({
   selectionPath = null,
   isRectMode = true,
   selectionBBox = null,
+  tightSelectionBBox = null,
   isSelectionDragging = false,
   selectionDragOffset = { x: 0, y: 0 },
   isSelectionResizing = false,
@@ -108,6 +115,7 @@ export function CanvasPage({
   selectedTextBoxIds = new Set<string>(),
   onTextBoxContentUpdate,
   onTextBoxHeightMeasured,
+  onTextBoxContentBoundsMeasured,
   onDeleteSelection,
   onEditSelection,
   hasSelectedTextBoxes = false,
@@ -690,6 +698,9 @@ export function CanvasPage({
             onHeightMeasured={(id, height) =>
               onTextBoxHeightMeasured?.(page.id, id, height)
             }
+            onContentBoundsMeasured={(id, bounds) =>
+              onTextBoxContentBoundsMeasured?.(page.id, id, bounds)
+            }
           />
         ))}
       </div>
@@ -728,6 +739,7 @@ export function CanvasPage({
           selectionPath={selectionPath}
           isRectMode={isRectMode}
           selectionBBox={selectionBBox}
+          tightSelectionBBox={tightSelectionBBox}
           isDragging={isSelectionDragging}
           dragOffset={selectionDragOffset}
           isResizing={isSelectionResizing}

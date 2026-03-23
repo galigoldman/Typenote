@@ -33,6 +33,10 @@ export interface TextBox {
   linkedNextId?: string;
   /** Font size multiplier (1 = default). Applied when resizing text boxes. */
   fontScale?: number;
+  /** Measured tight bounds of rendered text content (transient, not persisted).
+   *  offsetX = horizontal offset from text box origin (0 for LTR, positive for RTL).
+   *  width = actual rendered content width (max across all lines). */
+  contentBounds?: { offsetX: number; width: number };
 }
 
 /** A single A4 page in the document */

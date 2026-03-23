@@ -59,7 +59,9 @@ export function SidebarLayout({ sidebar, children }: SidebarLayoutProps) {
   const router = useRouter();
   const isDocumentPage = pathname.includes('/documents/');
   const isDashboardRoot = pathname === '/dashboard';
-  const isDesktop = useMediaQuery('(min-width: 768px)');
+  // Use 1280px (xl) so iPads get the mobile sheet pattern — the inline
+  // sidebar wastes space on tablets where users primarily use touch.
+  const isDesktop = useMediaQuery('(min-width: 1280px)');
   const isMobile = !isDesktop;
 
   // Mobile sheet state
@@ -135,7 +137,7 @@ export function SidebarLayout({ sidebar, children }: SidebarLayoutProps) {
     <SidebarContext.Provider value={contextValue}>
       <div
         ref={layoutRef}
-        className="flex h-dvh min-h-dvh flex-col md:flex-row"
+        className="flex h-dvh min-h-dvh flex-col xl:flex-row"
       >
         {/* Navigation header — visible on mobile + iPad, hidden on document pages and xl+ desktop */}
         {!isDocumentPage && (
