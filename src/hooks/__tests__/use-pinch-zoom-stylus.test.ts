@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { hasStylus } from '../use-pinch-zoom';
+import { hasStylus, shouldCountAsDoubleTap } from '../use-pinch-zoom';
 
 // ── Mock TouchList helper ───────────────────────────────────────────
 
@@ -54,5 +54,41 @@ describe('hasStylus', () => {
       { touchType: 'direct' },
     );
     expect(hasStylus(touches)).toBe(false);
+  });
+});
+
+// ── shouldCountAsDoubleTap tests ────────────────────────────────────
+
+describe('shouldCountAsDoubleTap', () => {
+  it('rejects pen tap detected via PointerEvent (lastPointerType=pen)', () => {
+    // touchType is missing (non-Apple or unreliable), but PointerEvent caught it
+    const touches = makeTouchList({});
+    expect(shouldCountAsDoubleTap(touches, 'pen')).toBe(false);
+  });
+
+  it('rejects pen tap detected via TouchEvent (touchType=stylus)', () => {
+    // PointerEvent says touch, but TouchEvent correctly reports stylus
+    const touches = makeTouchList({ touchType: 'stylus' });
+    expect(shouldCountAsDoubleTap(touches, 'touch')).toBe(false);
+  });
+
+  it('rejects pen tap detected by both methods', () => {
+    const touches = makeTouchList({ touchType: 'stylus' });
+    expect(shouldCountAsDoubleTap(touches, 'pen')).toBe(false);
+  });
+
+  it('allows finger tap (touch pointer, no stylus touchType)', () => {
+    const touches = makeTouchList({ touchType: 'direct' });
+    expect(shouldCountAsDoubleTap(touches, 'touch')).toBe(true);
+  });
+
+  it('allows finger tap when touchType is undefined (non-Apple device)', () => {
+    const touches = makeTouchList({});
+    expect(shouldCountAsDoubleTap(touches, 'touch')).toBe(true);
+  });
+
+  it('allows mouse double-click (mouse pointer, no stylus)', () => {
+    const touches = makeTouchList({});
+    expect(shouldCountAsDoubleTap(touches, 'mouse')).toBe(true);
   });
 });
