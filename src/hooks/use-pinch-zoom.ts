@@ -275,7 +275,9 @@ export function usePinchZoom({
 
     const hasStylus = (touches: TouchList) => {
       for (let i = 0; i < touches.length; i++) {
-        if ((touches[i] as Touch & { touchType?: string }).touchType === 'stylus') {
+        if (
+          (touches[i] as Touch & { touchType?: string }).touchType === 'stylus'
+        ) {
           return true;
         }
       }
