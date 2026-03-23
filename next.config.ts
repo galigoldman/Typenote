@@ -10,6 +10,8 @@ const nextConfig: NextConfig = {
   // Required: next-pwa uses webpack, so turbopack must be explicitly configured
   // to avoid a conflict error in Next.js 16
   turbopack: {},
+  // Allow iPad/mobile devices on the local network to access dev server
+  allowedDevOrigins: ['172.20.10.2', '192.168.*.*', '10.*.*.*', '172.16-31.*.*'],
   async rewrites() {
     return [
       {
