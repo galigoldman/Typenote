@@ -19,12 +19,12 @@ handleTouchEnd (line 379)
 
 ### Existing Stylus Guards (verified correct)
 
-| Handler                 | Location  | Guard                                        | Status  |
-| ----------------------- | --------- | -------------------------------------------- | ------- |
-| handleTouchStart (pinch)| Line 290  | `!hasStylus(e.touches)`                      | Correct |
-| handleTouchMove (pinch) | Line 313  | `hasStylus(e.touches)` early return          | Correct |
-| handleSingleTouchStart  | Line 518  | `hasStylus(e.touches)` early return          | Correct |
-| handleTouchEnd (double-tap) | Line 408 | **MISSING** — no stylus check            | **BUG** |
+| Handler                     | Location | Guard                               | Status  |
+| --------------------------- | -------- | ----------------------------------- | ------- |
+| handleTouchStart (pinch)    | Line 290 | `!hasStylus(e.touches)`             | Correct |
+| handleTouchMove (pinch)     | Line 313 | `hasStylus(e.touches)` early return | Correct |
+| handleSingleTouchStart      | Line 518 | `hasStylus(e.touches)` early return | Correct |
+| handleTouchEnd (double-tap) | Line 408 | **MISSING** — no stylus check       | **BUG** |
 
 ## Decision Log
 
