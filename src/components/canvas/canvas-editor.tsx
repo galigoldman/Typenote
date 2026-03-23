@@ -446,6 +446,7 @@ export function CanvasEditor({
   const [historyVersion, setHistoryVersion] = useState(0);
 
   const pagesRef = useRef(pages);
+  const saveStatusRef = useRef<SaveStatus>('saved');
 
   useEffect(() => {
     pagesRef.current = pages;
@@ -472,6 +473,14 @@ export function CanvasEditor({
 
   const onRemotePagesUpdate = useCallback(
     (remotePagesData: Record<string, unknown>) => {
+      // Skip remote updates when we have unsaved local changes (e.g. after undo)
+      // to prevent the database state from overwriting the user's local edits.
+      if (
+        saveStatusRef.current === 'unsaved' ||
+        saveStatusRef.current === 'saving'
+      ) {
+        return;
+      }
       const remote = remotePagesData as unknown as CanvasDocument;
       if (remote?.pages) {
         setPages(remote.pages);
@@ -499,6 +508,10 @@ export function CanvasEditor({
     getPagesData,
     onRemotePagesUpdate,
   });
+
+  useEffect(() => {
+    saveStatusRef.current = saveStatus;
+  }, [saveStatus]);
 
   // Ctrl+S / Cmd+S keyboard shortcut for manual save
   useEffect(() => {
