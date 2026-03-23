@@ -97,6 +97,9 @@ END;
 $$;
 
 -- 4. Updated quota read RPC — returns one row per query_type
+-- Must DROP first because the return type changed (added query_type column).
+-- Postgres does not allow CREATE OR REPLACE to change return types.
+DROP FUNCTION IF EXISTS get_ai_quota(uuid);
 CREATE OR REPLACE FUNCTION get_ai_quota(p_user_id uuid)
 RETURNS TABLE (
   query_type text,
