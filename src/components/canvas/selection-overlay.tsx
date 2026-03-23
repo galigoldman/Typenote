@@ -124,8 +124,7 @@ function BoundingBox({
   ];
 
   // Selection highlight border uses tight bounds (falls back to container bounds)
-  const highlightBBox =
-    !isResizing && tightBBox ? tightBBox : effectiveBBox;
+  const highlightBBox = !isResizing && tightBBox ? tightBBox : effectiveBBox;
   const bx = highlightBBox.minX + ox;
   const by = highlightBBox.minY + oy;
   const bw = highlightBBox.maxX - highlightBBox.minX;

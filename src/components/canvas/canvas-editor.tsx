@@ -606,11 +606,7 @@ export function CanvasEditor({
           const tb = p.textBoxes.find((t) => t.id === textBoxId);
           if (!tb) return p;
           // Skip if bounds haven't meaningfully changed
-          if (
-            !bounds &&
-            !tb.contentBounds
-          )
-            return p;
+          if (!bounds && !tb.contentBounds) return p;
           if (
             bounds &&
             tb.contentBounds &&
@@ -1835,7 +1831,9 @@ export function CanvasEditor({
                     selectedTextBoxIds={selectedTextBoxIds}
                     onTextBoxContentUpdate={handleTextBoxContentUpdate}
                     onTextBoxHeightMeasured={handleTextBoxHeightMeasured}
-                    onTextBoxContentBoundsMeasured={handleTextBoxContentBoundsMeasured}
+                    onTextBoxContentBoundsMeasured={
+                      handleTextBoxContentBoundsMeasured
+                    }
                     onDeleteSelection={deleteSelected}
                     onEditSelection={handleEditSelection}
                     hasSelectedTextBoxes={selectedTextBoxIds.size > 0}
