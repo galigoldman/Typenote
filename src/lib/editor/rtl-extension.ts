@@ -32,10 +32,7 @@ function applyDirections(doc: PmNode, tr: Transaction): boolean {
       const $pos = tr.doc.resolve(pos);
       for (let d = $pos.depth - 1; d >= 0; d--) {
         const ancestor = $pos.node(d);
-        if (
-          LIST_TYPES.has(ancestor.type.name) &&
-          ancestor.attrs.dir !== dir
-        ) {
+        if (LIST_TYPES.has(ancestor.type.name) && ancestor.attrs.dir !== dir) {
           tr.setNodeMarkup($pos.before(d), undefined, {
             ...ancestor.attrs,
             dir,
