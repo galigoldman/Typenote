@@ -86,7 +86,12 @@ export async function compareScrapedCourses(
   instanceDomain: string,
   scrapedCourses: Array<{ moodleCourseId: string; name: string; url: string }>,
 ): Promise<
-  | { success: true; data: Awaited<ReturnType<typeof import('@/lib/moodle/sync-service').compareCourses>> }
+  | {
+      success: true;
+      data: Awaited<
+        ReturnType<typeof import('@/lib/moodle/sync-service').compareCourses>
+      >;
+    }
   | { success: false; error: string }
 > {
   try {
@@ -97,7 +102,11 @@ export async function compareScrapedCourses(
     if (!user) return { success: false, error: 'Not authenticated' };
 
     const { compareCourses } = await import('@/lib/moodle/sync-service');
-    const result = await compareCourses(instanceDomain, scrapedCourses, user.id);
+    const result = await compareCourses(
+      instanceDomain,
+      scrapedCourses,
+      user.id,
+    );
     return { success: true, data: result };
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
@@ -132,7 +141,13 @@ export async function syncMoodleCourses(
     }>;
   }>,
 ): Promise<
-  | { success: true; syncedCount: number; courses: Awaited<ReturnType<typeof import('@/lib/moodle/sync-service').upsertMoodleData>>['courses'] }
+  | {
+      success: true;
+      syncedCount: number;
+      courses: Awaited<
+        ReturnType<typeof import('@/lib/moodle/sync-service').upsertMoodleData>
+      >['courses'];
+    }
   | { success: false; error: string }
 > {
   try {
@@ -152,8 +167,7 @@ export async function syncMoodleCourses(
     });
 
     // Step 2: Create Typenote courses and user_course_syncs for courses with actual content
-    const courseName = (idx: number) =>
-      courses[idx]?.name ?? 'Untitled Course';
+    const courseName = (idx: number) => courses[idx]?.name ?? 'Untitled Course';
     for (let i = 0; i < syncResult.courses.length; i++) {
       const courseResult = syncResult.courses[i];
       const hasFiles = courseResult.sections.some((s) => s.items.length > 0);
