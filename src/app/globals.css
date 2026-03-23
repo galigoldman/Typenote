@@ -130,3 +130,38 @@ body {
     @apply bg-background text-foreground;
   }
 }
+
+/* RTL list support — flip bullets, numbers, and checkboxes for Hebrew/Arabic */
+.ProseMirror [dir='rtl'] ul,
+.ProseMirror [dir='rtl'] ol,
+.ProseMirror ul[dir='rtl'],
+.ProseMirror ol[dir='rtl'] {
+  direction: rtl;
+  padding-right: 1.625em;
+  padding-left: 0;
+}
+
+.ProseMirror [dir='rtl'] ul[data-type='taskList'],
+.ProseMirror ul[data-type='taskList'][dir='rtl'] {
+  direction: rtl;
+  padding-right: 0;
+  padding-left: 0;
+}
+
+.ProseMirror [dir='rtl'] li,
+.ProseMirror li[dir='rtl'] {
+  direction: rtl;
+  text-align: right;
+}
+
+.ProseMirror [dir='rtl'] li[data-type='taskItem'],
+.ProseMirror li[data-type='taskItem'][dir='rtl'] {
+  direction: rtl;
+}
+
+.ProseMirror [dir='rtl'] li[data-type='taskItem'] > label,
+.ProseMirror li[data-type='taskItem'][dir='rtl'] > label {
+  float: right;
+  margin-right: 0;
+  margin-left: 0.5em;
+}
