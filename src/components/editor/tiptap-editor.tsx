@@ -163,7 +163,7 @@ export function TiptapEditor({ document, courseName }: TiptapEditorProps) {
     editor?.commands.focus();
   };
 
-  // Listen for math input trigger from ProseMirror plugin
+  // Listen for math input trigger from ProseMirror plugin (:{ sequence)
   useEffect(() => {
     const handleMathTrigger = (e: Event) => {
       const detail = (e as CustomEvent).detail as { x: number; y: number };

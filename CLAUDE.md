@@ -37,6 +37,8 @@ Every step of development must follow this git workflow:
 - PRs cannot be merged unless CI passes. This is enforced via GitHub branch protection rules on `main`.
 
 ## Active Technologies
+- TypeScript 5 / Node.js 22+ + Next.js 16, TipTap 3, ProseMirror (`@tiptap/pm/state`, `@tiptap/pm/view`) (020-change-latex-trigger)
+- N/A — no data changes (020-change-latex-trigger)
 
 - TypeScript 5 / Node.js 22+ + Next.js 16 (App Router), puppeteer-core (NEW), @sparticuz/chromium-min (NEW), pdf-lib (NEW), TipTap 3, KaTeX, perfect-freehand (020-pdf-export-overhaul)
 - No new storage — reads existing `documents` table from Supabase (020-pdf-export-overhaul)

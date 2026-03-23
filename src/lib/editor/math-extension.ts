@@ -92,11 +92,19 @@ export const MathExpression = Node.create({
         key: MATH_INPUT_PLUGIN_KEY,
         props: {
           handleKeyDown(view, event) {
-            if (event.key !== '$') return false;
+            if (event.key !== '{') return false;
 
             const { state } = view;
             const { selection } = state;
             const { $from } = selection;
+
+            // Need at least one character before cursor in this text block
+            if ($from.parentOffset < 1) return false;
+
+            // Check if the preceding character is ':'
+            const pos = selection.from;
+            const before = state.doc.textBetween(pos - 1, pos);
+            if (before !== ':') return false;
 
             // Don't trigger inside code blocks
             if ($from.parent.type.name === 'codeBlock') return false;
@@ -107,8 +115,11 @@ export const MathExpression = Node.create({
               return false;
             }
 
+            // Delete the ':' before cursor (insert-then-cleanup)
+            view.dispatch(state.tr.delete(pos - 1, pos));
+
             // Get cursor coordinates for positioning the input box
-            const coords = view.coordsAtPos(selection.from);
+            const coords = view.coordsAtPos(pos - 1);
 
             // Dispatch a custom event that the React wrapper listens for
             const customEvent = new CustomEvent('math-input-trigger', {
@@ -116,7 +127,7 @@ export const MathExpression = Node.create({
             });
             window.dispatchEvent(customEvent);
 
-            // Prevent the $ from being inserted
+            // Prevent the '{' from being inserted
             return true;
           },
         },
