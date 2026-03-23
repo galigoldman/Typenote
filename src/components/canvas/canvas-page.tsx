@@ -908,7 +908,7 @@ export function CanvasPage({
 
       {/* Layer 6: Interaction layer — ALWAYS present
           In draw/erase mode: captures all events (pointer-events: auto, touch-action: none)
-          In select mode: captures pointer events but allows finger scroll (touch-action: manipulation)
+          In select mode: captures pointer events but allows finger scroll (touch-action: pan-y)
           In text mode: transparent (pointer-events: none), lets clicks reach editor */}
       <div
         ref={interactionLayerRef}
@@ -916,9 +916,9 @@ export function CanvasPage({
         style={{
           touchAction: isInteractionMode
             ? activeTool === 'select'
-              ? 'manipulation'
+              ? 'pan-y'
               : 'none'
-            : 'manipulation',
+            : 'auto',
           userSelect: 'none',
           WebkitUserSelect: 'none',
           pointerEvents:
