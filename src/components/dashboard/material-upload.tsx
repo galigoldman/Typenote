@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { useFileUpload } from '@/hooks/use-file-upload';
 import { createCourseMaterial } from '@/lib/actions/course-materials';
 import { toast } from 'sonner';
+import { trackEvent } from '@/lib/analytics/events';
 
 interface MaterialUploadProps {
   weekId: string;
@@ -39,6 +40,11 @@ export function MaterialUpload({
         mime_type: file.type,
       });
       reset();
+      trackEvent('file_uploaded', {
+        file_size: file.size,
+        mime_type: file.type,
+        week_id: weekId,
+      });
       toast.success(
         `${category === 'homework' ? 'Homework' : 'Material'} uploaded`,
       );

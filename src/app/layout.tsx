@@ -1,7 +1,10 @@
+import { Suspense } from 'react';
 import type { Metadata, Viewport } from 'next';
 import { Geist, Geist_Mono } from 'next/font/google';
+import { PostHogProvider, PostHogPageView } from '@posthog/next';
 import { Toaster } from '@/components/ui/sonner';
 import { TooltipProvider } from '@/components/ui/tooltip';
+import { PostHogIdentify } from '@/lib/analytics/identify';
 import './globals.css';
 
 const geistSans = Geist({
@@ -37,18 +40,45 @@ export const viewport: Viewport = {
   viewportFit: 'cover',
 };
 
+const posthogKey = process.env.NEXT_PUBLIC_POSTHOG_KEY;
+
 export default function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const content = (
+    <>
+      <TooltipProvider>{children}</TooltipProvider>
+      <Toaster />
+    </>
+  );
+
   return (
     <html lang="en" className="h-full">
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased h-full`}
       >
-        <TooltipProvider>{children}</TooltipProvider>
-        <Toaster />
+        {posthogKey ? (
+          <PostHogProvider
+            apiKey={posthogKey}
+            clientOptions={{
+              api_host: '/ingest',
+              capture_exceptions: true,
+              session_recording: {
+                maskAllInputs: true,
+              },
+            }}
+          >
+            <Suspense fallback={null}>
+              <PostHogPageView />
+            </Suspense>
+            <PostHogIdentify />
+            {content}
+          </PostHogProvider>
+        ) : (
+          content
+        )}
       </body>
     </html>
   );

@@ -15,6 +15,7 @@ import {
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { createCourse, updateCourse } from '@/lib/actions/courses';
+import { trackEvent } from '@/lib/analytics/events';
 import type { Course } from '@/types/database';
 import { cn } from '@/lib/utils';
 
@@ -83,6 +84,9 @@ export function CourseDialog({
           name: name.trim(),
           color,
           folder_id: folderId,
+        });
+        trackEvent('course_created', {
+          course_name_length: name.trim().length,
         });
       }
       handleOpenChange(false);

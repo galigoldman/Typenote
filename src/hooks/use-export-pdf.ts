@@ -6,6 +6,7 @@ import {
   type ExportableDocument,
 } from '@/lib/pdf/export-pdf';
 import { toast } from 'sonner';
+import { trackEvent } from '@/lib/analytics/events';
 
 export function useExportPdf() {
   const [isExporting, setIsExporting] = useState(false);
@@ -17,6 +18,11 @@ export function useExportPdf() {
       setIsExporting(true);
       try {
         await exportDocumentAsPdf(document);
+        const pages = document.pages as Record<string, unknown> | null;
+        const pageArray = pages?.pages as unknown[] | undefined;
+        trackEvent('pdf_exported', {
+          page_count: pageArray?.length ?? 1,
+        });
         toast.success('PDF exported successfully');
       } catch (error) {
         console.error('PDF export failed:', error);

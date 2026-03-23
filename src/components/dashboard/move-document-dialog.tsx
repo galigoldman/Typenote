@@ -26,6 +26,7 @@ import type { MoveDestination } from '@/lib/actions/documents';
 import { createFolder } from '@/lib/actions/folders';
 import type { Document, Course, CourseWeek, Folder } from '@/types/database';
 import { cn } from '@/lib/utils';
+import { trackEvent } from '@/lib/analytics/events';
 
 interface MoveDocumentDialogProps {
   document: Document | null;
@@ -232,6 +233,9 @@ export function MoveDocumentDialog({
 
     try {
       await moveDocument(document.id, destination);
+      trackEvent('document_moved', {
+        destination_type: destination.type,
+      });
       onOpenChange(false);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to move document');
