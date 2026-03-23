@@ -270,7 +270,13 @@ describe('renderTiptapContent', () => {
     const content = makeDoc([makeParagraph('Some text')]);
 
     const startY = 40;
-    const resultY = await renderTiptapContent(doc as never, content, 20, startY, 500);
+    const resultY = await renderTiptapContent(
+      doc as never,
+      content,
+      20,
+      startY,
+      500,
+    );
 
     expect(resultY).toBeGreaterThan(startY);
   });

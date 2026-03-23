@@ -51,7 +51,12 @@ export async function exportDocumentAsPdf(
     const canvasPages = (document.pages as { pages: CanvasPage[] }).pages;
     const sortedPages = [...canvasPages].sort((a, b) => a.order - b.order);
     for (let i = 0; i < sortedPages.length; i++) {
-      await renderCanvasPage(doc, sortedPages[i], document.canvas_type, i === 0);
+      await renderCanvasPage(
+        doc,
+        sortedPages[i],
+        document.canvas_type,
+        i === 0,
+      );
     }
   }
 

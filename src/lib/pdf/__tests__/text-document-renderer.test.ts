@@ -46,12 +46,14 @@ describe('renderTextDocument', () => {
     // Default: each node fits comfortably on a page
     mockMeasureNodeHeight.mockReturnValue(20);
     // Default: renderTiptapContent advances cursor by the measured height
-    mockRenderTiptapContent.mockImplementation(async (_doc, _content, _x, y, _w) => {
-      // The mock returns y + height of the single-node doc.
-      // In practice the renderer passes a single-node wrapper, so we return
-      // y + whatever measureNodeHeight last returned.
-      return y + 20;
-    });
+    mockRenderTiptapContent.mockImplementation(
+      async (_doc, _content, _x, y, _w) => {
+        // The mock returns y + height of the single-node doc.
+        // In practice the renderer passes a single-node wrapper, so we return
+        // y + whatever measureNodeHeight last returned.
+        return y + 20;
+      },
+    );
   });
 
   // -------------------------------------------------------------------------
@@ -61,7 +63,9 @@ describe('renderTextDocument', () => {
     const doc = makeMockDoc();
     // Two nodes that together exceed one page to force addPage
     mockMeasureNodeHeight.mockReturnValue(400);
-    mockRenderTiptapContent.mockImplementation(async (_d, _c, _x, y) => y + 400);
+    mockRenderTiptapContent.mockImplementation(
+      async (_d, _c, _x, y) => y + 400,
+    );
 
     const content = makeTiptapDoc([
       { type: 'paragraph', content: [{ type: 'text', text: 'A' }] },

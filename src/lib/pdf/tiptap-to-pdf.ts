@@ -571,7 +571,15 @@ async function renderBulletList(
 
   for (const listItem of node.content) {
     if (listItem.type !== 'listItem') continue;
-    cursorY = await renderListItem(doc, listItem, x, cursorY, width, depth, 'bullet');
+    cursorY = await renderListItem(
+      doc,
+      listItem,
+      x,
+      cursorY,
+      width,
+      depth,
+      'bullet',
+    );
   }
 
   return cursorY;
@@ -675,13 +683,34 @@ async function renderListItem(
         cursorY += cfg.paragraphSpacing;
       } else if (child.type === 'bulletList') {
         firstBlock = false;
-        cursorY = await renderBulletList(doc, child, x, cursorY, width, depth + 1);
+        cursorY = await renderBulletList(
+          doc,
+          child,
+          x,
+          cursorY,
+          width,
+          depth + 1,
+        );
       } else if (child.type === 'orderedList') {
         firstBlock = false;
-        cursorY = await renderOrderedList(doc, child, x, cursorY, width, depth + 1);
+        cursorY = await renderOrderedList(
+          doc,
+          child,
+          x,
+          cursorY,
+          width,
+          depth + 1,
+        );
       } else if (child.type === 'taskList') {
         firstBlock = false;
-        cursorY = await renderTaskList(doc, child, x, cursorY, width, depth + 1);
+        cursorY = await renderTaskList(
+          doc,
+          child,
+          x,
+          cursorY,
+          width,
+          depth + 1,
+        );
       } else {
         firstBlock = false;
         cursorY = await renderNode(
@@ -791,7 +820,14 @@ async function renderBlockquote(
   // Render children (paragraphs inside the blockquote)
   if (node.content) {
     for (const child of node.content) {
-      cursorY = await renderNode(doc, child, contentX, cursorY, contentWidth, depth);
+      cursorY = await renderNode(
+        doc,
+        child,
+        contentX,
+        cursorY,
+        contentWidth,
+        depth,
+      );
     }
   }
 

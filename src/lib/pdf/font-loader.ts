@@ -11,8 +11,16 @@ const FONTS: FontConfig[] = [
   { filename: 'GeistSans-Bold.ttf', family: 'GeistSans', style: 'bold' },
   { filename: 'GeistSans-Italic.ttf', family: 'GeistSans', style: 'italic' },
   { filename: 'GeistMono-Regular.ttf', family: 'GeistMono', style: 'normal' },
-  { filename: 'NotoSansHebrew-Regular.ttf', family: 'NotoSansHebrew', style: 'normal' },
-  { filename: 'NotoSansHebrew-Bold.ttf', family: 'NotoSansHebrew', style: 'bold' },
+  {
+    filename: 'NotoSansHebrew-Regular.ttf',
+    family: 'NotoSansHebrew',
+    style: 'normal',
+  },
+  {
+    filename: 'NotoSansHebrew-Bold.ttf',
+    family: 'NotoSansHebrew',
+    style: 'bold',
+  },
 ];
 
 /**
