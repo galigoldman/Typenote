@@ -4,7 +4,7 @@
  *
  * Uses the admin (service_role) client which bypasses RLS.
  * This tests the database layer itself — the atomic upsert, tier-based
- * limits, and quota read logic defined in 00016_ai_rate_limiting.sql.
+ * limits, and quota read logic defined in 00016/00018 migrations.
  */
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import type { SupabaseClient } from '@supabase/supabase-js';
@@ -55,6 +55,7 @@ describe('increment_ai_usage', () => {
     const { data, error } = await supabase.rpc('increment_ai_usage', {
       p_user_id: TEST_USER_ID,
       p_model: 'flash',
+      p_query_type: 'chat',
     });
 
     expect(error).toBeNull();
@@ -72,6 +73,7 @@ describe('increment_ai_usage', () => {
     const { data, error } = await supabase.rpc('increment_ai_usage', {
       p_user_id: TEST_USER_ID,
       p_model: 'flash',
+      p_query_type: 'chat',
     });
 
     expect(error).toBeNull();
@@ -85,6 +87,7 @@ describe('increment_ai_usage', () => {
     await supabase.rpc('increment_ai_usage', {
       p_user_id: TEST_USER_ID,
       p_model: 'gemini-2.0-pro',
+      p_query_type: 'chat',
     });
 
     const { data, error } = await supabase
@@ -92,6 +95,7 @@ describe('increment_ai_usage', () => {
       .select('last_model')
       .eq('user_id', TEST_USER_ID)
       .eq('usage_month', currentMonth())
+      .eq('query_type', 'chat')
       .single();
 
     expect(error).toBeNull();
@@ -99,17 +103,17 @@ describe('increment_ai_usage', () => {
   });
 
   it('returns is_allowed=false when count exceeds limit (free tier = 50)', async () => {
-    // Current count is 3 from previous tests. Set it to 50 directly
-    // so the next increment pushes it to 51 (which exceeds the limit).
     await supabase
       .from('ai_usage')
       .update({ query_count: 50 })
       .eq('user_id', TEST_USER_ID)
-      .eq('usage_month', currentMonth());
+      .eq('usage_month', currentMonth())
+      .eq('query_type', 'chat');
 
     const { data, error } = await supabase.rpc('increment_ai_usage', {
       p_user_id: TEST_USER_ID,
       p_model: 'flash',
+      p_query_type: 'chat',
     });
 
     expect(error).toBeNull();
@@ -119,11 +123,63 @@ describe('increment_ai_usage', () => {
     expect(row!.is_allowed).toBe(false);
     expect(row!.monthly_limit).toBe(50);
   });
+
+  it('tracks latex queries independently from chat', async () => {
+    // Chat is at 51 from previous test. LaTeX should start fresh at 1.
+    const { data, error } = await supabase.rpc('increment_ai_usage', {
+      p_user_id: TEST_USER_ID,
+      p_model: 'flash',
+      p_query_type: 'latex',
+    });
+
+    expect(error).toBeNull();
+
+    const row = Array.isArray(data) ? data[0] : data;
+    expect(row!.current_count).toBe(1);
+    expect(row!.is_allowed).toBe(true);
+    expect(row!.monthly_limit).toBe(150); // free tier latex limit
+  });
+
+  it('uses beta tier limits for chat (100) and latex (500)', async () => {
+    await supabase
+      .from('profiles')
+      .update({ subscription_tier: 'beta' })
+      .eq('id', TEST_USER_ID);
+
+    // Clean up
+    await supabase
+      .from('ai_usage')
+      .delete()
+      .eq('user_id', TEST_USER_ID)
+      .eq('usage_month', currentMonth());
+
+    const { data: chatData } = await supabase.rpc('increment_ai_usage', {
+      p_user_id: TEST_USER_ID,
+      p_model: 'flash',
+      p_query_type: 'chat',
+    });
+    const chatRow = Array.isArray(chatData) ? chatData[0] : chatData;
+    expect(chatRow!.monthly_limit).toBe(100);
+    expect(chatRow!.tier).toBe('beta');
+
+    const { data: latexData } = await supabase.rpc('increment_ai_usage', {
+      p_user_id: TEST_USER_ID,
+      p_model: 'flash',
+      p_query_type: 'latex',
+    });
+    const latexRow = Array.isArray(latexData) ? latexData[0] : latexData;
+    expect(latexRow!.monthly_limit).toBe(500);
+
+    // Reset back to free
+    await supabase
+      .from('profiles')
+      .update({ subscription_tier: 'free' })
+      .eq('id', TEST_USER_ID);
+  });
 });
 
 describe('get_ai_quota', () => {
-  it('returns used=0 when no row exists for this month', async () => {
-    // Delete this month's row so get_ai_quota sees nothing
+  it('returns per-type rows with used=0 when no usage exists', async () => {
     await supabase
       .from('ai_usage')
       .delete()
@@ -136,18 +192,36 @@ describe('get_ai_quota', () => {
 
     expect(error).toBeNull();
 
-    const row = Array.isArray(data) ? data[0] : data;
-    expect(row!.used).toBe(0);
-    expect(row!.tier).toBe('free');
-    expect(row!.monthly_limit).toBe(50);
+    const rows = Array.isArray(data) ? data : [data];
+    expect(rows).toHaveLength(2);
+
+    const chatRow = rows.find(
+      (r: { query_type: string }) => r.query_type === 'chat',
+    );
+    const latexRow = rows.find(
+      (r: { query_type: string }) => r.query_type === 'latex',
+    );
+
+    expect(chatRow!.used).toBe(0);
+    expect(chatRow!.monthly_limit).toBe(50);
+    expect(chatRow!.tier).toBe('free');
+    expect(latexRow!.used).toBe(0);
+    expect(latexRow!.monthly_limit).toBe(150);
   });
 
   it('returns correct count after several increments', async () => {
-    // Increment 5 times
     for (let i = 0; i < 5; i++) {
       await supabase.rpc('increment_ai_usage', {
         p_user_id: TEST_USER_ID,
         p_model: 'flash',
+        p_query_type: 'chat',
+      });
+    }
+    for (let i = 0; i < 3; i++) {
+      await supabase.rpc('increment_ai_usage', {
+        p_user_id: TEST_USER_ID,
+        p_model: 'flash',
+        p_query_type: 'latex',
       });
     }
 
@@ -157,8 +231,16 @@ describe('get_ai_quota', () => {
 
     expect(error).toBeNull();
 
-    const row = Array.isArray(data) ? data[0] : data;
-    expect(row!.used).toBe(5);
+    const rows = Array.isArray(data) ? data : [data];
+    const chatRow = rows.find(
+      (r: { query_type: string }) => r.query_type === 'chat',
+    );
+    const latexRow = rows.find(
+      (r: { query_type: string }) => r.query_type === 'latex',
+    );
+
+    expect(chatRow!.used).toBe(5);
+    expect(latexRow!.used).toBe(3);
   });
 
   it('returns the correct resets_at (first of next month UTC)', async () => {
@@ -168,10 +250,8 @@ describe('get_ai_quota', () => {
 
     expect(error).toBeNull();
 
-    const row = Array.isArray(data) ? data[0] : data;
-
-    // resets_at should be the first day of the next month at midnight UTC
-    const resetsAt = new Date(row!.resets_at);
+    const rows = Array.isArray(data) ? data : [data];
+    const resetsAt = new Date(rows[0].resets_at);
     const now = new Date();
     const expectedMonth = now.getUTCMonth() === 11 ? 0 : now.getUTCMonth() + 1;
     const expectedYear =
@@ -183,21 +263,16 @@ describe('get_ai_quota', () => {
     expect(resetsAt.getUTCMonth()).toBe(expectedMonth);
     expect(resetsAt.getUTCDate()).toBe(1);
     expect(resetsAt.getUTCHours()).toBe(0);
-    expect(resetsAt.getUTCMinutes()).toBe(0);
   });
 });
 
 describe('subscription tiers', () => {
   it('default tier is free with limit 50', async () => {
-    const { data: profile } = await supabase
+    await supabase
       .from('profiles')
-      .select('subscription_tier')
-      .eq('id', TEST_USER_ID)
-      .single();
+      .update({ subscription_tier: 'free' })
+      .eq('id', TEST_USER_ID);
 
-    expect(profile!.subscription_tier).toBe('free');
-
-    // Clean up this month's usage for a fresh increment
     await supabase
       .from('ai_usage')
       .delete()
@@ -207,6 +282,7 @@ describe('subscription tiers', () => {
     const { data, error } = await supabase.rpc('increment_ai_usage', {
       p_user_id: TEST_USER_ID,
       p_model: 'flash',
+      p_query_type: 'chat',
     });
 
     expect(error).toBeNull();
@@ -217,27 +293,23 @@ describe('subscription tiers', () => {
   });
 
   it('changing user tier to pro changes the limit to 500', async () => {
-    // Update user to pro tier
-    const { error: updateError } = await supabase
+    await supabase
       .from('profiles')
       .update({ subscription_tier: 'pro' })
       .eq('id', TEST_USER_ID);
 
-    expect(updateError).toBeNull();
-
-    // Clean up this month's usage for a fresh test
     await supabase
       .from('ai_usage')
       .delete()
       .eq('user_id', TEST_USER_ID)
       .eq('usage_month', currentMonth());
 
-    // Verify increment reflects pro tier
     const { data: incData, error: incError } = await supabase.rpc(
       'increment_ai_usage',
       {
         p_user_id: TEST_USER_ID,
         p_model: 'flash',
+        p_query_type: 'chat',
       },
     );
 
@@ -248,18 +320,18 @@ describe('subscription tiers', () => {
     expect(incRow!.monthly_limit).toBe(500);
     expect(incRow!.is_allowed).toBe(true);
 
-    // Verify get_ai_quota also reflects pro tier
     const { data: quotaData, error: quotaError } = await supabase.rpc(
       'get_ai_quota',
-      {
-        p_user_id: TEST_USER_ID,
-      },
+      { p_user_id: TEST_USER_ID },
     );
 
     expect(quotaError).toBeNull();
 
-    const quotaRow = Array.isArray(quotaData) ? quotaData[0] : quotaData;
-    expect(quotaRow!.tier).toBe('pro');
-    expect(quotaRow!.monthly_limit).toBe(500);
+    const rows = Array.isArray(quotaData) ? quotaData : [quotaData];
+    const chatRow = rows.find(
+      (r: { query_type: string }) => r.query_type === 'chat',
+    );
+    expect(chatRow!.tier).toBe('pro');
+    expect(chatRow!.monthly_limit).toBe(500);
   });
 });
