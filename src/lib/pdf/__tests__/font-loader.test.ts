@@ -24,22 +24,24 @@ describe('loadFonts', () => {
     vi.restoreAllMocks();
   });
 
-  it('should register all 4 fonts with jsPDF', async () => {
+  it('should register all 6 fonts with jsPDF', async () => {
     const doc = createMockDoc();
 
     vi.spyOn(globalThis, 'fetch').mockResolvedValue(fakeFontResponse());
 
     await loadFonts(doc);
 
-    // fetch called once per font
-    expect(fetch).toHaveBeenCalledTimes(4);
+    // fetch called once per font (4 Geist + 2 NotoSansHebrew)
+    expect(fetch).toHaveBeenCalledTimes(6);
     expect(fetch).toHaveBeenCalledWith('/fonts/GeistSans-Regular.ttf');
     expect(fetch).toHaveBeenCalledWith('/fonts/GeistSans-Bold.ttf');
     expect(fetch).toHaveBeenCalledWith('/fonts/GeistSans-Italic.ttf');
     expect(fetch).toHaveBeenCalledWith('/fonts/GeistMono-Regular.ttf');
+    expect(fetch).toHaveBeenCalledWith('/fonts/NotoSansHebrew-Regular.ttf');
+    expect(fetch).toHaveBeenCalledWith('/fonts/NotoSansHebrew-Bold.ttf');
 
-    // addFileToVFS called 4 times with filename + base64 data
-    expect(doc.addFileToVFS).toHaveBeenCalledTimes(4);
+    // addFileToVFS called 6 times with filename + base64 data
+    expect(doc.addFileToVFS).toHaveBeenCalledTimes(6);
     expect(doc.addFileToVFS).toHaveBeenCalledWith(
       'GeistSans-Regular.ttf',
       expect.any(String),
@@ -56,9 +58,17 @@ describe('loadFonts', () => {
       'GeistMono-Regular.ttf',
       expect.any(String),
     );
+    expect(doc.addFileToVFS).toHaveBeenCalledWith(
+      'NotoSansHebrew-Regular.ttf',
+      expect.any(String),
+    );
+    expect(doc.addFileToVFS).toHaveBeenCalledWith(
+      'NotoSansHebrew-Bold.ttf',
+      expect.any(String),
+    );
 
-    // addFont called 4 times with correct family and style
-    expect(doc.addFont).toHaveBeenCalledTimes(4);
+    // addFont called 6 times with correct family and style
+    expect(doc.addFont).toHaveBeenCalledTimes(6);
     expect(doc.addFont).toHaveBeenCalledWith(
       'GeistSans-Regular.ttf',
       'GeistSans',
@@ -78,6 +88,16 @@ describe('loadFonts', () => {
       'GeistMono-Regular.ttf',
       'GeistMono',
       'normal',
+    );
+    expect(doc.addFont).toHaveBeenCalledWith(
+      'NotoSansHebrew-Regular.ttf',
+      'NotoSansHebrew',
+      'normal',
+    );
+    expect(doc.addFont).toHaveBeenCalledWith(
+      'NotoSansHebrew-Bold.ttf',
+      'NotoSansHebrew',
+      'bold',
     );
   });
 
@@ -109,9 +129,9 @@ describe('loadFonts', () => {
 
     await loadFonts(doc);
 
-    // The 3 successful fonts should still be registered
-    expect(doc.addFileToVFS).toHaveBeenCalledTimes(3);
-    expect(doc.addFont).toHaveBeenCalledTimes(3);
+    // The 5 successful fonts should still be registered
+    expect(doc.addFileToVFS).toHaveBeenCalledTimes(5);
+    expect(doc.addFont).toHaveBeenCalledTimes(5);
 
     // A warning should have been logged for the failed font
     expect(warnSpy).toHaveBeenCalledTimes(1);

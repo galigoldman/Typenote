@@ -3,6 +3,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import {
   renderTiptapContent,
   measureNodeHeight,
+  containsHebrew,
   PX_TO_PT,
 } from '../tiptap-to-pdf';
 
@@ -19,6 +20,7 @@ function makeMockDoc() {
     setFillColor: vi.fn(),
     setDrawColor: vi.fn(),
     setLineWidth: vi.fn(),
+    setR2L: vi.fn(),
     rect: vi.fn(),
     line: vi.fn(),
     link: vi.fn(),
@@ -129,74 +131,74 @@ describe('renderTiptapContent', () => {
     vi.clearAllMocks();
   });
 
-  it('should render heading with bold font and correct size', () => {
+  it('should render heading with bold font and correct size', async () => {
     const content = makeDoc([makeHeading(1, 'Hello World')]);
 
-    renderTiptapContent(doc as never, content, 20, 40, 500);
+    await renderTiptapContent(doc as never, content, 20, 40, 500);
 
     expect(doc.setFont).toHaveBeenCalledWith('GeistSans', 'bold');
     // H1 = 36px (prose-base 2.25em) at default scale=1
     expect(doc.setFontSize).toHaveBeenCalledWith(36);
   });
 
-  it('should render heading level 2 at 24px', () => {
+  it('should render heading level 2 at 24px', async () => {
     const content = makeDoc([makeHeading(2, 'Sub Heading')]);
 
-    renderTiptapContent(doc as never, content, 20, 40, 500);
+    await renderTiptapContent(doc as never, content, 20, 40, 500);
 
     // H2 = 24px (prose-base 1.5em)
     expect(doc.setFontSize).toHaveBeenCalledWith(24);
   });
 
-  it('should render heading level 3 at 20px', () => {
+  it('should render heading level 3 at 20px', async () => {
     const content = makeDoc([makeHeading(3, 'Small Heading')]);
 
-    renderTiptapContent(doc as never, content, 20, 40, 500);
+    await renderTiptapContent(doc as never, content, 20, 40, 500);
 
     // H3 = 20px (prose-base 1.25em)
     expect(doc.setFontSize).toHaveBeenCalledWith(20);
   });
 
-  it('should render paragraph at 16px normal', () => {
+  it('should render paragraph at 16px normal', async () => {
     const content = makeDoc([makeParagraph('A simple paragraph.')]);
 
-    renderTiptapContent(doc as never, content, 20, 40, 500);
+    await renderTiptapContent(doc as never, content, 20, 40, 500);
 
     // Paragraph = 16px (prose-base 1rem) at default scale=1
     expect(doc.setFontSize).toHaveBeenCalledWith(16);
     expect(doc.setFont).toHaveBeenCalledWith('GeistSans', 'normal');
   });
 
-  it('should use PX_TO_PT scale for text-only A4 rendering', () => {
+  it('should use PX_TO_PT scale for text-only A4 rendering', async () => {
     const content = makeDoc([makeParagraph('A4 text.')]);
 
-    renderTiptapContent(doc as never, content, 72, 72, 451, PX_TO_PT);
+    await renderTiptapContent(doc as never, content, 72, 72, 451, PX_TO_PT);
 
     // 16 * 0.75 = 12pt for A4
     expect(doc.setFontSize).toHaveBeenCalledWith(12);
   });
 
-  it('should render bullet list items with bullet character', () => {
+  it('should render bullet list items with bullet character', async () => {
     const content = makeDoc([makeBulletList(['Item one', 'Item two'])]);
 
-    renderTiptapContent(doc as never, content, 20, 40, 500);
+    await renderTiptapContent(doc as never, content, 20, 40, 500);
 
     // The bullet character U+2022 should appear via doc.text
     const textCalls = doc.text.mock.calls.map((c) => c[0]);
     expect(textCalls).toContain('\u2022');
   });
 
-  it('should render ordered list items with numbers', () => {
+  it('should render ordered list items with numbers', async () => {
     const content = makeDoc([makeOrderedList(['First', 'Second'])]);
 
-    renderTiptapContent(doc as never, content, 20, 40, 500);
+    await renderTiptapContent(doc as never, content, 20, 40, 500);
 
     const textCalls = doc.text.mock.calls.map((c) => c[0]);
     expect(textCalls).toContain('1.');
     expect(textCalls).toContain('2.');
   });
 
-  it('should render task list with checkbox characters', () => {
+  it('should render task list with checkbox characters', async () => {
     const content = makeDoc([
       makeTaskList([
         { text: 'Unchecked task', checked: false },
@@ -204,7 +206,7 @@ describe('renderTiptapContent', () => {
       ]),
     ]);
 
-    renderTiptapContent(doc as never, content, 20, 40, 500);
+    await renderTiptapContent(doc as never, content, 20, 40, 500);
 
     const textCalls = doc.text.mock.calls.map((c) => c[0]);
     // ☐ (U+2610) for unchecked, ☑ (U+2611) for checked
@@ -212,15 +214,15 @@ describe('renderTiptapContent', () => {
     expect(textCalls).toContain('\u2611');
   });
 
-  it('should render code block with GeistMono font', () => {
+  it('should render code block with GeistMono font', async () => {
     const content = makeDoc([makeCodeBlock('const x = 1;')]);
 
-    renderTiptapContent(doc as never, content, 20, 40, 500);
+    await renderTiptapContent(doc as never, content, 20, 40, 500);
 
     expect(doc.setFont).toHaveBeenCalledWith('GeistMono', 'normal');
   });
 
-  it('should handle bold mark', () => {
+  it('should handle bold mark', async () => {
     const content = makeDoc([
       {
         type: 'paragraph',
@@ -228,12 +230,12 @@ describe('renderTiptapContent', () => {
       },
     ]);
 
-    renderTiptapContent(doc as never, content, 20, 40, 500);
+    await renderTiptapContent(doc as never, content, 20, 40, 500);
 
     expect(doc.setFont).toHaveBeenCalledWith('GeistSans', 'bold');
   });
 
-  it('should handle italic mark', () => {
+  it('should handle italic mark', async () => {
     const content = makeDoc([
       {
         type: 'paragraph',
@@ -241,12 +243,12 @@ describe('renderTiptapContent', () => {
       },
     ]);
 
-    renderTiptapContent(doc as never, content, 20, 40, 500);
+    await renderTiptapContent(doc as never, content, 20, 40, 500);
 
     expect(doc.setFont).toHaveBeenCalledWith('GeistSans', 'italic');
   });
 
-  it('should handle link mark with blue color', () => {
+  it('should handle link mark with blue color', async () => {
     const content = makeDoc([
       {
         type: 'paragraph',
@@ -258,19 +260,73 @@ describe('renderTiptapContent', () => {
       },
     ]);
 
-    renderTiptapContent(doc as never, content, 20, 40, 500);
+    await renderTiptapContent(doc as never, content, 20, 40, 500);
 
     // #2563eb -> r=37, g=99, b=235
     expect(doc.setTextColor).toHaveBeenCalledWith(37, 99, 235);
   });
 
-  it('should return updated y position after rendering', () => {
+  it('should return updated y position after rendering', async () => {
     const content = makeDoc([makeParagraph('Some text')]);
 
     const startY = 40;
-    const resultY = renderTiptapContent(doc as never, content, 20, startY, 500);
+    const resultY = await renderTiptapContent(doc as never, content, 20, startY, 500);
 
     expect(resultY).toBeGreaterThan(startY);
+  });
+
+  it('should use NotoSansHebrew font for Hebrew text', async () => {
+    const content = makeDoc([
+      {
+        type: 'paragraph',
+        content: [{ type: 'text', text: 'שלום עולם' }],
+      },
+    ]);
+
+    await renderTiptapContent(doc as never, content, 20, 40, 500);
+
+    expect(doc.setFont).toHaveBeenCalledWith('NotoSansHebrew', 'normal');
+  });
+
+  it('should enable R2L for Hebrew text and restore LTR after', async () => {
+    const content = makeDoc([
+      {
+        type: 'paragraph',
+        content: [{ type: 'text', text: 'שלום' }],
+      },
+    ]);
+
+    await renderTiptapContent(doc as never, content, 20, 40, 500);
+
+    expect(doc.setR2L).toHaveBeenCalledWith(true);
+    expect(doc.setR2L).toHaveBeenCalledWith(false);
+  });
+
+  it('should use GeistSans for Latin text (no R2L)', async () => {
+    const content = makeDoc([makeParagraph('Hello World')]);
+
+    await renderTiptapContent(doc as never, content, 20, 40, 500);
+
+    expect(doc.setFont).toHaveBeenCalledWith('GeistSans', 'normal');
+    expect(doc.setR2L).not.toHaveBeenCalled();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// containsHebrew
+// ---------------------------------------------------------------------------
+
+describe('containsHebrew', () => {
+  it('should detect Hebrew characters', () => {
+    expect(containsHebrew('שלום')).toBe(true);
+    expect(containsHebrew('Hello שלום')).toBe(true);
+    expect(containsHebrew('אבגד')).toBe(true);
+  });
+
+  it('should return false for non-Hebrew text', () => {
+    expect(containsHebrew('Hello World')).toBe(false);
+    expect(containsHebrew('123')).toBe(false);
+    expect(containsHebrew('')).toBe(false);
   });
 });
 

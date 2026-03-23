@@ -12,7 +12,7 @@ vi.mock('../stroke-renderer', () => ({
 }));
 
 vi.mock('../tiptap-to-pdf', () => ({
-  renderTiptapContent: vi.fn(),
+  renderTiptapContent: vi.fn().mockResolvedValue(0),
 }));
 
 import { renderBackground } from '../background-renderer';
@@ -88,46 +88,46 @@ describe('renderCanvasPage', () => {
     vi.clearAllMocks();
   });
 
-  it('should add a new page with correct dimensions when not first page', () => {
+  it('should add a new page with correct dimensions when not first page', async () => {
     const doc = makeMockDoc();
     const page = makePage();
 
-    renderCanvasPage(doc as never, page, 'blank', false);
+    await renderCanvasPage(doc as never, page, 'blank', false);
 
     expect(doc.addPage).toHaveBeenCalledOnce();
     expect(doc.addPage).toHaveBeenCalledWith([794, 1123]);
   });
 
-  it('should not add page when isFirstPage is true', () => {
+  it('should not add page when isFirstPage is true', async () => {
     const doc = makeMockDoc();
     const page = makePage();
 
-    renderCanvasPage(doc as never, page, 'blank', true);
+    await renderCanvasPage(doc as never, page, 'blank', true);
 
     expect(doc.addPage).not.toHaveBeenCalled();
   });
 
-  it('should render background with page-specific type', () => {
+  it('should render background with page-specific type', async () => {
     const doc = makeMockDoc();
     const page = makePage({ pageType: 'grid' });
 
-    renderCanvasPage(doc as never, page, 'blank', true);
+    await renderCanvasPage(doc as never, page, 'blank', true);
 
     expect(mockRenderBackground).toHaveBeenCalledOnce();
     expect(mockRenderBackground).toHaveBeenCalledWith(doc, 'grid', 794, 1123);
   });
 
-  it('should fall back to document canvas_type for background', () => {
+  it('should fall back to document canvas_type for background', async () => {
     const doc = makeMockDoc();
     const page = makePage(); // no pageType set
 
-    renderCanvasPage(doc as never, page, 'lined', true);
+    await renderCanvasPage(doc as never, page, 'lined', true);
 
     expect(mockRenderBackground).toHaveBeenCalledOnce();
     expect(mockRenderBackground).toHaveBeenCalledWith(doc, 'lined', 794, 1123);
   });
 
-  it('should render all strokes', () => {
+  it('should render all strokes', async () => {
     const doc = makeMockDoc();
     const strokes = [
       makeStroke({ id: 's1', createdAt: 1 }),
@@ -136,7 +136,7 @@ describe('renderCanvasPage', () => {
     ];
     const page = makePage({ strokes });
 
-    renderCanvasPage(doc as never, page, 'blank', true);
+    await renderCanvasPage(doc as never, page, 'blank', true);
 
     expect(mockRenderStroke).toHaveBeenCalledTimes(3);
     expect(mockRenderStroke).toHaveBeenCalledWith(doc, strokes[0]);
@@ -144,7 +144,7 @@ describe('renderCanvasPage', () => {
     expect(mockRenderStroke).toHaveBeenCalledWith(doc, strokes[2]);
   });
 
-  it('should isolate each stroke with save/restore graphics state', () => {
+  it('should isolate each stroke with save/restore graphics state', async () => {
     const doc = makeMockDoc();
     const strokes = [
       makeStroke({ id: 's1', createdAt: 1 }),
@@ -152,7 +152,7 @@ describe('renderCanvasPage', () => {
     ];
     const page = makePage({ strokes });
 
-    renderCanvasPage(doc as never, page, 'blank', true);
+    await renderCanvasPage(doc as never, page, 'blank', true);
 
     // Each stroke gets its own save/restore pair (no shared clip region)
     expect(doc.saveGraphicsState).toHaveBeenCalledTimes(2);
@@ -175,11 +175,11 @@ describe('renderCanvasPage', () => {
     expect(stroke2).toBeLessThan(restore2);
   });
 
-  it('should not call save/restore when there are no strokes', () => {
+  it('should not call save/restore when there are no strokes', async () => {
     const doc = makeMockDoc();
     const page = makePage({ strokes: [] });
 
-    renderCanvasPage(doc as never, page, 'blank', true);
+    await renderCanvasPage(doc as never, page, 'blank', true);
 
     // No strokes means no save/restore calls
     expect(doc.saveGraphicsState).not.toHaveBeenCalled();
@@ -188,7 +188,7 @@ describe('renderCanvasPage', () => {
     expect(doc.clip).not.toHaveBeenCalled();
   });
 
-  it('should render text boxes with content', () => {
+  it('should render text boxes with content', async () => {
     const doc = makeMockDoc();
     const textBoxes = [
       makeTextBox({ id: 'tb1', x: 50, y: 100, width: 200 }),
@@ -196,7 +196,7 @@ describe('renderCanvasPage', () => {
     ];
     const page = makePage({ textBoxes });
 
-    renderCanvasPage(doc as never, page, 'blank', true);
+    await renderCanvasPage(doc as never, page, 'blank', true);
 
     expect(mockRenderTiptapContent).toHaveBeenCalledTimes(2);
     expect(mockRenderTiptapContent).toHaveBeenCalledWith(
@@ -215,7 +215,7 @@ describe('renderCanvasPage', () => {
     );
   });
 
-  it('should skip empty text boxes', () => {
+  it('should skip empty text boxes', async () => {
     const doc = makeMockDoc();
     const textBoxes = [
       // Text box with no content array
@@ -233,7 +233,7 @@ describe('renderCanvasPage', () => {
     ];
     const page = makePage({ textBoxes });
 
-    renderCanvasPage(doc as never, page, 'blank', true);
+    await renderCanvasPage(doc as never, page, 'blank', true);
 
     // Only the one valid text box should have been rendered
     expect(mockRenderTiptapContent).toHaveBeenCalledTimes(1);
@@ -246,11 +246,11 @@ describe('renderCanvasPage', () => {
     );
   });
 
-  it('should use correct page dimensions (794x1123)', () => {
+  it('should use correct page dimensions (794x1123)', async () => {
     const doc = makeMockDoc();
     const page = makePage();
 
-    renderCanvasPage(doc as never, page, 'dotted', false);
+    await renderCanvasPage(doc as never, page, 'dotted', false);
 
     // Verify addPage uses the correct dimensions
     expect(doc.addPage).toHaveBeenCalledWith([794, 1123]);

@@ -1,5 +1,7 @@
 import type { jsPDF } from 'jspdf';
 
+import { renderMath } from './math-renderer';
+
 // ---------------------------------------------------------------------------
 // TipTap JSON types (mirrors the ProseMirror document model)
 // ---------------------------------------------------------------------------
@@ -183,6 +185,21 @@ function hexToRgb(hex: string): { r: number; g: number; b: number } {
 }
 
 // ---------------------------------------------------------------------------
+// Script detection helpers
+// ---------------------------------------------------------------------------
+
+/** Matches any Hebrew Unicode character (U+0590 – U+05FF). */
+const HEBREW_REGEX = /[\u0590-\u05FF]/;
+
+/**
+ * Returns true if the string contains at least one Hebrew character.
+ * Used to select a Hebrew-capable font for PDF rendering.
+ */
+export function containsHebrew(text: string): boolean {
+  return HEBREW_REGEX.test(text);
+}
+
+// ---------------------------------------------------------------------------
 // Mark analysis helpers
 // ---------------------------------------------------------------------------
 
@@ -240,14 +257,24 @@ function resolveMarks(marks?: TipTapMark[]): ResolvedMarks {
 
 /**
  * Determines the jsPDF font family and style string from resolved marks.
+ *
+ * When `text` is provided and contains Hebrew characters, NotoSansHebrew
+ * is selected instead of GeistSans so the glyphs render correctly.
+ * NotoSansHebrew only ships normal and bold variants (no italic).
  */
-function fontStyleFromMarks(resolved: ResolvedMarks): {
+function fontStyleFromMarks(
+  resolved: ResolvedMarks,
+  text?: string,
+): {
   family: string;
   style: string;
 } {
   if (resolved.code) {
     return { family: 'GeistMono', style: 'normal' };
   }
+
+  const isHebrew = text ? containsHebrew(text) : false;
+  const family = isHebrew ? 'NotoSansHebrew' : 'GeistSans';
 
   let style = 'normal';
   if (resolved.bold && resolved.italic) {
@@ -256,10 +283,11 @@ function fontStyleFromMarks(resolved: ResolvedMarks): {
   } else if (resolved.bold) {
     style = 'bold';
   } else if (resolved.italic) {
-    style = 'italic';
+    // NotoSansHebrew has no italic variant — use normal instead
+    style = isHebrew ? 'normal' : 'italic';
   }
 
-  return { family: 'GeistSans', style };
+  return { family, style };
 }
 
 // ---------------------------------------------------------------------------
@@ -307,7 +335,7 @@ function collectInlineNodes(nodes?: TipTapNode[]): TipTapNode[] {
  *
  * Returns the y-position after the last line of rendered text.
  */
-function renderInlineContent(
+async function renderInlineContent(
   doc: jsPDF,
   nodes: TipTapNode[],
   x: number,
@@ -315,7 +343,7 @@ function renderInlineContent(
   maxWidth: number,
   baseFontSize: number,
   lineHeightFactor: number = LINE_HEIGHT_PARAGRAPH,
-): number {
+): Promise<number> {
   const lineHeight = baseFontSize * lineHeightFactor;
 
   // For simple rendering, concatenate text segments and handle marks per segment.
@@ -325,26 +353,36 @@ function renderInlineContent(
   let cursorY = y;
 
   for (const node of nodes) {
-    // Handle math expression inline nodes
+    // Handle math expression inline nodes — render via KaTeX → SVG/PNG pipeline
     if (node.type === 'mathExpression') {
       const latex = (node.attrs?.latex as string) ?? '';
       if (latex) {
-        // Render math as a fallback LaTeX string in italic mono
-        // (A dedicated math-renderer module can be integrated here once available)
+        // Estimate math expression dimensions for layout purposes.
+        // Use a generous height estimate based on font size and a width estimate
+        // based on measuring the raw string as a rough proxy.
+        const mathHeight = baseFontSize * 1.4;
         doc.setFont('GeistMono', 'normal');
-        const mathSize = baseFontSize * 0.9;
-        doc.setFontSize(mathSize);
-        const mathText = latex;
-        const dims = doc.getTextDimensions(mathText);
+        doc.setFontSize(baseFontSize * 0.9);
+        const roughWidth = doc.getTextDimensions(latex).w;
+        const mathWidth = Math.min(roughWidth, maxWidth);
 
         // Wrap to next line if needed
-        if (cursorX + dims.w > x + maxWidth && cursorX > x) {
+        if (cursorX + mathWidth > x + maxWidth && cursorX > x) {
           cursorX = x;
           cursorY += lineHeight;
         }
 
-        doc.text(mathText, cursorX, cursorY);
-        cursorX += dims.w;
+        // Render the math expression as a properly typeset formula
+        await renderMath(
+          doc,
+          latex,
+          cursorX,
+          cursorY - baseFontSize * 0.8, // Offset to align with text baseline
+          mathWidth,
+          mathHeight,
+        );
+
+        cursorX += mathWidth;
 
         // Restore font
         doc.setFont('GeistSans', 'normal');
@@ -357,13 +395,19 @@ function renderInlineContent(
     if (node.type !== 'text' || !node.text) continue;
 
     const resolved = resolveMarks(node.marks);
-    const { family, style } = fontStyleFromMarks(resolved);
+    const isHebrew = containsHebrew(node.text);
+    const { family, style } = fontStyleFromMarks(resolved, node.text);
     const fontSize = resolved.code
       ? baseFontSize * INLINE_CODE_SIZE_FACTOR
       : baseFontSize;
 
     doc.setFont(family, style);
     doc.setFontSize(fontSize);
+
+    // Enable RTL rendering for Hebrew text so character order is correct
+    if (isHebrew) {
+      doc.setR2L(true);
+    }
 
     // Set text color
     if (resolved.link) {
@@ -418,6 +462,11 @@ function renderInlineContent(
       cursorX += dims.w;
     }
 
+    // Restore LTR rendering direction after Hebrew text
+    if (isHebrew) {
+      doc.setR2L(false);
+    }
+
     // Reset text color to black after each node
     doc.setTextColor(TEXT_COLOR.r, TEXT_COLOR.g, TEXT_COLOR.b);
   }
@@ -436,13 +485,13 @@ function renderInlineContent(
 // Node-type renderers
 // ---------------------------------------------------------------------------
 
-function renderHeading(
+async function renderHeading(
   doc: jsPDF,
   node: TipTapNode,
   x: number,
   y: number,
   width: number,
-): number {
+): Promise<number> {
   const level = (node.attrs?.level as number) ?? 1;
   const fontSize = cfg.headingSizes[level] ?? cfg.headingSizes[1];
   const lhFactor = LINE_HEIGHT_HEADINGS[level] ?? LINE_HEIGHT_PARAGRAPH;
@@ -454,7 +503,7 @@ function renderHeading(
 
   const inlines = collectInlineNodes(node.content);
   if (inlines.length > 0) {
-    cursorY = renderInlineContent(
+    cursorY = await renderInlineContent(
       doc,
       inlines,
       x,
@@ -477,13 +526,13 @@ function renderHeading(
   return cursorY;
 }
 
-function renderParagraph(
+async function renderParagraph(
   doc: jsPDF,
   node: TipTapNode,
   x: number,
   y: number,
   width: number,
-): number {
+): Promise<number> {
   doc.setFont('GeistSans', 'normal');
   doc.setFontSize(cfg.paragraphSize);
 
@@ -491,7 +540,7 @@ function renderParagraph(
   let cursorY = y;
 
   if (inlines.length > 0) {
-    cursorY = renderInlineContent(
+    cursorY = await renderInlineContent(
       doc,
       inlines,
       x,
@@ -508,34 +557,34 @@ function renderParagraph(
   return cursorY;
 }
 
-function renderBulletList(
+async function renderBulletList(
   doc: jsPDF,
   node: TipTapNode,
   x: number,
   y: number,
   width: number,
   depth: number,
-): number {
+): Promise<number> {
   let cursorY = y;
 
   if (!node.content) return cursorY;
 
   for (const listItem of node.content) {
     if (listItem.type !== 'listItem') continue;
-    cursorY = renderListItem(doc, listItem, x, cursorY, width, depth, 'bullet');
+    cursorY = await renderListItem(doc, listItem, x, cursorY, width, depth, 'bullet');
   }
 
   return cursorY;
 }
 
-function renderOrderedList(
+async function renderOrderedList(
   doc: jsPDF,
   node: TipTapNode,
   x: number,
   y: number,
   width: number,
   depth: number,
-): number {
+): Promise<number> {
   let cursorY = y;
 
   if (!node.content) return cursorY;
@@ -545,7 +594,7 @@ function renderOrderedList(
   for (let i = 0; i < node.content.length; i++) {
     const listItem = node.content[i];
     if (listItem.type !== 'listItem') continue;
-    cursorY = renderListItem(
+    cursorY = await renderListItem(
       doc,
       listItem,
       x,
@@ -560,7 +609,7 @@ function renderOrderedList(
   return cursorY;
 }
 
-function renderListItem(
+async function renderListItem(
   doc: jsPDF,
   node: TipTapNode,
   x: number,
@@ -570,7 +619,7 @@ function renderListItem(
   listType: 'bullet' | 'ordered' | 'task',
   index?: number,
   checked?: boolean,
-): number {
+): Promise<number> {
   const indent = x + depth * cfg.listIndent;
   const contentIndent = indent + cfg.listIndent;
   const contentWidth = width - (depth + 1) * cfg.listIndent;
@@ -600,7 +649,7 @@ function renderListItem(
         if (inlines.length > 0) {
           if (firstBlock) {
             // First paragraph renders on the same line as the marker
-            cursorY = renderInlineContent(
+            cursorY = await renderInlineContent(
               doc,
               inlines,
               contentIndent,
@@ -610,7 +659,7 @@ function renderListItem(
             );
             firstBlock = false;
           } else {
-            cursorY = renderInlineContent(
+            cursorY = await renderInlineContent(
               doc,
               inlines,
               contentIndent,
@@ -626,16 +675,16 @@ function renderListItem(
         cursorY += cfg.paragraphSpacing;
       } else if (child.type === 'bulletList') {
         firstBlock = false;
-        cursorY = renderBulletList(doc, child, x, cursorY, width, depth + 1);
+        cursorY = await renderBulletList(doc, child, x, cursorY, width, depth + 1);
       } else if (child.type === 'orderedList') {
         firstBlock = false;
-        cursorY = renderOrderedList(doc, child, x, cursorY, width, depth + 1);
+        cursorY = await renderOrderedList(doc, child, x, cursorY, width, depth + 1);
       } else if (child.type === 'taskList') {
         firstBlock = false;
-        cursorY = renderTaskList(doc, child, x, cursorY, width, depth + 1);
+        cursorY = await renderTaskList(doc, child, x, cursorY, width, depth + 1);
       } else {
         firstBlock = false;
-        cursorY = renderNode(
+        cursorY = await renderNode(
           doc,
           child,
           contentIndent,
@@ -650,14 +699,14 @@ function renderListItem(
   return cursorY;
 }
 
-function renderTaskList(
+async function renderTaskList(
   doc: jsPDF,
   node: TipTapNode,
   x: number,
   y: number,
   width: number,
   depth: number,
-): number {
+): Promise<number> {
   let cursorY = y;
 
   if (!node.content) return cursorY;
@@ -665,7 +714,7 @@ function renderTaskList(
   for (const taskItem of node.content) {
     if (taskItem.type !== 'taskItem') continue;
     const isChecked = (taskItem.attrs?.checked as boolean) ?? false;
-    cursorY = renderListItem(
+    cursorY = await renderListItem(
       doc,
       taskItem,
       x,
@@ -681,13 +730,13 @@ function renderTaskList(
   return cursorY;
 }
 
-function renderCodeBlock(
+async function renderCodeBlock(
   doc: jsPDF,
   node: TipTapNode,
   x: number,
   y: number,
   width: number,
-): number {
+): Promise<number> {
   doc.setFont('GeistMono', 'normal');
   doc.setFontSize(cfg.codeSize);
 
@@ -723,14 +772,14 @@ function renderCodeBlock(
   return y + bgHeight + cfg.paragraphSpacing;
 }
 
-function renderBlockquote(
+async function renderBlockquote(
   doc: jsPDF,
   node: TipTapNode,
   x: number,
   y: number,
   width: number,
   depth: number,
-): number {
+): Promise<number> {
   const barX = x;
   const contentX = x + 16;
   const contentWidth = width - 16;
@@ -742,7 +791,7 @@ function renderBlockquote(
   // Render children (paragraphs inside the blockquote)
   if (node.content) {
     for (const child of node.content) {
-      cursorY = renderNode(doc, child, contentX, cursorY, contentWidth, depth);
+      cursorY = await renderNode(doc, child, contentX, cursorY, contentWidth, depth);
     }
   }
 
@@ -754,13 +803,13 @@ function renderBlockquote(
   return cursorY;
 }
 
-function renderHorizontalRule(
+async function renderHorizontalRule(
   _doc: jsPDF,
   _node: TipTapNode,
   x: number,
   y: number,
   width: number,
-): number {
+): Promise<number> {
   const ruleY = y + 8;
 
   _doc.setDrawColor(200, 200, 200);
@@ -774,14 +823,14 @@ function renderHorizontalRule(
 // Central node dispatcher
 // ---------------------------------------------------------------------------
 
-function renderNode(
+async function renderNode(
   doc: jsPDF,
   node: TipTapNode,
   x: number,
   y: number,
   width: number,
   depth: number = 0,
-): number {
+): Promise<number> {
   switch (node.type) {
     case 'heading':
       return renderHeading(doc, node, x, y, width);
@@ -812,7 +861,7 @@ function renderNode(
       if (node.content) {
         let cursorY = y;
         for (const child of node.content) {
-          cursorY = renderNode(doc, child, x, cursorY, width, depth);
+          cursorY = await renderNode(doc, child, x, cursorY, width, depth);
         }
         return cursorY;
       }
@@ -849,14 +898,14 @@ export const PX_TO_PT = 72 / 96;
  *                  for standard A4 pages (595×842 pt coordinate space).
  * @returns The y-position immediately after the last rendered element
  */
-export function renderTiptapContent(
+export async function renderTiptapContent(
   doc: jsPDF,
   content: Record<string, unknown>,
   x: number,
   y: number,
   width: number,
   scale: number = 1,
-): number {
+): Promise<number> {
   cfg = createConfig(scale);
 
   const tiptapDoc = content as unknown as {
@@ -871,7 +920,7 @@ export function renderTiptapContent(
   let cursorY = y;
 
   for (const node of tiptapDoc.content) {
-    cursorY = renderNode(doc, node, x, cursorY, width, 0);
+    cursorY = await renderNode(doc, node, x, cursorY, width, 0);
   }
 
   return cursorY;

@@ -27,12 +27,12 @@ const PAGE_HEIGHT = 1123;
  * @param isFirstPage  - When true, the renderer skips adding a new page
  *                       (the first page already exists in the document)
  */
-export function renderCanvasPage(
+export async function renderCanvasPage(
   doc: jsPDF,
   page: CanvasPage,
   canvasType: string,
   isFirstPage: boolean,
-): void {
+): Promise<void> {
   // Add a new page for every page after the first
   if (!isFirstPage) {
     doc.addPage([PAGE_WIDTH, PAGE_HEIGHT]);
@@ -59,7 +59,7 @@ export function renderCanvasPage(
       // Match CSS: px-4 (16px) horizontal, pt-4/pt-8 vertical + font baseline offset
       const FLOW_PADDING_X = 16;
       const FLOW_PADDING_TOP = pageType === 'lined' ? 44 : 28;
-      renderTiptapContent(
+      await renderTiptapContent(
         doc,
         page.flowContent,
         FLOW_PADDING_X,
@@ -76,7 +76,7 @@ export function renderCanvasPage(
     const content = textBox.content as { content?: unknown[] };
     if (!content.content || content.content.length === 0) continue;
 
-    renderTiptapContent(
+    await renderTiptapContent(
       doc,
       textBox.content,
       textBox.x,
