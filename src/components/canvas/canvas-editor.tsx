@@ -439,7 +439,11 @@ export function CanvasEditor({
     while (lastContentIndex > 0 && !pageHasContent(all[lastContentIndex])) {
       lastContentIndex--;
     }
-    const toSave = all.slice(0, lastContentIndex + 1);
+    const toSave = all.slice(0, lastContentIndex + 1).map((p) => ({
+      ...p,
+      // Strip transient contentBounds from text boxes before persisting
+      textBoxes: p.textBoxes.map(({ contentBounds: _, ...tb }) => tb),
+    }));
     return { pages: toSave } as unknown as Record<string, unknown>;
   }, []);
 
@@ -581,6 +585,43 @@ export function CanvasEditor({
             ...p,
             textBoxes: p.textBoxes.map((t) =>
               t.id === textBoxId ? { ...t, height: measuredHeight } : t,
+            ),
+          };
+        }),
+      );
+    },
+    [],
+  );
+
+  // Auto-fit text box content bounds (tight horizontal bounds for selection)
+  const handleTextBoxContentBoundsMeasured = useCallback(
+    (
+      pageId: string,
+      textBoxId: string,
+      bounds: { offsetX: number; width: number } | undefined,
+    ) => {
+      setPages((prev) =>
+        prev.map((p) => {
+          if (p.id !== pageId) return p;
+          const tb = p.textBoxes.find((t) => t.id === textBoxId);
+          if (!tb) return p;
+          // Skip if bounds haven't meaningfully changed
+          if (
+            !bounds &&
+            !tb.contentBounds
+          )
+            return p;
+          if (
+            bounds &&
+            tb.contentBounds &&
+            Math.abs(tb.contentBounds.offsetX - bounds.offsetX) < 2 &&
+            Math.abs(tb.contentBounds.width - bounds.width) < 2
+          )
+            return p;
+          return {
+            ...p,
+            textBoxes: p.textBoxes.map((t) =>
+              t.id === textBoxId ? { ...t, contentBounds: bounds } : t,
             ),
           };
         }),
@@ -940,6 +981,7 @@ export function CanvasEditor({
     selectedStrokeIds,
     selectedTextBoxIds,
     selectionBBox,
+    tightSelectionBBox,
     isRectMode,
     isDragging: isSelectionDragging,
     dragOffset: selectionDragOffset,
@@ -1719,7 +1761,7 @@ export function CanvasEditor({
         {/* Canvas scroll area */}
         <div
           ref={scrollContainerRef}
-          className="flex-1 bg-gray-200 xl:bg-gray-100"
+          className="flex-1 bg-white xl:bg-gray-100"
           data-scroll-container
           style={{
             overflowX: zoom > 1 ? 'auto' : 'hidden',
@@ -1753,14 +1795,11 @@ export function CanvasEditor({
             className="py-8 max-xl:py-0"
             style={{
               transform: `scale(${scale})`,
-              transformOrigin: 'top left',
+              transformOrigin: zoom <= 1 ? 'top center' : 'top left',
               willChange: 'transform',
               // Explicit size so the scroll container knows the scaled content size
-              width: PAGE_WIDTH * scale,
+              width: zoom > 1 ? PAGE_WIDTH * scale : undefined,
               minHeight: `${pages.length * PAGE_HEIGHT * scale + 100}px`,
-              // Center horizontally when the page fits within the container
-              marginLeft: zoom <= 1 ? 'auto' : undefined,
-              marginRight: zoom <= 1 ? 'auto' : undefined,
             }}
           >
             {pages.map((page, index) => {
@@ -1788,6 +1827,7 @@ export function CanvasEditor({
                     selectionPath={selectionPath}
                     isRectMode={isRectMode}
                     selectionBBox={selectionBBox}
+                    tightSelectionBBox={tightSelectionBBox}
                     isSelectionDragging={isSelectionDragging}
                     selectionDragOffset={selectionDragOffset}
                     isSelectionResizing={isSelectionResizing}
@@ -1795,6 +1835,7 @@ export function CanvasEditor({
                     selectedTextBoxIds={selectedTextBoxIds}
                     onTextBoxContentUpdate={handleTextBoxContentUpdate}
                     onTextBoxHeightMeasured={handleTextBoxHeightMeasured}
+                    onTextBoxContentBoundsMeasured={handleTextBoxContentBoundsMeasured}
                     onDeleteSelection={deleteSelected}
                     onEditSelection={handleEditSelection}
                     hasSelectedTextBoxes={selectedTextBoxIds.size > 0}

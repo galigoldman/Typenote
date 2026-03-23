@@ -8,8 +8,10 @@ interface SelectionOverlayProps {
   selectionPath: [number, number][] | null;
   /** Whether selection mode is rectangle (true) or freeform lasso (false) */
   isRectMode: boolean;
-  /** Bounding box of selected objects, null when nothing selected */
+  /** Container-based bounding box (used for resize handles), null when nothing selected */
   selectionBBox: BBox | null;
+  /** Tight content-based bounding box (used for selection highlight), null when nothing selected */
+  tightSelectionBBox?: BBox | null;
   /** Whether currently dragging selected objects */
   isDragging: boolean;
   /** Current drag offset */
@@ -79,12 +81,16 @@ function Handle({ cx, cy }: { cx: number; cy: number }) {
 
 function BoundingBox({
   bbox,
+  tightBBox,
   isDragging,
   dragOffset,
   isResizing,
   resizeBBox,
 }: {
+  /** Container bounds (for resize handles) */
   bbox: BBox;
+  /** Tight content bounds (for selection highlight border) */
+  tightBBox?: BBox | null;
   isDragging: boolean;
   dragOffset: { x: number; y: number };
   isResizing: boolean;
@@ -95,34 +101,43 @@ function BoundingBox({
   const ox = isDragging ? dragOffset.x : 0;
   const oy = isDragging ? dragOffset.y : 0;
 
-  const x = effectiveBBox.minX + ox;
-  const y = effectiveBBox.minY + oy;
-  const w = effectiveBBox.maxX - effectiveBBox.minX;
-  const h = effectiveBBox.maxY - effectiveBBox.minY;
+  // Handles use container bounds
+  const hx = effectiveBBox.minX + ox;
+  const hy = effectiveBBox.minY + oy;
+  const hw = effectiveBBox.maxX - effectiveBBox.minX;
+  const hh = effectiveBBox.maxY - effectiveBBox.minY;
 
-  const midX = x + w / 2;
-  const midY = y + h / 2;
-  const right = x + w;
-  const bottom = y + h;
+  const midX = hx + hw / 2;
+  const midY = hy + hh / 2;
+  const right = hx + hw;
+  const bottom = hy + hh;
 
   const handles: { cx: number; cy: number }[] = [
-    { cx: x, cy: y }, // TL
-    { cx: midX, cy: y }, // TC
-    { cx: right, cy: y }, // TR
-    { cx: x, cy: midY }, // ML
+    { cx: hx, cy: hy }, // TL
+    { cx: midX, cy: hy }, // TC
+    { cx: right, cy: hy }, // TR
+    { cx: hx, cy: midY }, // ML
     { cx: right, cy: midY }, // MR
-    { cx: x, cy: bottom }, // BL
+    { cx: hx, cy: bottom }, // BL
     { cx: midX, cy: bottom }, // BC
     { cx: right, cy: bottom }, // BR
   ];
 
+  // Selection highlight border uses tight bounds (falls back to container bounds)
+  const highlightBBox =
+    !isResizing && tightBBox ? tightBBox : effectiveBBox;
+  const bx = highlightBBox.minX + ox;
+  const by = highlightBBox.minY + oy;
+  const bw = highlightBBox.maxX - highlightBBox.minX;
+  const bh = highlightBBox.maxY - highlightBBox.minY;
+
   return (
     <g>
       <rect
-        x={x}
-        y={y}
-        width={w}
-        height={h}
+        x={bx}
+        y={by}
+        width={bw}
+        height={bh}
         fill="none"
         stroke="#3b82f6"
         strokeWidth={1.5}
@@ -139,6 +154,7 @@ export function SelectionOverlay({
   selectionPath,
   isRectMode,
   selectionBBox,
+  tightSelectionBBox,
   isDragging,
   dragOffset,
   isResizing,
@@ -156,6 +172,7 @@ export function SelectionOverlay({
       {selectionBBox && (
         <BoundingBox
           bbox={selectionBBox}
+          tightBBox={tightSelectionBBox}
           isDragging={isDragging}
           dragOffset={dragOffset}
           isResizing={isResizing}

@@ -37,6 +37,11 @@ Every step of development must follow this git workflow:
 - PRs cannot be merged unless CI passes. This is enforced via GitHub branch protection rules on `main`.
 
 ## Active Technologies
+- TypeScript 5 / Node.js 22+ + React 19, Next.js 16, TipTap 3 (ProseMirror), perfect-freehand, Canvas 2D API (014-tight-text-bounds)
+- N/A — no schema changes, client-side only; text boxes stored in existing `pages` JSONB column via Supabase (014-tight-text-bounds)
+
+- TypeScript 5 / Node.js 22+ + React 19, Next.js 16, perfect-freehand (stroke geometry), Canvas 2D API (015-shape-snap-circle)
+- N/A — strokes stored in existing `pages` JSONB column via Supabase (015-shape-snap-circle)
 
 - TypeScript 5 / Node.js 22+ + Next.js 16 (App Router), @supabase/ssr, shadcn/ui (Dialog, Tooltip, Card, Button, Input, Label) (011-core-ux-improvements)
 - PostgreSQL via Supabase — new tables: `ai_conversations`, `ai_messages` + extended `moveDocument` server action (011-core-ux-improvements)
@@ -72,6 +77,7 @@ Every step of development must follow this git workflow:
 
 ## Recent Changes
 
+- 014-tight-text-bounds: Text box selection uses tight content bounds (actual rendered text width) instead of full container width, for hit-testing and selection highlight
 - 011-core-ux-improvements: Auto-save retry with manual save button, document move dialog with course/folder tree, AI conversation persistence per course with conversation list
 - 009-ai-rate-limit: Per-user daily AI query caps with subscription tiers, atomic Postgres RPC enforcement, quota display in chat panel
 - 007-ai-context-polish: Dynamic system prompt with course/week context, document content awareness, markdown+LaTeX rendering in AI chat, embedding cleanup on deletion
