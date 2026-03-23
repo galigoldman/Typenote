@@ -221,4 +221,55 @@ describe('MathExpression Trigger Plugin', () => {
     expect(result).toBe(false);
     expect(dispatchEventSpy).not.toHaveBeenCalled();
   });
+
+  // RTL/Hebrew: :{ triggers even with invisible bidi marks between : and cursor
+  it('should trigger when bidi marks exist between : and cursor (Hebrew/RTL)', () => {
+    // Simulate Hebrew text followed by : and a Right-to-Left Mark (U+200F)
+    editor.commands.setContent('<p>\u05E9\u05DC\u05D5\u05DD:\u200F</p>');
+    editor.commands.focus('end');
+
+    const result = keyDown('{');
+
+    expect(result).toBe(true);
+    expect(dispatchEventSpy).toHaveBeenCalledWith(
+      expect.objectContaining({ type: 'math-input-trigger' }),
+    );
+    // Both the : and the bidi mark should be removed
+    expect(editor.state.doc.textContent).toBe('\u05E9\u05DC\u05D5\u05DD');
+  });
+
+  // RTL: bidi mark without preceding : should NOT trigger
+  it('should not trigger with bidi mark but no colon (Hebrew/RTL)', () => {
+    editor.commands.setContent('<p>\u05E9\u05DC\u05D5\u05DD\u200F</p>');
+    editor.commands.focus('end');
+
+    const result = keyDown('{');
+
+    expect(result).toBe(false);
+    expect(dispatchEventSpy).not.toHaveBeenCalled();
+  });
+
+  // RTL/Hebrew: :} also triggers (braces swapped on Hebrew keyboards)
+  it('should trigger with } key (Hebrew keyboard swaps braces)', () => {
+    editor.commands.setContent('<p>\u05E9\u05DC\u05D5\u05DD:</p>');
+    editor.commands.focus('end');
+
+    const result = keyDown('}');
+
+    expect(result).toBe(true);
+    expect(dispatchEventSpy).toHaveBeenCalledWith(
+      expect.objectContaining({ type: 'math-input-trigger' }),
+    );
+  });
+
+  // } without : should NOT trigger
+  it('should not trigger } without preceding :', () => {
+    editor.commands.setContent('<p>hello</p>');
+    editor.commands.focus('end');
+
+    const result = keyDown('}');
+
+    expect(result).toBe(false);
+    expect(dispatchEventSpy).not.toHaveBeenCalled();
+  });
 });
