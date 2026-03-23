@@ -1,8 +1,18 @@
 import { type NextRequest } from 'next/server';
+import { postHogMiddleware } from '@posthog/next';
 import { updateSession } from '@/lib/supabase/middleware';
 
 export async function middleware(request: NextRequest) {
-  return await updateSession(request);
+  // PostHog proxy: forward /ingest/* to PostHog without running auth
+  if (request.nextUrl.pathname.startsWith('/ingest')) {
+    return postHogMiddleware({ proxy: true })(request);
+  }
+
+  // All other routes: Supabase auth first, then PostHog identity cookie
+  const supabaseResponse = await updateSession(request);
+  return postHogMiddleware({ proxy: true, response: supabaseResponse })(
+    request,
+  );
 }
 
 export const config = {

@@ -12,6 +12,7 @@ import {
 import type { Document } from '@/types/database';
 import { SUBJECTS } from '@/lib/constants/subjects';
 import { deleteDocument } from '@/lib/actions/documents';
+import { trackEvent } from '@/lib/analytics/events';
 import { useExportPdf } from '@/hooks/use-export-pdf';
 import { cn } from '@/lib/utils';
 import {
@@ -90,6 +91,7 @@ export function DocumentCard({
     } else {
       await deleteDocument(document.id);
     }
+    trackEvent('document_deleted', { document_id: document.id });
   }
 
   return (

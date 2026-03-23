@@ -38,6 +38,9 @@ Every step of development must follow this git workflow:
 
 ## Active Technologies
 
+- TypeScript 5 / Node.js 22+ + Next.js 16 (App Router), `@posthog/next` (new), `@supabase/ssr` (existing) (014-posthog-analytics)
+- PostHog Cloud (external) — no local database changes (014-posthog-analytics)
+
 - TypeScript 5 / Node.js 22+ + React 19, Next.js 16, TipTap 3 (ProseMirror), perfect-freehand, Canvas 2D API (014-tight-text-bounds)
 - N/A — no schema changes, client-side only; text boxes stored in existing `pages` JSONB column via Supabase (014-tight-text-bounds)
 
@@ -78,9 +81,37 @@ Every step of development must follow this git workflow:
 
 ## Recent Changes
 
+- 014-posthog-analytics: PostHog analytics integration (session recordings, autocapture, 7 custom domain events, error tracking, user identification). Uses `@posthog/next` with middleware proxy for ad-blocker resilience. No database changes — all data in PostHog Cloud.
 - 014-tight-text-bounds: Text box selection uses tight content bounds (actual rendered text width) instead of full container width, for hit-testing and selection highlight
 - 011-core-ux-improvements: Auto-save retry with manual save button, document move dialog with course/folder tree, AI conversation persistence per course with conversation list
 - 009-ai-rate-limit: Per-user daily AI query caps with subscription tiers, atomic Postgres RPC enforcement, quota display in chat panel
 - 007-ai-context-polish: Dynamic system prompt with course/week context, document content awareness, markdown+LaTeX rendering in AI chat, embedding cleanup on deletion
 - 006-course-context-engine: Text-based RAG with pgvector, AI chat panel, multimodal embedding infrastructure
 - 001-canvas-editor: Added TypeScript 5.x, React 19, Next.js 16 + TipTap 3 (text editing), `perfect-freehand` (stroke geometry), Pointer Events API (input), Canvas 2D API (rendering)
+
+## PostHog Analytics
+
+PostHog is integrated for session recordings, event tracking, and error tracking on the free tier.
+
+### Key Files
+
+- `src/app/layout.tsx` — `PostHogProvider` wraps the app (conditional: skipped when `NEXT_PUBLIC_POSTHOG_KEY` is not set)
+- `src/middleware.ts` — `postHogMiddleware` composed with Supabase auth; proxies `/ingest/*` to PostHog (ad-blocker resilience)
+- `src/lib/analytics/events.ts` — Type-safe `trackEvent()` wrapper with `AnalyticsEventMap` discriminated union
+- `src/lib/analytics/identify.tsx` — `PostHogIdentify` client component (calls `posthog.identify(userId)` on auth state change)
+
+### Adding New Custom Events
+
+1. Add the event name and properties to `AnalyticsEventMap` in `src/lib/analytics/events.ts`
+2. Call `trackEvent('event_name', { ...properties })` in the client component/hook where the action succeeds
+3. Never include PII (emails, names, note content) in properties — use UUIDs and counts only
+4. The `trackEvent()` wrapper handles graceful degradation (never throws if PostHog is unavailable)
+
+### Existing Custom Events
+
+`document_created`, `document_deleted`, `file_uploaded`, `ai_chat_message_sent`, `pdf_exported`, `course_created`, `document_moved`
+
+### Environment Variables
+
+- `NEXT_PUBLIC_POSTHOG_KEY` — PostHog project API key (required for analytics, app works without it)
+- `NEXT_PUBLIC_POSTHOG_HOST` — PostHog ingest endpoint (default: `https://us.i.posthog.com`)

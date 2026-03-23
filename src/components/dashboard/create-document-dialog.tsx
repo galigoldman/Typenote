@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { SUBJECTS, CANVAS_TYPES } from '@/lib/constants/subjects';
 import { createDocument } from '@/lib/actions/documents';
+import { trackEvent } from '@/lib/analytics/events';
 import {
   Dialog,
   DialogContent,
@@ -62,6 +63,11 @@ export function CreateDocumentDialog({
         course_id: courseId,
       });
 
+      trackEvent('document_created', {
+        course_id: courseId,
+        document_type: canvasType,
+        purpose: null,
+      });
       setOpen(false);
       resetForm();
       router.push(`/dashboard/documents/${doc.id}`);

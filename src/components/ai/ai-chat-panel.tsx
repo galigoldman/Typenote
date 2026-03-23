@@ -17,6 +17,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { MarkdownResponse } from './markdown-response';
 import { ConversationList } from './conversation-list';
+import { trackEvent } from '@/lib/analytics/events';
 
 interface ChatSource {
   sourceType: string;
@@ -389,6 +390,11 @@ export function AiChatPanel({
             model,
           },
         ]);
+
+        trackEvent('ai_chat_message_sent', {
+          course_id: courseId,
+          mode,
+        });
 
         // Optimistically decrement quota after successful question
         setQuota((prev) =>
