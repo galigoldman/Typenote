@@ -326,14 +326,15 @@ export function AiChatPanel({
         if (res.status === 429 && err.error === 'rate_limited') {
           setQuota((prev) =>
             prev
-              ? { ...prev, used: err.used, limit: err.limit, remaining: 0 }
-              : {
-                  used: err.used,
-                  limit: err.limit,
-                  remaining: 0,
-                  tier: 'free',
-                  resetsAt: err.resetsAt,
-                },
+              ? {
+                  ...prev,
+                  chat: {
+                    used: err.used ?? prev.chat.used,
+                    limit: err.limit ?? prev.chat.limit,
+                    remaining: 0,
+                  },
+                }
+              : null,
           );
           setMessages((prev) => [
             ...prev,
