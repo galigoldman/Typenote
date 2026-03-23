@@ -37,6 +37,7 @@ Every step of development must follow this git workflow:
 - PRs cannot be merged unless CI passes. This is enforced via GitHub branch protection rules on `main`.
 
 ## Active Technologies
+
 - TypeScript 5 / Node.js 22+ + Next.js 16, TipTap 3, ProseMirror (`@tiptap/pm/state`, `@tiptap/pm/view`) (020-change-latex-trigger)
 - N/A — no data changes (020-change-latex-trigger)
 
