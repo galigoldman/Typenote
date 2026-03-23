@@ -57,11 +57,11 @@ function setupDefaultFetchResponses(overrides?: {
   const conversations = overrides?.conversations ?? [];
   const messages = overrides?.messages ?? [];
   const quota = overrides?.quota ?? {
-    used: 40,
-    limit: 50,
-    remaining: 10,
+    chat: { used: 40, limit: 50, remaining: 10 },
+    latex: { used: 50, limit: 150, remaining: 100 },
     tier: 'free',
     resetsAt: '2026-04-01T00:00:00Z',
+    deepModeAvailable: false,
   };
 
   mockFetch.mockImplementation((url: string) => {
@@ -244,11 +244,11 @@ describe('AiChatPanel', () => {
   it('shows quota information', async () => {
     setupDefaultFetchResponses({
       quota: {
-        used: 40,
-        limit: 50,
-        remaining: 10,
+        chat: { used: 40, limit: 50, remaining: 10 },
+        latex: { used: 50, limit: 150, remaining: 100 },
         tier: 'free',
         resetsAt: '2026-04-01T00:00:00Z',
+        deepModeAvailable: false,
       },
     });
 
@@ -256,7 +256,7 @@ describe('AiChatPanel', () => {
 
     await waitFor(() => {
       expect(
-        screen.getByText('10 of 50 questions remaining this month'),
+        screen.getByText('Chat: 10 of 50 remaining'),
       ).toBeInTheDocument();
     });
   });

@@ -22,6 +22,7 @@ import 'katex/dist/katex.min.css';
 
 interface TiptapEditorProps {
   document: Document;
+  courseName?: string;
 }
 
 const CANVAS_CLASSES: Record<string, string> = {
@@ -82,7 +83,7 @@ function ConnectionIndicator({
   );
 }
 
-export function TiptapEditor({ document }: TiptapEditorProps) {
+export function TiptapEditor({ document, courseName }: TiptapEditorProps) {
   const [title, setTitle] = useState(document.title);
   const [mathInputPosition, setMathInputPosition] = useState<{
     x: number;
@@ -179,7 +180,7 @@ export function TiptapEditor({ document }: TiptapEditorProps) {
         const res = await fetch('/api/ai/latex', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ text }),
+          body: JSON.stringify({ text, courseName }),
         });
         if (!res.ok) {
           throw new Error('Conversion failed');

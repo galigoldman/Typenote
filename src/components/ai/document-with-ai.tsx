@@ -76,6 +76,7 @@ export function DocumentWithAi({
         document={document}
         onDocumentTextReady={handleDocumentTextReady}
         materialId={materialId}
+        courseName={courseName}
         onAskAiWithContext={handleAskAiWithContext}
       />
     </>

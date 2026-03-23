@@ -1,11 +1,14 @@
 import { generateText } from 'ai';
 import { getModel } from './provider';
-import { LATEX_SYSTEM_PROMPT } from './prompts';
+import { buildLatexPrompt } from './prompts';
 
-export async function convertToLatex(text: string): Promise<string> {
+export async function convertToLatex(
+  text: string,
+  courseName?: string,
+): Promise<string> {
   const { text: latex } = await generateText({
     model: getModel(),
-    system: LATEX_SYSTEM_PROMPT,
+    system: buildLatexPrompt(courseName),
     prompt: text,
     temperature: 0,
   });

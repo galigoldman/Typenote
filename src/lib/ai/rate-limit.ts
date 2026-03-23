@@ -4,6 +4,8 @@ import { createClient } from '@/lib/supabase/server';
 // Types
 // ---------------------------------------------------------------------------
 
+export type QueryType = 'chat' | 'latex';
+
 export interface RateLimitResult {
   currentCount: number;
   monthlyLimit: number;
@@ -11,35 +13,54 @@ export interface RateLimitResult {
   isAllowed: boolean;
 }
 
-export interface QuotaInfo {
+export interface QuotaBucket {
   used: number;
   limit: number;
   remaining: number;
+}
+
+export interface QuotaInfo {
+  chat: QuotaBucket;
+  latex: QuotaBucket;
   tier: string;
   resetsAt: string; // ISO 8601
+  deepModeAvailable: boolean;
 }
 
 // ---------------------------------------------------------------------------
 // Tier limit resolution
 // ---------------------------------------------------------------------------
 
-/** Default monthly limits per tier (used when env vars are not set). */
-const DEFAULT_LIMITS: Record<string, number> = {
+/** Default monthly chat limits per tier. */
+const DEFAULT_CHAT_LIMITS: Record<string, number> = {
   free: 50,
+  beta: 100,
   pro: 500,
 };
 
+/** Default monthly LaTeX limits per tier. */
+const DEFAULT_LATEX_LIMITS: Record<string, number> = {
+  free: 150,
+  beta: 500,
+  pro: 1500,
+};
+
 /**
- * Resolve the monthly limit for a given tier.
+ * Resolve the monthly limit for a given tier and query type.
  *
- * Priority: environment variable AI_LIMIT_{TIER} > default map > free default.
+ * Priority: environment variable > default map > free default.
  *
- * Why env vars? Decouples operational decisions (changing a limit from 50 to 100)
- * from code deployments. This is the twelve-factor app principle of storing
- * config in the environment.
+ * For chat: checks AI_LIMIT_{TIER} (backwards-compatible with existing env vars).
+ * For LaTeX: checks AI_LATEX_LIMIT_{TIER}.
  */
-function resolveLimitForTier(tier: string): number {
-  const envKey = `AI_LIMIT_${tier.toUpperCase()}`;
+export function resolveLimitForTier(
+  tier: string,
+  queryType: QueryType = 'chat',
+): number {
+  const defaults =
+    queryType === 'latex' ? DEFAULT_LATEX_LIMITS : DEFAULT_CHAT_LIMITS;
+  const envPrefix = queryType === 'latex' ? 'AI_LATEX_LIMIT' : 'AI_LIMIT';
+  const envKey = `${envPrefix}_${tier.toUpperCase()}`;
   const envValue = process.env[envKey];
 
   if (envValue !== undefined) {
@@ -47,13 +68,12 @@ function resolveLimitForTier(tier: string): number {
     if (!isNaN(parsed) && parsed > 0) {
       return parsed;
     }
-    // Invalid env var — fall through to defaults
     console.warn(
       `[rate-limit] Invalid value for ${envKey}="${envValue}", using default`,
     );
   }
 
-  return DEFAULT_LIMITS[tier] ?? DEFAULT_LIMITS.free!;
+  return defaults[tier] ?? defaults.free!;
 }
 
 // ---------------------------------------------------------------------------
@@ -64,28 +84,26 @@ function resolveLimitForTier(tier: string): number {
  * Atomically check and increment a user's monthly AI usage.
  *
  * Calls the `increment_ai_usage` Postgres RPC which performs an atomic upsert.
- * After getting the DB-level limit, applies env var overrides if configured.
- *
- * Why RPC instead of application-level logic? The atomic guarantee lives in
- * the database, not the application. Even if the app layer has a bug or race
- * condition, the database function ensures correctness. This is defense-in-depth.
+ * The `queryType` parameter separates chat and LaTeX counters so they have
+ * independent quotas.
  */
 export async function checkAndIncrementUsage(
   userId: string,
   model: string,
+  queryType: QueryType = 'chat',
 ): Promise<RateLimitResult> {
   const supabase = await createClient();
 
   const { data, error } = await supabase.rpc('increment_ai_usage', {
     p_user_id: userId,
     p_model: model,
+    p_query_type: queryType,
   });
 
   if (error) {
     throw new Error(`Rate limit check failed: ${error.message}`);
   }
 
-  // RPC returns an array with one row
   const row = Array.isArray(data) ? data[0] : data;
 
   if (!row) {
@@ -96,7 +114,7 @@ export async function checkAndIncrementUsage(
   const currentCount = row.current_count as number;
 
   // Apply env var override for the limit
-  const monthlyLimit = resolveLimitForTier(tier);
+  const monthlyLimit = resolveLimitForTier(tier, queryType);
 
   return {
     currentCount,
@@ -113,8 +131,8 @@ export async function checkAndIncrementUsage(
 /**
  * Get a user's current AI quota for display in the chat panel.
  *
- * Calls the `get_ai_quota` Postgres RPC, then applies env var overrides
- * so the displayed limit matches what enforcement actually uses.
+ * The RPC now returns two rows (chat + latex). We combine them into a single
+ * QuotaInfo object with per-type buckets.
  */
 export async function getQuota(userId: string): Promise<QuotaInfo> {
   const supabase = await createClient();
@@ -127,24 +145,78 @@ export async function getQuota(userId: string): Promise<QuotaInfo> {
     throw new Error(`Quota check failed: ${error.message}`);
   }
 
-  const row = Array.isArray(data) ? data[0] : data;
+  const rows = Array.isArray(data) ? data : [data];
 
-  if (!row) {
+  if (!rows.length) {
     throw new Error('Quota check returned no data');
   }
 
-  const tier = row.tier as string;
-  const used = row.used as number;
+  // The RPC returns one row per query_type. Both rows share the same tier/resets_at.
+  const tier = (rows[0].tier as string) ?? 'free';
+  const resetsAt = rows[0].resets_at as string;
 
-  // Apply env var override for the limit
-  const limit = resolveLimitForTier(tier);
-  const remaining = Math.max(0, limit - used);
+  let chatUsed = 0;
+  let latexUsed = 0;
+
+  for (const row of rows) {
+    if (row.query_type === 'chat') {
+      chatUsed = row.used as number;
+    } else if (row.query_type === 'latex') {
+      latexUsed = row.used as number;
+    }
+  }
+
+  const chatLimit = resolveLimitForTier(tier, 'chat');
+  const latexLimit = resolveLimitForTier(tier, 'latex');
 
   return {
-    used,
-    limit,
-    remaining,
+    chat: {
+      used: chatUsed,
+      limit: chatLimit,
+      remaining: Math.max(0, chatLimit - chatUsed),
+    },
+    latex: {
+      used: latexUsed,
+      limit: latexLimit,
+      remaining: Math.max(0, latexLimit - latexUsed),
+    },
     tier,
-    resetsAt: row.resets_at as string,
+    resetsAt,
+    deepModeAvailable: tier === 'pro',
   };
+}
+
+// ---------------------------------------------------------------------------
+// recordTokenUsage (fire-and-forget)
+// ---------------------------------------------------------------------------
+
+/**
+ * Record token counts for admin observability. Called AFTER the AI response.
+ *
+ * This is a fire-and-forget update — it never throws. If the DB update fails,
+ * we log and move on. The user's query is not affected.
+ *
+ * Why not in the atomic RPC? Because token counts are unknown before the AI call,
+ * and the RPC runs before the call for fail-closed rate limiting.
+ */
+export async function recordTokenUsage(
+  userId: string,
+  queryType: QueryType,
+  inputTokens: number,
+  outputTokens: number,
+): Promise<void> {
+  try {
+    const supabase = await createClient();
+
+    // Atomic increment via RPC — can't use .update() because it replaces, not adds.
+    await supabase.rpc('record_token_usage', {
+      p_user_id: userId,
+      p_query_type: queryType,
+      p_input_tokens: inputTokens,
+      p_output_tokens: outputTokens,
+    });
+  } catch (err) {
+    // Fire-and-forget: log but never throw
+    console.error('[rate-limit] Failed to record token usage:', err);
+  }
 }

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { buildSystemPrompt } from '../prompts';
+import { buildLatexPrompt, buildSystemPrompt } from '../prompts';
 
 describe('buildSystemPrompt', () => {
   it('returns generic prompt with no context', () => {
@@ -65,5 +65,25 @@ describe('buildSystemPrompt', () => {
     expect(prompt).toContain('[Sources]');
     expect(prompt).toContain('primary source');
     expect(prompt).toContain('smart AI');
+  });
+});
+
+describe('buildLatexPrompt', () => {
+  it('returns base prompt when no courseName', () => {
+    const prompt = buildLatexPrompt();
+    expect(prompt).toContain('LaTeX conversion assistant');
+    expect(prompt).not.toContain('student is in the course');
+  });
+
+  it('returns base prompt when courseName is empty string', () => {
+    const prompt = buildLatexPrompt('');
+    expect(prompt).not.toContain('student is in the course');
+  });
+
+  it('appends course context when courseName provided', () => {
+    const prompt = buildLatexPrompt('Linear Algebra');
+    expect(prompt).toContain('LaTeX conversion assistant');
+    expect(prompt).toContain('student is in the course: Linear Algebra');
+    expect(prompt).toContain('notation conventions');
   });
 });

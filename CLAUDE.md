@@ -37,6 +37,8 @@ Every step of development must follow this git workflow:
 - PRs cannot be merged unless CI passes. This is enforced via GitHub branch protection rules on `main`.
 
 ## Active Technologies
+- TypeScript 5 / Node.js 22+ / Next.js 16 (App Router) + `@google/genai` (chat streaming), `@ai-sdk/google` + `ai` (LaTeX via generateText), `@supabase/ssr` (014-beta-latex-limits)
+- PostgreSQL via Supabase — modifying `ai_usage` table, `increment_ai_usage` and `get_ai_quota` RPC functions (014-beta-latex-limits)
 
 - TypeScript 5 / Node.js 22+ + Next.js 16 (App Router), `@posthog/next` (new), `@supabase/ssr` (existing) (014-posthog-analytics)
 - PostHog Cloud (external) — no local database changes (014-posthog-analytics)
