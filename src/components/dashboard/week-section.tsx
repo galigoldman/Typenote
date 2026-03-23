@@ -147,17 +147,167 @@ export function WeekSection({
 
       {expanded && (
         <div className="space-y-4 border-t px-4 py-3">
-          {/* Quick-action buttons */}
+          {/* My Solutions — always visible */}
+          <div>
+            <h4 className="mb-1.5 flex items-center gap-1.5 text-sm font-medium text-muted-foreground">
+              <PenLine className="size-3.5" />
+              My Solutions
+            </h4>
+            {homeworkDocs.length > 0 && (
+              <div className="mb-2 space-y-1">
+                {homeworkDocs.map((doc) => (
+                  <button
+                    key={doc.id}
+                    onClick={() =>
+                      router.push(`/dashboard/documents/${doc.id}`)
+                    }
+                    className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-muted"
+                  >
+                    <FileText className="size-3.5 text-muted-foreground" />
+                    <span className="truncate">{doc.title}</span>
+                  </button>
+                ))}
+              </div>
+            )}
+            {personalFiles.filter((f) => f.category === 'homework').length >
+              0 && (
+              <div className="mb-2 space-y-0.5">
+                {personalFiles
+                  .filter((f) => f.category === 'homework')
+                  .map((file) => (
+                    <PersonalFileItem key={file.id} file={file} />
+                  ))}
+              </div>
+            )}
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={creating !== null}
+                onClick={() => handleQuickCreate('homework')}
+              >
+                <PenLine className="size-4" />
+                {creating === 'homework' ? 'Creating...' : 'Start Homework'}
+              </Button>
+              <PersonalFileUpload
+                courseId={courseId}
+                weekId={week.id}
+                userId={userId}
+                category="homework"
+                label="Add File"
+              />
+            </div>
+          </div>
+
+          {/* Materials */}
+          <div>
+            <h4 className="mb-2 text-sm font-medium text-muted-foreground">
+              Materials
+            </h4>
+            {materials.length > 0 && (
+              <div className="mb-2 space-y-1">
+                {materials.map((m) => (
+                  <MaterialItem key={m.id} material={m} />
+                ))}
+              </div>
+            )}
+            {personalFiles.filter((f) => f.category === 'material').length >
+              0 && (
+              <div className="mb-2 space-y-0.5">
+                {personalFiles
+                  .filter((f) => f.category === 'material')
+                  .map((file) => (
+                    <PersonalFileItem key={file.id} file={file} />
+                  ))}
+              </div>
+            )}
+            <div className="flex items-center gap-2">
+              <MaterialUpload
+                weekId={week.id}
+                courseId={courseId}
+                userId={userId}
+                category="material"
+              />
+              <PersonalFileUpload
+                courseId={courseId}
+                weekId={week.id}
+                userId={userId}
+                category="material"
+                label="Add File"
+              />
+              {moodleFiles.length > 0 && (
+                <MoodleImportPicker
+                  weekId={week.id}
+                  courseId={courseId}
+                  category="material"
+                  moodleFiles={moodleFiles}
+                />
+              )}
+            </div>
+          </div>
+
+          {/* Assignment */}
+          <div>
+            <h4 className="mb-2 text-sm font-medium text-muted-foreground">
+              Assignment
+            </h4>
+            {homework.length > 0 && (
+              <div className="mb-2 space-y-1">
+                {homework.map((m) => (
+                  <MaterialItem key={m.id} material={m} />
+                ))}
+              </div>
+            )}
+            <div className="flex items-center gap-2">
+              <MaterialUpload
+                weekId={week.id}
+                courseId={courseId}
+                userId={userId}
+                category="homework"
+              />
+              <PersonalFileUpload
+                courseId={courseId}
+                weekId={week.id}
+                userId={userId}
+                category="homework"
+                label="Add File"
+              />
+              {moodleFiles.length > 0 && (
+                <MoodleImportPicker
+                  weekId={week.id}
+                  courseId={courseId}
+                  category="homework"
+                  moodleFiles={moodleFiles}
+                />
+              )}
+            </div>
+          </div>
+
+          {/* Summaries, Notes, Other docs — only if they exist */}
+          {(summaryDocs.length > 0 ||
+            notesDocs.length > 0 ||
+            otherDocs.length > 0) && (
+            <div className="space-y-3">
+              <DocumentGroup
+                label="Summaries"
+                icon={<BookOpen className="size-3.5" />}
+                docs={summaryDocs}
+              />
+              <DocumentGroup
+                label="Notes"
+                icon={<StickyNote className="size-3.5" />}
+                docs={notesDocs}
+              />
+              <DocumentGroup
+                label="Documents"
+                icon={<FileText className="size-3.5" />}
+                docs={otherDocs}
+              />
+            </div>
+          )}
+
+          {/* Quick-create for summaries and notes */}
           <div className="flex flex-wrap gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              disabled={creating !== null}
-              onClick={() => handleQuickCreate('homework')}
-            >
-              <PenLine className="size-4" />
-              {creating === 'homework' ? 'Creating...' : 'Start Homework'}
-            </Button>
             <Button
               variant="outline"
               size="sm"
@@ -177,133 +327,6 @@ export function WeekSection({
               {creating === 'notes' ? 'Creating...' : 'Notes'}
             </Button>
           </div>
-
-          {/* Documents grouped by purpose */}
-          {documents.length > 0 && (
-            <div className="space-y-3">
-              <DocumentGroup
-                label="My Solutions"
-                icon={<PenLine className="size-3.5" />}
-                docs={homeworkDocs}
-              />
-              <DocumentGroup
-                label="Summaries"
-                icon={<BookOpen className="size-3.5" />}
-                docs={summaryDocs}
-              />
-              <DocumentGroup
-                label="Notes"
-                icon={<StickyNote className="size-3.5" />}
-                docs={notesDocs}
-              />
-              <DocumentGroup
-                label="Documents"
-                icon={<FileText className="size-3.5" />}
-                docs={otherDocs}
-              />
-            </div>
-          )}
-
-          {/* Materials section */}
-          <div>
-            <h4 className="mb-2 text-sm font-medium text-muted-foreground">
-              Materials
-            </h4>
-            {materials.length > 0 && (
-              <div className="mb-2 space-y-1">
-                {materials.map((m) => (
-                  <MaterialItem key={m.id} material={m} />
-                ))}
-              </div>
-            )}
-            <div className="flex items-center gap-2">
-              <MaterialUpload
-                weekId={week.id}
-                courseId={courseId}
-                userId={userId}
-                category="material"
-              />
-              <PersonalFileUpload
-                courseId={courseId}
-                weekId={week.id}
-                userId={userId}
-                category="material"
-                label="Import File"
-              />
-              {moodleFiles.length > 0 && (
-                <MoodleImportPicker
-                  weekId={week.id}
-                  courseId={courseId}
-                  category="material"
-                  moodleFiles={moodleFiles}
-                />
-              )}
-            </div>
-          </div>
-
-          {/* Assignment PDFs (questions from professor) */}
-          <div>
-            <h4 className="mb-2 text-sm font-medium text-muted-foreground">
-              Assignment
-            </h4>
-            {homework.length > 0 && (
-              <div className="mb-2 space-y-1">
-                {homework.map((m) => (
-                  <MaterialItem key={m.id} material={m} />
-                ))}
-              </div>
-            )}
-            {personalFiles.filter((f) => f.category === 'homework').length >
-              0 && (
-              <div className="mb-2 space-y-0.5">
-                {personalFiles
-                  .filter((f) => f.category === 'homework')
-                  .map((file) => (
-                    <PersonalFileItem key={file.id} file={file} />
-                  ))}
-              </div>
-            )}
-            <div className="flex items-center gap-2">
-              <MaterialUpload
-                weekId={week.id}
-                courseId={courseId}
-                userId={userId}
-                category="homework"
-              />
-              <PersonalFileUpload
-                courseId={courseId}
-                weekId={week.id}
-                userId={userId}
-                category="homework"
-                label="Import Homework"
-              />
-              {moodleFiles.length > 0 && (
-                <MoodleImportPicker
-                  weekId={week.id}
-                  courseId={courseId}
-                  category="homework"
-                  moodleFiles={moodleFiles}
-                />
-              )}
-            </div>
-          </div>
-
-          {/* Imported materials for this week */}
-          {personalFiles.filter((f) => f.category === 'material').length >
-            0 && (
-            <div>
-              <h4 className="mb-2 text-sm font-medium text-muted-foreground">
-                Imported Files
-              </h4>
-              <div className="space-y-0.5">
-                {personalFiles
-                  .filter((f) => f.category === 'material')
-                  .map((file) => (
-                    <PersonalFileItem key={file.id} file={file} />
-                  ))}
-              </div>
-            </div>
-          )}
         </div>
       )}
 
