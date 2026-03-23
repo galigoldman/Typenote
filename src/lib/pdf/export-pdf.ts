@@ -74,5 +74,6 @@ export async function exportDocumentAsPdf(
   // jsPDF.save() uses FileSaver.js internally which handles cross-platform
   // downloads including iOS Safari and Chrome.
   const filename = sanitizeFilename(document.title) + '.pdf';
+
   doc.save(filename);
 }
