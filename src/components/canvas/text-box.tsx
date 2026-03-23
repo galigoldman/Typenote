@@ -134,10 +134,7 @@ export function TextBox({
         // Empty text box — clear content bounds
         if (lastBoundsRef.current !== undefined) {
           lastBoundsRef.current = undefined;
-          onContentBoundsMeasuredRef.current?.(
-            textBoxIdRef.current,
-            undefined,
-          );
+          onContentBoundsMeasuredRef.current?.(textBoxIdRef.current, undefined);
         }
         return;
       }
@@ -166,10 +163,7 @@ export function TextBox({
         // No measurable content
         if (lastBoundsRef.current !== undefined) {
           lastBoundsRef.current = undefined;
-          onContentBoundsMeasuredRef.current?.(
-            textBoxIdRef.current,
-            undefined,
-          );
+          onContentBoundsMeasuredRef.current?.(textBoxIdRef.current, undefined);
         }
         return;
       }
