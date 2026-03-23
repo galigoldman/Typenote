@@ -2,87 +2,79 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 
-/**
- * GoodNotes-style pinch-to-zoom + pan.
- *
- * - "100%" means the page width fills the available container width.
- * - fitScale is recalculated on container resize (chat panel open/close, etc.).
- * - Pinch zooms toward the midpoint between two fingers.
- * - Two-finger pan works via native scroll when zoomed in.
- * - Double-tap toggles between 100% and 200%.
- * - Ctrl+wheel zoom supported on desktop.
- */
+import {
+  type Camera,
+  type GestureState,
+  type SpringState,
+  DOUBLE_TAP_DELAY,
+  MAX_ZOOM,
+  MIN_ZOOM,
+  MOMENTUM_DECAY,
+  MOMENTUM_STOP,
+  SPRING_THRESHOLD,
+  clampOffset,
+  clampZoom,
+  focalPointOffset,
+  isMomentumStopped,
+  isSpringSettled,
+  momentumStep,
+  rubberBand,
+  springStep,
+} from '@/lib/canvas/zoom-physics';
 
-const MAX_ZOOM = 4.0; // 400%
-const MIN_ZOOM = 1.0; // 100% — can't zoom out past fit
-const DOUBLE_TAP_DELAY = 300;
+/**
+ * GoodNotes-style pinch-to-zoom + pan using a camera model.
+ *
+ * Instead of relying on native browser scroll for panning, the camera
+ * model ({x, y, zoom, fitScale}) manages both zoom and pan in a single
+ * CSS transform. This enables:
+ *   - Focal-point pinch zoom (content under fingers stays stationary)
+ *   - Sub-100% zoom (zoom out to 25% for overview)
+ *   - Smooth animated transitions (spring physics for double-tap)
+ *   - Rubber-band overscroll at boundaries
+ *   - Momentum-based panning with deceleration
+ */
 
 interface UsePinchZoomOptions {
   containerRef: React.RefObject<HTMLElement | null>;
   enabled?: boolean;
   pageWidth?: number;
+  /** Total content height in logical pixels (PAGE_HEIGHT * pageCount) */
+  contentHeight?: number;
 }
 
 export function usePinchZoom({
   containerRef,
   enabled = true,
   pageWidth = 794,
+  contentHeight = 1123,
 }: UsePinchZoomOptions) {
-  // fitScale: CSS scale value at which pageWidth fills the container width
-  const [fitScale, setFitScale] = useState(1);
-  // zoom: user zoom multiplier (1.0 = 100% = page fills width)
-  const [zoom, setZoom] = useState(1);
+  const [camera, setCamera] = useState<Camera>({
+    x: 0,
+    y: 0,
+    zoom: 1,
+    fitScale: 1,
+  });
   const [isZooming, setIsZooming] = useState(false);
 
-  const zoomRef = useRef(zoom);
-  const fitScaleRef = useRef(fitScale);
+  const cameraRef = useRef(camera);
   useEffect(() => {
-    zoomRef.current = zoom;
-  }, [zoom]);
+    cameraRef.current = camera;
+  }, [camera]);
+
+  const contentHeightRef = useRef(contentHeight);
   useEffect(() => {
-    fitScaleRef.current = fitScale;
-  }, [fitScale]);
+    contentHeightRef.current = contentHeight;
+  }, [contentHeight]);
 
-  // Actual CSS scale applied to the content
-  const scale = fitScale * zoom;
+  // Derived values
+  const scale = camera.fitScale * camera.zoom;
+  const displayPercent = Math.round(camera.zoom * 100);
 
-  // Compute fitScale on mount and whenever the container resizes.
-  // On touch devices (iPad): scale up to fill the available width.
-  // On desktop: never scale up past natural size — just center the page.
-  useEffect(() => {
-    const container = containerRef.current;
-    if (!container) return;
-
-    const isTouchDevice =
-      'ontouchstart' in window || navigator.maxTouchPoints > 0;
-
-    const computeFit = () => {
-      const w = container.clientWidth;
-      if (w > 0) {
-        const raw = w / pageWidth;
-        // On desktop, cap at 1 so the page stays at natural 794px width
-        const newFit = isTouchDevice ? raw : Math.min(raw, 1);
-        setFitScale(newFit);
-        fitScaleRef.current = newFit;
-      }
-    };
-
-    computeFit();
-    const observer = new ResizeObserver(computeFit);
-    observer.observe(container);
-    return () => observer.disconnect();
-  }, [containerRef, pageWidth]);
-
-  // Gesture tracking
-  const gestureRef = useRef<{
-    startDistance: number;
-    startZoom: number;
-    // Midpoint of the two fingers relative to the container viewport
-    midX: number;
-    midY: number;
-    startScrollLeft: number;
-    startScrollTop: number;
-  } | null>(null);
+  // ── Gesture tracking ─────────────────────────────────────────────
+  const gestureRef = useRef<GestureState | null>(null);
+  const animRafRef = useRef<number | null>(null);
+  const momentumRafRef = useRef<number | null>(null);
 
   const zoomTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -92,13 +84,172 @@ export function usePinchZoom({
     zoomTimeoutRef.current = setTimeout(() => setIsZooming(false), 1000);
   }, []);
 
-  const resetZoom = useCallback(() => {
-    setZoom(1);
-    const container = containerRef.current;
-    if (container) {
-      container.scrollLeft = 0;
+  /** Cancel any running animation (spring or momentum). */
+  const cancelAnimations = useCallback(() => {
+    if (animRafRef.current !== null) {
+      cancelAnimationFrame(animRafRef.current);
+      animRafRef.current = null;
     }
-  }, [containerRef]);
+    if (momentumRafRef.current !== null) {
+      cancelAnimationFrame(momentumRafRef.current);
+      momentumRafRef.current = null;
+    }
+  }, []);
+
+  /**
+   * Compute clamped camera offsets for the current zoom level.
+   * Centers the content when it fits, otherwise clamps to pan bounds.
+   */
+  const clampCamera = useCallback(
+    (cam: Camera): Camera => {
+      const container = containerRef.current;
+      if (!container) return cam;
+
+      const s = cam.fitScale * cam.zoom;
+      const scaledW = pageWidth * s;
+      const scaledH = contentHeightRef.current * s;
+      const vw = container.clientWidth;
+      const vh = container.clientHeight;
+
+      return {
+        ...cam,
+        x: clampOffset(cam.x, scaledW, vw),
+        y: clampOffset(cam.y, scaledH, vh),
+      };
+    },
+    [containerRef, pageWidth],
+  );
+
+  // ── Animated camera transitions (spring physics) ─────────────────
+
+  /**
+   * Animate camera to a target state using critically-damped springs.
+   * Used for double-tap zoom, zoom reset, and rubber-band snap-back.
+   */
+  const animateCamera = useCallback(
+    (target: { x: number; y: number; zoom: number }) => {
+      cancelAnimations();
+
+      const cam = cameraRef.current;
+      let springX: SpringState = {
+        position: cam.x,
+        velocity: 0,
+        target: target.x,
+      };
+      let springY: SpringState = {
+        position: cam.y,
+        velocity: 0,
+        target: target.y,
+      };
+      let springZ: SpringState = {
+        position: cam.zoom,
+        velocity: 0,
+        target: target.zoom,
+      };
+      let lastTime = performance.now();
+
+      const tick = (now: number) => {
+        const dt = Math.min((now - lastTime) / 1000, 0.032);
+        lastTime = now;
+
+        springX = springStep(springX, dt);
+        springY = springStep(springY, dt);
+        springZ = springStep(springZ, dt);
+
+        const newCam: Camera = {
+          x: springX.position,
+          y: springY.position,
+          zoom: springZ.position,
+          fitScale: cameraRef.current.fitScale,
+        };
+
+        setCamera(newCam);
+        cameraRef.current = newCam;
+
+        if (
+          isSpringSettled(springX) &&
+          isSpringSettled(springY) &&
+          isSpringSettled(springZ)
+        ) {
+          // Snap to exact target
+          const final = clampCamera({
+            ...newCam,
+            x: target.x,
+            y: target.y,
+            zoom: target.zoom,
+          });
+          setCamera(final);
+          cameraRef.current = final;
+          animRafRef.current = null;
+          return;
+        }
+
+        animRafRef.current = requestAnimationFrame(tick);
+      };
+
+      animRafRef.current = requestAnimationFrame(tick);
+    },
+    [cancelAnimations, clampCamera],
+  );
+
+  // ── Reset zoom ───────────────────────────────────────────────────
+
+  const resetZoom = useCallback(() => {
+    const container = containerRef.current;
+    if (!container) return;
+
+    const s = cameraRef.current.fitScale * 1; // target zoom = 1
+    const scaledW = pageWidth * s;
+    const vw = container.clientWidth;
+
+    animateCamera({
+      x: clampOffset(0, scaledW, vw),
+      y: 0,
+      zoom: 1,
+    });
+    showZoomIndicator();
+  }, [containerRef, pageWidth, animateCamera, showZoomIndicator]);
+
+  // ── Compute fitScale on mount and resize ──────────────────────────
+
+  useEffect(() => {
+    const container = containerRef.current;
+    if (!container) return;
+
+    const isTouchDevice =
+      'ontouchstart' in window || navigator.maxTouchPoints > 0;
+
+    const computeFit = () => {
+      const w = container.clientWidth;
+      if (w <= 0) return;
+
+      const raw = w / pageWidth;
+      const newFit = isTouchDevice ? raw : Math.min(raw, 1);
+
+      setCamera((prev) => {
+        const updated: Camera = { ...prev, fitScale: newFit };
+        // Re-clamp offsets after resize
+        const s = newFit * prev.zoom;
+        const scaledW = pageWidth * s;
+        const scaledH = contentHeightRef.current * s;
+        const vw = container.clientWidth;
+        const vh = container.clientHeight;
+
+        updated.x = clampOffset(prev.x, scaledW, vw);
+        updated.y = clampOffset(prev.y, scaledH, vh);
+
+        cameraRef.current = updated;
+        return updated;
+      });
+    };
+
+    computeFit();
+    const observer = new ResizeObserver(computeFit);
+    observer.observe(container);
+    return () => observer.disconnect();
+  }, [containerRef, pageWidth]);
+
+  // ── Touch + Wheel event handlers ──────────────────────────────────
 
   useEffect(() => {
     const container = containerRef.current;
@@ -123,17 +274,21 @@ export function usePinchZoom({
     const handleTouchStart = (e: TouchEvent) => {
       if (e.touches.length === 2) {
         e.preventDefault();
+        // Cancel any running animation when gesture starts
+        cancelAnimations();
+
         const t1 = e.touches[0];
         const t2 = e.touches[1];
         const mid = midpoint(t1, t2);
+        const cam = cameraRef.current;
 
         gestureRef.current = {
           startDistance: dist(t1, t2),
-          startZoom: zoomRef.current,
+          startZoom: cam.zoom,
+          startX: cam.x,
+          startY: cam.y,
           midX: mid.x,
           midY: mid.y,
-          startScrollLeft: container.scrollLeft,
-          startScrollTop: container.scrollTop,
         };
         setIsZooming(true);
       }
@@ -146,54 +301,104 @@ export function usePinchZoom({
       const t1 = e.touches[0];
       const t2 = e.touches[1];
       const g = gestureRef.current;
+      const cam = cameraRef.current;
 
       // Calculate new zoom from pinch ratio
       const currentDist = dist(t1, t2);
       const ratio = currentDist / g.startDistance;
-      const newZoom = Math.min(
-        MAX_ZOOM,
-        Math.max(MIN_ZOOM, g.startZoom * ratio),
-      );
+      const rawZoom = g.startZoom * ratio;
+      // Allow exceeding bounds during gesture for rubber-band feel
+      const newZoom = rawZoom;
 
-      // Zoom toward the original pinch midpoint:
-      // The content point under the midpoint should stay under the midpoint.
-      const oldScale = fitScaleRef.current * g.startZoom;
-      const newScale = fitScaleRef.current * newZoom;
+      // Focal-point zoom: keep content under the original midpoint stationary.
+      const oldScale = cam.fitScale * g.startZoom;
+      const newScale = cam.fitScale * newZoom;
 
-      const contentX = (g.startScrollLeft + g.midX) / oldScale;
-      const contentY = (g.startScrollTop + g.midY) / oldScale;
+      // Convert original midpoint to content space using start camera
+      const contentX = (g.midX - g.startX) / oldScale;
+      const contentY = (g.midY - g.startY) / oldScale;
 
-      let newScrollLeft = contentX * newScale - g.midX;
-      let newScrollTop = contentY * newScale - g.midY;
+      // Compute new offset so the content point stays at the midpoint
+      let newX = focalPointOffset(g.midX, contentX, newScale);
+      let newY = focalPointOffset(g.midY, contentY, newScale);
 
-      // Also handle two-finger pan: offset by how much the midpoint moved
+      // Two-finger pan: offset by how much the midpoint moved
       const currentMid = midpoint(t1, t2);
-      newScrollLeft += g.midX - currentMid.x;
-      newScrollTop += g.midY - currentMid.y;
+      newX += currentMid.x - g.midX;
+      newY += currentMid.y - g.midY;
 
-      setZoom(newZoom);
+      // Apply rubber-band to zoom if past boundaries
+      const displayZoom =
+        newZoom > MAX_ZOOM
+          ? MAX_ZOOM + rubberBand(newZoom - MAX_ZOOM, 1.0)
+          : newZoom < MIN_ZOOM
+            ? MIN_ZOOM - rubberBand(MIN_ZOOM - newZoom, 1.0)
+            : newZoom;
 
-      requestAnimationFrame(() => {
-        container.scrollLeft = Math.max(0, newScrollLeft);
-        container.scrollTop = Math.max(0, newScrollTop);
-      });
+      // Recompute offsets with displayed (rubber-banded) zoom
+      const displayScale = cam.fitScale * displayZoom;
+      const displayX = focalPointOffset(g.midX, contentX, displayScale);
+      const displayY = focalPointOffset(g.midY, contentY, displayScale);
+      const finalX = displayX + (currentMid.x - g.midX);
+      const finalY = displayY + (currentMid.y - g.midY);
+
+      const newCam: Camera = {
+        x: finalX,
+        y: finalY,
+        zoom: displayZoom,
+        fitScale: cam.fitScale,
+      };
+
+      setCamera(newCam);
+      cameraRef.current = newCam;
     };
 
     // ── Double-tap detection ───────────────────────────────────────
 
     let tapCount = 0;
     let tapTimer: ReturnType<typeof setTimeout> | null = null;
+    let lastTapX = 0;
+    let lastTapY = 0;
 
     const handleTouchEnd = (e: TouchEvent) => {
-      if (e.touches.length < 2) {
+      if (e.touches.length < 2 && gestureRef.current) {
+        // Pinch ended — snap back if zoom is out of bounds
+        const cam = cameraRef.current;
         gestureRef.current = null;
+
+        if (cam.zoom > MAX_ZOOM || cam.zoom < MIN_ZOOM) {
+          const targetZoom = clampZoom(cam.zoom);
+          const clamped = clampCamera({ ...cam, zoom: targetZoom });
+          animateCamera({
+            x: clamped.x,
+            y: clamped.y,
+            zoom: targetZoom,
+          });
+        } else {
+          // Clamp pan offsets
+          const clamped = clampCamera(cam);
+          if (clamped.x !== cam.x || clamped.y !== cam.y) {
+            animateCamera({
+              x: clamped.x,
+              y: clamped.y,
+              zoom: cam.zoom,
+            });
+          }
+        }
         showZoomIndicator();
       }
 
       // Single-finger double-tap: toggle 100% ↔ 200%
       if (e.touches.length === 0 && e.changedTouches.length === 1) {
+        const touch = e.changedTouches[0];
+        const rect = container.getBoundingClientRect();
+        const tapX = touch.clientX - rect.left;
+        const tapY = touch.clientY - rect.top;
+
         tapCount++;
         if (tapCount === 1) {
+          lastTapX = tapX;
+          lastTapY = tapY;
           tapTimer = setTimeout(() => {
             tapCount = 0;
           }, DOUBLE_TAP_DELAY);
@@ -201,17 +406,31 @@ export function usePinchZoom({
           if (tapTimer) clearTimeout(tapTimer);
           tapCount = 0;
 
-          const isNearFit = Math.abs(zoomRef.current - 1) < 0.15;
-          const target = isNearFit ? Math.min(2, MAX_ZOOM) : 1;
-          setZoom(target);
-          showZoomIndicator();
+          const cam = cameraRef.current;
+          const isNearFit = Math.abs(cam.zoom - 1) < 0.15;
+          const targetZoom = isNearFit ? Math.min(2, MAX_ZOOM) : 1;
 
-          // Reset horizontal scroll when zooming back to fit
-          if (!isNearFit) {
-            requestAnimationFrame(() => {
-              container.scrollLeft = 0;
-            });
-          }
+          // Focal-point: keep the tap point stationary during zoom
+          const currentScale = cam.fitScale * cam.zoom;
+          const targetScale = cam.fitScale * targetZoom;
+
+          // Content point under tap
+          const contentX = (lastTapX - cam.x) / currentScale;
+          const contentY = (lastTapY - cam.y) / currentScale;
+
+          let targetX = focalPointOffset(lastTapX, contentX, targetScale);
+          let targetY = focalPointOffset(lastTapY, contentY, targetScale);
+
+          // Clamp the target position
+          const scaledW = pageWidth * targetScale;
+          const scaledH = contentHeightRef.current * targetScale;
+          const vw = container.clientWidth;
+          const vh = container.clientHeight;
+          targetX = clampOffset(targetX, scaledW, vw);
+          targetY = clampOffset(targetY, scaledH, vh);
+
+          animateCamera({ x: targetX, y: targetY, zoom: targetZoom });
+          showZoomIndicator();
         }
       }
     };
@@ -222,35 +441,171 @@ export function usePinchZoom({
       if (!e.ctrlKey && !e.metaKey) return;
       e.preventDefault();
 
+      const cam = cameraRef.current;
       const delta = -e.deltaY * 0.01;
-      const newZoom = Math.min(
-        MAX_ZOOM,
-        Math.max(MIN_ZOOM, zoomRef.current * (1 + delta)),
-      );
+      const newZoom = clampZoom(cam.zoom * (1 + delta));
 
-      const oldScale = fitScaleRef.current * zoomRef.current;
-      const newScale = fitScaleRef.current * newZoom;
+      const currentScale = cam.fitScale * cam.zoom;
+      const newScale = cam.fitScale * newZoom;
 
       const rect = container.getBoundingClientRect();
       const mouseX = e.clientX - rect.left;
       const mouseY = e.clientY - rect.top;
 
-      // Zoom toward mouse cursor
-      const contentX = (container.scrollLeft + mouseX) / oldScale;
-      const contentY = (container.scrollTop + mouseY) / oldScale;
+      // Content point under mouse cursor
+      const contentX = (mouseX - cam.x) / currentScale;
+      const contentY = (mouseY - cam.y) / currentScale;
 
-      const newScrollLeft = contentX * newScale - mouseX;
-      const newScrollTop = contentY * newScale - mouseY;
+      const newX = focalPointOffset(mouseX, contentX, newScale);
+      const newY = focalPointOffset(mouseY, contentY, newScale);
 
-      setZoom(newZoom);
-      showZoomIndicator();
-
-      requestAnimationFrame(() => {
-        container.scrollLeft = Math.max(0, newScrollLeft);
-        container.scrollTop = Math.max(0, newScrollTop);
+      const newCam = clampCamera({
+        x: newX,
+        y: newY,
+        zoom: newZoom,
+        fitScale: cam.fitScale,
       });
+
+      setCamera(newCam);
+      cameraRef.current = newCam;
+      showZoomIndicator();
     };
 
+    // ── Single-finger pan + momentum (both axes) ──────────────────────
+
+    let panStartX = 0;
+    let panStartY = 0;
+    let panStartCamX = 0;
+    let panStartCamY = 0;
+    let panVelocityX = 0;
+    let panVelocityY = 0;
+    let lastPanTime = 0;
+    let lastPanX = 0;
+    let lastPanY = 0;
+    let isPanning = false;
+
+    const handleSingleTouchStart = (e: TouchEvent) => {
+      if (e.touches.length !== 1) return;
+      cancelAnimations();
+      isPanning = true;
+      const touch = e.touches[0];
+      const cam = cameraRef.current;
+      panStartX = touch.clientX;
+      panStartY = touch.clientY;
+      panStartCamX = cam.x;
+      panStartCamY = cam.y;
+      panVelocityX = 0;
+      panVelocityY = 0;
+      lastPanTime = performance.now();
+      lastPanX = touch.clientX;
+      lastPanY = touch.clientY;
+    };
+
+    const handleSingleTouchMove = (e: TouchEvent) => {
+      if (e.touches.length !== 1 || !isPanning) return;
+
+      const touch = e.touches[0];
+      const deltaX = touch.clientX - panStartX;
+      const deltaY = touch.clientY - panStartY;
+      const cam = cameraRef.current;
+
+      // Track velocity for momentum
+      const now = performance.now();
+      const dt = now - lastPanTime;
+      if (dt > 0) {
+        panVelocityX = ((touch.clientX - lastPanX) / dt) * 16;
+        panVelocityY = ((touch.clientY - lastPanY) / dt) * 16;
+      }
+      lastPanTime = now;
+      lastPanX = touch.clientX;
+      lastPanY = touch.clientY;
+
+      const s = cam.fitScale * cam.zoom;
+      const scaledW = pageWidth * s;
+      const scaledH = contentHeightRef.current * s;
+      const vw = container.clientWidth;
+      const vh = container.clientHeight;
+
+      let newX = panStartCamX + deltaX;
+      let newY = panStartCamY + deltaY;
+
+      // Apply rubber-band if past bounds (horizontal)
+      const clampedX = clampOffset(newX, scaledW, vw);
+      if (newX !== clampedX) {
+        const overX = newX - clampedX;
+        newX =
+          clampedX +
+          (overX > 0 ? rubberBand(overX, vw) : -rubberBand(-overX, vw));
+      }
+
+      // Apply rubber-band if past bounds (vertical)
+      const clampedY = clampOffset(newY, scaledH, vh);
+      if (newY !== clampedY) {
+        const overY = newY - clampedY;
+        newY =
+          clampedY +
+          (overY > 0 ? rubberBand(overY, vh) : -rubberBand(-overY, vh));
+      }
+
+      const newCam = { ...cam, x: newX, y: newY };
+      setCamera(newCam);
+      cameraRef.current = newCam;
+    };
+
+    const handleSingleTouchEnd = (e: TouchEvent) => {
+      if (e.touches.length !== 0 || !isPanning) return;
+      isPanning = false;
+
+      const cam = cameraRef.current;
+      const clamped = clampCamera(cam);
+
+      // If out of bounds, spring back
+      if (clamped.x !== cam.x || clamped.y !== cam.y) {
+        animateCamera({ x: clamped.x, y: clamped.y, zoom: cam.zoom });
+        return;
+      }
+
+      // Apply momentum if velocity is significant
+      const hasVelocity =
+        !isMomentumStopped(panVelocityX) || !isMomentumStopped(panVelocityY);
+
+      if (hasVelocity) {
+        let vx = panVelocityX;
+        let vy = panVelocityY;
+
+        const momentumTick = () => {
+          const cam = cameraRef.current;
+          vx = momentumStep(vx, MOMENTUM_DECAY);
+          vy = momentumStep(vy, MOMENTUM_DECAY);
+
+          const newCam = { ...cam, x: cam.x + vx, y: cam.y + vy };
+          const clamped = clampCamera(newCam);
+
+          // If we hit bounds on either axis, stop and spring back
+          if (clamped.x !== newCam.x || clamped.y !== newCam.y) {
+            setCamera(newCam);
+            cameraRef.current = newCam;
+            animateCamera({ x: clamped.x, y: clamped.y, zoom: cam.zoom });
+            momentumRafRef.current = null;
+            return;
+          }
+
+          setCamera(clamped);
+          cameraRef.current = clamped;
+
+          if (isMomentumStopped(vx) && isMomentumStopped(vy)) {
+            momentumRafRef.current = null;
+            return;
+          }
+
+          momentumRafRef.current = requestAnimationFrame(momentumTick);
+        };
+
+        momentumRafRef.current = requestAnimationFrame(momentumTick);
+      }
+    };
+
+    // Pinch handlers (capture phase, non-passive for preventDefault)
     container.addEventListener('touchstart', handleTouchStart, {
       passive: false,
       capture: true,
@@ -263,6 +618,19 @@ export function usePinchZoom({
     container.addEventListener('touchcancel', handleTouchEnd, {
       capture: true,
     });
+
+    // Single-finger pan (bubble phase — lower priority than pinch)
+    container.addEventListener('touchstart', handleSingleTouchStart, {
+      passive: true,
+    });
+    container.addEventListener('touchmove', handleSingleTouchMove, {
+      passive: true,
+    });
+    container.addEventListener('touchend', handleSingleTouchEnd, {
+      passive: true,
+    });
+
+    // Desktop wheel zoom
     container.addEventListener('wheel', handleWheel, { passive: false });
 
     return () => {
@@ -278,13 +646,42 @@ export function usePinchZoom({
       container.removeEventListener('touchcancel', handleTouchEnd, {
         capture: true,
       });
+      container.removeEventListener('touchstart', handleSingleTouchStart);
+      container.removeEventListener('touchmove', handleSingleTouchMove);
+      container.removeEventListener('touchend', handleSingleTouchEnd);
       container.removeEventListener('wheel', handleWheel);
+      cancelAnimations();
       if (zoomTimeoutRef.current) clearTimeout(zoomTimeoutRef.current);
     };
-  }, [containerRef, enabled, showZoomIndicator]);
+  }, [
+    containerRef,
+    enabled,
+    pageWidth,
+    showZoomIndicator,
+    cancelAnimations,
+    clampCamera,
+    animateCamera,
+  ]);
 
-  // Display percentage: zoom * 100 (1.0 = 100%)
-  const displayPercent = Math.round(zoom * 100);
+  /** Instantly set camera.y (for page navigation). */
+  const setCameraY = useCallback(
+    (y: number) => {
+      const cam = cameraRef.current;
+      const newCam = clampCamera({ ...cam, y });
+      setCamera(newCam);
+      cameraRef.current = newCam;
+    },
+    [clampCamera],
+  );
 
-  return { scale, zoom, fitScale, isZooming, resetZoom, displayPercent };
+  return {
+    camera,
+    scale,
+    zoom: camera.zoom,
+    fitScale: camera.fitScale,
+    isZooming,
+    resetZoom,
+    displayPercent,
+    setCameraY,
+  };
 }
