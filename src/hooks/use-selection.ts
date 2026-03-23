@@ -462,32 +462,7 @@ export function useSelection({
           }
           lastTapRef.current = { time: now, x, y };
 
-          // Single tap — select one object at tap point (tight bounds for hit-testing)
-          const tappedTextBox = textBoxes.find((tb) => {
-            const bbox = getSelectableBBox(tb);
-            return (
-              x >= bbox.minX &&
-              x <= bbox.maxX &&
-              y >= bbox.minY &&
-              y <= bbox.maxY
-            );
-          });
-          if (tappedTextBox) {
-            stateRef.current = 'selected';
-            activePageIdRef.current = targetPageId;
-            const tbIds = new Set([tappedTextBox.id]);
-            setSelectedTextBoxIds(tbIds);
-            selectedTextBoxIdsRef.current = tbIds;
-            setSelectedStrokeIds(new Set());
-            selectedStrokesRef.current = [];
-            // Use container bounds for resize, tight bounds for highlight
-            const tbBBox = getContainerBBox(tappedTextBox);
-            setSelectionBBox(tbBBox);
-            setTightSelectionBBox(getSelectableBBox(tappedTextBox));
-            setSelectionPath(null);
-            return;
-          }
-
+          // Single tap — select one stroke at tap point (text boxes are not selectable)
           // Check strokes (tap within 10px of any stroke point)
           const tappedStroke = strokes.find((s) => {
             if (
@@ -554,27 +529,18 @@ export function useSelection({
             }
           }
 
-          // Hit-test text boxes
-          for (const tb of textBoxes) {
-            const tbBox = getSelectableBBox(tb);
-            if (aabbIntersectsRect(tbBox, selectionRect)) {
-              selectedTbIds.push(tb.id);
-              selectedTbs.push(tb);
-            }
-          }
+          // Text boxes are not selectable — only strokes
 
-          if (selectedStrokes.length > 0 || selectedTbIds.length > 0) {
+          if (selectedStrokes.length > 0) {
             stateRef.current = 'selected';
             activePageIdRef.current = targetPageId;
             setSelectedStrokeIds(new Set(selectedStrokes.map((s) => s.id)));
             selectedStrokesRef.current = selectedStrokes;
-            const tbIdSet = new Set(selectedTbIds);
-            setSelectedTextBoxIds(tbIdSet);
-            selectedTextBoxIdsRef.current = tbIdSet;
-            setSelectionBBox(computeUnionBBox(selectedStrokes, selectedTbs));
-            setTightSelectionBBox(
-              computeTightUnionBBox(selectedStrokes, selectedTbs),
-            );
+            setSelectedTextBoxIds(new Set());
+            selectedTextBoxIdsRef.current = new Set();
+            const unionBBox = computeUnionBBox(selectedStrokes, []);
+            setSelectionBBox(unionBBox);
+            setTightSelectionBBox(unionBBox);
             setSelectionPath(null);
           } else {
             // No objects found — fire empty rect callback (used for crop-to-AI)
