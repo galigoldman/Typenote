@@ -22,8 +22,13 @@ export function MaterialUpload({
   category,
 }: MaterialUploadProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const { uploading, progress, error, upload, reset } =
-    useFileUpload('course-materials');
+  const { uploading, progress, error, upload, reset } = useFileUpload(
+    'course-materials',
+    [
+      'application/pdf',
+      'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    ],
+  );
   const [dragOver, setDragOver] = useState(false);
 
   async function handleFile(file: File) {
@@ -114,7 +119,7 @@ export function MaterialUpload({
       <input
         ref={fileInputRef}
         type="file"
-        accept=".pdf,application/pdf"
+        accept=".pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
         className="hidden"
         onChange={handleInputChange}
       />

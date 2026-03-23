@@ -24,8 +24,15 @@ import { deleteCourseWeek } from '@/lib/actions/course-weeks';
 import { createWeekDocument } from '@/lib/actions/documents';
 import { MaterialUpload } from './material-upload';
 import { MaterialItem } from './material-item';
+import { PersonalFileUpload } from './personal-file-upload';
+import { PersonalFileItem } from './personal-file-item';
 import { MoodleImportPicker } from './moodle-import-picker';
-import type { CourseWeek, CourseMaterial, Document } from '@/types/database';
+import type {
+  CourseWeek,
+  CourseMaterial,
+  Document,
+  PersonalFile,
+} from '@/types/database';
 import { cn } from '@/lib/utils';
 
 interface MoodleFileOption {
@@ -44,6 +51,7 @@ interface WeekSectionProps {
   materials: CourseMaterial[];
   homework: CourseMaterial[];
   documents: Document[];
+  personalFiles?: PersonalFile[];
   moodleFiles?: MoodleFileOption[];
 }
 
@@ -54,6 +62,7 @@ export function WeekSection({
   materials,
   homework,
   documents,
+  personalFiles = [],
   moodleFiles = [],
 }: WeekSectionProps) {
   const router = useRouter();
@@ -214,6 +223,13 @@ export function WeekSection({
                 userId={userId}
                 category="material"
               />
+              <PersonalFileUpload
+                courseId={courseId}
+                weekId={week.id}
+                userId={userId}
+                category="material"
+                label="Import File"
+              />
               {moodleFiles.length > 0 && (
                 <MoodleImportPicker
                   weekId={week.id}
@@ -237,12 +253,29 @@ export function WeekSection({
                 ))}
               </div>
             )}
+            {personalFiles.filter((f) => f.category === 'homework').length >
+              0 && (
+              <div className="mb-2 space-y-0.5">
+                {personalFiles
+                  .filter((f) => f.category === 'homework')
+                  .map((file) => (
+                    <PersonalFileItem key={file.id} file={file} />
+                  ))}
+              </div>
+            )}
             <div className="flex items-center gap-2">
               <MaterialUpload
                 weekId={week.id}
                 courseId={courseId}
                 userId={userId}
                 category="homework"
+              />
+              <PersonalFileUpload
+                courseId={courseId}
+                weekId={week.id}
+                userId={userId}
+                category="homework"
+                label="Import Homework"
               />
               {moodleFiles.length > 0 && (
                 <MoodleImportPicker
@@ -254,6 +287,23 @@ export function WeekSection({
               )}
             </div>
           </div>
+
+          {/* Imported materials for this week */}
+          {personalFiles.filter((f) => f.category === 'material').length >
+            0 && (
+            <div>
+              <h4 className="mb-2 text-sm font-medium text-muted-foreground">
+                Imported Files
+              </h4>
+              <div className="space-y-0.5">
+                {personalFiles
+                  .filter((f) => f.category === 'material')
+                  .map((file) => (
+                    <PersonalFileItem key={file.id} file={file} />
+                  ))}
+              </div>
+            </div>
+          )}
         </div>
       )}
 

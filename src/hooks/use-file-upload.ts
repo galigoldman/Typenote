@@ -4,7 +4,7 @@ import { useState, useCallback } from 'react';
 import { createClient } from '@/lib/supabase/client';
 
 const MAX_FILE_SIZE = 50 * 1024 * 1024; // 50MB
-const ALLOWED_MIME_TYPES = ['application/pdf'];
+const DEFAULT_ALLOWED_MIME_TYPES = ['application/pdf'];
 
 interface UploadState {
   uploading: boolean;
@@ -12,22 +12,31 @@ interface UploadState {
   error: string | null;
 }
 
-export function useFileUpload(bucketName: string) {
+export function useFileUpload(
+  bucketName: string,
+  allowedMimeTypes: string[] = DEFAULT_ALLOWED_MIME_TYPES,
+) {
   const [state, setState] = useState<UploadState>({
     uploading: false,
     progress: 0,
     error: null,
   });
 
-  const validateFile = useCallback((file: File): string | null => {
-    if (!ALLOWED_MIME_TYPES.includes(file.type)) {
-      return 'Only PDF files are accepted';
-    }
-    if (file.size > MAX_FILE_SIZE) {
-      return 'File size must be under 50MB';
-    }
-    return null;
-  }, []);
+  const validateFile = useCallback(
+    (file: File): string | null => {
+      if (!allowedMimeTypes.includes(file.type)) {
+        const accepted = allowedMimeTypes
+          .map((t) => t.split('/').pop())
+          .join(', ');
+        return `Accepted file types: ${accepted}`;
+      }
+      if (file.size > MAX_FILE_SIZE) {
+        return 'File size must be under 50MB';
+      }
+      return null;
+    },
+    [allowedMimeTypes],
+  );
 
   const upload = useCallback(
     async (file: File, path: string): Promise<string> => {

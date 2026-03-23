@@ -74,6 +74,7 @@ export interface Document {
   course_id: string | null;
   week_id: string | null;
   material_id: string | null;
+  personal_file_id: string | null;
   purpose: 'homework' | 'summary' | 'notes' | null;
   title: string;
   content: Record<string, unknown>;
@@ -82,6 +83,21 @@ export interface Document {
   subject_custom: string | null;
   canvas_type: CanvasType;
   position: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface PersonalFile {
+  id: string;
+  user_id: string;
+  course_id: string;
+  week_id: string | null;
+  category: MaterialCategory;
+  file_name: string;
+  display_name: string;
+  mime_type: string;
+  file_size: number;
+  storage_path: string;
   created_at: string;
   updated_at: string;
 }

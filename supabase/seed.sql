@@ -15,7 +15,11 @@ INSERT INTO auth.users (
   created_at,
   updated_at,
   confirmation_token,
-  recovery_token
+  recovery_token,
+  email_change,
+  email_change_token_new,
+  email_change_token_current,
+  email_change_confirm_status
 ) VALUES (
   'ac3be77d-4566-406c-9ac0-7c410634ad41',
   '00000000-0000-0000-0000-000000000000',
@@ -29,7 +33,11 @@ INSERT INTO auth.users (
   now(),
   now(),
   '',
-  ''
+  '',
+  '',
+  '',
+  '',
+  0
 ) ON CONFLICT (id) DO NOTHING;
 
 -- Insert identity for the user
@@ -278,6 +286,36 @@ ON CONFLICT (id) DO NOTHING;
 INSERT INTO public.user_file_imports (id, user_id, moodle_file_id, sync_id, status)
 VALUES ('66000000-0000-0000-0000-000000000002', 'ac3be77d-4566-406c-9ac0-7c410634ad41', '63000000-0000-0000-0000-000000000002', '65000000-0000-0000-0000-000000000001', 'imported')
 ON CONFLICT (id) DO NOTHING;
+
+-- ============================================
+-- PERSONAL FILES (test data for personal file import)
+-- ============================================
+
+INSERT INTO public.personal_files (id, user_id, course_id, category, file_name, display_name, mime_type, file_size, storage_path)
+VALUES (
+  '80000000-0000-0000-0000-000000000001',
+  'ac3be77d-4566-406c-9ac0-7c410634ad41',
+  '30000000-0000-0000-0000-000000000001',
+  'material',
+  'my-notes.pdf',
+  'my-notes',
+  'application/pdf',
+  1024000,
+  'ac3be77d-4566-406c-9ac0-7c410634ad41/30000000-0000-0000-0000-000000000001/my-notes.pdf'
+) ON CONFLICT (id) DO NOTHING;
+
+INSERT INTO public.personal_files (id, user_id, course_id, category, file_name, display_name, mime_type, file_size, storage_path)
+VALUES (
+  '80000000-0000-0000-0000-000000000002',
+  'ac3be77d-4566-406c-9ac0-7c410634ad41',
+  '30000000-0000-0000-0000-000000000001',
+  'homework',
+  'essay-draft.docx',
+  'essay-draft',
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  512000,
+  'ac3be77d-4566-406c-9ac0-7c410634ad41/30000000-0000-0000-0000-000000000001/essay-draft.docx'
+) ON CONFLICT (id) DO NOTHING;
 
 -- ============================================
 -- AI CONVERSATIONS (test data for conversation persistence)
