@@ -1,4 +1,5 @@
 import type { ViewTransform } from '@/types/canvas';
+import type { Camera } from './zoom-physics';
 
 /**
  * Converts screen (pixel) coordinates to page (logical) coordinates
@@ -31,6 +32,18 @@ export function pageToScreen(
   return {
     x: pageX * scale + offsetX,
     y: pageY * scale + offsetY,
+  };
+}
+
+/**
+ * Convert a Camera state into a ViewTransform for coordinate conversion.
+ * scale = fitScale * zoom, offsets = camera x/y.
+ */
+export function cameraToViewTransform(camera: Camera): ViewTransform {
+  return {
+    scale: camera.fitScale * camera.zoom,
+    offsetX: camera.x,
+    offsetY: camera.y,
   };
 }
 

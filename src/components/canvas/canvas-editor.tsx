@@ -374,11 +374,20 @@ export function CanvasEditor({
   const [highlighterSize, setHighlighterSize] = useState(20);
   const [eraserSize, setEraserSize] = useState(14);
 
-  // Pinch-to-zoom: GoodNotes-style — 100% = page fills container width
+  // Pinch-to-zoom: camera model — 100% = page fills container width
   const scrollContainerRef = useRef<HTMLDivElement>(null);
-  const { scale, zoom, isZooming, resetZoom, displayPercent } = usePinchZoom({
+  const {
+    camera,
+    scale,
+    zoom,
+    isZooming,
+    resetZoom,
+    displayPercent,
+    setCameraY,
+  } = usePinchZoom({
     containerRef: scrollContainerRef,
     pageWidth: PAGE_WIDTH,
+    contentHeight: pages.length * PAGE_HEIGHT,
   });
 
   // Auto-add missing pages when PDF has more pages than the document.
@@ -651,26 +660,24 @@ export function CanvasEditor({
 
   // Scroll so the top of a page is ~1/3 from the top of the viewport,
   // showing the divider and bottom of the previous page (like Word/Docs).
-  const scrollToPage = useCallback((pageId: string) => {
-    const scrollContainer = globalThis.document.querySelector(
-      '[data-scroll-container]',
-    ) as HTMLElement | null;
-    if (!scrollContainer) return;
-    const targetEl = scrollContainer.querySelector(
-      `[data-page-id="${pageId}"]`,
-    ) as HTMLElement | null;
-    if (targetEl) {
-      const containerRect = scrollContainer.getBoundingClientRect();
-      const targetRect = targetEl.getBoundingClientRect();
-      const scrollOffset =
-        targetRect.top - containerRect.top + scrollContainer.scrollTop;
-      // Show ~1/3 of viewport above the page top (shows divider + prev page bottom)
-      scrollContainer.scrollTo({
-        top: scrollOffset - containerRect.height * 0.35,
-        behavior: 'smooth',
-      });
-    }
-  }, []);
+  const scrollToPage = useCallback(
+    (pageId: string) => {
+      const container = scrollContainerRef.current;
+      if (!container) return;
+      const targetEl = container.querySelector(
+        `[data-page-id="${pageId}"]`,
+      ) as HTMLElement | null;
+      if (targetEl) {
+        const containerRect = container.getBoundingClientRect();
+        const targetRect = targetEl.getBoundingClientRect();
+        const currentOffset = targetRect.top - containerRect.top;
+        const desiredOffset = containerRect.height * 0.35;
+        const delta = currentOffset - desiredOffset;
+        setCameraY(camera.y - delta);
+      }
+    },
+    [camera.y, setCameraY],
+  );
 
   // Focus a page's editor by polling until it appears in editorsRef.
   // This is reliable for both existing pages and newly created ones
@@ -1234,16 +1241,12 @@ export function CanvasEditor({
     // Grab the first selected text box ID before clearing
     const tbId =
       selectedTextBoxIds.size > 0 ? Array.from(selectedTextBoxIds)[0] : null;
-    // Save scroll position before mode switch
-    const sc = scrollContainerRef.current;
-    const savedScroll = sc ? sc.scrollTop : 0;
+    // Camera state is preserved across mode switches — no save/restore needed
     clearSelection();
     setActiveTool('text');
-    // After React re-renders in text mode, restore scroll and focus text box
+    // After React re-renders in text mode, focus the text box
     if (tbId) {
       requestAnimationFrame(() => {
-        // Restore scroll first
-        if (sc) sc.scrollTop = savedScroll;
         const el = globalThis.document.querySelector(
           `[data-textbox-id="${tbId}"] .ProseMirror`,
         ) as HTMLElement | null;
@@ -1256,10 +1259,6 @@ export function CanvasEditor({
             sel.collapseToEnd();
           }
         }
-        // Restore again after focus (some browsers scroll on focus)
-        requestAnimationFrame(() => {
-          if (sc) sc.scrollTop = savedScroll;
-        });
       });
     }
   }, [clearSelection, setActiveTool, selectedTextBoxIds]);
@@ -1798,21 +1797,8 @@ export function CanvasEditor({
           className="flex-1 bg-white xl:bg-gray-100"
           data-scroll-container
           style={{
-            overflowX: zoom > 1 ? 'auto' : 'hidden',
-            overflowY:
-              activeTool === 'text' ||
-              activeTool === 'select' ||
-              isReadMode ||
-              activeTool === 'crop'
-                ? 'auto'
-                : 'hidden',
-            touchAction:
-              activeTool === 'text' ||
-              activeTool === 'select' ||
-              isReadMode ||
-              activeTool === 'crop'
-                ? 'auto'
-                : 'none',
+            overflow: 'hidden',
+            touchAction: 'none',
             overscrollBehavior: 'none',
             userSelect: isReadMode
               ? 'text'
@@ -1828,12 +1814,11 @@ export function CanvasEditor({
           <div
             className="py-8 max-xl:py-0"
             style={{
-              transform: `scale(${scale})`,
-              transformOrigin: zoom <= 1 ? 'top center' : 'top left',
+              transform: `translate(${camera.x}px, ${camera.y}px) scale(${scale})`,
+              transformOrigin: 'top left',
               willChange: 'transform',
-              // Explicit size so the scroll container knows the scaled content size
-              width: zoom > 1 ? PAGE_WIDTH * scale : undefined,
-              minHeight: `${pages.length * PAGE_HEIGHT * scale + 100}px`,
+              width: PAGE_WIDTH,
+              minHeight: `${pages.length * PAGE_HEIGHT}px`,
             }}
           >
             {pages.map((page, index) => {

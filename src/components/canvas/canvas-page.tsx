@@ -279,49 +279,10 @@ export function CanvasPage({
     renderPdfPage(page.pdfPage, canvas);
   }, [page.pdfPage, renderPdfPage]);
 
-  // Native event listeners for pen and touch.
-  // FINGER scroll: In Draw/Eraser mode the scroll container has overflow:hidden
-  // (set by canvas-editor), so native scrolling is blocked. We manually scroll
-  // via TouchEvent listeners. On iOS, TouchEvent fires only for fingers, never
-  // for Apple Pencil, so this cleanly separates pen drawing from finger scrolling.
-  useEffect(() => {
-    const el = interactionLayerRef.current;
-    if (!el) return;
-
-    const scrollContainer = el.closest(
-      '[data-scroll-container]',
-    ) as HTMLElement | null;
-
-    let touchStartX = 0;
-    let touchStartY = 0;
-    let scrollStartLeft = 0;
-    let scrollStartTop = 0;
-
-    const handleTouchStart = (e: TouchEvent) => {
-      if (e.touches.length !== 1 || !scrollContainer) return;
-      touchStartX = e.touches[0].clientX;
-      touchStartY = e.touches[0].clientY;
-      scrollStartLeft = scrollContainer.scrollLeft;
-      scrollStartTop = scrollContainer.scrollTop;
-    };
-
-    const handleTouchMove = (e: TouchEvent) => {
-      if (e.touches.length !== 1 || !scrollContainer) return;
-      const deltaX = touchStartX - e.touches[0].clientX;
-      const deltaY = touchStartY - e.touches[0].clientY;
-      scrollContainer.scrollLeft = scrollStartLeft + deltaX;
-      scrollContainer.scrollTop = scrollStartTop + deltaY;
-      e.preventDefault();
-    };
-
-    el.addEventListener('touchstart', handleTouchStart, { passive: true });
-    el.addEventListener('touchmove', handleTouchMove, { passive: false });
-
-    return () => {
-      el.removeEventListener('touchstart', handleTouchStart);
-      el.removeEventListener('touchmove', handleTouchMove);
-    };
-  }, []);
+  // Finger scroll in draw/erase modes is handled by the camera model
+  // in use-pinch-zoom.ts at the container level. On iOS, TouchEvent fires
+  // only for fingers (not Apple Pencil), so the container-level handler
+  // cleanly separates pen drawing from finger panning.
 
   // TipTap editor for flow content
   const onFlowContentUpdateRef = useRef(onFlowContentUpdate);
