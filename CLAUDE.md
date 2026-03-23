@@ -37,6 +37,8 @@ Every step of development must follow this git workflow:
 - PRs cannot be merged unless CI passes. This is enforced via GitHub branch protection rules on `main`.
 
 ## Active Technologies
+- TypeScript 5 / Node.js 22+ + jsPDF, svg2pdf.js, KaTeX, React 19, Next.js 16 (016-fix-pdf-latex-render)
+- N/A — client-side PDF rendering only, no database changes (016-fix-pdf-latex-render)
 
 - TypeScript 5 / Node.js 22+ + React 19, Next.js 16, TipTap 3 (ProseMirror), perfect-freehand, Canvas 2D API (014-tight-text-bounds)
 - N/A — no schema changes, client-side only; text boxes stored in existing `pages` JSONB column via Supabase (014-tight-text-bounds)

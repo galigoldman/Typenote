@@ -22,15 +22,19 @@ vi.mock('../font-loader', () => ({
 }));
 
 vi.mock('../canvas-page-renderer', () => ({
-  renderCanvasPage: vi.fn(),
+  renderCanvasPage: vi.fn().mockResolvedValue(undefined),
 }));
 
 vi.mock('../text-document-renderer', () => ({
-  renderTextDocument: vi.fn(),
+  renderTextDocument: vi.fn().mockResolvedValue(undefined),
 }));
 
 vi.mock('../utils', () => ({
   sanitizeFilename: vi.fn((title: string) => title || 'Untitled'),
+}));
+
+vi.mock('../math-renderer', () => ({
+  resetMathRendererCache: vi.fn(),
 }));
 
 import { jsPDF } from 'jspdf';
@@ -85,10 +89,10 @@ describe('exportDocumentAsPdf', () => {
   // -------------------------------------------------------------------------
   it('should render canvas pages first for mixed documents', async () => {
     const callOrder: string[] = [];
-    mockRenderCanvasPage.mockImplementation(() => {
+    mockRenderCanvasPage.mockImplementation(async () => {
       callOrder.push('canvas');
     });
-    mockRenderTextDocument.mockImplementation(() => {
+    mockRenderTextDocument.mockImplementation(async () => {
       callOrder.push('text');
     });
 
@@ -112,7 +116,7 @@ describe('exportDocumentAsPdf', () => {
   // -------------------------------------------------------------------------
   it('should append text pages after canvas pages', async () => {
     const callOrder: string[] = [];
-    mockRenderCanvasPage.mockImplementation(() => {
+    mockRenderCanvasPage.mockImplementation(async () => {
       callOrder.push('renderCanvas');
     });
     mockAddPage.mockImplementation((format) => {
@@ -120,7 +124,7 @@ describe('exportDocumentAsPdf', () => {
         `addPage:${typeof format === 'string' ? format : 'custom'}`,
       );
     });
-    mockRenderTextDocument.mockImplementation(() => {
+    mockRenderTextDocument.mockImplementation(async () => {
       callOrder.push('renderText');
     });
 
@@ -245,7 +249,7 @@ describe('exportDocumentAsPdf', () => {
     mockLoadFonts.mockImplementation(async () => {
       callOrder.push('loadFonts');
     });
-    mockRenderTextDocument.mockImplementation(() => {
+    mockRenderTextDocument.mockImplementation(async () => {
       callOrder.push('renderText');
     });
 
@@ -279,7 +283,7 @@ describe('exportDocumentAsPdf', () => {
 
   it('should sort canvas pages by order before rendering', async () => {
     const renderOrders: number[] = [];
-    mockRenderCanvasPage.mockImplementation((_doc, page) => {
+    mockRenderCanvasPage.mockImplementation(async (_doc, page) => {
       renderOrders.push((page as { order: number }).order);
     });
 

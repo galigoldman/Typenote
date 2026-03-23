@@ -1,5 +1,7 @@
 import type { jsPDF } from 'jspdf';
 
+import { renderMath } from './math-renderer';
+
 // ---------------------------------------------------------------------------
 // TipTap JSON types (mirrors the ProseMirror document model)
 // ---------------------------------------------------------------------------
@@ -113,6 +115,18 @@ const CODE_BLOCK_BG = { r: 243, g: 244, b: 246 }; // #f3f4f6
 
 /** Standard text color */
 const TEXT_COLOR = { r: 0, g: 0, b: 0 };
+
+// ---------------------------------------------------------------------------
+// Hebrew / RTL detection helpers
+// ---------------------------------------------------------------------------
+
+/** Matches Hebrew Unicode characters (basic + presentation forms). */
+const HEBREW_REGEX = /[\u0590-\u05FF\uFB1D-\uFB4F]/;
+
+/** Returns true if the string contains any Hebrew characters. */
+function containsHebrew(text: string): boolean {
+  return HEBREW_REGEX.test(text);
+}
 
 // ---------------------------------------------------------------------------
 // Scaled configuration — computed once per render call
@@ -240,8 +254,13 @@ function resolveMarks(marks?: TipTapMark[]): ResolvedMarks {
 
 /**
  * Determines the jsPDF font family and style string from resolved marks.
+ * When `isHebrew` is true, uses NotoSansHebrew (which has normal and bold
+ * but no italic variant).
  */
-function fontStyleFromMarks(resolved: ResolvedMarks): {
+function fontStyleFromMarks(
+  resolved: ResolvedMarks,
+  isHebrew: boolean = false,
+): {
   family: string;
   style: string;
 } {
@@ -249,17 +268,18 @@ function fontStyleFromMarks(resolved: ResolvedMarks): {
     return { family: 'GeistMono', style: 'normal' };
   }
 
+  const family = isHebrew ? 'NotoSansHebrew' : 'GeistSans';
   let style = 'normal';
   if (resolved.bold && resolved.italic) {
-    // jsPDF may not have a bold-italic variant; fall back to bold
     style = 'bold';
   } else if (resolved.bold) {
     style = 'bold';
   } else if (resolved.italic) {
-    style = 'italic';
+    // NotoSansHebrew has no italic variant — fall back to normal
+    style = isHebrew ? 'normal' : 'italic';
   }
 
-  return { family: 'GeistSans', style };
+  return { family, style };
 }
 
 // ---------------------------------------------------------------------------
@@ -305,9 +325,12 @@ function collectInlineNodes(nodes?: TipTapNode[]): TipTapNode[] {
  * Renders an array of inline nodes (text nodes with marks, math expressions)
  * at the given position, wrapping within `maxWidth`.
  *
+ * Async because math expressions are rendered via the math-renderer module
+ * which uses svg2pdf.js's async `doc.svg()` for vector embedding.
+ *
  * Returns the y-position after the last line of rendered text.
  */
-function renderInlineContent(
+async function renderInlineContent(
   doc: jsPDF,
   nodes: TipTapNode[],
   x: number,
@@ -315,7 +338,7 @@ function renderInlineContent(
   maxWidth: number,
   baseFontSize: number,
   lineHeightFactor: number = LINE_HEIGHT_PARAGRAPH,
-): number {
+): Promise<number> {
   const lineHeight = baseFontSize * lineHeightFactor;
 
   // For simple rendering, concatenate text segments and handle marks per segment.
@@ -325,30 +348,47 @@ function renderInlineContent(
   let cursorY = y;
 
   for (const node of nodes) {
-    // Handle math expression inline nodes
+    // Handle math expression inline nodes via the dedicated math renderer.
+    // This uses KaTeX → SVG → vector PDF for selectable, academic-quality math.
     if (node.type === 'mathExpression') {
       const latex = (node.attrs?.latex as string) ?? '';
       if (latex) {
-        // Render math as a fallback LaTeX string in italic mono
-        // (A dedicated math-renderer module can be integrated here once available)
-        doc.setFont('GeistMono', 'normal');
-        const mathSize = baseFontSize * 0.9;
-        doc.setFontSize(mathSize);
-        const mathText = latex;
-        const dims = doc.getTextDimensions(mathText);
+        const remainingWidth = maxWidth - (cursorX - x);
 
-        // Wrap to next line if needed
-        if (cursorX + dims.w > x + maxWidth && cursorX > x) {
+        // Wrap to next line if very little space remains
+        if (remainingWidth < maxWidth * 0.2 && cursorX > x) {
           cursorX = x;
           cursorY += lineHeight;
         }
 
-        doc.text(mathText, cursorX, cursorY);
-        cursorX += dims.w;
+        try {
+          const dims = await renderMath(
+            doc,
+            latex,
+            cursorX,
+            cursorY - lineHeight * 0.8,
+            maxWidth - (cursorX - x),
+            lineHeight,
+          );
+          cursorX += dims.width;
+        } catch {
+          // Fallback: render raw LaTeX as monospace text if renderMath fails
+          doc.setFont('GeistMono', 'normal');
+          const mathSize = baseFontSize * 0.9;
+          doc.setFontSize(mathSize);
+          const textDims = doc.getTextDimensions(latex);
 
-        // Restore font
-        doc.setFont('GeistSans', 'normal');
-        doc.setFontSize(baseFontSize);
+          if (cursorX + textDims.w > x + maxWidth && cursorX > x) {
+            cursorX = x;
+            cursorY += lineHeight;
+          }
+
+          doc.text(latex, cursorX, cursorY);
+          cursorX += textDims.w;
+
+          doc.setFont('GeistSans', 'normal');
+          doc.setFontSize(baseFontSize);
+        }
       }
       continue;
     }
@@ -357,7 +397,8 @@ function renderInlineContent(
     if (node.type !== 'text' || !node.text) continue;
 
     const resolved = resolveMarks(node.marks);
-    const { family, style } = fontStyleFromMarks(resolved);
+    const isHebrew = containsHebrew(node.text);
+    const { family, style } = fontStyleFromMarks(resolved, isHebrew);
     const fontSize = resolved.code
       ? baseFontSize * INLINE_CODE_SIZE_FACTOR
       : baseFontSize;
@@ -436,13 +477,13 @@ function renderInlineContent(
 // Node-type renderers
 // ---------------------------------------------------------------------------
 
-function renderHeading(
+async function renderHeading(
   doc: jsPDF,
   node: TipTapNode,
   x: number,
   y: number,
   width: number,
-): number {
+): Promise<number> {
   const level = (node.attrs?.level as number) ?? 1;
   const fontSize = cfg.headingSizes[level] ?? cfg.headingSizes[1];
   const lhFactor = LINE_HEIGHT_HEADINGS[level] ?? LINE_HEIGHT_PARAGRAPH;
@@ -454,7 +495,7 @@ function renderHeading(
 
   const inlines = collectInlineNodes(node.content);
   if (inlines.length > 0) {
-    cursorY = renderInlineContent(
+    cursorY = await renderInlineContent(
       doc,
       inlines,
       x,
@@ -477,13 +518,13 @@ function renderHeading(
   return cursorY;
 }
 
-function renderParagraph(
+async function renderParagraph(
   doc: jsPDF,
   node: TipTapNode,
   x: number,
   y: number,
   width: number,
-): number {
+): Promise<number> {
   doc.setFont('GeistSans', 'normal');
   doc.setFontSize(cfg.paragraphSize);
 
@@ -491,7 +532,7 @@ function renderParagraph(
   let cursorY = y;
 
   if (inlines.length > 0) {
-    cursorY = renderInlineContent(
+    cursorY = await renderInlineContent(
       doc,
       inlines,
       x,
@@ -508,34 +549,42 @@ function renderParagraph(
   return cursorY;
 }
 
-function renderBulletList(
+async function renderBulletList(
   doc: jsPDF,
   node: TipTapNode,
   x: number,
   y: number,
   width: number,
   depth: number,
-): number {
+): Promise<number> {
   let cursorY = y;
 
   if (!node.content) return cursorY;
 
   for (const listItem of node.content) {
     if (listItem.type !== 'listItem') continue;
-    cursorY = renderListItem(doc, listItem, x, cursorY, width, depth, 'bullet');
+    cursorY = await renderListItem(
+      doc,
+      listItem,
+      x,
+      cursorY,
+      width,
+      depth,
+      'bullet',
+    );
   }
 
   return cursorY;
 }
 
-function renderOrderedList(
+async function renderOrderedList(
   doc: jsPDF,
   node: TipTapNode,
   x: number,
   y: number,
   width: number,
   depth: number,
-): number {
+): Promise<number> {
   let cursorY = y;
 
   if (!node.content) return cursorY;
@@ -545,7 +594,7 @@ function renderOrderedList(
   for (let i = 0; i < node.content.length; i++) {
     const listItem = node.content[i];
     if (listItem.type !== 'listItem') continue;
-    cursorY = renderListItem(
+    cursorY = await renderListItem(
       doc,
       listItem,
       x,
@@ -560,7 +609,7 @@ function renderOrderedList(
   return cursorY;
 }
 
-function renderListItem(
+async function renderListItem(
   doc: jsPDF,
   node: TipTapNode,
   x: number,
@@ -570,7 +619,7 @@ function renderListItem(
   listType: 'bullet' | 'ordered' | 'task',
   index?: number,
   checked?: boolean,
-): number {
+): Promise<number> {
   const indent = x + depth * cfg.listIndent;
   const contentIndent = indent + cfg.listIndent;
   const contentWidth = width - (depth + 1) * cfg.listIndent;
@@ -600,7 +649,7 @@ function renderListItem(
         if (inlines.length > 0) {
           if (firstBlock) {
             // First paragraph renders on the same line as the marker
-            cursorY = renderInlineContent(
+            cursorY = await renderInlineContent(
               doc,
               inlines,
               contentIndent,
@@ -610,7 +659,7 @@ function renderListItem(
             );
             firstBlock = false;
           } else {
-            cursorY = renderInlineContent(
+            cursorY = await renderInlineContent(
               doc,
               inlines,
               contentIndent,
@@ -626,16 +675,37 @@ function renderListItem(
         cursorY += cfg.paragraphSpacing;
       } else if (child.type === 'bulletList') {
         firstBlock = false;
-        cursorY = renderBulletList(doc, child, x, cursorY, width, depth + 1);
+        cursorY = await renderBulletList(
+          doc,
+          child,
+          x,
+          cursorY,
+          width,
+          depth + 1,
+        );
       } else if (child.type === 'orderedList') {
         firstBlock = false;
-        cursorY = renderOrderedList(doc, child, x, cursorY, width, depth + 1);
+        cursorY = await renderOrderedList(
+          doc,
+          child,
+          x,
+          cursorY,
+          width,
+          depth + 1,
+        );
       } else if (child.type === 'taskList') {
         firstBlock = false;
-        cursorY = renderTaskList(doc, child, x, cursorY, width, depth + 1);
+        cursorY = await renderTaskList(
+          doc,
+          child,
+          x,
+          cursorY,
+          width,
+          depth + 1,
+        );
       } else {
         firstBlock = false;
-        cursorY = renderNode(
+        cursorY = await renderNode(
           doc,
           child,
           contentIndent,
@@ -650,14 +720,14 @@ function renderListItem(
   return cursorY;
 }
 
-function renderTaskList(
+async function renderTaskList(
   doc: jsPDF,
   node: TipTapNode,
   x: number,
   y: number,
   width: number,
   depth: number,
-): number {
+): Promise<number> {
   let cursorY = y;
 
   if (!node.content) return cursorY;
@@ -665,7 +735,7 @@ function renderTaskList(
   for (const taskItem of node.content) {
     if (taskItem.type !== 'taskItem') continue;
     const isChecked = (taskItem.attrs?.checked as boolean) ?? false;
-    cursorY = renderListItem(
+    cursorY = await renderListItem(
       doc,
       taskItem,
       x,
@@ -723,14 +793,14 @@ function renderCodeBlock(
   return y + bgHeight + cfg.paragraphSpacing;
 }
 
-function renderBlockquote(
+async function renderBlockquote(
   doc: jsPDF,
   node: TipTapNode,
   x: number,
   y: number,
   width: number,
   depth: number,
-): number {
+): Promise<number> {
   const barX = x;
   const contentX = x + 16;
   const contentWidth = width - 16;
@@ -742,7 +812,14 @@ function renderBlockquote(
   // Render children (paragraphs inside the blockquote)
   if (node.content) {
     for (const child of node.content) {
-      cursorY = renderNode(doc, child, contentX, cursorY, contentWidth, depth);
+      cursorY = await renderNode(
+        doc,
+        child,
+        contentX,
+        cursorY,
+        contentWidth,
+        depth,
+      );
     }
   }
 
@@ -774,14 +851,14 @@ function renderHorizontalRule(
 // Central node dispatcher
 // ---------------------------------------------------------------------------
 
-function renderNode(
+async function renderNode(
   doc: jsPDF,
   node: TipTapNode,
   x: number,
   y: number,
   width: number,
   depth: number = 0,
-): number {
+): Promise<number> {
   switch (node.type) {
     case 'heading':
       return renderHeading(doc, node, x, y, width);
@@ -812,7 +889,7 @@ function renderNode(
       if (node.content) {
         let cursorY = y;
         for (const child of node.content) {
-          cursorY = renderNode(doc, child, x, cursorY, width, depth);
+          cursorY = await renderNode(doc, child, x, cursorY, width, depth);
         }
         return cursorY;
       }
@@ -834,6 +911,9 @@ export const PX_TO_PT = 72 / 96;
 /**
  * Renders TipTap JSON content onto a jsPDF document at the specified position.
  *
+ * Async because math expressions (`mathExpression` nodes) are rendered via
+ * svg2pdf.js which requires an async `doc.svg()` call for vector embedding.
+ *
  * Walks the top-level `content` array of the document node, rendering each
  * block node (heading, paragraph, list, code block, etc.) sequentially. Text
  * marks (bold, italic, underline, code, link, highlight) are applied inline.
@@ -849,14 +929,14 @@ export const PX_TO_PT = 72 / 96;
  *                  for standard A4 pages (595×842 pt coordinate space).
  * @returns The y-position immediately after the last rendered element
  */
-export function renderTiptapContent(
+export async function renderTiptapContent(
   doc: jsPDF,
   content: Record<string, unknown>,
   x: number,
   y: number,
   width: number,
   scale: number = 1,
-): number {
+): Promise<number> {
   cfg = createConfig(scale);
 
   const tiptapDoc = content as unknown as {
@@ -871,7 +951,7 @@ export function renderTiptapContent(
   let cursorY = y;
 
   for (const node of tiptapDoc.content) {
-    cursorY = renderNode(doc, node, x, cursorY, width, 0);
+    cursorY = await renderNode(doc, node, x, cursorY, width, 0);
   }
 
   return cursorY;

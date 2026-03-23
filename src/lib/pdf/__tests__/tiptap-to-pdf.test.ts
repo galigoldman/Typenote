@@ -7,6 +7,16 @@ import {
 } from '../tiptap-to-pdf';
 
 // ---------------------------------------------------------------------------
+// Mock the math-renderer module so renderMath doesn't need real DOM/KaTeX
+// ---------------------------------------------------------------------------
+
+const mockRenderMath = vi.fn().mockResolvedValue({ width: 50, height: 14 });
+
+vi.mock('../math-renderer', () => ({
+  renderMath: (...args: unknown[]) => mockRenderMath(...args),
+}));
+
+// ---------------------------------------------------------------------------
 // Mock jsPDF document factory
 // ---------------------------------------------------------------------------
 
@@ -48,6 +58,13 @@ function makeParagraph(text: string) {
   return {
     type: 'paragraph',
     content: [{ type: 'text', text }],
+  };
+}
+
+function makeMathExpression(latex: string) {
+  return {
+    type: 'mathExpression',
+    attrs: { latex },
   };
 }
 
@@ -127,76 +144,83 @@ describe('renderTiptapContent', () => {
   beforeEach(() => {
     doc = makeMockDoc();
     vi.clearAllMocks();
+    mockRenderMath.mockResolvedValue({ width: 50, height: 14 });
   });
 
-  it('should render heading with bold font and correct size', () => {
+  it('should return a Promise (is async)', () => {
+    const content = makeDoc([makeParagraph('Test')]);
+    const result = renderTiptapContent(doc as never, content, 20, 40, 500);
+    expect(result).toBeInstanceOf(Promise);
+  });
+
+  it('should render heading with bold font and correct size', async () => {
     const content = makeDoc([makeHeading(1, 'Hello World')]);
 
-    renderTiptapContent(doc as never, content, 20, 40, 500);
+    await renderTiptapContent(doc as never, content, 20, 40, 500);
 
     expect(doc.setFont).toHaveBeenCalledWith('GeistSans', 'bold');
     // H1 = 36px (prose-base 2.25em) at default scale=1
     expect(doc.setFontSize).toHaveBeenCalledWith(36);
   });
 
-  it('should render heading level 2 at 24px', () => {
+  it('should render heading level 2 at 24px', async () => {
     const content = makeDoc([makeHeading(2, 'Sub Heading')]);
 
-    renderTiptapContent(doc as never, content, 20, 40, 500);
+    await renderTiptapContent(doc as never, content, 20, 40, 500);
 
     // H2 = 24px (prose-base 1.5em)
     expect(doc.setFontSize).toHaveBeenCalledWith(24);
   });
 
-  it('should render heading level 3 at 20px', () => {
+  it('should render heading level 3 at 20px', async () => {
     const content = makeDoc([makeHeading(3, 'Small Heading')]);
 
-    renderTiptapContent(doc as never, content, 20, 40, 500);
+    await renderTiptapContent(doc as never, content, 20, 40, 500);
 
     // H3 = 20px (prose-base 1.25em)
     expect(doc.setFontSize).toHaveBeenCalledWith(20);
   });
 
-  it('should render paragraph at 16px normal', () => {
+  it('should render paragraph at 16px normal', async () => {
     const content = makeDoc([makeParagraph('A simple paragraph.')]);
 
-    renderTiptapContent(doc as never, content, 20, 40, 500);
+    await renderTiptapContent(doc as never, content, 20, 40, 500);
 
     // Paragraph = 16px (prose-base 1rem) at default scale=1
     expect(doc.setFontSize).toHaveBeenCalledWith(16);
     expect(doc.setFont).toHaveBeenCalledWith('GeistSans', 'normal');
   });
 
-  it('should use PX_TO_PT scale for text-only A4 rendering', () => {
+  it('should use PX_TO_PT scale for text-only A4 rendering', async () => {
     const content = makeDoc([makeParagraph('A4 text.')]);
 
-    renderTiptapContent(doc as never, content, 72, 72, 451, PX_TO_PT);
+    await renderTiptapContent(doc as never, content, 72, 72, 451, PX_TO_PT);
 
     // 16 * 0.75 = 12pt for A4
     expect(doc.setFontSize).toHaveBeenCalledWith(12);
   });
 
-  it('should render bullet list items with bullet character', () => {
+  it('should render bullet list items with bullet character', async () => {
     const content = makeDoc([makeBulletList(['Item one', 'Item two'])]);
 
-    renderTiptapContent(doc as never, content, 20, 40, 500);
+    await renderTiptapContent(doc as never, content, 20, 40, 500);
 
     // The bullet character U+2022 should appear via doc.text
     const textCalls = doc.text.mock.calls.map((c) => c[0]);
     expect(textCalls).toContain('\u2022');
   });
 
-  it('should render ordered list items with numbers', () => {
+  it('should render ordered list items with numbers', async () => {
     const content = makeDoc([makeOrderedList(['First', 'Second'])]);
 
-    renderTiptapContent(doc as never, content, 20, 40, 500);
+    await renderTiptapContent(doc as never, content, 20, 40, 500);
 
     const textCalls = doc.text.mock.calls.map((c) => c[0]);
     expect(textCalls).toContain('1.');
     expect(textCalls).toContain('2.');
   });
 
-  it('should render task list with checkbox characters', () => {
+  it('should render task list with checkbox characters', async () => {
     const content = makeDoc([
       makeTaskList([
         { text: 'Unchecked task', checked: false },
@@ -204,7 +228,7 @@ describe('renderTiptapContent', () => {
       ]),
     ]);
 
-    renderTiptapContent(doc as never, content, 20, 40, 500);
+    await renderTiptapContent(doc as never, content, 20, 40, 500);
 
     const textCalls = doc.text.mock.calls.map((c) => c[0]);
     // ☐ (U+2610) for unchecked, ☑ (U+2611) for checked
@@ -212,15 +236,15 @@ describe('renderTiptapContent', () => {
     expect(textCalls).toContain('\u2611');
   });
 
-  it('should render code block with GeistMono font', () => {
+  it('should render code block with GeistMono font', async () => {
     const content = makeDoc([makeCodeBlock('const x = 1;')]);
 
-    renderTiptapContent(doc as never, content, 20, 40, 500);
+    await renderTiptapContent(doc as never, content, 20, 40, 500);
 
     expect(doc.setFont).toHaveBeenCalledWith('GeistMono', 'normal');
   });
 
-  it('should handle bold mark', () => {
+  it('should handle bold mark', async () => {
     const content = makeDoc([
       {
         type: 'paragraph',
@@ -228,12 +252,12 @@ describe('renderTiptapContent', () => {
       },
     ]);
 
-    renderTiptapContent(doc as never, content, 20, 40, 500);
+    await renderTiptapContent(doc as never, content, 20, 40, 500);
 
     expect(doc.setFont).toHaveBeenCalledWith('GeistSans', 'bold');
   });
 
-  it('should handle italic mark', () => {
+  it('should handle italic mark', async () => {
     const content = makeDoc([
       {
         type: 'paragraph',
@@ -241,12 +265,12 @@ describe('renderTiptapContent', () => {
       },
     ]);
 
-    renderTiptapContent(doc as never, content, 20, 40, 500);
+    await renderTiptapContent(doc as never, content, 20, 40, 500);
 
     expect(doc.setFont).toHaveBeenCalledWith('GeistSans', 'italic');
   });
 
-  it('should handle link mark with blue color', () => {
+  it('should handle link mark with blue color', async () => {
     const content = makeDoc([
       {
         type: 'paragraph',
@@ -258,19 +282,97 @@ describe('renderTiptapContent', () => {
       },
     ]);
 
-    renderTiptapContent(doc as never, content, 20, 40, 500);
+    await renderTiptapContent(doc as never, content, 20, 40, 500);
 
     // #2563eb -> r=37, g=99, b=235
     expect(doc.setTextColor).toHaveBeenCalledWith(37, 99, 235);
   });
 
-  it('should return updated y position after rendering', () => {
+  it('should return updated y position after rendering', async () => {
     const content = makeDoc([makeParagraph('Some text')]);
 
     const startY = 40;
-    const resultY = renderTiptapContent(doc as never, content, 20, startY, 500);
+    const resultY = await renderTiptapContent(
+      doc as never,
+      content,
+      20,
+      startY,
+      500,
+    );
 
     expect(resultY).toBeGreaterThan(startY);
+  });
+
+  // ---------------------------------------------------------------------------
+  // Math expression rendering (T003 — calls renderMath, not plain text)
+  // ---------------------------------------------------------------------------
+
+  it('should call renderMath for mathExpression nodes', async () => {
+    const content = makeDoc([
+      {
+        type: 'paragraph',
+        content: [makeMathExpression('\\frac{1}{2}')],
+      },
+    ]);
+
+    await renderTiptapContent(doc as never, content, 20, 40, 500);
+
+    // renderMath should have been called with the LaTeX string
+    expect(mockRenderMath).toHaveBeenCalledTimes(1);
+    expect(mockRenderMath).toHaveBeenCalledWith(
+      expect.anything(), // doc
+      '\\frac{1}{2}', // latex
+      expect.any(Number), // x
+      expect.any(Number), // y
+      expect.any(Number), // maxWidth
+      expect.any(Number), // maxHeight
+    );
+
+    // Should NOT render raw LaTeX as plain text via doc.text
+    const textCalls = doc.text.mock.calls.map((c) => c[0]);
+    expect(textCalls).not.toContain('\\frac{1}{2}');
+  });
+
+  it('should handle multiple math expressions in one paragraph', async () => {
+    const content = makeDoc([
+      {
+        type: 'paragraph',
+        content: [
+          { type: 'text', text: 'The value is ' },
+          makeMathExpression('x^2'),
+          { type: 'text', text: ' plus ' },
+          makeMathExpression('y^2'),
+        ],
+      },
+    ]);
+
+    await renderTiptapContent(doc as never, content, 20, 40, 500);
+
+    expect(mockRenderMath).toHaveBeenCalledTimes(2);
+  });
+
+  // ---------------------------------------------------------------------------
+  // Fallback when renderMath fails (T015 — graceful error handling)
+  // ---------------------------------------------------------------------------
+
+  it('should fall back to plain text when renderMath throws', async () => {
+    mockRenderMath.mockRejectedValueOnce(new Error('SVG embedding failed'));
+
+    const content = makeDoc([
+      {
+        type: 'paragraph',
+        content: [makeMathExpression('\\frac{1}{2}')],
+      },
+    ]);
+
+    // Should not throw — the export must complete
+    await expect(
+      renderTiptapContent(doc as never, content, 20, 40, 500),
+    ).resolves.not.toThrow();
+
+    // Should have rendered the raw LaTeX as fallback text
+    const textCalls = doc.text.mock.calls.map((c) => c[0]);
+    expect(textCalls).toContain('\\frac{1}{2}');
   });
 });
 

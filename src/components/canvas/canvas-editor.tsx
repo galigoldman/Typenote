@@ -369,11 +369,30 @@ export function CanvasEditor({
   const [eraserSize, setEraserSize] = useState(14);
 
   // Pinch-to-zoom: GoodNotes-style — 100% = page fills container width
+  // Type mode uses a zoomed-out default (Word-like view with margins)
+  const TYPE_MODE_ZOOM = 0.75;
+  const DRAW_MODE_ZOOM = 1.0;
+  const isTypeMode = activeTool === 'text';
   const scrollContainerRef = useRef<HTMLDivElement>(null);
-  const { scale, zoom, isZooming, resetZoom, displayPercent } = usePinchZoom({
-    containerRef: scrollContainerRef,
-    pageWidth: PAGE_WIDTH,
-  });
+  const { scale, zoom, isZooming, resetZoom, setZoom, displayPercent } =
+    usePinchZoom({
+      containerRef: scrollContainerRef,
+      pageWidth: PAGE_WIDTH,
+      minZoom: isTypeMode ? TYPE_MODE_ZOOM : DRAW_MODE_ZOOM,
+    });
+
+  // Switch zoom level when changing between type and draw modes
+  const prevIsTypeModeRef = useRef(isTypeMode);
+  useEffect(() => {
+    if (prevIsTypeModeRef.current !== isTypeMode) {
+      prevIsTypeModeRef.current = isTypeMode;
+      setZoom(isTypeMode ? TYPE_MODE_ZOOM : DRAW_MODE_ZOOM);
+      // Reset horizontal scroll when switching modes
+      if (scrollContainerRef.current) {
+        scrollContainerRef.current.scrollLeft = 0;
+      }
+    }
+  }, [isTypeMode, setZoom]);
 
   // Auto-add missing pages when PDF has more pages than the document.
   const lastSyncedPageCount = useRef(0);

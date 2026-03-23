@@ -14,19 +14,22 @@ import { useCallback, useEffect, useRef, useState } from 'react';
  */
 
 const MAX_ZOOM = 4.0; // 400%
-const MIN_ZOOM = 1.0; // 100% — can't zoom out past fit
+const DEFAULT_MIN_ZOOM = 1.0; // 100% — can't zoom out past fit
 const DOUBLE_TAP_DELAY = 300;
 
 interface UsePinchZoomOptions {
   containerRef: React.RefObject<HTMLElement | null>;
   enabled?: boolean;
   pageWidth?: number;
+  /** Minimum zoom level (default 1.0). Lower for modes that need a zoomed-out view. */
+  minZoom?: number;
 }
 
 export function usePinchZoom({
   containerRef,
   enabled = true,
   pageWidth = 794,
+  minZoom = DEFAULT_MIN_ZOOM,
 }: UsePinchZoomOptions) {
   // fitScale: CSS scale value at which pageWidth fills the container width
   const [fitScale, setFitScale] = useState(1);
@@ -152,7 +155,7 @@ export function usePinchZoom({
       const ratio = currentDist / g.startDistance;
       const newZoom = Math.min(
         MAX_ZOOM,
-        Math.max(MIN_ZOOM, g.startZoom * ratio),
+        Math.max(minZoom, g.startZoom * ratio),
       );
 
       // Zoom toward the original pinch midpoint:
@@ -225,7 +228,7 @@ export function usePinchZoom({
       const delta = -e.deltaY * 0.01;
       const newZoom = Math.min(
         MAX_ZOOM,
-        Math.max(MIN_ZOOM, zoomRef.current * (1 + delta)),
+        Math.max(minZoom, zoomRef.current * (1 + delta)),
       );
 
       const oldScale = fitScaleRef.current * zoomRef.current;
@@ -281,10 +284,18 @@ export function usePinchZoom({
       container.removeEventListener('wheel', handleWheel);
       if (zoomTimeoutRef.current) clearTimeout(zoomTimeoutRef.current);
     };
-  }, [containerRef, enabled, showZoomIndicator]);
+  }, [containerRef, enabled, minZoom, showZoomIndicator]);
 
   // Display percentage: zoom * 100 (1.0 = 100%)
   const displayPercent = Math.round(zoom * 100);
 
-  return { scale, zoom, fitScale, isZooming, resetZoom, displayPercent };
+  return {
+    scale,
+    zoom,
+    fitScale,
+    isZooming,
+    resetZoom,
+    setZoom,
+    displayPercent,
+  };
 }

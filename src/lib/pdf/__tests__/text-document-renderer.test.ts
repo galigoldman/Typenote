@@ -5,7 +5,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 // ---------------------------------------------------------------------------
 vi.mock('../tiptap-to-pdf', () => ({
   measureNodeHeight: vi.fn(),
-  renderTiptapContent: vi.fn(),
+  renderTiptapContent: vi.fn().mockResolvedValue(0),
   PX_TO_PT: 72 / 96,
 }));
 
@@ -46,29 +46,33 @@ describe('renderTextDocument', () => {
     // Default: each node fits comfortably on a page
     mockMeasureNodeHeight.mockReturnValue(20);
     // Default: renderTiptapContent advances cursor by the measured height
-    mockRenderTiptapContent.mockImplementation((_doc, _content, _x, y, _w) => {
-      // The mock returns y + height of the single-node doc.
-      // In practice the renderer passes a single-node wrapper, so we return
-      // y + whatever measureNodeHeight last returned.
-      return y + 20;
-    });
+    mockRenderTiptapContent.mockImplementation(
+      async (_doc, _content, _x, y, _w) => {
+        // The mock returns y + height of the single-node doc.
+        // In practice the renderer passes a single-node wrapper, so we return
+        // y + whatever measureNodeHeight last returned.
+        return y + 20;
+      },
+    );
   });
 
   // -------------------------------------------------------------------------
   // Test 1: A4 page dimensions
   // -------------------------------------------------------------------------
-  it('should create A4 pages (595x842 pts)', () => {
+  it('should create A4 pages (595x842 pts)', async () => {
     const doc = makeMockDoc();
     // Two nodes that together exceed one page to force addPage
     mockMeasureNodeHeight.mockReturnValue(400);
-    mockRenderTiptapContent.mockImplementation((_d, _c, _x, y) => y + 400);
+    mockRenderTiptapContent.mockImplementation(
+      async (_d, _c, _x, y) => y + 400,
+    );
 
     const content = makeTiptapDoc([
       { type: 'paragraph', content: [{ type: 'text', text: 'A' }] },
       { type: 'paragraph', content: [{ type: 'text', text: 'B' }] },
     ]);
 
-    renderTextDocument(doc as never, content);
+    await renderTextDocument(doc as never, content);
 
     // When a page break occurs the renderer should call addPage with 'a4'
     expect(doc.addPage).toHaveBeenCalledWith('a4');
@@ -77,13 +81,13 @@ describe('renderTextDocument', () => {
   // -------------------------------------------------------------------------
   // Test 2: 72pt margins
   // -------------------------------------------------------------------------
-  it('should use 72pt margins', () => {
+  it('should use 72pt margins', async () => {
     const doc = makeMockDoc();
     const content = makeTiptapDoc([
       { type: 'paragraph', content: [{ type: 'text', text: 'Hello' }] },
     ]);
 
-    renderTextDocument(doc as never, content);
+    await renderTextDocument(doc as never, content);
 
     // renderTiptapContent should be called with x = MARGIN, y = MARGIN
     expect(mockRenderTiptapContent).toHaveBeenCalledOnce();
@@ -96,7 +100,7 @@ describe('renderTextDocument', () => {
   // -------------------------------------------------------------------------
   // Test 3: Page break on overflow
   // -------------------------------------------------------------------------
-  it('should add new page when content overflows', () => {
+  it('should add new page when content overflows', async () => {
     const doc = makeMockDoc();
 
     // First node takes up almost all usable height
@@ -111,7 +115,7 @@ describe('renderTextDocument', () => {
     });
 
     let renderCall = 0;
-    mockRenderTiptapContent.mockImplementation((_d, _c, _x, y) => {
+    mockRenderTiptapContent.mockImplementation(async (_d, _c, _x, y) => {
       renderCall++;
       return y + (renderCall === 1 ? firstHeight : secondHeight);
     });
@@ -121,7 +125,7 @@ describe('renderTextDocument', () => {
       { type: 'paragraph', content: [{ type: 'text', text: 'Second' }] },
     ]);
 
-    renderTextDocument(doc as never, content);
+    await renderTextDocument(doc as never, content);
 
     expect(doc.addPage).toHaveBeenCalledOnce();
     expect(doc.addPage).toHaveBeenCalledWith('a4');
@@ -134,7 +138,7 @@ describe('renderTextDocument', () => {
   // -------------------------------------------------------------------------
   // Test 4: Orphan heading prevention
   // -------------------------------------------------------------------------
-  it('should prevent orphan headings', () => {
+  it('should prevent orphan headings', async () => {
     const doc = makeMockDoc();
 
     // First node fills the page up to the bottom 15% zone
@@ -151,7 +155,7 @@ describe('renderTextDocument', () => {
     });
 
     let renderCall = 0;
-    mockRenderTiptapContent.mockImplementation((_d, _c, _x, y) => {
+    mockRenderTiptapContent.mockImplementation(async (_d, _c, _x, y) => {
       renderCall++;
       return y + (renderCall === 1 ? firstHeight : headingHeight);
     });
@@ -165,7 +169,7 @@ describe('renderTextDocument', () => {
       },
     ]);
 
-    renderTextDocument(doc as never, content);
+    await renderTextDocument(doc as never, content);
 
     // Heading should be pushed to a new page
     expect(doc.addPage).toHaveBeenCalledOnce();
@@ -178,18 +182,18 @@ describe('renderTextDocument', () => {
   // -------------------------------------------------------------------------
   // Test 5: Empty content
   // -------------------------------------------------------------------------
-  it('should handle empty content gracefully', () => {
+  it('should handle empty content gracefully', async () => {
     const doc = makeMockDoc();
 
     // Empty doc (no content array)
-    renderTextDocument(doc as never, { type: 'doc' });
+    await renderTextDocument(doc as never, { type: 'doc' });
     expect(doc.addPage).not.toHaveBeenCalled();
     expect(mockRenderTiptapContent).not.toHaveBeenCalled();
 
     vi.clearAllMocks();
 
     // Doc with empty content array
-    renderTextDocument(doc as never, { type: 'doc', content: [] });
+    await renderTextDocument(doc as never, { type: 'doc', content: [] });
     expect(doc.addPage).not.toHaveBeenCalled();
     expect(mockRenderTiptapContent).not.toHaveBeenCalled();
   });
@@ -197,7 +201,7 @@ describe('renderTextDocument', () => {
   // -------------------------------------------------------------------------
   // Test 6: All node types rendered
   // -------------------------------------------------------------------------
-  it('should render all node types', () => {
+  it('should render all node types', async () => {
     const doc = makeMockDoc();
 
     const nodes = [
@@ -242,7 +246,7 @@ describe('renderTextDocument', () => {
 
     const content = makeTiptapDoc(nodes);
 
-    renderTextDocument(doc as never, content);
+    await renderTextDocument(doc as never, content);
 
     // renderTiptapContent should be called once per node
     expect(mockRenderTiptapContent).toHaveBeenCalledTimes(nodes.length);

@@ -4,6 +4,7 @@ import type { CanvasPage } from '@/types/canvas';
 
 import { renderCanvasPage } from './canvas-page-renderer';
 import { loadFonts } from './font-loader';
+import { resetMathRendererCache } from './math-renderer';
 import { renderTextDocument } from './text-document-renderer';
 import { sanitizeFilename } from './utils';
 
@@ -41,8 +42,9 @@ export async function exportDocumentAsPdf(
     format: hasCanvasPages ? [794, 1123] : 'a4',
   });
 
-  // 3. Load fonts
+  // 3. Load fonts and reset math renderer cache for fresh font resolution
   await loadFonts(doc);
+  resetMathRendererCache();
 
   // 4. Route to appropriate renderer(s)
   // For mixed documents (both canvas pages AND text content), render canvas
@@ -51,7 +53,12 @@ export async function exportDocumentAsPdf(
     const canvasPages = (document.pages as { pages: CanvasPage[] }).pages;
     const sortedPages = [...canvasPages].sort((a, b) => a.order - b.order);
     for (let i = 0; i < sortedPages.length; i++) {
-      renderCanvasPage(doc, sortedPages[i], document.canvas_type, i === 0);
+      await renderCanvasPage(
+        doc,
+        sortedPages[i],
+        document.canvas_type,
+        i === 0,
+      );
     }
   }
 
@@ -61,7 +68,7 @@ export async function exportDocumentAsPdf(
       // before starting text rendering (switches from canvas to A4 format)
       doc.addPage('a4');
     }
-    renderTextDocument(doc, document.content);
+    await renderTextDocument(doc, document.content);
   }
   // If neither: empty document -> already has one blank page from jsPDF constructor
 
