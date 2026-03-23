@@ -1386,36 +1386,64 @@ export function CanvasEditor({
   );
 
   const handleAskAiWithRegion = useCallback(
-    async (bbox: BBox, pageId: string) => {
+    (bbox: BBox, pageId: string) => {
       const refs = pageCanvasRefsMap.current.get(pageId);
-      if (!refs?.element) return;
+      if (!refs) return;
 
       const w = bbox.maxX - bbox.minX;
       const h = bbox.maxY - bbox.minY;
       if (w < 20 || h < 20) return;
 
       try {
-        const { toPng } = await import('html-to-image');
         const dpr = window.devicePixelRatio || 1;
-        const dataUrl = await toPng(refs.element, {
-          pixelRatio: dpr,
-          canvasWidth: Math.round(w * dpr),
-          canvasHeight: Math.round(h * dpr),
-          width: w,
-          height: h,
-          style: {
-            transform: `translate(-${bbox.minX}px, -${bbox.minY}px)`,
-            transformOrigin: 'top left',
-          },
-          filter: (node) => {
-            // Exclude the crop overlay and floating bars from the screenshot
-            if (node instanceof HTMLElement) {
-              const z = node.style?.zIndex;
-              if (z === '8' || z === '10' || z === '100') return false;
-            }
-            return true;
-          },
-        });
+        // Composite PDF + strokes canvases directly (avoids html-to-image DOM cloning issues)
+        const offscreen = window.document.createElement('canvas');
+        offscreen.width = Math.round(w * dpr);
+        offscreen.height = Math.round(h * dpr);
+        const ctx = offscreen.getContext('2d');
+        if (!ctx) return;
+
+        // White background
+        ctx.fillStyle = 'white';
+        ctx.fillRect(0, 0, offscreen.width, offscreen.height);
+
+        // Source rect in internal canvas pixels (high-DPI backing buffer)
+        const sx = bbox.minX * dpr;
+        const sy = bbox.minY * dpr;
+        const sw = w * dpr;
+        const sh = h * dpr;
+
+        // Draw PDF background layer (if available)
+        if (refs.pdf && refs.pdf.width > 0) {
+          ctx.drawImage(
+            refs.pdf,
+            sx,
+            sy,
+            sw,
+            sh,
+            0,
+            0,
+            offscreen.width,
+            offscreen.height,
+          );
+        }
+
+        // Draw committed strokes layer
+        if (refs.strokes && refs.strokes.width > 0) {
+          ctx.drawImage(
+            refs.strokes,
+            sx,
+            sy,
+            sw,
+            sh,
+            0,
+            0,
+            offscreen.width,
+            offscreen.height,
+          );
+        }
+
+        const dataUrl = offscreen.toDataURL('image/png');
         onAskAiWithContext?.({ type: 'image', dataUrl });
       } catch (err) {
         console.error('Region capture failed:', err);
@@ -1431,7 +1459,7 @@ export function CanvasEditor({
   const isReadMode = activeTool === 'read';
 
   return (
-    <div className="flex flex-col flex-1 min-h-0 max-xl:overflow-hidden">
+    <div className="flex flex-col flex-1 min-h-0">
       {/* Header — hidden on mobile (merged into toolbar) */}
       <div className="hidden xl:flex items-center justify-between border-b px-4 py-2">
         <button
@@ -1515,7 +1543,7 @@ export function CanvasEditor({
       )}
 
       {/* Toolbar — sticky so it stays visible when zoomed */}
-      <div className="flex items-center border-b px-2 py-1 overflow-x-auto bg-background z-20 shrink-0">
+      <div className="flex items-center border-b px-2 py-1 overflow-x-auto overflow-y-visible bg-background z-20 shrink-0">
         {/* Mobile: back + home + title (hidden on desktop — shown in header) */}
         <div className="flex items-center gap-1 mr-2 xl:hidden shrink-0">
           <button
