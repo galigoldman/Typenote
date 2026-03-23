@@ -268,23 +268,6 @@ export function usePinchZoom({
     const container = containerRef.current;
     if (!container || !enabled) return;
 
-    // ── Pen tracking via PointerEvents ──────────────────────────────
-    // PointerEvents reliably report pointerType === "pen" on all platforms.
-    // Track whether a pen is currently active so touch handlers can skip
-    // zoom/pan gestures during pen interaction.
-    let penIsDown = false;
-
-    const handlePointerDown = (e: PointerEvent) => {
-      if (e.pointerType === 'pen') penIsDown = true;
-    };
-    const handlePointerUp = (e: PointerEvent) => {
-      if (e.pointerType === 'pen') penIsDown = false;
-    };
-
-    container.addEventListener('pointerdown', handlePointerDown, true);
-    container.addEventListener('pointerup', handlePointerUp, true);
-    container.addEventListener('pointercancel', handlePointerUp, true);
-
     const dist = (t1: Touch, t2: Touch) => {
       const dx = t1.clientX - t2.clientX;
       const dy = t1.clientY - t2.clientY;
@@ -302,7 +285,7 @@ export function usePinchZoom({
     // ── Pinch-to-zoom ──────────────────────────────────────────────
 
     const handleTouchStart = (e: TouchEvent) => {
-      if (e.touches.length === 2 && !penIsDown && !hasStylus(e.touches)) {
+      if (e.touches.length === 2 && !hasStylus(e.touches)) {
         e.preventDefault();
         // Cancel any running animation when gesture starts
         cancelAnimations();
@@ -325,12 +308,7 @@ export function usePinchZoom({
     };
 
     const handleTouchMove = (e: TouchEvent) => {
-      if (
-        e.touches.length !== 2 ||
-        !gestureRef.current ||
-        penIsDown ||
-        hasStylus(e.touches)
-      )
+      if (e.touches.length !== 2 || !gestureRef.current || hasStylus(e.touches))
         return;
       e.preventDefault();
 
@@ -425,11 +403,10 @@ export function usePinchZoom({
       }
 
       // Single-finger double-tap: toggle 100% ↔ 200%
-      // Skip pen input — check both PointerEvent pen state and TouchEvent touchType
+      // Skip stylus touches — pen taps must never trigger zoom (FR-001)
       if (
         e.touches.length === 0 &&
         e.changedTouches.length === 1 &&
-        !penIsDown &&
         !hasStylus(e.changedTouches)
       ) {
         const touch = e.changedTouches[0];
@@ -482,7 +459,7 @@ export function usePinchZoom({
       if (
         e.touches.length === 0 &&
         e.changedTouches.length === 1 &&
-        (penIsDown || hasStylus(e.changedTouches))
+        hasStylus(e.changedTouches)
       ) {
         tapCount = 0;
         if (tapTimer) clearTimeout(tapTimer);
@@ -553,7 +530,7 @@ export function usePinchZoom({
     let isPanning = false;
 
     const handleSingleTouchStart = (e: TouchEvent) => {
-      if (e.touches.length !== 1 || penIsDown || hasStylus(e.touches)) return;
+      if (e.touches.length !== 1 || hasStylus(e.touches)) return;
       cancelAnimations();
       isPanning = true;
       const touch = e.touches[0];
@@ -718,15 +695,6 @@ export function usePinchZoom({
       container.removeEventListener('touchmove', handleSingleTouchMove);
       container.removeEventListener('touchend', handleSingleTouchEnd);
       container.removeEventListener('wheel', handleWheel);
-      container.removeEventListener('pointerdown', handlePointerDown, {
-        capture: true,
-      });
-      container.removeEventListener('pointerup', handlePointerUp, {
-        capture: true,
-      });
-      container.removeEventListener('pointercancel', handlePointerUp, {
-        capture: true,
-      });
       cancelAnimations();
       if (zoomTimeoutRef.current) clearTimeout(zoomTimeoutRef.current);
     };
