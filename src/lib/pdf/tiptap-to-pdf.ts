@@ -357,32 +357,49 @@ async function renderInlineContent(
     if (node.type === 'mathExpression') {
       const latex = (node.attrs?.latex as string) ?? '';
       if (latex) {
-        // Estimate math expression dimensions for layout purposes.
-        // Use a generous height estimate based on font size and a width estimate
-        // based on measuring the raw string as a rough proxy.
-        const mathHeight = baseFontSize * 1.4;
-        doc.setFont('GeistMono', 'normal');
-        doc.setFontSize(baseFontSize * 0.9);
-        const roughWidth = doc.getTextDimensions(latex).w;
-        const mathWidth = Math.min(roughWidth, maxWidth);
+        // Give renderMath generous space — the full remaining line width and
+        // double the line height so fractions/integrals aren't clipped.
+        const availableWidth = x + maxWidth - cursorX;
+        const mathMaxHeight = lineHeight * 2;
 
-        // Wrap to next line if needed
-        if (cursorX + mathWidth > x + maxWidth && cursorX > x) {
+        // Wrap to next line if very little space remains
+        if (availableWidth < baseFontSize * 2 && cursorX > x) {
           cursorX = x;
           cursorY += lineHeight;
         }
 
-        // Render the math expression as a properly typeset formula
-        await renderMath(
-          doc,
-          latex,
-          cursorX,
-          cursorY - baseFontSize * 0.8, // Offset to align with text baseline
-          mathWidth,
-          mathHeight,
-        );
+        const effectiveWidth = x + maxWidth - cursorX;
 
-        cursorX += mathWidth;
+        try {
+          // Render the math expression as a properly typeset formula.
+          // renderMath handles KaTeX → SVG → raster → text fallback internally.
+          await renderMath(
+            doc,
+            latex,
+            cursorX,
+            cursorY - baseFontSize * 0.85,
+            effectiveWidth,
+            mathMaxHeight,
+          );
+
+          // Advance cursor past the rendered formula.
+          // Use raw string width as rough estimate since renderMath doesn't
+          // report the actual rendered width.
+          doc.setFont('GeistMono', 'normal');
+          doc.setFontSize(baseFontSize * 0.9);
+          const roughAdvance = Math.min(
+            doc.getTextDimensions(latex).w * 1.2,
+            effectiveWidth,
+          );
+          cursorX += Math.max(roughAdvance, baseFontSize);
+        } catch {
+          // If renderMath throws, fall back to plain LaTeX text
+          doc.setFont('GeistMono', 'normal');
+          doc.setFontSize(baseFontSize * 0.9);
+          const dims = doc.getTextDimensions(latex);
+          doc.text(latex, cursorX, cursorY);
+          cursorX += dims.w;
+        }
 
         // Restore font
         doc.setFont('GeistSans', 'normal');
