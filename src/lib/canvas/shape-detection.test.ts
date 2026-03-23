@@ -436,10 +436,11 @@ describe('detectCircle', () => {
     expect(result!.type).toBe('circle');
   });
 
-  it('rejects a 180-degree arc (insufficient coverage)', () => {
+  it('accepts a 180-degree arc (GoodNotes-style forgiving detection)', () => {
     const points = makeArcPoints(200, 200, 100, 64, 180);
     const result = detectCircle(points);
-    expect(result).toBeNull();
+    expect(result).not.toBeNull();
+    expect(result!.type).toBe('circle');
   });
 
   it('rejects a straight line', () => {
