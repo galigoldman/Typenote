@@ -269,10 +269,23 @@ export function usePinchZoom({
       };
     };
 
+    // ── Stylus detection ────────────────────────────────────────────
+    // On iPadOS, Apple Pencil touches have touchType === "stylus".
+    // Zoom/pan should only respond to finger touches ("direct"), never pen.
+
+    const hasStylus = (touches: TouchList) => {
+      for (let i = 0; i < touches.length; i++) {
+        if ((touches[i] as Touch & { touchType?: string }).touchType === 'stylus') {
+          return true;
+        }
+      }
+      return false;
+    };
+
     // ── Pinch-to-zoom ──────────────────────────────────────────────
 
     const handleTouchStart = (e: TouchEvent) => {
-      if (e.touches.length === 2) {
+      if (e.touches.length === 2 && !hasStylus(e.touches)) {
         e.preventDefault();
         // Cancel any running animation when gesture starts
         cancelAnimations();
@@ -295,7 +308,8 @@ export function usePinchZoom({
     };
 
     const handleTouchMove = (e: TouchEvent) => {
-      if (e.touches.length !== 2 || !gestureRef.current) return;
+      if (e.touches.length !== 2 || !gestureRef.current || hasStylus(e.touches))
+        return;
       e.preventDefault();
 
       const t1 = e.touches[0];
@@ -485,7 +499,7 @@ export function usePinchZoom({
     let isPanning = false;
 
     const handleSingleTouchStart = (e: TouchEvent) => {
-      if (e.touches.length !== 1) return;
+      if (e.touches.length !== 1 || hasStylus(e.touches)) return;
       cancelAnimations();
       isPanning = true;
       const touch = e.touches[0];
