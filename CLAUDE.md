@@ -38,6 +38,8 @@ Every step of development must follow this git workflow:
 
 ## Active Technologies
 
+- TypeScript 5 / Node.js 22+ / React 19 + Next.js 16, TipTap 3, perfect-freehand, Canvas 2D API (019-improve-document-zoom)
+
 - TypeScript 5 / Node.js 22+ / Next.js 16 (App Router) + `@google/genai` (chat streaming), `@ai-sdk/google` + `ai` (LaTeX via generateText), `@supabase/ssr` (014-beta-latex-limits)
 - PostgreSQL via Supabase — modifying `ai_usage` table, `increment_ai_usage` and `get_ai_quota` RPC functions (014-beta-latex-limits)
 
