@@ -14,7 +14,7 @@ import { TextStyle } from '@tiptap/extension-text-style';
 import { Indent } from '@/lib/editor/indent-extension';
 import { FontSize } from '@/lib/editor/font-size-extension';
 import { MathExpression } from '@/lib/editor/math-extension';
-import { Pencil, Sparkles, Trash2 } from 'lucide-react';
+import { Pencil, Sparkles, Trash2, X } from 'lucide-react';
 import { PdfTextLayer } from './pdf-text-layer';
 import type {
   CanvasPage as CanvasPageData,
@@ -850,6 +850,16 @@ export function CanvasPage({
                   <Sparkles className="h-3.5 w-3.5" />
                   Ask AI
                 </button>
+                <button
+                  onPointerDown={(e) => {
+                    e.stopPropagation();
+                    setCropRect(null);
+                  }}
+                  className="flex items-center justify-center rounded-full p-1 text-zinc-400 transition-colors hover:bg-zinc-100 hover:text-zinc-600"
+                  aria-label="Dismiss"
+                >
+                  <X className="h-3.5 w-3.5" />
+                </button>
               </div>
             )}
         </div>
@@ -879,6 +889,19 @@ export function CanvasPage({
           >
             <Sparkles className="h-3.5 w-3.5" />
             Ask AI
+          </button>
+          <button
+            onMouseDown={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              selectedTextRef.current = '';
+              selectedRectRef.current = null;
+              setTextSelectionRect(null);
+            }}
+            className="flex items-center justify-center rounded-full p-1 text-zinc-400 transition-colors hover:bg-zinc-100 hover:text-zinc-600"
+            aria-label="Dismiss"
+          >
+            <X className="h-3.5 w-3.5" />
           </button>
         </div>
       )}

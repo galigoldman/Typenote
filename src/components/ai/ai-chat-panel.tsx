@@ -458,24 +458,24 @@ export function AiChatPanel({
     <div className="fixed inset-0 z-50 flex h-full w-full flex-col border-l bg-background shadow-xl md:inset-auto md:right-0 md:top-0 md:w-[420px]">
       {/* Header */}
       <div className="flex items-center justify-between border-b px-4 py-3">
-        <div className="flex items-center gap-2">
-          <Sparkles className="h-5 w-5 text-purple-500" />
+        <div className="flex min-w-0 items-center gap-2">
+          <Sparkles className="h-5 w-5 flex-shrink-0 text-purple-500" />
           <span className="font-semibold">AI Tutor</span>
           {currentConversationId && messages.length > 0 && (
             <span
-              className="text-xs text-muted-foreground truncate max-w-[120px]"
+              className="truncate text-xs text-muted-foreground max-w-[120px]"
               title={messages[0]?.content?.slice(0, 50)}
             >
               {messages[0]?.content?.slice(0, 30)}...
             </span>
           )}
           {weekLabel && (
-            <span className="rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground">
+            <span className="truncate rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground">
               {weekLabel}
             </span>
           )}
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-shrink-0 items-center gap-2">
           {/* Mode toggle */}
           <div className="flex rounded-lg border bg-muted p-0.5">
             <button
