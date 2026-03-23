@@ -12,21 +12,21 @@ This feature introduces **no new database tables or schema changes** and **no ne
 
 Source: `documents` table in Supabase
 
-| Field | Type | Used for |
-|-------|------|----------|
-| title | string | Print window title + suggested filename |
-| content | JSONB | TipTap JSON → `generateHTML()` → print HTML |
-| pages | JSONB \| null | Canvas page data → SVG strokes + HTML text boxes |
-| canvas_type | string | Default page background type |
+| Field       | Type          | Used for                                         |
+| ----------- | ------------- | ------------------------------------------------ |
+| title       | string        | Print window title + suggested filename          |
+| content     | JSONB         | TipTap JSON → `generateHTML()` → print HTML      |
+| pages       | JSONB \| null | Canvas page data → SVG strokes + HTML text boxes |
+| canvas_type | string        | Default page background type                     |
 
 ### Canvas Page (within `pages` JSONB)
 
-| Field | Type | Used for |
-|-------|------|----------|
-| strokes | Stroke[] | → `strokeToSvgPath()` → SVG `<path>` elements |
-| textBoxes | TextBox[] | → positioned HTML `<div>`s in print document |
-| flowContent | JSONB \| null | → `generateHTML()` → main page content |
-| pageType | string | → `renderBackgroundSvg()` → SVG background pattern |
+| Field       | Type          | Used for                                           |
+| ----------- | ------------- | -------------------------------------------------- |
+| strokes     | Stroke[]      | → `strokeToSvgPath()` → SVG `<path>` elements      |
+| textBoxes   | TextBox[]     | → positioned HTML `<div>`s in print document       |
+| flowContent | JSONB \| null | → `generateHTML()` → main page content             |
+| pageType    | string        | → `renderBackgroundSvg()` → SVG background pattern |
 
 ## Intermediate Structure (In-Memory Only)
 

@@ -21,13 +21,13 @@ Replace the manual jsPDF-based PDF export with browser-native `window.print()` o
 
 ## Constitution Check
 
-| Principle | Status | Notes |
-|-----------|--------|-------|
-| I. Incremental Development | ✅ PASS | Phased: text first, then canvas, then mixed. Each phase produces a working increment. |
-| II. Test-Driven Quality | ✅ PASS | Unit tests for HTML template + SVG conversion. E2E tests for export flow. |
-| III. Protected Main Branch | ✅ PASS | Working on feature branch `020-pdf-export-overhaul`. |
-| IV. Migrations as Code | ✅ PASS (N/A) | No database changes. |
-| V. Interview-Ready Architecture | ✅ PASS | Browser print architecture, CSS print layout, SVG graphics pipeline — all strong interview topics. |
+| Principle                       | Status        | Notes                                                                                              |
+| ------------------------------- | ------------- | -------------------------------------------------------------------------------------------------- |
+| I. Incremental Development      | ✅ PASS       | Phased: text first, then canvas, then mixed. Each phase produces a working increment.              |
+| II. Test-Driven Quality         | ✅ PASS       | Unit tests for HTML template + SVG conversion. E2E tests for export flow.                          |
+| III. Protected Main Branch      | ✅ PASS       | Working on feature branch `020-pdf-export-overhaul`.                                               |
+| IV. Migrations as Code          | ✅ PASS (N/A) | No database changes.                                                                               |
+| V. Interview-Ready Architecture | ✅ PASS       | Browser print architecture, CSS print layout, SVG graphics pipeline — all strong interview topics. |
 
 ## Project Structure
 
@@ -143,6 +143,7 @@ The user clicks one button in the print dialog ("Save as PDF"). This is the same
 **Goal**: Text-only documents export with correct LaTeX math, Hebrew BiDi, and full rich text fidelity via browser print.
 
 **Scope**:
+
 - `html-template.ts` — generates HTML from TipTap JSON with editor CSS, KaTeX rendering, Hebrew font, print CSS
 - `print-export.ts` — opens print window, writes HTML, triggers print
 - `use-export-pdf.ts` — updated to call new export function
@@ -156,6 +157,7 @@ The user clicks one button in the print dialog ("Save as PDF"). This is the same
 **Goal**: Canvas pages with strokes, text boxes, and backgrounds export via browser print.
 
 **Scope**:
+
 - `stroke-to-svg.ts` — convert strokes to SVG paths
 - `page-background-svg.ts` — SVG backgrounds
 - Canvas page HTML template in `html-template.ts`
@@ -168,6 +170,7 @@ The user clicks one button in the print dialog ("Save as PDF"). This is the same
 **Goal**: Mixed documents work. Old jsPDF code removed.
 
 **Scope**:
+
 - Handle mixed documents (canvas + text pages in one print)
 - Remove old modules (~8 files)
 - Update existing tests
@@ -177,9 +180,9 @@ The user clicks one button in the print dialog ("Save as PDF"). This is the same
 
 ## Risk Assessment
 
-| Risk | Likelihood | Impact | Mitigation |
-|------|-----------|--------|------------|
-| Print dialog UX friction | Low | Users unfamiliar with print-to-PDF | Add tooltip/guidance on first use |
-| CSS pagination edge cases | Low | Headings may orphan in rare cases | CSS `break-after: avoid`; test with long documents |
-| Font loading in print window | Low | Hebrew font may not load before print | Wait for `document.fonts.ready` before calling print() |
-| Browser differences in print output | Medium | Slightly different margins/spacing across browsers | Test in Chrome, Firefox, Safari; document any differences |
+| Risk                                | Likelihood | Impact                                             | Mitigation                                                |
+| ----------------------------------- | ---------- | -------------------------------------------------- | --------------------------------------------------------- |
+| Print dialog UX friction            | Low        | Users unfamiliar with print-to-PDF                 | Add tooltip/guidance on first use                         |
+| CSS pagination edge cases           | Low        | Headings may orphan in rare cases                  | CSS `break-after: avoid`; test with long documents        |
+| Font loading in print window        | Low        | Hebrew font may not load before print              | Wait for `document.fonts.ready` before calling print()    |
+| Browser differences in print output | Medium     | Slightly different margins/spacing across browsers | Test in Chrome, Firefox, Safari; document any differences |

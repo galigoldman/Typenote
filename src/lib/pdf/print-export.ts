@@ -36,7 +36,11 @@ export async function printExportDocument(
     html = buildTextDocumentHtml(document.content, document.title);
   } else if (!hasTextContent) {
     // Canvas-only document
-    html = buildCanvasPageHtml(canvasPages, document.canvas_type, document.title);
+    html = buildCanvasPageHtml(
+      canvasPages,
+      document.canvas_type,
+      document.title,
+    );
   } else {
     // Mixed: canvas pages + text content
     html = buildMixedDocumentHtml(

@@ -128,9 +128,7 @@ function renderMathNodes(html: string): string {
     `<div id="root">${html}</div>`,
     'text/html',
   );
-  const mathSpans = doc.querySelectorAll(
-    'span[data-type="math-expression"]',
-  );
+  const mathSpans = doc.querySelectorAll('span[data-type="math-expression"]');
 
   mathSpans.forEach((span) => {
     const latex = span.getAttribute('data-latex') ?? '';
