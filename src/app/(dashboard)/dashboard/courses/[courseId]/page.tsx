@@ -93,14 +93,28 @@ export default async function CoursePage({
   }
 
   // Fetch week-level personal files
-  const allWeekPersonalFiles = (await getPersonalFilesByWeeks(
+  const allWeekPersonalFilesRaw = (await getPersonalFilesByWeeks(
     weekIds,
   )) as PersonalFile[];
 
   // Fetch course-level personal files (no week)
-  const coursePersonalFiles = (await getPersonalFilesByCourse(
+  const coursePersonalFilesRaw = (await getPersonalFilesByCourse(
     courseId,
   )) as PersonalFile[];
+
+  // Hide personal files that already have a linked document
+  // (the document replaces the file in the UI once opened)
+  const linkedFileIds = new Set(
+    typedDocuments
+      .filter((d) => d.personal_file_id)
+      .map((d) => d.personal_file_id),
+  );
+  const allWeekPersonalFiles = allWeekPersonalFilesRaw.filter(
+    (f) => !linkedFileIds.has(f.id),
+  );
+  const coursePersonalFiles = coursePersonalFilesRaw.filter(
+    (f) => !linkedFileIds.has(f.id),
+  );
 
   // Fetch linked Moodle data (if this course was created from a Moodle sync)
   const admin = createAdminClient();
