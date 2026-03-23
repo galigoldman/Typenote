@@ -40,7 +40,10 @@ export const viewport: Viewport = {
   viewportFit: 'cover',
 };
 
-const posthogKey = process.env.NEXT_PUBLIC_POSTHOG_KEY;
+const posthogKey =
+  process.env.NODE_ENV === 'production'
+    ? process.env.NEXT_PUBLIC_POSTHOG_KEY
+    : undefined;
 
 export default function RootLayout({
   children,
@@ -65,7 +68,7 @@ export default function RootLayout({
             clientOptions={{
               api_host: '/ingest',
               capture_pageview: false,
-              capture_exceptions: true,
+              capture_exceptions: process.env.NODE_ENV === 'production',
               session_recording: {
                 maskAllInputs: true,
               },
