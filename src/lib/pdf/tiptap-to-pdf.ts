@@ -115,6 +115,18 @@ const CODE_BLOCK_BG = { r: 243, g: 244, b: 246 }; // #f3f4f6
 const TEXT_COLOR = { r: 0, g: 0, b: 0 };
 
 // ---------------------------------------------------------------------------
+// Hebrew / RTL detection helpers
+// ---------------------------------------------------------------------------
+
+/** Matches Hebrew Unicode characters (basic + presentation forms). */
+const HEBREW_REGEX = /[\u0590-\u05FF\uFB1D-\uFB4F]/;
+
+/** Returns true if the string contains any Hebrew characters. */
+function containsHebrew(text: string): boolean {
+  return HEBREW_REGEX.test(text);
+}
+
+// ---------------------------------------------------------------------------
 // Scaled configuration — computed once per render call
 // ---------------------------------------------------------------------------
 
@@ -241,7 +253,10 @@ function resolveMarks(marks?: TipTapMark[]): ResolvedMarks {
 /**
  * Determines the jsPDF font family and style string from resolved marks.
  */
-function fontStyleFromMarks(resolved: ResolvedMarks): {
+function fontStyleFromMarks(
+  resolved: ResolvedMarks,
+  isHebrew: boolean = false,
+): {
   family: string;
   style: string;
 } {
@@ -249,17 +264,18 @@ function fontStyleFromMarks(resolved: ResolvedMarks): {
     return { family: 'GeistMono', style: 'normal' };
   }
 
+  const family = isHebrew ? 'NotoSansHebrew' : 'GeistSans';
   let style = 'normal';
   if (resolved.bold && resolved.italic) {
-    // jsPDF may not have a bold-italic variant; fall back to bold
     style = 'bold';
   } else if (resolved.bold) {
     style = 'bold';
   } else if (resolved.italic) {
-    style = 'italic';
+    // NotoSansHebrew has no italic — fall back to normal for Hebrew
+    style = isHebrew ? 'normal' : 'italic';
   }
 
-  return { family: 'GeistSans', style };
+  return { family, style };
 }
 
 // ---------------------------------------------------------------------------
@@ -357,7 +373,8 @@ function renderInlineContent(
     if (node.type !== 'text' || !node.text) continue;
 
     const resolved = resolveMarks(node.marks);
-    const { family, style } = fontStyleFromMarks(resolved);
+    const isHebrew = containsHebrew(node.text);
+    const { family, style } = fontStyleFromMarks(resolved, isHebrew);
     const fontSize = resolved.code
       ? baseFontSize * INLINE_CODE_SIZE_FACTOR
       : baseFontSize;
