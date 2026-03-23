@@ -10,6 +10,7 @@
 **Rationale**: The current system uses Postgres RPC functions (`increment_ai_usage`, `get_ai_quota`) with atomic upsert for race-safe counting. This pattern is proven and works. We extend it with a `query_type` dimension rather than building a new system.
 
 **Alternatives considered**:
+
 - **Application-layer counting** — rejected because it's vulnerable to race conditions (TOCTOU), which is why the existing system uses DB-level atomicity.
 - **Redis-based rate limiting** — rejected because it adds infrastructure complexity for no gain. Postgres RPC is already fast enough for the query volume (~100-500/user/month).
 - **Separate tables per query type** — rejected because a single table with a `query_type` discriminator is simpler and the unique index `(user_id, usage_month, query_type)` handles separation cleanly.
@@ -34,6 +35,7 @@
 - **Chat streaming**: capture usage after the stream finishes in the `finally` block where we already persist the assistant message.
 
 **Alternatives considered**:
+
 - **Atomic token tracking in the RPC** — rejected because tokens are unknown before the AI call, and the RPC runs before the call.
 - **No token tracking at all** — rejected because admins want to see actual consumption, not just query counts.
 - **Per-query log table** — rejected for beta (overkill).
@@ -65,7 +67,7 @@
 **Default limits**:
 
 | Tier | Chat | LaTeX |
-|------|------|-------|
+| ---- | ---- | ----- |
 | free | 50   | 150   |
 | beta | 100  | 500   |
 | pro  | 500  | 1500  |

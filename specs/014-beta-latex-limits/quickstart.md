@@ -6,6 +6,7 @@
 ## Overview
 
 This feature adds:
+
 1. A "beta" subscription tier with 100 chat + 500 LaTeX queries/month
 2. Separate quota tracking for chat vs LaTeX queries
 3. Course name context in LaTeX prompts
@@ -17,29 +18,29 @@ This feature adds:
 
 ### Database (1 new migration)
 
-| File | Change |
-|------|--------|
+| File                                                        | Change                               |
+| ----------------------------------------------------------- | ------------------------------------ |
 | `supabase/migrations/00018_beta_latex_quota_separation.sql` | New column, updated RPCs, admin view |
 
 ### Backend (6 files)
 
-| File | Change |
-|------|--------|
-| `src/lib/ai/rate-limit.ts` | Add beta tier, query_type support, LaTeX limits |
-| `src/lib/ai/latex.ts` | Accept `courseName`, return full result for usage |
-| `src/lib/ai/prompts.ts` | Add `buildLatexPrompt(courseName?)` helper |
-| `src/app/api/ai/latex/route.ts` | Accept `courseName`, use 'latex' query_type |
-| `src/app/api/ai/ask/route.ts` | Add deep mode tier check |
-| `src/app/api/ai/quota/route.ts` | Return per-type quota with `deepModeAvailable` |
+| File                            | Change                                            |
+| ------------------------------- | ------------------------------------------------- |
+| `src/lib/ai/rate-limit.ts`      | Add beta tier, query_type support, LaTeX limits   |
+| `src/lib/ai/latex.ts`           | Accept `courseName`, return full result for usage |
+| `src/lib/ai/prompts.ts`         | Add `buildLatexPrompt(courseName?)` helper        |
+| `src/app/api/ai/latex/route.ts` | Accept `courseName`, use 'latex' query_type       |
+| `src/app/api/ai/ask/route.ts`   | Add deep mode tier check                          |
+| `src/app/api/ai/quota/route.ts` | Return per-type quota with `deepModeAvailable`    |
 
 ### Frontend (4 files)
 
-| File | Change |
-|------|--------|
-| `src/components/ai/ai-chat-panel.tsx` | Split quota display, lock deep mode toggle |
-| `src/components/editor/math-node-view.tsx` | Pass `courseName` in LaTeX API call |
-| `src/components/editor/tiptap-editor.tsx` | Pass `courseName` in LaTeX API call |
-| `src/components/canvas/canvas-editor.tsx` | Pass `courseName` in LaTeX API call |
+| File                                       | Change                                     |
+| ------------------------------------------ | ------------------------------------------ |
+| `src/components/ai/ai-chat-panel.tsx`      | Split quota display, lock deep mode toggle |
+| `src/components/editor/math-node-view.tsx` | Pass `courseName` in LaTeX API call        |
+| `src/components/editor/tiptap-editor.tsx`  | Pass `courseName` in LaTeX API call        |
+| `src/components/canvas/canvas-editor.tsx`  | Pass `courseName` in LaTeX API call        |
 
 ## Implementation Order
 
@@ -53,12 +54,12 @@ This feature adds:
 
 ## Environment Variables (new)
 
-| Variable | Default | Purpose |
-|----------|---------|---------|
-| `AI_LIMIT_BETA` | 100 | Monthly chat limit for beta tier |
-| `AI_LATEX_LIMIT_FREE` | 150 | Monthly LaTeX limit for free tier |
-| `AI_LATEX_LIMIT_BETA` | 500 | Monthly LaTeX limit for beta tier |
-| `AI_LATEX_LIMIT_PRO` | 1500 | Monthly LaTeX limit for pro tier |
+| Variable              | Default | Purpose                           |
+| --------------------- | ------- | --------------------------------- |
+| `AI_LIMIT_BETA`       | 100     | Monthly chat limit for beta tier  |
+| `AI_LATEX_LIMIT_FREE` | 150     | Monthly LaTeX limit for free tier |
+| `AI_LATEX_LIMIT_BETA` | 500     | Monthly LaTeX limit for beta tier |
+| `AI_LATEX_LIMIT_PRO`  | 1500    | Monthly LaTeX limit for pro tier  |
 
 ## Assigning Beta Tier
 

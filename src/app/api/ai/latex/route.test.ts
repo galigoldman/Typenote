@@ -16,10 +16,7 @@ vi.mock('@/lib/ai/rate-limit', () => ({
 import { POST } from './route';
 import { convertToLatex } from '@/lib/ai/latex';
 import { createClient } from '@/lib/supabase/server';
-import {
-  checkAndIncrementUsage,
-  recordTokenUsage,
-} from '@/lib/ai/rate-limit';
+import { checkAndIncrementUsage, recordTokenUsage } from '@/lib/ai/rate-limit';
 
 function createRequest(body: unknown): Request {
   return new Request('http://localhost:3000/api/ai/latex', {
@@ -79,7 +76,10 @@ describe('POST /api/ai/latex', () => {
     const data = await res.json();
 
     expect(res.status).toBe(200);
-    expect(convertToLatex).toHaveBeenCalledWith('determinant of A', 'Linear Algebra');
+    expect(convertToLatex).toHaveBeenCalledWith(
+      'determinant of A',
+      'Linear Algebra',
+    );
     expect(data.latex).toBe('\\det(A)');
   });
 

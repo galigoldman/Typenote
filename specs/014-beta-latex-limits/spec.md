@@ -116,12 +116,12 @@ A student opens the AI chat panel and sees a clear breakdown of their usage: how
 
 Estimated monthly cost per beta user (Flash-only, Gemini 2.5 Flash pricing):
 
-| Query Type | Limit | Cost/Query | 100% Usage | 60% Realistic |
-|---|---|---|---|---|
-| LaTeX (Flash) | 500 | $0.0002 | $0.10 | $0.06 |
-| Chat Quick (Flash) | 100 | $0.003 | $0.30 | $0.18 |
-| Chat Deep (Pro) | blocked | — | $0.00 | $0.00 |
-| **Total** | | | **$0.40** | **$0.24** |
+| Query Type         | Limit   | Cost/Query | 100% Usage | 60% Realistic |
+| ------------------ | ------- | ---------- | ---------- | ------------- |
+| LaTeX (Flash)      | 500     | $0.0002    | $0.10      | $0.06         |
+| Chat Quick (Flash) | 100     | $0.003     | $0.30      | $0.18         |
+| Chat Deep (Pro)    | blocked | —          | $0.00      | $0.00         |
+| **Total**          |         |            | **$0.40**  | **$0.24**     |
 
 At 50 beta users with 60% utilization: **~$12/month**.
 

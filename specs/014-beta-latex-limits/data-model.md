@@ -9,11 +9,11 @@
 
 **Add columns:**
 
-| Column | Type | Default | Purpose |
-|--------|------|---------|---------|
-| `query_type` | `text NOT NULL` | `'chat'` | Distinguishes chat vs latex usage |
-| `total_input_tokens` | `bigint NOT NULL` | `0` | Cumulative input tokens (observability only) |
-| `total_output_tokens` | `bigint NOT NULL` | `0` | Cumulative output tokens (observability only) |
+| Column                | Type              | Default  | Purpose                                       |
+| --------------------- | ----------------- | -------- | --------------------------------------------- |
+| `query_type`          | `text NOT NULL`   | `'chat'` | Distinguishes chat vs latex usage             |
+| `total_input_tokens`  | `bigint NOT NULL` | `0`      | Cumulative input tokens (observability only)  |
+| `total_output_tokens` | `bigint NOT NULL` | `0`      | Cumulative output tokens (observability only) |
 
 **Modify unique index:**
 
@@ -33,6 +33,7 @@ CREATE UNIQUE INDEX ai_usage_user_month_type_idx
 **New parameter:** `p_query_type text DEFAULT 'chat'`
 
 **Behavior changes:**
+
 - Upsert keyed on `(user_id, usage_month, query_type)` instead of `(user_id, usage_month)`
 - Limit resolution uses both tier and query_type (chat limits for `'chat'`, latex limits for `'latex'`)
 - Adds `'beta'` tier: chat=100, latex=500
@@ -91,7 +92,7 @@ ai_usage (modified)
 ## Tier Limits Matrix
 
 | Tier | Chat | LaTeX | Deep Mode |
-|------|------|-------|-----------|
+| ---- | ---- | ----- | --------- |
 | free | 50   | 150   | blocked   |
 | beta | 100  | 500   | blocked   |
 | pro  | 500  | 1500  | allowed   |

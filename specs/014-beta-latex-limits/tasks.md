@@ -40,7 +40,7 @@ Phase 1 (Setup) ──► Phase 2 (Foundational) ──┬──► Phase 3 (US1
 **Goal**: Application-layer rate limiting supports beta tier, query types, LaTeX limits, and token recording utility.
 
 - [x] T002 Update src/lib/ai/rate-limit.ts — add `'beta': 100` to `DEFAULT_LIMITS`, add `DEFAULT_LATEX_LIMITS` map `{ free: 150, beta: 500, pro: 1500 }`, update `resolveLimitForTier` to accept optional `queryType: 'chat' | 'latex'` and check `AI_LATEX_LIMIT_{TIER}` env vars for latex, update `checkAndIncrementUsage` to accept `queryType` param and pass `p_query_type` to RPC, update `getQuota` to return `{ chat: {used, limit, remaining}, latex: {used, limit, remaining}, tier, resetsAt, deepModeAvailable }`, add `recordTokenUsage(userId: string, queryType: 'chat' | 'latex', inputTokens: number, outputTokens: number)` that does a fire-and-forget `UPDATE ai_usage SET total_input_tokens = total_input_tokens + $1, total_output_tokens = total_output_tokens + $2 WHERE user_id = $3 AND usage_month = current AND query_type = $4` — catch and log errors, never throw
-- [x] T003 Update src/lib/ai/__tests__/rate-limit.test.ts — test beta tier limit (100), LaTeX limits per tier, `checkAndIncrementUsage` with `queryType='latex'`, `getQuota` returning separate chat/latex, `deepModeAvailable` per tier, env var overrides, `recordTokenUsage` calls supabase update (mock)
+- [x] T003 Update src/lib/ai/**tests**/rate-limit.test.ts — test beta tier limit (100), LaTeX limits per tier, `checkAndIncrementUsage` with `queryType='latex'`, `getQuota` returning separate chat/latex, `deepModeAvailable` per tier, env var overrides, `recordTokenUsage` calls supabase update (mock)
 
 ---
 
@@ -71,7 +71,7 @@ Phase 1 (Setup) ──► Phase 2 (Foundational) ──┬──► Phase 3 (US1
 
 - [x] T008 [US3] Update src/lib/ai/prompts.ts — add `buildLatexPrompt(courseName?: string): string` returning LATEX_SYSTEM_PROMPT with appended `\nThe student is in the course: {courseName}. Use notation conventions appropriate for this subject.` when courseName provided
 - [x] T009 [US3] Update src/lib/ai/latex.ts — change signature to `convertToLatex(text, courseName?)`, use `buildLatexPrompt(courseName)` as system prompt, return the full `generateText` result so route can access `result.usage`; update src/app/api/ai/latex/route.ts to pass `courseName` to `convertToLatex`
-- [x] T010 [US3] Update tests: src/lib/ai/latex.test.ts (courseName passthrough), src/lib/ai/__tests__/prompts.test.ts (buildLatexPrompt with/without courseName)
+- [x] T010 [US3] Update tests: src/lib/ai/latex.test.ts (courseName passthrough), src/lib/ai/**tests**/prompts.test.ts (buildLatexPrompt with/without courseName)
 - [x] T011 [P] [US3] Update src/components/editor/math-node-view.tsx — include `courseName` in `/api/ai/latex` fetch body; source courseName from component props or parent page context
 - [x] T012 [P] [US3] Update src/components/editor/tiptap-editor.tsx — include `courseName` in `/api/ai/latex` fetch body
 - [x] T013 [P] [US3] Update src/components/canvas/canvas-editor.tsx — include `courseName` in `/api/ai/latex` fetch body
@@ -99,13 +99,13 @@ Phase 1 (Setup) ──► Phase 2 (Foundational) ──┬──► Phase 3 (US1
 
 ## Summary
 
-| Phase | Story | Tasks | Parallel |
-|-------|-------|-------|----------|
-| 1: Setup | — | T001 | — |
-| 2: Foundational | — | T002–T003 | — |
-| 3: US1 (Beta + Deep Mode) | P1 | T004–T005 | With Phase 4 |
-| 4: US2 (LaTeX Quota) | P1 | T006–T007 | With Phase 3 |
-| 5: US3 (Course Context) | P2 | T008–T013 | T011, T012, T013 parallel |
-| 6: US4 (Quota Display) | P2 | T014–T016 | — |
-| 7: Polish | — | T017–T019 | — |
-| **Total** | | **19 tasks** | |
+| Phase                     | Story | Tasks        | Parallel                  |
+| ------------------------- | ----- | ------------ | ------------------------- |
+| 1: Setup                  | —     | T001         | —                         |
+| 2: Foundational           | —     | T002–T003    | —                         |
+| 3: US1 (Beta + Deep Mode) | P1    | T004–T005    | With Phase 4              |
+| 4: US2 (LaTeX Quota)      | P1    | T006–T007    | With Phase 3              |
+| 5: US3 (Course Context)   | P2    | T008–T013    | T011, T012, T013 parallel |
+| 6: US4 (Quota Display)    | P2    | T014–T016    | —                         |
+| 7: Polish                 | —     | T017–T019    | —                         |
+| **Total**                 |       | **19 tasks** |                           |

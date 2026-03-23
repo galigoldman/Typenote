@@ -212,9 +212,9 @@ describe('checkAndIncrementUsage', () => {
       error: { message: 'connection refused' },
     });
 
-    await expect(
-      checkAndIncrementUsage('user-123', 'flash'),
-    ).rejects.toThrow('Rate limit check failed: connection refused');
+    await expect(checkAndIncrementUsage('user-123', 'flash')).rejects.toThrow(
+      'Rate limit check failed: connection refused',
+    );
   });
 
   it('uses AI_LIMIT_FREE env var override', async () => {
