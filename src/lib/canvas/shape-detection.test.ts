@@ -562,12 +562,7 @@ describe('detectRectangle', () => {
 
 describe('detectTriangle', () => {
   it('detects a triangle from an open stroke with 3 corners', () => {
-    const points = makeTrianglePointsOpen(
-      [200, 50],
-      [350, 310],
-      [50, 310],
-      25,
-    );
+    const points = makeTrianglePointsOpen([200, 50], [350, 310], [50, 310], 25);
     const result = detectTriangle(points);
     expect(result).not.toBeNull();
     expect(result!.type).toBe('triangle');
@@ -576,12 +571,7 @@ describe('detectTriangle', () => {
   });
 
   it('detects a right triangle', () => {
-    const points = makeTrianglePointsOpen(
-      [50, 50],
-      [250, 50],
-      [50, 200],
-      25,
-    );
+    const points = makeTrianglePointsOpen([50, 50], [250, 50], [50, 200], 25);
     const result = detectTriangle(points);
     expect(result).not.toBeNull();
     expect(result!.type).toBe('triangle');
@@ -610,12 +600,7 @@ describe('detectTriangle', () => {
   });
 
   it('returns corners that lie within the bounding box of the input', () => {
-    const points = makeTrianglePointsOpen(
-      [200, 50],
-      [350, 310],
-      [50, 310],
-      25,
-    );
+    const points = makeTrianglePointsOpen([200, 50], [350, 310], [50, 310], 25);
     const result = detectTriangle(points);
     expect(result).not.toBeNull();
     for (const corner of result!.corners!) {

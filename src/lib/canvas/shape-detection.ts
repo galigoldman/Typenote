@@ -76,7 +76,7 @@ function normaliseDeg(deg: number): number {
  * (both in degrees). Result is in the range (-180, 180].
  */
 function angleDiffDeg(a: number, b: number): number {
-  let d = ((b - a) % 360 + 360) % 360;
+  let d = (((b - a) % 360) + 360) % 360;
   if (d > 180) d -= 360;
   return d;
 }
@@ -88,7 +88,10 @@ function angleDiffDeg(a: number, b: number): number {
 /**
  * Returns the arithmetic mean of all (x, y) positions in the stroke.
  */
-export function computeCentroid(points: StrokePoint[]): { x: number; y: number } {
+export function computeCentroid(points: StrokePoint[]): {
+  x: number;
+  y: number;
+} {
   let sx = 0;
   let sy = 0;
   for (const [x, y] of points) {
@@ -264,8 +267,7 @@ function edgeStraightness(
     const px = points[i][0];
     const py = points[i][1];
     // Perpendicular distance from point to line through A-B
-    const dist =
-      Math.abs(edgeDy * (px - ax) - edgeDx * (py - ay)) / edgeLen;
+    const dist = Math.abs(edgeDy * (px - ax) - edgeDx * (py - ay)) / edgeLen;
     if (dist > maxDist) maxDist = dist;
   }
 
@@ -300,7 +302,9 @@ function cornerAngle(
 // 5. detectCircle
 // ---------------------------------------------------------------------------
 
-export function detectCircle(points: StrokePoint[]): ShapeDetectionResult | null {
+export function detectCircle(
+  points: StrokePoint[],
+): ShapeDetectionResult | null {
   if (points.length < 6) return null;
 
   // Check minimum size
@@ -315,8 +319,7 @@ export function detectCircle(points: StrokePoint[]): ShapeDetectionResult | null
     return Math.sqrt(dx * dx + dy * dy);
   });
 
-  const meanDist =
-    distances.reduce((sum, d) => sum + d, 0) / distances.length;
+  const meanDist = distances.reduce((sum, d) => sum + d, 0) / distances.length;
 
   if (meanDist < 1e-6) return null;
 
@@ -335,7 +338,10 @@ export function detectCircle(points: StrokePoint[]): ShapeDetectionResult | null
   if (coverage < 180) return null;
 
   // Also check aspect ratio of bounding box — reject very elongated shapes
-  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+  let minX = Infinity,
+    minY = Infinity,
+    maxX = -Infinity,
+    maxY = -Infinity;
   for (const [x, y] of points) {
     if (x < minX) minX = x;
     if (y < minY) minY = y;
@@ -426,16 +432,14 @@ export function detectRectangle(
 
   for (let i = 0; i < 4; i++) {
     const cIdx = cornerIndices[i];
-    const prevIdx =
-      i === 0
-        ? 0
-        : cornerIndices[i - 1];
-    const nextIdx =
-      i === 3
-        ? smoothed.length - 1
-        : cornerIndices[i + 1];
+    const prevIdx = i === 0 ? 0 : cornerIndices[i - 1];
+    const nextIdx = i === 3 ? smoothed.length - 1 : cornerIndices[i + 1];
 
-    const angle = cornerAngle(smoothed[prevIdx], smoothed[cIdx], smoothed[nextIdx]);
+    const angle = cornerAngle(
+      smoothed[prevIdx],
+      smoothed[cIdx],
+      smoothed[nextIdx],
+    );
     const deviation = Math.abs(angle - 90);
 
     if (deviation > 30) return null;
