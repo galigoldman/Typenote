@@ -33,6 +33,7 @@ describe('useRealtimeSync', () => {
   const defaultProps = {
     documentId: 'doc-123',
     lastSaveTimestampRef: { current: null } as React.RefObject<string | null>,
+    lastSaveStartedRef: { current: 0 } as React.RefObject<number>,
     onRemoteContentUpdate: vi.fn(),
     onRemoteTitleUpdate: vi.fn(),
   };

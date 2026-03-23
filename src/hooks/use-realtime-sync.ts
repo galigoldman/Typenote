@@ -9,6 +9,7 @@ export type ConnectionStatus = 'connected' | 'connecting' | 'disconnected';
 interface UseRealtimeSyncOptions {
   documentId: string;
   lastSaveTimestampRef: React.RefObject<string | null>;
+  lastSaveStartedRef: React.RefObject<number>;
   onRemoteContentUpdate: (content: Record<string, unknown>) => void;
   onRemoteTitleUpdate: (title: string) => void;
   onRemotePagesUpdate?: (pages: Record<string, unknown>) => void;
@@ -17,6 +18,7 @@ interface UseRealtimeSyncOptions {
 export function useRealtimeSync({
   documentId,
   lastSaveTimestampRef,
+  lastSaveStartedRef,
   onRemoteContentUpdate,
   onRemoteTitleUpdate,
   onRemotePagesUpdate,
@@ -63,8 +65,17 @@ export function useRealtimeSync({
             pages?: Record<string, unknown>;
           };
 
-          // Echo guard: if this update came from our own save, ignore it
+          // Echo guard: ignore updates from our own saves.
+          // 1. Exact timestamp match (response already arrived)
           if (newRecord.updated_at === lastSaveTimestampRef.current) {
+            return;
+          }
+          // 2. Save in flight — response hasn't arrived yet but this is
+          //    almost certainly our own echo (within 5 seconds of save start)
+          if (
+            lastSaveStartedRef.current &&
+            Date.now() - lastSaveStartedRef.current < 5000
+          ) {
             return;
           }
 

@@ -45,8 +45,10 @@ export function useDocumentSync({
   onRemotePagesUpdate,
 }: UseDocumentSyncOptions): UseDocumentSyncReturn {
   const [isLockedByRemote, setIsLockedByRemote] = useState(false);
+  const lastSaveStartedRef = useRef<number>(0);
 
   const saveFn = useCallback(async () => {
+    lastSaveStartedRef.current = Date.now();
     const content = editor
       ? (editor.getJSON() as Record<string, unknown>)
       : ({} as Record<string, unknown>);
@@ -78,6 +80,9 @@ export function useDocumentSync({
   const onRemoteContentUpdate = useCallback(
     (content: Record<string, unknown>) => {
       if (!editor) return;
+      // Skip unconverted docx content — _html is a marker that hasn't been
+      // parsed into TipTap JSON yet. Applying it would blank the editor.
+      if (content && '_html' in content) return;
       editor.commands.setContent(content, { emitUpdate: false });
       setIsLockedByRemote(true);
     },
@@ -87,6 +92,7 @@ export function useDocumentSync({
   const { connectionStatus } = useRealtimeSync({
     documentId,
     lastSaveTimestampRef,
+    lastSaveStartedRef,
     onRemoteContentUpdate,
     onRemoteTitleUpdate,
     onRemotePagesUpdate,
