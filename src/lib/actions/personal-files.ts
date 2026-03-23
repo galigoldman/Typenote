@@ -140,7 +140,17 @@ export async function openPersonalFileAsDocument(data: {
       .select('id')
       .single();
 
-    if (error) throw new Error('Failed to open personal file');
+    if (error) {
+      // Unique constraint violation — document was created by a concurrent request
+      const { data: retry } = await supabase
+        .from('documents')
+        .select('id')
+        .eq('personal_file_id', data.fileId)
+        .eq('user_id', user.id)
+        .maybeSingle();
+      if (retry) return { documentId: retry.id, created: false };
+      throw new Error('Failed to open personal file');
+    }
 
     revalidatePath('/dashboard');
     return { documentId: doc.id, created: true };
@@ -187,7 +197,17 @@ export async function openPersonalFileAsDocument(data: {
       .select('id')
       .single();
 
-    if (error) throw new Error('Failed to open personal file');
+    if (error) {
+      // Unique constraint violation — document was created by a concurrent request
+      const { data: retry } = await supabase
+        .from('documents')
+        .select('id')
+        .eq('personal_file_id', data.fileId)
+        .eq('user_id', user.id)
+        .maybeSingle();
+      if (retry) return { documentId: retry.id, created: false };
+      throw new Error('Failed to open personal file');
+    }
 
     revalidatePath('/dashboard');
     return { documentId: doc.id, created: true };
