@@ -58,9 +58,9 @@ INSERT INTO auth.identities (
 UPDATE public.profiles SET subscription_tier = 'free' WHERE id = 'ac3be77d-4566-406c-9ac0-7c410634ad41';
 
 -- Sample AI usage data for testing the quota display
-INSERT INTO public.ai_usage (user_id, usage_month, query_count, last_model)
-VALUES ('ac3be77d-4566-406c-9ac0-7c410634ad41', to_char(CURRENT_DATE, 'YYYY-MM'), 3, 'flash')
-ON CONFLICT (user_id, usage_month) DO NOTHING;
+INSERT INTO public.ai_usage (user_id, usage_month, query_type, query_count, last_model)
+VALUES ('ac3be77d-4566-406c-9ac0-7c410634ad41', to_char(CURRENT_DATE, 'YYYY-MM'), 'chat', 3, 'flash')
+ON CONFLICT (user_id, usage_month, query_type) DO NOTHING;
 
 -- ============================================
 -- FOLDERS (Notebooks)
