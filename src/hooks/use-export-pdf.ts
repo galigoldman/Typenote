@@ -1,10 +1,8 @@
 'use client';
 
 import { useState, useCallback } from 'react';
-import {
-  exportDocumentAsPdf,
-  type ExportableDocument,
-} from '@/lib/pdf/export-pdf';
+import { type ExportableDocument } from '@/lib/pdf/export-pdf';
+import { printExportDocument } from '@/lib/pdf/print-export';
 import { toast } from 'sonner';
 import { trackEvent } from '@/lib/analytics/events';
 
@@ -17,7 +15,7 @@ export function useExportPdf() {
 
       setIsExporting(true);
       try {
-        await exportDocumentAsPdf(document);
+        await printExportDocument(document);
         const pages = document.pages as Record<string, unknown> | null;
         const pageArray = pages?.pages as unknown[] | undefined;
         trackEvent('pdf_exported', {
