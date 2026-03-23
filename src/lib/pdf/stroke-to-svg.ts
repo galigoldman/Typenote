@@ -23,8 +23,7 @@ export function strokeToSvgPath(stroke: Stroke): string {
     'Z',
   ].join(' ');
 
-  const opacity =
-    stroke.opacity < 1 ? ` fill-opacity="${stroke.opacity}"` : '';
+  const opacity = stroke.opacity < 1 ? ` fill-opacity="${stroke.opacity}"` : '';
 
   return `<path d="${d}" fill="${stroke.color}"${opacity} stroke="none"/>`;
 }

@@ -28,19 +28,13 @@ function mathNode(latex: string) {
 function paragraphWithMath(textBefore: string, latex: string) {
   return {
     type: 'paragraph',
-    content: [
-      { type: 'text', text: textBefore },
-      mathNode(latex),
-    ],
+    content: [{ type: 'text', text: textBefore }, mathNode(latex)],
   };
 }
 
 describe('buildTextDocumentHtml', () => {
   it('produces valid HTML with head and body', () => {
-    const html = buildTextDocumentHtml(
-      makeDoc(paragraph('Hello')),
-      'Test Doc',
-    );
+    const html = buildTextDocumentHtml(makeDoc(paragraph('Hello')), 'Test Doc');
     expect(html).toContain('<!DOCTYPE html>');
     expect(html).toContain('<head>');
     expect(html).toContain('<body');
@@ -48,10 +42,7 @@ describe('buildTextDocumentHtml', () => {
   });
 
   it('includes @font-face for GeistSans, GeistMono, and Noto Sans Hebrew', () => {
-    const html = buildTextDocumentHtml(
-      makeDoc(paragraph('Hello')),
-      'Test Doc',
-    );
+    const html = buildTextDocumentHtml(makeDoc(paragraph('Hello')), 'Test Doc');
     expect(html).toContain("font-family: 'GeistSans'");
     expect(html).toContain("font-family: 'GeistMono'");
     expect(html).toContain("font-family: 'Noto Sans Hebrew'");
@@ -64,44 +55,29 @@ describe('buildTextDocumentHtml', () => {
   });
 
   it('includes KaTeX CSS link', () => {
-    const html = buildTextDocumentHtml(
-      makeDoc(paragraph('Hello')),
-      'Test Doc',
-    );
+    const html = buildTextDocumentHtml(makeDoc(paragraph('Hello')), 'Test Doc');
     expect(html).toContain('katex');
     expect(html).toContain('.css');
   });
 
   it('includes A4 page size print rule', () => {
-    const html = buildTextDocumentHtml(
-      makeDoc(paragraph('Hello')),
-      'Test Doc',
-    );
+    const html = buildTextDocumentHtml(makeDoc(paragraph('Hello')), 'Test Doc');
     expect(html).toContain('@page');
     expect(html).toContain('A4');
   });
 
   it('includes break-after: avoid on headings', () => {
-    const html = buildTextDocumentHtml(
-      makeDoc(paragraph('Hello')),
-      'Test Doc',
-    );
+    const html = buildTextDocumentHtml(makeDoc(paragraph('Hello')), 'Test Doc');
     expect(html).toContain('break-after: avoid');
   });
 
   it('includes dir="auto" on body for BiDi support', () => {
-    const html = buildTextDocumentHtml(
-      makeDoc(paragraph('Hello')),
-      'Test Doc',
-    );
+    const html = buildTextDocumentHtml(makeDoc(paragraph('Hello')), 'Test Doc');
     expect(html).toContain('dir="auto"');
   });
 
   it('sets the document title', () => {
-    const html = buildTextDocumentHtml(
-      makeDoc(paragraph('Hello')),
-      'My Notes',
-    );
+    const html = buildTextDocumentHtml(makeDoc(paragraph('Hello')), 'My Notes');
     expect(html).toContain('<title>My Notes</title>');
   });
 
@@ -163,10 +139,7 @@ describe('buildTextDocumentHtml', () => {
   });
 
   it('produces valid HTML for empty document', () => {
-    const html = buildTextDocumentHtml(
-      { type: 'doc', content: [] },
-      'Empty',
-    );
+    const html = buildTextDocumentHtml({ type: 'doc', content: [] }, 'Empty');
     expect(html).toContain('<!DOCTYPE html>');
     expect(html).toContain('<body');
   });

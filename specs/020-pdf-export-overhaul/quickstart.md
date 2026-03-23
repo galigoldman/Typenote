@@ -19,6 +19,7 @@
    - `NotoSansHebrew-Bold.ttf`
 
 2. **Start dev server**:
+
    ```bash
    pnpm dev
    ```
@@ -32,29 +33,32 @@
 ## Key Files
 
 ### New Files
-| File | Purpose |
-|------|---------|
-| `src/lib/pdf/print-export.ts` | Orchestrates HTML generation + opens print window |
-| `src/lib/pdf/html-template.ts` | Builds styled HTML from TipTap JSON (editor CSS + KaTeX + fonts + print rules) |
-| `src/lib/pdf/stroke-to-svg.ts` | Converts perfect-freehand strokes to SVG path elements |
-| `src/lib/pdf/page-background-svg.ts` | Generates SVG backgrounds (lined, grid, dotted) |
+
+| File                                 | Purpose                                                                        |
+| ------------------------------------ | ------------------------------------------------------------------------------ |
+| `src/lib/pdf/print-export.ts`        | Orchestrates HTML generation + opens print window                              |
+| `src/lib/pdf/html-template.ts`       | Builds styled HTML from TipTap JSON (editor CSS + KaTeX + fonts + print rules) |
+| `src/lib/pdf/stroke-to-svg.ts`       | Converts perfect-freehand strokes to SVG path elements                         |
+| `src/lib/pdf/page-background-svg.ts` | Generates SVG backgrounds (lined, grid, dotted)                                |
 
 ### Modified Files
-| File | Change |
-|------|--------|
+
+| File                          | Change                                                           |
+| ----------------------------- | ---------------------------------------------------------------- |
 | `src/hooks/use-export-pdf.ts` | Calls `printExportDocument()` instead of `exportDocumentAsPdf()` |
 
 ### Files to Remove (after migration)
-| File | Reason |
-|------|--------|
-| `src/lib/pdf/export-pdf.ts` | Replaced by print-export.ts |
-| `src/lib/pdf/tiptap-to-pdf.ts` | Replaced by html-template.ts + browser rendering |
-| `src/lib/pdf/text-document-renderer.ts` | Replaced by CSS pagination |
-| `src/lib/pdf/font-loader.ts` | Replaced by @font-face in HTML template |
-| `src/lib/pdf/math-renderer.ts` | KaTeX renders natively in the browser |
-| `src/lib/pdf/canvas-page-renderer.ts` | Replaced by SVG in HTML |
-| `src/lib/pdf/stroke-renderer.ts` | Replaced by stroke-to-svg.ts |
-| `src/lib/pdf/background-renderer.ts` | Replaced by page-background-svg.ts |
+
+| File                                    | Reason                                           |
+| --------------------------------------- | ------------------------------------------------ |
+| `src/lib/pdf/export-pdf.ts`             | Replaced by print-export.ts                      |
+| `src/lib/pdf/tiptap-to-pdf.ts`          | Replaced by html-template.ts + browser rendering |
+| `src/lib/pdf/text-document-renderer.ts` | Replaced by CSS pagination                       |
+| `src/lib/pdf/font-loader.ts`            | Replaced by @font-face in HTML template          |
+| `src/lib/pdf/math-renderer.ts`          | KaTeX renders natively in the browser            |
+| `src/lib/pdf/canvas-page-renderer.ts`   | Replaced by SVG in HTML                          |
+| `src/lib/pdf/stroke-renderer.ts`        | Replaced by stroke-to-svg.ts                     |
+| `src/lib/pdf/background-renderer.ts`    | Replaced by page-background-svg.ts               |
 
 ## Running Tests
 

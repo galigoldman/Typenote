@@ -4,9 +4,7 @@ import type { ExportableDocument } from '../export-pdf';
 
 // Mock html-template module
 vi.mock('../html-template', () => ({
-  buildTextDocumentHtml: vi.fn(
-    () => '<html><body>mock content</body></html>',
-  ),
+  buildTextDocumentHtml: vi.fn(() => '<html><body>mock content</body></html>'),
 }));
 
 describe('printExportDocument', () => {
@@ -33,9 +31,7 @@ describe('printExportDocument', () => {
       close: vi.fn(),
     };
 
-    vi.spyOn(window, 'open').mockReturnValue(
-      mockWindow as unknown as Window,
-    );
+    vi.spyOn(window, 'open').mockReturnValue(mockWindow as unknown as Window);
   });
 
   const textDoc: ExportableDocument = {
