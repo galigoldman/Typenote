@@ -66,7 +66,10 @@ describe('MaterialUpload', () => {
     ) as HTMLInputElement;
     expect(input).toBeInTheDocument();
     expect(input).toHaveClass('hidden');
-    expect(input).toHaveAttribute('accept', '.pdf,application/pdf');
+    expect(input).toHaveAttribute(
+      'accept',
+      '.pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    );
   });
 
   it('shows progress bar when uploading', () => {
