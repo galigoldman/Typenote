@@ -451,10 +451,24 @@ export function usePinchZoom({
       }
     };
 
-    // ── Ctrl+Wheel zoom (desktop) ──────────────────────────────────
+    // ── Wheel: scroll (plain) or zoom (Ctrl/Meta) ─────────────────
 
     const handleWheel = (e: WheelEvent) => {
-      if (!e.ctrlKey && !e.metaKey) return;
+      // Plain wheel → scroll (pan camera vertically/horizontally)
+      if (!e.ctrlKey && !e.metaKey) {
+        e.preventDefault();
+        const cam = cameraRef.current;
+        const newCam = clampCamera({
+          ...cam,
+          x: cam.x - e.deltaX,
+          y: cam.y - e.deltaY,
+        });
+        setCamera(newCam);
+        cameraRef.current = newCam;
+        return;
+      }
+
+      // Ctrl/Meta + wheel → zoom
       e.preventDefault();
 
       const cam = cameraRef.current;
