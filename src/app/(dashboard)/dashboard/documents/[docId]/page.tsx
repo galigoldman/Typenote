@@ -49,8 +49,7 @@ export default async function DocumentPage({ params }: DocumentPageProps) {
   }
 
   // Text-only document (e.g. imported .docx) — use TipTap editor directly
-  const isTextDocument =
-    !typedDocument.pages && !typedDocument.material_id;
+  const isTextDocument = !typedDocument.pages && !typedDocument.material_id;
 
   // No course linked — render editor without AI
   if (!course) {

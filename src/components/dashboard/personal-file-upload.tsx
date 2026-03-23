@@ -67,8 +67,7 @@ export function PersonalFileUpload({
   }
 
   const buttonLabel =
-    label ??
-    (category === 'homework' ? 'Import Homework' : 'Import File');
+    label ?? (category === 'homework' ? 'Import Homework' : 'Import File');
 
   return (
     <div>
