@@ -37,6 +37,7 @@ Every step of development must follow this git workflow:
 - PRs cannot be merged unless CI passes. This is enforced via GitHub branch protection rules on `main`.
 
 ## Active Technologies
+
 - TypeScript 5 / Node.js 22+ + React 19, Next.js 16 (App Router) (023-fix-pen-double-tap-zoom)
 - N/A — client-side only, no data changes (023-fix-pen-double-tap-zoom)
 
