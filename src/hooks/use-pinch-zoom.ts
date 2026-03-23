@@ -48,6 +48,16 @@ export const hasStylus = (touches: TouchList) => {
   return false;
 };
 
+/**
+ * Returns true if a touch-end event should be allowed to count towards
+ * double-tap zoom. Pen/stylus taps are excluded using two independent
+ * detection methods for robustness.
+ */
+export const shouldCountAsDoubleTap = (
+  changedTouches: TouchList,
+  lastPointerType: string,
+) => !hasStylus(changedTouches) && lastPointerType !== 'pen';
+
 interface UsePinchZoomOptions {
   containerRef: React.RefObject<HTMLElement | null>;
   enabled?: boolean;
@@ -367,6 +377,17 @@ export function usePinchZoom({
       cameraRef.current = newCam;
     };
 
+    // ── PointerEvent pen tracking ────────────────────────────────────
+    // Track the last pointer type (W3C standard: "mouse" | "touch" | "pen")
+    // as a redundant guard for double-tap detection. PointerEvent.pointerType
+    // is more reliable than the iPadOS-specific Touch.touchType across all
+    // browsers and deployment contexts.
+    let lastPointerType = '';
+
+    const handlePointerDown = (e: PointerEvent) => {
+      lastPointerType = e.pointerType;
+    };
+
     // ── Double-tap detection ───────────────────────────────────────
 
     let tapCount = 0;
@@ -404,10 +425,12 @@ export function usePinchZoom({
 
       // Single-finger double-tap: toggle 100% ↔ 200%
       // Skip stylus touches — pen taps must never trigger zoom (FR-001)
+      // Uses both TouchEvent.touchType AND PointerEvent.pointerType for
+      // robust pen detection across all browsers and deployment contexts.
       if (
         e.touches.length === 0 &&
         e.changedTouches.length === 1 &&
-        !hasStylus(e.changedTouches)
+        shouldCountAsDoubleTap(e.changedTouches, lastPointerType)
       ) {
         const touch = e.changedTouches[0];
         const rect = container.getBoundingClientRect();
@@ -456,10 +479,11 @@ export function usePinchZoom({
       // Stylus lift — reset double-tap counter to prevent pen→finger
       // false positive (FR-006): a pen tap followed by a finger tap
       // within 300ms must not register as a double-tap.
+      // Uses both detection methods for robustness.
       if (
         e.touches.length === 0 &&
         e.changedTouches.length === 1 &&
-        hasStylus(e.changedTouches)
+        (hasStylus(e.changedTouches) || lastPointerType === 'pen')
       ) {
         tapCount = 0;
         if (tapTimer) clearTimeout(tapTimer);
@@ -675,6 +699,9 @@ export function usePinchZoom({
       passive: true,
     });
 
+    // PointerEvent pen tracking (fires before touch events on iOS)
+    container.addEventListener('pointerdown', handlePointerDown);
+
     // Desktop wheel zoom
     container.addEventListener('wheel', handleWheel, { passive: false });
 
@@ -695,6 +722,7 @@ export function usePinchZoom({
       container.removeEventListener('touchmove', handleSingleTouchMove);
       container.removeEventListener('touchend', handleSingleTouchEnd);
       container.removeEventListener('wheel', handleWheel);
+      container.removeEventListener('pointerdown', handlePointerDown);
       cancelAnimations();
       if (zoomTimeoutRef.current) clearTimeout(zoomTimeoutRef.current);
     };
