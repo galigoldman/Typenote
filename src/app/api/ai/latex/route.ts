@@ -10,6 +10,13 @@ export async function POST(req: Request) {
     const body = await req.json();
     const { text, courseName } = body;
 
+    // Debug mode: return mock LaTeX without calling Gemini (skip auth + rate limit)
+    if (isDebugMode) {
+      return NextResponse.json({
+        latex: '5 \\times \\frac{1}{2}',
+      });
+    }
+
     if (!text || typeof text !== 'string' || text.trim().length === 0) {
       return NextResponse.json({ error: 'Text is required' }, { status: 400 });
     }
@@ -71,13 +78,6 @@ export async function POST(req: Request) {
         { error: 'Rate limit check failed' },
         { status: 503 },
       );
-    }
-
-    // Debug mode: return mock LaTeX without calling Gemini
-    if (isDebugMode) {
-      return NextResponse.json({
-        latex: '\\text{debug: ' + text.trim().slice(0, 30) + '}',
-      });
     }
 
     const latex = await convertToLatex(text.trim(), courseName || undefined);

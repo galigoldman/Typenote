@@ -32,6 +32,8 @@ import {
   MousePointer2,
   Save,
   Sparkles,
+  Download,
+  Loader2,
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useSidebar } from '@/components/dashboard/sidebar-layout';
@@ -44,6 +46,7 @@ import { useSelection } from '@/hooks/use-selection';
 import { usePinchZoom } from '@/hooks/use-pinch-zoom';
 import { ZoomIndicator } from './zoom-indicator';
 import { EditorToolbar } from '@/components/editor/editor-toolbar';
+import { useExportPdf } from '@/hooks/use-export-pdf';
 import { CanvasPage } from './canvas-page';
 import { usePdfBackground } from '@/hooks/use-pdf-background';
 import {
@@ -309,6 +312,7 @@ export function CanvasEditor({
 }: CanvasEditorProps) {
   const router = useRouter();
   const { isOpen: sidebarOpen, toggle: toggleSidebar } = useSidebar();
+  const { exportPdf, isExporting } = useExportPdf();
   const [title, setTitle] = useState(document.title);
   const [pages, setPages] = useState<CanvasPageData[]>(() =>
     initializePagesFromDocument(document),
@@ -1773,6 +1777,24 @@ export function CanvasEditor({
                 document={{ ...document, pages: { pages } }}
               />
             </div>
+          </>
+        )}
+
+        {/* Export PDF — always visible */}
+        {activeTool !== 'text' && (
+          <>
+            <div className="flex-1" />
+            <button
+              onPointerDown={(e) => {
+                e.stopPropagation();
+                exportPdf({ ...document, pages: { pages } });
+              }}
+              disabled={isExporting}
+              className="flex items-center justify-center h-8 w-8 min-h-[44px] min-w-[44px] rounded-lg transition-colors hover:bg-accent/50 text-muted-foreground"
+              title="Export as PDF"
+            >
+              {isExporting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
+            </button>
           </>
         )}
       </div>
