@@ -35,6 +35,19 @@ import {
  *   - Momentum-based panning with deceleration
  */
 
+// ── Stylus detection ────────────────────────────────────────────────
+// On iPadOS, Apple Pencil touches have touchType === "stylus".
+// Zoom/pan should only respond to finger touches ("direct"), never pen.
+
+export const hasStylus = (touches: TouchList) => {
+  for (let i = 0; i < touches.length; i++) {
+    if ((touches[i] as Touch & { touchType?: string }).touchType === 'stylus') {
+      return true;
+    }
+  }
+  return false;
+};
+
 interface UsePinchZoomOptions {
   containerRef: React.RefObject<HTMLElement | null>;
   enabled?: boolean;
@@ -269,21 +282,6 @@ export function usePinchZoom({
       };
     };
 
-    // ── Stylus detection ────────────────────────────────────────────
-    // On iPadOS, Apple Pencil touches have touchType === "stylus".
-    // Zoom/pan should only respond to finger touches ("direct"), never pen.
-
-    const hasStylus = (touches: TouchList) => {
-      for (let i = 0; i < touches.length; i++) {
-        if (
-          (touches[i] as Touch & { touchType?: string }).touchType === 'stylus'
-        ) {
-          return true;
-        }
-      }
-      return false;
-    };
-
     // ── Pinch-to-zoom ──────────────────────────────────────────────
 
     const handleTouchStart = (e: TouchEvent) => {
@@ -405,7 +403,12 @@ export function usePinchZoom({
       }
 
       // Single-finger double-tap: toggle 100% ↔ 200%
-      if (e.touches.length === 0 && e.changedTouches.length === 1) {
+      // Skip stylus touches — pen taps must never trigger zoom (FR-001)
+      if (
+        e.touches.length === 0 &&
+        e.changedTouches.length === 1 &&
+        !hasStylus(e.changedTouches)
+      ) {
         const touch = e.changedTouches[0];
         const rect = container.getBoundingClientRect();
         const tapX = touch.clientX - rect.left;
@@ -448,6 +451,18 @@ export function usePinchZoom({
           animateCamera({ x: targetX, y: targetY, zoom: targetZoom });
           showZoomIndicator();
         }
+      }
+
+      // Stylus lift — reset double-tap counter to prevent pen→finger
+      // false positive (FR-006): a pen tap followed by a finger tap
+      // within 300ms must not register as a double-tap.
+      if (
+        e.touches.length === 0 &&
+        e.changedTouches.length === 1 &&
+        hasStylus(e.changedTouches)
+      ) {
+        tapCount = 0;
+        if (tapTimer) clearTimeout(tapTimer);
       }
     };
 
