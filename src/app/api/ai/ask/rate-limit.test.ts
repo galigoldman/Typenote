@@ -62,12 +62,10 @@ function mockProfilesTier(tier: string) {
       return {
         select: vi.fn().mockReturnValue({
           eq: vi.fn().mockReturnValue({
-            single: vi
-              .fn()
-              .mockResolvedValue({
-                data: { subscription_tier: tier },
-                error: null,
-              }),
+            single: vi.fn().mockResolvedValue({
+              data: { subscription_tier: tier },
+              error: null,
+            }),
           }),
         }),
       };
@@ -267,7 +265,9 @@ describe('POST /api/ai/ask — rate limiting', () => {
       }),
       insert: vi.fn().mockReturnValue({
         select: vi.fn().mockReturnValue({
-          single: vi.fn().mockResolvedValue({ data: { id: 'c1' }, error: null }),
+          single: vi
+            .fn()
+            .mockResolvedValue({ data: { id: 'c1' }, error: null }),
         }),
       }),
       update: vi.fn().mockReturnValue({
@@ -278,9 +278,7 @@ describe('POST /api/ai/ask — rate limiting', () => {
       table === 'profiles' ? profilesMock : defaultChain,
     );
 
-    const res = await POST(
-      createRequest({ ...validBody, mode: 'deep' }),
-    );
+    const res = await POST(createRequest({ ...validBody, mode: 'deep' }));
     const data = await res.json();
 
     expect(res.status).toBe(403);
@@ -318,9 +316,7 @@ describe('POST /api/ai/ask — rate limiting', () => {
       };
     });
 
-    const res = await POST(
-      createRequest({ ...validBody, mode: 'deep' }),
-    );
+    const res = await POST(createRequest({ ...validBody, mode: 'deep' }));
     const data = await res.json();
 
     expect(res.status).toBe(403);
@@ -356,7 +352,9 @@ describe('POST /api/ai/ask — rate limiting', () => {
         }),
         insert: vi.fn().mockReturnValue({
           select: vi.fn().mockReturnValue({
-            single: vi.fn().mockResolvedValue({ data: { id: 'c1' }, error: null }),
+            single: vi
+              .fn()
+              .mockResolvedValue({ data: { id: 'c1' }, error: null }),
           }),
         }),
         update: vi.fn().mockReturnValue({

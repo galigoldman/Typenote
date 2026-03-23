@@ -255,9 +255,7 @@ describe('AiChatPanel', () => {
     render(<AiChatPanel {...defaultProps} />);
 
     await waitFor(() => {
-      expect(
-        screen.getByText('Chat: 10 of 50 remaining'),
-      ).toBeInTheDocument();
+      expect(screen.getByText('Chat: 10 of 50 remaining')).toBeInTheDocument();
     });
   });
 

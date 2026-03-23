@@ -126,9 +126,7 @@ export function MathInputBox({
       {latexRemaining && (
         <span
           className={`text-[10px] ${
-            latexRemaining.remaining <= 10
-              ? 'text-amber-500'
-              : 'text-zinc-400'
+            latexRemaining.remaining <= 10 ? 'text-amber-500' : 'text-zinc-400'
           }`}
         >
           {latexRemaining.remaining} of {latexRemaining.limit} LaTeX remaining

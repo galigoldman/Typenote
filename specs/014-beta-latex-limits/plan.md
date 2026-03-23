@@ -95,7 +95,7 @@ Breaking change from flat `{ used, limit, remaining }` to nested `{ chat: {...},
 ## Tier Limits Summary
 
 | Tier | Chat | LaTeX | Deep Mode |
-|------|------|-------|-----------|
+| ---- | ---- | ----- | --------- |
 | free | 50   | 150   | blocked   |
 | beta | 100  | 500   | blocked   |
 | pro  | 500  | 1500  | allowed   |

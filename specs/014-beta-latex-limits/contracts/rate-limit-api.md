@@ -10,14 +10,14 @@
 ```json
 {
   "text": "integral from 0 to infinity of e to the minus x",
-  "courseName": "Calculus II"         // NEW — optional
+  "courseName": "Calculus II" // NEW — optional
 }
 ```
 
-| Field | Type | Required | Constraints |
-|-------|------|----------|-------------|
-| `text` | string | yes | 1-500 chars, non-empty |
-| `courseName` | string | no | Max 200 chars. Omitted if document is not in a course |
+| Field        | Type   | Required | Constraints                                           |
+| ------------ | ------ | -------- | ----------------------------------------------------- |
+| `text`       | string | yes      | 1-500 chars, non-empty                                |
+| `courseName` | string | no       | Max 200 chars. Omitted if document is not in a course |
 
 ### Response (200)
 
@@ -81,17 +81,17 @@ All other request/response behavior unchanged.
 }
 ```
 
-| Field | Type | Description |
-|-------|------|-------------|
-| `chat.used` | number | Chat questions used this month |
-| `chat.limit` | number | Chat question limit for tier |
-| `chat.remaining` | number | `limit - used` (min 0) |
-| `latex.used` | number | LaTeX conversions used this month |
-| `latex.limit` | number | LaTeX conversion limit for tier |
-| `latex.remaining` | number | `limit - used` (min 0) |
-| `tier` | string | User's subscription tier |
-| `resetsAt` | string | ISO 8601 timestamp of next reset (1st of next month UTC) |
-| `deepModeAvailable` | boolean | Whether deep mode is available for this tier |
+| Field               | Type    | Description                                              |
+| ------------------- | ------- | -------------------------------------------------------- |
+| `chat.used`         | number  | Chat questions used this month                           |
+| `chat.limit`        | number  | Chat question limit for tier                             |
+| `chat.remaining`    | number  | `limit - used` (min 0)                                   |
+| `latex.used`        | number  | LaTeX conversions used this month                        |
+| `latex.limit`       | number  | LaTeX conversion limit for tier                          |
+| `latex.remaining`   | number  | `limit - used` (min 0)                                   |
+| `tier`              | string  | User's subscription tier                                 |
+| `resetsAt`          | string  | ISO 8601 timestamp of next reset (1st of next month UTC) |
+| `deepModeAvailable` | boolean | Whether deep mode is available for this tier             |
 
 ### Breaking change note
 
