@@ -33,7 +33,7 @@ const DEG_TO_RAD = Math.PI / 180;
 const MIN_BBOX_DIAGONAL = 30;
 
 /** Minimum confidence score required to accept a shape detection. */
-const CONFIDENCE_THRESHOLD = 0.5;
+const CONFIDENCE_THRESHOLD = 0.3;
 
 /**
  * Computes the mean pressure across all points.
@@ -301,7 +301,7 @@ function cornerAngle(
 // ---------------------------------------------------------------------------
 
 export function detectCircle(points: StrokePoint[]): ShapeDetectionResult | null {
-  if (points.length < 8) return null;
+  if (points.length < 6) return null;
 
   // Check minimum size
   if (bboxDiagonal(points) < MIN_BBOX_DIAGONAL) return null;
@@ -326,16 +326,33 @@ export function detectCircle(points: StrokePoint[]): ShapeDetectionResult | null
   const stddev = Math.sqrt(variance);
   const cv = stddev / meanDist; // coefficient of variation
 
-  if (cv > 0.25) return null;
+  // GoodNotes-style: very forgiving — real freehand circles are messy.
+  // CV up to 0.45 still looks intentionally circular.
+  if (cv > 0.45) return null;
 
-  // Check angular coverage
+  // Check angular coverage — 180° minimum (even half-circles should snap)
   const coverage = computeAngularCoverage(points, center);
-  if (coverage < 270) return null;
+  if (coverage < 180) return null;
 
-  // Score: start from (1 - CV), penalise if coverage < 360°
-  let score = 1 - cv;
+  // Also check aspect ratio of bounding box — reject very elongated shapes
+  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+  for (const [x, y] of points) {
+    if (x < minX) minX = x;
+    if (y < minY) minY = y;
+    if (x > maxX) maxX = x;
+    if (y > maxY) maxY = y;
+  }
+  const bboxW = maxX - minX;
+  const bboxH = maxY - minY;
+  const aspect = bboxW > bboxH ? bboxW / bboxH : bboxH / bboxW;
+  // Reject if aspect ratio > 2.5 (too elongated to be a circle)
+  if (aspect > 2.5) return null;
+
+  // Score: lower CV and higher coverage = better circle
+  let score = 1 - cv * 1.5; // scale CV impact (0.45 → score ~0.325)
   if (coverage < 360) {
-    score *= coverage / 360;
+    // Gentle penalty for incomplete coverage
+    score *= 0.5 + 0.5 * (coverage / 360);
   }
 
   return {
