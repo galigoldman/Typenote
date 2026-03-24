@@ -214,7 +214,8 @@ const PROSE_CSS = `
   /* Underline */
   u { text-decoration: underline; }
 
-  /* KaTeX display math centering */
+  /* KaTeX: force LTR direction so math symbols are not mirrored in RTL text */
+  .katex { direction: ltr; unicode-bidi: isolate; }
   .katex-display { margin: 1em 0; text-align: center; }
 
   /* Overflow protection */

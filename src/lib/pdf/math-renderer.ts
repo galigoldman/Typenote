@@ -47,6 +47,7 @@ export async function renderMath(
   // KaTeX HTML output relies on its own CSS for sizing. Set a reasonable
   // font-size so the measurement is representative of the PDF output.
   container.style.fontSize = '12pt';
+  container.style.direction = 'ltr';
   container.innerHTML = html;
   document.body.appendChild(container);
 
@@ -147,6 +148,7 @@ function buildForeignObjectSvg(
   const body = document.createElementNS(xhtmlNS, 'div');
   body.innerHTML = htmlContainer.innerHTML;
   body.style.fontSize = htmlContainer.style.fontSize;
+  body.style.direction = 'ltr';
   foreignObject.appendChild(body);
 
   svg.appendChild(foreignObject);
@@ -217,7 +219,7 @@ function buildSvgDataUri(
   const svgMarkup = [
     `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}">`,
     '<foreignObject width="100%" height="100%">',
-    `<div xmlns="http://www.w3.org/1999/xhtml" style="font-size:${htmlContainer.style.fontSize}">`,
+    `<div xmlns="http://www.w3.org/1999/xhtml" style="font-size:${htmlContainer.style.fontSize};direction:ltr">`,
     styles ? `<style>${styles}</style>` : '',
     htmlContainer.innerHTML,
     '</div>',
