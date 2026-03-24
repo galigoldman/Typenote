@@ -13,12 +13,12 @@ No new entities or schema changes required. This feature fixes bugs in the exist
 
 Represents a user's note document. Already supports linking to either a course material or a personal file.
 
-| Field | Type | Description |
-| --- | --- | --- |
-| id | UUID | Primary key |
-| material_id | UUID (nullable) | FK to `course_materials` — set when document is from a course material |
-| personal_file_id | UUID (nullable) | FK to `personal_files` — set when document is from a personal file |
-| pages | JSONB (nullable) | Array of page objects, each with optional `pdfPage` index |
+| Field            | Type             | Description                                                            |
+| ---------------- | ---------------- | ---------------------------------------------------------------------- |
+| id               | UUID             | Primary key                                                            |
+| material_id      | UUID (nullable)  | FK to `course_materials` — set when document is from a course material |
+| personal_file_id | UUID (nullable)  | FK to `personal_files` — set when document is from a personal file     |
+| pages            | JSONB (nullable) | Array of page objects, each with optional `pdfPage` index              |
 
 **Constraint**: A document may have at most one of `material_id` or `personal_file_id` set (never both).
 
@@ -26,19 +26,19 @@ Represents a user's note document. Already supports linking to either a course m
 
 A user-uploaded file stored in `personal-files` storage bucket.
 
-| Field | Type | Description |
-| --- | --- | --- |
-| id | UUID | Primary key |
+| Field        | Type   | Description                             |
+| ------------ | ------ | --------------------------------------- |
+| id           | UUID   | Primary key                             |
 | storage_path | string | Path within the `personal-files` bucket |
-| mime_type | string | MIME type (e.g., `application/pdf`) |
+| mime_type    | string | MIME type (e.g., `application/pdf`)     |
 
 ### Course Material
 
 A file associated with a course, stored in `course-materials` or `moodle-materials` bucket.
 
-| Field | Type | Description |
-| --- | --- | --- |
-| id | UUID | Primary key |
+| Field        | Type   | Description                                                            |
+| ------------ | ------ | ---------------------------------------------------------------------- |
+| id           | UUID   | Primary key                                                            |
 | storage_path | string | Path within bucket; `moodle:` prefix indicates moodle-materials bucket |
 
 ## Data Flow Fix

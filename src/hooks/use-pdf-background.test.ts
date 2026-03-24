@@ -69,9 +69,7 @@ describe('usePdfBackground', () => {
       data: { signedUrl: 'https://example.com/signed-url' },
     });
 
-    renderHook(() =>
-      usePdfBackground(null, undefined, 'personal-file-123'),
-    );
+    renderHook(() => usePdfBackground(null, undefined, 'personal-file-123'));
 
     await waitFor(() => {
       expect(mockFrom).toHaveBeenCalledWith('personal_files');
@@ -88,9 +86,7 @@ describe('usePdfBackground', () => {
       data: { signedUrl: 'https://example.com/signed-url' },
     });
 
-    renderHook(() =>
-      usePdfBackground(null, undefined, 'personal-file-456'),
-    );
+    renderHook(() => usePdfBackground(null, undefined, 'personal-file-456'));
 
     await waitFor(() => {
       expect(mockStorageFrom).toHaveBeenCalledWith('personal-files');
