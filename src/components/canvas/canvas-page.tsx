@@ -238,7 +238,13 @@ export function CanvasPage({
     document.addEventListener('selectionchange', handleSelectionChange);
     return () =>
       document.removeEventListener('selectionchange', handleSelectionChange);
-  }, [activeTool, page.pdfPage, materialId, personalFileId, handleTextSelected]);
+  }, [
+    activeTool,
+    page.pdfPage,
+    materialId,
+    personalFileId,
+    handleTextSelected,
+  ]);
 
   const isInteractionMode =
     activeTool === 'pen' ||
@@ -668,7 +674,9 @@ export function CanvasPage({
         style={{
           pointerEvents:
             isInteractionMode ||
-            (activeTool === 'read' && page.pdfPage != null && !!(materialId || personalFileId))
+            (activeTool === 'read' &&
+              page.pdfPage != null &&
+              !!(materialId || personalFileId))
               ? 'none'
               : 'auto',
           userSelect: activeTool === 'read' ? 'text' : undefined,

@@ -23,13 +23,13 @@ Fix two bugs: (1) Personal-file PDF imports show empty pages because the PDF ren
 
 _GATE: Must pass before Phase 0 research. Re-check after Phase 1 design._
 
-| Principle | Status | Notes |
-| --- | --- | --- |
-| I. Incremental Development | PASS | Bug fix on existing infrastructure; no new advanced features |
-| II. Test-Driven Quality | PASS | Will add/update unit tests for modified hooks and component |
-| III. Protected Main Branch | PASS | Working on feature branch `024-fix-latex-pdf-bugs` |
-| IV. Migrations as Code | PASS | No schema changes needed |
-| V. Interview-Ready Architecture | PASS | Fix follows existing patterns; extends hooks with a second source |
+| Principle                       | Status | Notes                                                             |
+| ------------------------------- | ------ | ----------------------------------------------------------------- |
+| I. Incremental Development      | PASS   | Bug fix on existing infrastructure; no new advanced features      |
+| II. Test-Driven Quality         | PASS   | Will add/update unit tests for modified hooks and component       |
+| III. Protected Main Branch      | PASS   | Working on feature branch `024-fix-latex-pdf-bugs`                |
+| IV. Migrations as Code          | PASS   | No schema changes needed                                          |
+| V. Interview-Ready Architecture | PASS   | Fix follows existing patterns; extends hooks with a second source |
 
 **Post-Phase 1 re-check**: PASS — No violations. The fix adds a conditional code path to existing hooks using the same patterns already established for course materials vs. moodle materials.
 
@@ -98,6 +98,7 @@ src/
 #### Step 1.3: Thread `personalFileId` through the component tree
 
 **Files**:
+
 - `src/app/(dashboard)/dashboard/documents/[docId]/page.tsx` — pass `personalFileId={typedDocument.personal_file_id}` alongside `materialId`
 - `src/components/canvas/canvas-editor.tsx` — accept `personalFileId` prop, pass to `usePdfBackground`
 - `src/components/canvas/canvas-page.tsx` — accept `personalFileId` prop, pass to `PdfTextLayer`
@@ -135,8 +136,8 @@ When a linked PDF cannot be loaded (deleted file, corrupted, etc.), display a us
 
 ## Risk Assessment
 
-| Risk | Likelihood | Impact | Mitigation |
-| --- | --- | --- | --- |
-| Regression in course-material PDF rendering | Low | High | Explicit regression test; no changes to course_materials query path |
-| `personal_files` table RLS prevents hook from reading storage_path | Medium | High | Verify RLS policy allows authenticated user to read their own files |
-| Input width fix causes layout overflow on mobile | Low | Low | `max-w` with viewport calc prevents overflow |
+| Risk                                                               | Likelihood | Impact | Mitigation                                                          |
+| ------------------------------------------------------------------ | ---------- | ------ | ------------------------------------------------------------------- |
+| Regression in course-material PDF rendering                        | Low        | High   | Explicit regression test; no changes to course_materials query path |
+| `personal_files` table RLS prevents hook from reading storage_path | Medium     | High   | Verify RLS policy allows authenticated user to read their own files |
+| Input width fix causes layout overflow on mobile                   | Low        | Low    | `max-w` with viewport calc prevents overflow                        |

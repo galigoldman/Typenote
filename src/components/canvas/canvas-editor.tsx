@@ -423,9 +423,13 @@ export function CanvasEditor({
     isLoading: pdfLoading,
     error: pdfError,
     pageCount: pdfPageCount,
-  } = usePdfBackground(materialId ?? null, {
-    onPageCountReady: expandPagesIfNeeded,
-  }, effectivePersonalFileId);
+  } = usePdfBackground(
+    materialId ?? null,
+    {
+      onPageCountReady: expandPagesIfNeeded,
+    },
+    effectivePersonalFileId,
+  );
 
   // Derived values based on active tool
   const currentColor =
