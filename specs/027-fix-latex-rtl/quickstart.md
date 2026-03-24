@@ -22,11 +22,11 @@ pnpm dev
 
 ## Key Files to Modify
 
-| File | Purpose |
-| ---- | ------- |
-| `src/app/globals.css` | Add `.katex { direction: ltr; unicode-bidi: isolate; }` for editor |
-| `src/lib/pdf/html-template.ts` | Add same rule to `PROSE_CSS` for PDF export |
-| `src/lib/pdf/math-renderer.ts` | Add LTR style to hidden measurement container |
+| File                           | Purpose                                                            |
+| ------------------------------ | ------------------------------------------------------------------ |
+| `src/app/globals.css`          | Add `.katex { direction: ltr; unicode-bidi: isolate; }` for editor |
+| `src/lib/pdf/html-template.ts` | Add same rule to `PROSE_CSS` for PDF export                        |
+| `src/lib/pdf/math-renderer.ts` | Add LTR style to hidden measurement container                      |
 
 ## Running Tests
 

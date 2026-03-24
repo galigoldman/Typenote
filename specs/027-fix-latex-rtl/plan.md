@@ -23,13 +23,13 @@ LaTeX math expressions rendered via KaTeX inherit RTL text direction from surrou
 
 _GATE: Must pass before Phase 0 research. Re-check after Phase 1 design._
 
-| Principle | Status | Notes |
-| --------- | ------ | ----- |
-| I. Incremental Development | PASS | Bug fix on existing feature, no new infrastructure |
-| II. Test-Driven Quality | PASS | Will add test verifying KaTeX LTR direction |
-| III. Protected Main Branch | PASS | Working on feature branch `027-fix-latex-rtl` |
-| IV. Migrations as Code | N/A | No database changes |
-| V. Interview-Ready Architecture | PASS | Unicode BiDi algorithm is a relevant topic for i18n interviews |
+| Principle                       | Status | Notes                                                          |
+| ------------------------------- | ------ | -------------------------------------------------------------- |
+| I. Incremental Development      | PASS   | Bug fix on existing feature, no new infrastructure             |
+| II. Test-Driven Quality         | PASS   | Will add test verifying KaTeX LTR direction                    |
+| III. Protected Main Branch      | PASS   | Working on feature branch `027-fix-latex-rtl`                  |
+| IV. Migrations as Code          | N/A    | No database changes                                            |
+| V. Interview-Ready Architecture | PASS   | Unicode BiDi algorithm is a relevant topic for i18n interviews |
 
 **Post-Phase 1 Re-check**: All gates pass. No data model, no new dependencies, no architectural changes.
 
@@ -75,6 +75,7 @@ __tests__/                                   # New test for KaTeX direction
 2. **Layout reversal**: Flexbox and inline elements flow right-to-left
 
 The fix uses two CSS properties:
+
 - `direction: ltr` — forces LTR layout for math content
 - `unicode-bidi: isolate` — creates a bidi isolation boundary, preventing the math from affecting (or being affected by) surrounding text direction. This is the modern W3C recommendation over `embed` or `bidi-override`.
 
@@ -101,7 +102,10 @@ This single rule covers all inline and display KaTeX renderings in the editor be
 Add the same rule to the `PROSE_CSS` constant, which defines styles for the server-side HTML document used in Puppeteer-based PDF export:
 
 ```css
-.katex { direction: ltr; unicode-bidi: isolate; }
+.katex {
+  direction: ltr;
+  unicode-bidi: isolate;
+}
 ```
 
 Place it near the existing `.katex-display` rule (line ~218).
