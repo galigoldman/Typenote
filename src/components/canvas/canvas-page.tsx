@@ -81,6 +81,7 @@ interface CanvasPageProps {
   hasSelectedTextBoxes?: boolean;
   renderPdfPage?: (pageNum: number, canvas: HTMLCanvasElement) => Promise<void>;
   materialId?: string | null;
+  personalFileId?: string | null;
   onAskAiWithText?: (text: string) => void;
   onAskAiWithRegion?: (bbox: BBox, pageId: string) => void;
   onCanvasRefsReady?: (
@@ -123,6 +124,7 @@ export function CanvasPage({
   hasSelectedTextBoxes = false,
   renderPdfPage,
   materialId,
+  personalFileId,
   onAskAiWithText,
   onAskAiWithRegion,
   onCanvasRefsReady,
@@ -213,7 +215,7 @@ export function CanvasPage({
   useEffect(() => {
     if (activeTool !== 'read') return;
     // Skip if this page has a PDF text layer (PdfTextLayer handles selection)
-    if (page.pdfPage != null && materialId) return;
+    if (page.pdfPage != null && (materialId || personalFileId)) return;
 
     const handleSelectionChange = () => {
       const sel = window.getSelection();
@@ -236,7 +238,7 @@ export function CanvasPage({
     document.addEventListener('selectionchange', handleSelectionChange);
     return () =>
       document.removeEventListener('selectionchange', handleSelectionChange);
-  }, [activeTool, page.pdfPage, materialId, handleTextSelected]);
+  }, [activeTool, page.pdfPage, materialId, personalFileId, handleTextSelected]);
 
   const isInteractionMode =
     activeTool === 'pen' ||
@@ -666,7 +668,7 @@ export function CanvasPage({
         style={{
           pointerEvents:
             isInteractionMode ||
-            (activeTool === 'read' && page.pdfPage != null && !!materialId)
+            (activeTool === 'read' && page.pdfPage != null && !!(materialId || personalFileId))
               ? 'none'
               : 'auto',
           userSelect: activeTool === 'read' ? 'text' : undefined,
@@ -699,10 +701,11 @@ export function CanvasPage({
       </div>
 
       {/* Layer 4.5: PDF text layer (Read tool) — above text content so it's selectable */}
-      {page.pdfPage != null && materialId && (
+      {page.pdfPage != null && (materialId || personalFileId) && (
         <PdfTextLayer
           pdfPage={page.pdfPage}
-          materialId={materialId}
+          materialId={materialId ?? null}
+          personalFileId={personalFileId ?? null}
           isActive={activeTool === 'read'}
           onTextSelected={handleTextSelected}
         />

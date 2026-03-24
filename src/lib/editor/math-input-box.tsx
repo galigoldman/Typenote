@@ -79,7 +79,7 @@ export function MathInputBox({
         top: `${position.y}px`,
         zIndex: 50,
       }}
-      className="flex flex-col gap-1 rounded-lg border border-violet-400 bg-white px-3 py-2 shadow-lg dark:bg-zinc-900"
+      className="flex max-w-[min(400px,calc(100vw-2rem))] flex-col gap-1 rounded-lg border border-violet-400 bg-white px-3 py-2 shadow-lg dark:bg-zinc-900"
     >
       <div className="flex items-center gap-2">
         <span className="text-sm font-medium text-violet-500">∑</span>
@@ -95,7 +95,7 @@ export function MathInputBox({
               : 'Describe math in plain English...'
           }
           disabled={isLoading || isQuotaExhausted}
-          className="min-w-[220px] border-none bg-transparent text-sm outline-none placeholder:text-zinc-400 disabled:opacity-50"
+          className="min-w-[220px] flex-1 border-none bg-transparent text-sm outline-none placeholder:text-zinc-400 disabled:opacity-50"
         />
         {isLoading ? (
           <div className="h-4 w-4 animate-spin rounded-full border-2 border-zinc-300 border-t-violet-500" />

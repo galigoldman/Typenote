@@ -15,6 +15,7 @@ interface DocumentWithAiProps {
   weekLabel?: string;
   document: Document;
   materialId?: string | null;
+  personalFileId?: string | null;
 }
 
 export function DocumentWithAi({
@@ -24,6 +25,7 @@ export function DocumentWithAi({
   weekLabel,
   document,
   materialId,
+  personalFileId,
 }: DocumentWithAiProps) {
   const getDocumentTextRef = useRef<(() => string) | null>(null);
   const [contextItems, setContextItems] = useState<AiContextItem[]>([]);
@@ -76,6 +78,7 @@ export function DocumentWithAi({
         document={document}
         onDocumentTextReady={handleDocumentTextReady}
         materialId={materialId}
+        personalFileId={personalFileId}
         courseName={courseName}
         onAskAiWithContext={handleAskAiWithContext}
       />

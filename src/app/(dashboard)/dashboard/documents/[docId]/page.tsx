@@ -61,6 +61,7 @@ export default async function DocumentPage({ params }: DocumentPageProps) {
           <CanvasEditor
             document={typedDocument}
             materialId={typedDocument.material_id}
+            personalFileId={typedDocument.personal_file_id}
           />
         )}
       </div>
@@ -90,6 +91,7 @@ export default async function DocumentPage({ params }: DocumentPageProps) {
           weekLabel={weekLabel}
           document={typedDocument}
           materialId={typedDocument.material_id}
+          personalFileId={typedDocument.personal_file_id}
         />
       )}
     </div>

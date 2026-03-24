@@ -15,7 +15,8 @@ interface PdfTextItem {
 
 interface PdfTextLayerProps {
   pdfPage: number;
-  materialId: string;
+  materialId: string | null;
+  personalFileId?: string | null;
   isActive: boolean;
   onTextSelected?: (text: string, rect: DOMRect | null) => void;
 }
@@ -23,12 +24,14 @@ interface PdfTextLayerProps {
 export function PdfTextLayer({
   pdfPage,
   materialId,
+  personalFileId,
   isActive,
   onTextSelected,
 }: PdfTextLayerProps) {
   const { textContent, scale, offsetX, offsetY, loading } = usePdfTextLayer(
     materialId,
     pdfPage,
+    personalFileId,
   );
   const containerRef = useRef<HTMLDivElement>(null);
   const onTextSelectedRef = useRef(onTextSelected);

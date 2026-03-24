@@ -73,6 +73,7 @@ interface CanvasEditorProps {
   document: Document;
   onDocumentTextReady?: (getter: () => string) => void;
   materialId?: string | null;
+  personalFileId?: string | null;
   courseName?: string;
   onAskAiWithContext?: (
     context:
@@ -307,6 +308,7 @@ export function CanvasEditor({
   document,
   onDocumentTextReady,
   materialId,
+  personalFileId,
   courseName,
   onAskAiWithContext,
 }: CanvasEditorProps) {
@@ -410,7 +412,12 @@ export function CanvasEditor({
     });
   }, []);
 
-  // PDF background for material-backed documents
+  // Only pass personalFileId to the PDF hook when pages actually reference PDF
+  // pages (pdfPage field). Personal files can be DOCX (no PDF) or PDF.
+  const hasPdfPages = pages.some((p) => p.pdfPage != null);
+  const effectivePersonalFileId = hasPdfPages ? (personalFileId ?? null) : null;
+
+  // PDF background for material-backed or personal-file-backed documents
   const {
     renderPage: renderPdfPage,
     isLoading: pdfLoading,
@@ -418,7 +425,7 @@ export function CanvasEditor({
     pageCount: pdfPageCount,
   } = usePdfBackground(materialId ?? null, {
     onPageCountReady: expandPagesIfNeeded,
-  });
+  }, effectivePersonalFileId);
 
   // Derived values based on active tool
   const currentColor =
@@ -1817,7 +1824,7 @@ export function CanvasEditor({
       </div>
 
       {/* PDF loading/error banner for material-backed documents */}
-      {pdfLoading && materialId && (
+      {pdfLoading && (materialId || personalFileId) && (
         <div className="bg-muted px-4 py-2 text-center text-sm text-muted-foreground">
           Loading PDF background…
         </div>
@@ -1902,6 +1909,7 @@ export function CanvasEditor({
                     hasSelectedTextBoxes={selectedTextBoxIds.size > 0}
                     renderPdfPage={renderPdfPage}
                     materialId={materialId}
+                    personalFileId={personalFileId}
                     onAskAiWithText={handleAskAiWithText}
                     onAskAiWithRegion={handleAskAiWithRegion}
                     onCanvasRefsReady={handleCanvasRefsReady}
