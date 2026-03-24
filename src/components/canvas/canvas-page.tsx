@@ -307,12 +307,18 @@ export function CanvasPage({
   const editorPaddingTop = canvasType === 'lined' ? 'pt-8' : 'pt-4';
 
   // Sanitize content: ProseMirror crashes on { type: 'doc', content: [] }
+  // Imported .docx pages may have flowContent = { _html: "<h2>..." } which
+  // TipTap's useEditor accepts as an HTML string via content prop.
   const safeContent = (() => {
     const fc = page.flowContent as {
       type?: string;
       content?: unknown[];
+      _html?: string;
     } | null;
-    if (!fc || !fc.content || fc.content.length === 0) return undefined;
+    if (!fc) return undefined;
+    // .docx HTML content — pass the raw HTML string to TipTap
+    if (fc._html) return fc._html;
+    if (!fc.content || fc.content.length === 0) return undefined;
     return fc as Record<string, unknown>;
   })();
 
@@ -423,17 +429,23 @@ export function CanvasPage({
         });
       }
 
-      // Overflow detection — runs after every edit to check if the
-      // cursor has pushed past the page boundary.
+      // Overflow detection — runs after every edit to check if content
+      // has pushed past the page boundary (cursor-based or height-based).
       requestAnimationFrame(() => {
         const layer = textLayerRef.current;
         if (!layer || overflowNotifiedRef.current) return;
         try {
-          const coords = ed.view.coordsAtPos(ed.state.selection.from);
           const layerRect = layer.getBoundingClientRect();
-          const cursorY = coords.bottom - layerRect.top;
 
-          if (cursorY > PAGE_HEIGHT) {
+          // Check both cursor position AND total content height.
+          // Height check catches programmatic setContent (e.g. docx import
+          // overflow cascading across pages) where cursor stays at top.
+          const coords = ed.view.coordsAtPos(ed.state.selection.from);
+          const cursorY = coords.bottom - layerRect.top;
+          const contentHeight = ed.view.dom.scrollHeight;
+          const overflows = cursorY > PAGE_HEIGHT || contentHeight > PAGE_HEIGHT;
+
+          if (overflows) {
             overflowNotifiedRef.current = true;
             const { doc } = ed.state;
 
@@ -522,11 +534,20 @@ export function CanvasPage({
     },
   });
 
-  // Notify parent when editor is created
+  // Notify parent when editor is created, and trigger an initial overflow
+  // check for content loaded from import (e.g. docx HTML that exceeds page).
   useEffect(() => {
-    if (editor) {
-      onEditorReadyRef.current?.(pageIdRef.current, editor);
-    }
+    if (!editor) return;
+    onEditorReadyRef.current?.(pageIdRef.current, editor);
+
+    // Schedule a synthetic update to trigger overflow detection.
+    // Delay lets TipTap finish rendering the initial HTML content.
+    const timer = setTimeout(() => {
+      // Emit a no-op transaction so the onUpdate handler runs and
+      // its overflow detection measures the actual rendered height.
+      editor.view.dispatch(editor.state.tr);
+    }, 100);
+    return () => clearTimeout(timer);
   }, [editor]);
 
   // In Draw/Eraser mode the TipTap editor must be non-editable. This prevents

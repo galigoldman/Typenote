@@ -4,7 +4,6 @@ import { GraduationCap } from 'lucide-react';
 import { createClient } from '@/lib/supabase/server';
 import { DocumentWithAi } from '@/components/ai/document-with-ai';
 import { CanvasEditor } from '@/components/canvas/canvas-editor';
-import { TiptapEditor } from '@/components/editor/tiptap-editor';
 import type { Course, CourseWeek, Document } from '@/types/database';
 
 interface DocumentPageProps {
@@ -48,22 +47,16 @@ export default async function DocumentPage({ params }: DocumentPageProps) {
     }
   }
 
-  // Text-only document (e.g. imported .docx) — use TipTap editor directly
-  const isTextDocument = !typedDocument.pages && !typedDocument.material_id;
-
-  // No course linked — render editor without AI
+  // No course linked — render canvas editor directly (all docs use CanvasEditor
+  // for unified draw/type/select experience)
   if (!course) {
     return (
       <div className="flex flex-1 min-h-0 flex-col overflow-hidden">
-        {isTextDocument ? (
-          <TiptapEditor document={typedDocument} />
-        ) : (
-          <CanvasEditor
-            document={typedDocument}
-            materialId={typedDocument.material_id}
-            personalFileId={typedDocument.personal_file_id}
-          />
-        )}
+        <CanvasEditor
+          document={typedDocument}
+          materialId={typedDocument.material_id}
+          personalFileId={typedDocument.personal_file_id}
+        />
       </div>
     );
   }
@@ -81,19 +74,15 @@ export default async function DocumentPage({ params }: DocumentPageProps) {
           {course.name}
         </Link>
       </div>
-      {isTextDocument ? (
-        <TiptapEditor document={typedDocument} />
-      ) : (
-        <DocumentWithAi
-          courseId={course.id}
-          courseName={course.name}
-          weekId={typedDocument.week_id ?? undefined}
-          weekLabel={weekLabel}
-          document={typedDocument}
-          materialId={typedDocument.material_id}
-          personalFileId={typedDocument.personal_file_id}
-        />
-      )}
+      <DocumentWithAi
+        courseId={course.id}
+        courseName={course.name}
+        weekId={typedDocument.week_id ?? undefined}
+        weekLabel={weekLabel}
+        document={typedDocument}
+        materialId={typedDocument.material_id}
+        personalFileId={typedDocument.personal_file_id}
+      />
     </div>
   );
 }

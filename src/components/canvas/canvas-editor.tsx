@@ -11,6 +11,13 @@ import type {
   TextBox,
 } from '@/types/canvas';
 import { PAGE_WIDTH, PAGE_HEIGHT } from '@/types/canvas';
+import {
+  PEN_COLORS,
+  HIGHLIGHTER_COLORS,
+  PEN_SIZES,
+  HIGHLIGHTER_SIZES,
+  ERASER_SIZES,
+} from '@/lib/canvas/drawing-constants';
 import type { Document } from '@/types/database';
 import type { SaveStatus } from '@/hooks/use-auto-save';
 import type { ConnectionStatus } from '@/hooks/use-realtime-sync';
@@ -97,46 +104,6 @@ function pageHasContent(page: CanvasPageData): boolean {
   // Real text contains a "text" key somewhere in the JSON.
   return JSON.stringify(page.flowContent).includes('"text"');
 }
-
-const PEN_COLORS = [
-  '#000000',
-  '#374151',
-  '#DC2626',
-  '#EA580C',
-  '#CA8A04',
-  '#16A34A',
-  '#2563EB',
-  '#7C3AED',
-  '#DB2777',
-  '#FFFFFF',
-];
-
-const HIGHLIGHTER_COLORS = [
-  '#FBBF24',
-  '#34D399',
-  '#60A5FA',
-  '#F472B6',
-  '#A78BFA',
-];
-
-const PEN_SIZES = [
-  { label: 'S', value: 1.5 },
-  { label: 'M', value: 3 },
-  { label: 'L', value: 5 },
-  { label: 'XL', value: 8 },
-];
-
-const HIGHLIGHTER_SIZES = [
-  { label: 'S', value: 16 },
-  { label: 'M', value: 26 },
-  { label: 'L', value: 40 },
-];
-
-const ERASER_SIZES = [
-  { label: 'S', value: 6 },
-  { label: 'M', value: 14 },
-  { label: 'L', value: 24 },
-];
 
 function SaveIndicator({
   status,
@@ -301,6 +268,31 @@ function initializePagesFromDocument(doc: Document): CanvasPageData[] {
     }
     return loaded;
   }
+
+  // Text-only document (e.g. imported .docx): load TipTap content as
+  // flowContent on the first canvas page so the text is editable inside
+  // the full canvas experience (draw, select, type modes).
+  const content = doc.content as Record<string, unknown> | null;
+  if (content) {
+    // Imported .docx files store raw HTML under the _html key.
+    // Regular TipTap JSON has { type: 'doc', content: [...] }.
+    const html = content._html as string | undefined;
+    const hasJson =
+      content.type === 'doc' &&
+      Array.isArray(content.content) &&
+      content.content.length > 0;
+
+    if (html || hasJson) {
+      const page = createEmptyPage(0, doc.canvas_type, doc.id);
+      // flowContent: TipTap JSON for regular docs, raw HTML string for .docx
+      // The canvas page editor (useEditor) accepts both formats.
+      page.flowContent = html
+        ? ({ _html: html } as unknown as Record<string, unknown>)
+        : content;
+      return [page, createEmptyPage(1, doc.canvas_type, doc.id)];
+    }
+  }
+
   return [createEmptyPage(0, doc.canvas_type, doc.id)];
 }
 
