@@ -71,6 +71,28 @@ export function splitDocumentAtBlockIndex(
  * Returns the block index (0-based) where the split should occur,
  * or null if the coordinate is outside the editor bounds.
  */
+/**
+ * Given an array of block bottom Y positions (relative to the page top),
+ * returns the index of the first block whose bottom exceeds pageHeight.
+ *
+ * The returned index is clamped so at least one block stays on the current
+ * page (minimum return value is 1). Returns null if no block overflows.
+ *
+ * Pure function — no DOM dependency, fully testable.
+ */
+export function findOverflowSplitIndex(
+  blockBottoms: number[],
+  pageHeight: number,
+): number | null {
+  for (let i = 0; i < blockBottoms.length; i++) {
+    if (blockBottoms[i] > pageHeight) {
+      // Ensure at least one block stays on the current page
+      return Math.max(i, 1);
+    }
+  }
+  return null;
+}
+
 export function findSplitIndex(
   editorView: {
     posAtCoords: (coords: {

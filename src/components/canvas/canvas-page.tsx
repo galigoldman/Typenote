@@ -16,6 +16,7 @@ import { FontSize } from '@/lib/editor/font-size-extension';
 import { MathExpression } from '@/lib/editor/math-extension';
 import { Pencil, Sparkles, Trash2, X } from 'lucide-react';
 import { PdfTextLayer } from './pdf-text-layer';
+import { findOverflowSplitIndex } from '@/lib/canvas/text-split';
 import type {
   CanvasPage as CanvasPageData,
   CanvasTool,
@@ -423,34 +424,73 @@ export function CanvasPage({
         });
       }
 
-      // Overflow detection — runs after every edit to check if the
-      // cursor has pushed past the page boundary.
+      // Overflow detection — runs after every edit to check if content
+      // extends past the page boundary. Measures the BOTTOM of document
+      // content (not cursor position) so paste-triggered overflow is
+      // detected even when the cursor is at the top of the page.
       requestAnimationFrame(() => {
         const layer = textLayerRef.current;
         if (!layer || overflowNotifiedRef.current) return;
         try {
-          const coords = ed.view.coordsAtPos(ed.state.selection.from);
-          const layerRect = layer.getBoundingClientRect();
-          const cursorY = coords.bottom - layerRect.top;
+          // Use scrollHeight to detect overflow — coordsAtPos returns
+          // clipped coordinates when the text layer has overflow:hidden,
+          // making it unable to detect content beyond the page boundary.
+          const editorDom = ed.view.dom as HTMLElement;
+          const contentHeight = editorDom.scrollHeight;
 
-          if (cursorY > PAGE_HEIGHT) {
+          if (contentHeight > PAGE_HEIGHT) {
             overflowNotifiedRef.current = true;
             const { doc } = ed.state;
 
             if (doc.childCount > 1) {
-              // Multi-block: extract the last block node
-              const lastChild = doc.lastChild!;
-              const lastNodeJson = lastChild.toJSON();
-              const nodeFrom = doc.content.size - lastChild.nodeSize;
-              const nodeTo = doc.content.size;
-              ed.chain().deleteRange({ from: nodeFrom, to: nodeTo }).run();
-              ed.commands.blur();
-              onTextOverflowRef.current?.(pageIdRef.current, {
-                type: 'doc',
-                content: [lastNodeJson],
-              } as Record<string, unknown>);
+              // Multi-block: measure each block element's bottom using
+              // DOM offsetTop/offsetHeight which are unaffected by
+              // overflow:hidden clipping.
+              const blockBottoms: number[] = [];
+              const domChildren = editorDom.children;
+              for (let i = 0; i < doc.childCount; i++) {
+                const el = domChildren[i] as HTMLElement | undefined;
+                if (el) {
+                  blockBottoms.push(el.offsetTop + el.offsetHeight);
+                } else {
+                  blockBottoms.push(Infinity);
+                }
+              }
+
+              const splitIdx = findOverflowSplitIndex(
+                blockBottoms,
+                PAGE_HEIGHT,
+              );
+
+              if (splitIdx !== null && splitIdx < doc.childCount) {
+                // Collect overflow blocks as JSON
+                const overflowNodes: unknown[] = [];
+                for (let i = splitIdx; i < doc.childCount; i++) {
+                  overflowNodes.push(doc.child(i).toJSON());
+                }
+
+                // Compute the ProseMirror position where overflow starts
+                let deleteFrom = 0;
+                for (let i = 0; i < splitIdx; i++) {
+                  deleteFrom += doc.child(i).nodeSize;
+                }
+
+                ed.chain()
+                  .deleteRange({ from: deleteFrom, to: doc.content.size })
+                  .run();
+                ed.commands.blur();
+
+                // Reset gate — remaining content now fits within the page
+                overflowNotifiedRef.current = false;
+
+                onTextOverflowRef.current?.(pageIdRef.current, {
+                  type: 'doc',
+                  content: overflowNodes,
+                } as Record<string, unknown>);
+              }
             } else {
               // Single block: split at page boundary word break
+              const layerRect = layer.getBoundingClientRect();
               const bottomY = layerRect.top + PAGE_HEIGHT - 20;
               const posInfo = ed.view.posAtCoords({
                 left: layerRect.left + PAGE_WIDTH / 2,
@@ -499,6 +539,10 @@ export function CanvasPage({
                 );
 
                 ed.commands.blur();
+
+                // Reset gate — remaining content fits after split
+                overflowNotifiedRef.current = false;
+
                 onTextOverflowRef.current?.(pageIdRef.current, {
                   type: 'doc',
                   content: overflowNodes,
@@ -509,11 +553,11 @@ export function CanvasPage({
                 onTextOverflowRef.current?.(pageIdRef.current, null);
               }
             }
-          } else if (cursorY < PAGE_HEIGHT - 100) {
+          } else if (contentHeight < PAGE_HEIGHT - 100) {
             overflowNotifiedRef.current = false;
           }
         } catch {
-          /* coordsAtPos can throw before DOM is ready */
+          /* DOM measurements can throw before editor is ready */
         }
       });
     },

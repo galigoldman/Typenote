@@ -729,22 +729,30 @@ export function CanvasEditor({
     ) => {
       const editor = editorsRef.current.get(pageId);
       if (editor) {
-        // Merge overflow content into an existing page
-        if (isExistingPage && overflowContent) {
-          const existing = editor.getJSON() as {
-            type?: string;
-            content?: unknown[];
-          };
-          const merged = {
-            type: 'doc',
-            content: [
-              ...((overflowContent as { content?: unknown[] }).content || []),
-              ...(existing?.content || [{ type: 'paragraph' }]),
-            ],
-          };
-          editor.commands.setContent(
-            merged as unknown as Record<string, unknown>,
-          );
+        if (overflowContent) {
+          if (isExistingPage) {
+            // Merge overflow content at the start of existing page content
+            const existing = editor.getJSON() as {
+              type?: string;
+              content?: unknown[];
+            };
+            const merged = {
+              type: 'doc',
+              content: [
+                ...((overflowContent as { content?: unknown[] }).content || []),
+                ...(existing?.content || [{ type: 'paragraph' }]),
+              ],
+            };
+            editor.commands.setContent(
+              merged as unknown as Record<string, unknown>,
+            );
+          } else {
+            // New page — set overflow content directly (fires onUpdate
+            // so overflow detection can cascade to further pages)
+            editor.commands.setContent(
+              overflowContent as Record<string, unknown>,
+            );
+          }
         }
         editor.commands.focus('start');
         scrollToPage(pageId);
@@ -843,46 +851,40 @@ export function CanvasEditor({
   // next page, creating one if needed. Works on any page, like Word/Docs.
   const handleTextOverflow = useCallback(
     (pageId: string, overflowContent: Record<string, unknown> | null) => {
-      let targetPageId: string | null = null;
-      let isExisting = false;
+      // Read the current pages synchronously via ref — we can't rely on
+      // the setPages updater function setting local variables because
+      // React 19's automatic batching defers updater execution when
+      // there are pending state updates (e.g. from content saves).
+      const currentPages = pagesRef.current;
+      const pageIndex = currentPages.findIndex((p) => p.id === pageId);
+      if (pageIndex === -1) return;
 
-      setPages((prev) => {
-        const pageIndex = prev.findIndex((p) => p.id === pageId);
-        if (pageIndex === -1) return prev;
+      const nextPage = currentPages[pageIndex + 1];
 
-        const nextPage = prev[pageIndex + 1];
-
-        if (nextPage) {
-          targetPageId = nextPage.id;
-          isExisting = true;
-          return prev;
-        }
-
-        // No next page — create one after the current page
-        const currentPage = prev[pageIndex];
-        const newType = currentPage.pageType || document.canvas_type;
-        const newPage = createEmptyPage(pageIndex + 1, newType);
-        if (overflowContent) {
-          newPage.flowContent = overflowContent;
-        }
-        targetPageId = newPage.id;
-
-        return [
-          ...prev.slice(0, pageIndex + 1),
-          newPage,
-          ...prev.slice(pageIndex + 1),
-        ].map((p, i) => ({ ...p, order: i }));
-      });
-
-      // Poll for the editor and focus it (handles both existing and new pages)
-      if (targetPageId) {
-        focusPage(
-          targetPageId,
-          isExisting ? overflowContent : null,
-          isExisting,
-        );
+      if (nextPage) {
+        // Existing next page — pass overflow content to merge
+        focusPage(nextPage.id, overflowContent, true);
+        triggerSave();
+        return;
       }
 
+      // No next page — create one after the current page
+      const currentPage = currentPages[pageIndex];
+      const newType = currentPage.pageType || document.canvas_type;
+      const newPage = createEmptyPage(pageIndex + 1, newType);
+
+      setPages((prev) => {
+        const idx = prev.findIndex((p) => p.id === pageId);
+        if (idx === -1) return prev;
+        return [...prev.slice(0, idx + 1), newPage, ...prev.slice(idx + 1)].map(
+          (p, i) => ({ ...p, order: i }),
+        );
+      });
+
+      // focusPage polls for the editor — the new page will mount after
+      // React processes the setPages update. Pass overflow content so
+      // setContent() fires onUpdate and enables cascade.
+      focusPage(newPage.id, overflowContent, false);
       triggerSave();
     },
     [triggerSave, document.canvas_type, focusPage],
