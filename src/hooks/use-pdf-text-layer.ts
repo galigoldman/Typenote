@@ -29,6 +29,7 @@ export interface PdfTextLayerInfo {
 export function usePdfTextLayer(
   materialId: string | null,
   pageNum: number,
+  personalFileId?: string | null,
 ): PdfTextLayerInfo {
   const [textContent, setTextContent] = useState<TextContent | null>(null);
   const [scale, setScale] = useState(1);
@@ -39,7 +40,7 @@ export function usePdfTextLayer(
   const pdfDocRef = useRef<PDFDocumentProxy | null>(null);
 
   useEffect(() => {
-    if (!materialId) {
+    if (!materialId && !personalFileId) {
       setLoading(false);
       return;
     }
@@ -50,23 +51,42 @@ export function usePdfTextLayer(
       try {
         setLoading(true);
 
-        // Fetch material storage details
         const supabase = createClient();
-        const { data: material, error: matError } = await supabase
-          .from('course_materials')
-          .select('storage_path')
-          .eq('id', materialId)
-          .single();
+        let bucket: string;
+        let storagePath: string;
 
-        if (matError || !material) {
-          throw new Error('Material not found');
+        if (materialId) {
+          // Fetch course material storage details
+          const { data: material, error: matError } = await supabase
+            .from('course_materials')
+            .select('storage_path')
+            .eq('id', materialId)
+            .single();
+
+          if (matError || !material) {
+            throw new Error('Material not found');
+          }
+
+          const isMoodle = material.storage_path.startsWith('moodle:');
+          bucket = isMoodle ? 'moodle-materials' : 'course-materials';
+          storagePath = isMoodle
+            ? material.storage_path.slice('moodle:'.length)
+            : material.storage_path;
+        } else {
+          // Fetch personal file storage details
+          const { data: file, error: fileError } = await supabase
+            .from('personal_files')
+            .select('storage_path')
+            .eq('id', personalFileId!)
+            .single();
+
+          if (fileError || !file) {
+            throw new Error('Personal file not found');
+          }
+
+          bucket = 'personal-files';
+          storagePath = file.storage_path;
         }
-
-        const isMoodle = material.storage_path.startsWith('moodle:');
-        const bucket = isMoodle ? 'moodle-materials' : 'course-materials';
-        const storagePath = isMoodle
-          ? material.storage_path.slice('moodle:'.length)
-          : material.storage_path;
 
         // Generate signed URL
         const { data: urlData } = await supabase.storage
@@ -132,7 +152,7 @@ export function usePdfTextLayer(
       pdfDocRef.current?.destroy();
       pdfDocRef.current = null;
     };
-  }, [materialId, pageNum]);
+  }, [materialId, personalFileId, pageNum]);
 
   return { textContent, scale, offsetX, offsetY, loading };
 }

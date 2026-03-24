@@ -74,4 +74,18 @@ describe('MathInputBox', () => {
     await userEvent.keyboard('{Enter}');
     expect(onCancel).toHaveBeenCalledOnce();
   });
+
+  it('should have flex-1 on input so it expands to fill available space', () => {
+    render(<MathInputBox {...defaultProps} />);
+    const input = screen.getByPlaceholderText(
+      'Describe math in plain English...',
+    );
+    expect(input.className).toContain('flex-1');
+  });
+
+  it('should have a max-width constraint on the outer container', () => {
+    const { container } = render(<MathInputBox {...defaultProps} />);
+    const wrapper = container.firstChild as HTMLElement;
+    expect(wrapper.className).toContain('max-w-');
+  });
 });

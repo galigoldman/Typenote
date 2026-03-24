@@ -25,13 +25,16 @@ interface UsePdfBackgroundOptions {
 /**
  * Loads a PDF from Supabase Storage and provides a function to render
  * individual pages onto canvas elements. Used by the canvas editor to
- * display PDF content as page backgrounds for material-backed documents.
+ * display PDF content as page backgrounds for material-backed documents
+ * or personal-file-backed documents.
  */
 export function usePdfBackground(
   materialId: string | null,
   options?: UsePdfBackgroundOptions,
+  personalFileId?: string | null,
 ): PdfBackground {
-  const [isLoading, setIsLoading] = useState(!!materialId);
+  const sourceId = materialId || personalFileId || null;
+  const [isLoading, setIsLoading] = useState(!!sourceId);
   const [error, setError] = useState<string | null>(null);
   const [pageCount, setPageCount] = useState(0);
 
@@ -40,9 +43,9 @@ export function usePdfBackground(
   // Track in-progress renders per canvas to prevent concurrent render() calls
   const renderingRef = useRef<Set<HTMLCanvasElement>>(new Set());
 
-  // Fetch material info and load PDF
+  // Fetch material/personal-file info and load PDF
   useEffect(() => {
-    if (!materialId) {
+    if (!materialId && !personalFileId) {
       setIsLoading(false);
       return;
     }
@@ -54,23 +57,42 @@ export function usePdfBackground(
         setIsLoading(true);
         setError(null);
 
-        // Fetch material storage details
         const supabase = createClient();
-        const { data: material, error: matError } = await supabase
-          .from('course_materials')
-          .select('storage_path')
-          .eq('id', materialId)
-          .single();
+        let bucket: string;
+        let storagePath: string;
 
-        if (matError || !material) {
-          throw new Error('Material not found');
+        if (materialId) {
+          // Fetch course material storage details
+          const { data: material, error: matError } = await supabase
+            .from('course_materials')
+            .select('storage_path')
+            .eq('id', materialId)
+            .single();
+
+          if (matError || !material) {
+            throw new Error('Material not found');
+          }
+
+          const isMoodle = material.storage_path.startsWith('moodle:');
+          bucket = isMoodle ? 'moodle-materials' : 'course-materials';
+          storagePath = isMoodle
+            ? material.storage_path.slice('moodle:'.length)
+            : material.storage_path;
+        } else {
+          // Fetch personal file storage details
+          const { data: file, error: fileError } = await supabase
+            .from('personal_files')
+            .select('storage_path')
+            .eq('id', personalFileId!)
+            .single();
+
+          if (fileError || !file) {
+            throw new Error('Personal file not found');
+          }
+
+          bucket = 'personal-files';
+          storagePath = file.storage_path;
         }
-
-        const isMoodle = material.storage_path.startsWith('moodle:');
-        const bucket = isMoodle ? 'moodle-materials' : 'course-materials';
-        const storagePath = isMoodle
-          ? material.storage_path.slice('moodle:'.length)
-          : material.storage_path;
 
         materialInfoRef.current = { storagePath, bucket };
 
@@ -116,7 +138,7 @@ export function usePdfBackground(
       pdfDocRef.current?.destroy();
       pdfDocRef.current = null;
     };
-  }, [materialId]);
+  }, [materialId, personalFileId]);
 
   // pageCount in deps so renderPage gets a new identity when PDF loads,
   // triggering re-render in CanvasPage's useEffect
