@@ -64,6 +64,9 @@ interface UsePinchZoomOptions {
   pageWidth?: number;
   /** Total content height in logical pixels (PAGE_HEIGHT * pageCount) */
   contentHeight?: number;
+  /** When true, let the browser handle vertical scrolling natively
+   *  instead of panning camera.y via the wheel handler. */
+  nativeVerticalScroll?: boolean;
 }
 
 export function usePinchZoom({
@@ -71,6 +74,7 @@ export function usePinchZoom({
   enabled = true,
   pageWidth = 794,
   contentHeight = 1123,
+  nativeVerticalScroll = false,
 }: UsePinchZoomOptions) {
   const [camera, setCamera] = useState<Camera>({
     x: 0,
@@ -495,6 +499,18 @@ export function usePinchZoom({
     const handleWheel = (e: WheelEvent) => {
       // Plain wheel → scroll (pan camera vertically/horizontally)
       if (!e.ctrlKey && !e.metaKey) {
+        if (nativeVerticalScroll) {
+          // Let the browser handle vertical scroll natively.
+          // Only intercept horizontal scroll (deltaX) via camera.
+          if (e.deltaX !== 0) {
+            e.preventDefault();
+            const cam = cameraRef.current;
+            const newCam = clampCamera({ ...cam, x: cam.x - e.deltaX });
+            setCamera(newCam);
+            cameraRef.current = newCam;
+          }
+          return;
+        }
         e.preventDefault();
         const cam = cameraRef.current;
         const newCam = clampCamera({
@@ -730,6 +746,7 @@ export function usePinchZoom({
     containerRef,
     enabled,
     pageWidth,
+    nativeVerticalScroll,
     showZoomIndicator,
     cancelAnimations,
     clampCamera,

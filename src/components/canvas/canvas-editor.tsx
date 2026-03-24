@@ -394,6 +394,10 @@ export function CanvasEditor({
     containerRef: scrollContainerRef,
     pageWidth: PAGE_WIDTH,
     contentHeight: pages.length * PAGE_HEIGHT,
+    nativeVerticalScroll:
+      activeTool !== 'pen' &&
+      activeTool !== 'highlighter' &&
+      activeTool !== 'eraser',
   });
 
   // Auto-add missing pages when PDF has more pages than the document.
@@ -1849,8 +1853,9 @@ export function CanvasEditor({
           className="flex-1 bg-white xl:bg-gray-100"
           data-scroll-container
           style={{
-            overflow: 'hidden',
-            touchAction: 'none',
+            overflowX: 'hidden',
+            overflowY: isDrawMode ? 'hidden' : 'auto',
+            touchAction: isDrawMode ? 'none' : 'pan-y',
             overscrollBehavior: 'none',
             userSelect: isReadMode
               ? 'text'
@@ -1866,7 +1871,9 @@ export function CanvasEditor({
           <div
             className="py-8 max-xl:py-0"
             style={{
-              transform: `translate(${camera.x}px, ${camera.y}px) scale(${scale})`,
+              transform: isDrawMode
+                ? `translate(${camera.x}px, ${camera.y}px) scale(${scale})`
+                : `translateX(${camera.x}px) scale(${scale})`,
               transformOrigin: 'top left',
               willChange: 'transform',
               width: PAGE_WIDTH,
