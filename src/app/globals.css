@@ -131,6 +131,15 @@ body {
   }
 }
 
+/* Ensure math expressions always render LTR, even in RTL (Hebrew/Arabic) text.
+   KaTeX elements inherit direction from surrounding text by default, which causes
+   symbols like ∈ to mirror to ∋ in RTL context. unicode-bidi: isolate creates a
+   bidi boundary so math and text don't interfere with each other's direction. */
+.katex {
+  direction: ltr;
+  unicode-bidi: isolate;
+}
+
 /* RTL list support — flip bullets, numbers, and checkboxes for Hebrew/Arabic */
 .ProseMirror [dir='rtl'] ul,
 .ProseMirror [dir='rtl'] ol,
