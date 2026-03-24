@@ -27,9 +27,14 @@ export async function updateSession(request: NextRequest) {
 
   // Refresh the session — this is the primary purpose of this middleware.
   // Do NOT remove this line. It revalidates the auth token on every request.
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  let user = null;
+  try {
+    const { data } = await supabase.auth.getUser();
+    user = data.user;
+  } catch {
+    // Network errors (e.g. dev server accessed from another device) —
+    // treat as unauthenticated rather than crashing the error overlay.
+  }
 
   // Route protection: unauthenticated users can only access auth pages
   const isAuthPage =
