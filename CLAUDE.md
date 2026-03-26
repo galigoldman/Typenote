@@ -37,6 +37,8 @@ Every step of development must follow this git workflow:
 - PRs cannot be merged unless CI passes. This is enforced via GitHub branch protection rules on `main`.
 
 ## Active Technologies
+- TypeScript 5 / Node.js 20+ (CI) / 22+ (local) + Playwright (E2E), Vitest (unit/integration), GitHub Actions (CI), Supabase CLI (028-safe-dev-workflow)
+- N/A — no schema changes, uses existing seeded data in local Supabase (028-safe-dev-workflow)
 
 - TypeScript 5 / Node.js 22+ + Next.js 16 (App Router), TipTap 3, KaTeX 0.16.x, perfect-freehand (027-fix-latex-rtl)
 - N/A — no data changes, CSS-only fix (027-fix-latex-rtl)
