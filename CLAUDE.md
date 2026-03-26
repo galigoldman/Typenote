@@ -14,11 +14,13 @@ The primary goal for this project is not just to get it working, but to deeply u
 ## Testing Requirements
 
 ### Unit & Integration Tests
+
 - Every new feature or change must include unit tests (Vitest) and integration tests where applicable.
 - When fixing a bug, write a failing test first, then fix and confirm it passes.
 - After writing code, run `pnpm test && pnpm test:integration` to confirm nothing is broken.
 
 ### E2E Browser Tests (Playwright)
+
 - Every feature MUST have E2E Playwright tests that test **real user flows**: log in → navigate → use the feature → verify results. Tests against `/test/*` mock pages do NOT count as feature E2E coverage.
 - Before considering any feature complete, check `e2e/TEST_REGISTRY.md` and update it with the new feature's test scenarios, then write the corresponding Playwright tests.
 - If the user doesn't mention E2E tests, ask: **"What E2E test scenarios should we add to the test registry for this feature?"**
@@ -48,6 +50,7 @@ The project uses a two-branch model: `dev` (integration) and `main` (production)
 - PRs cannot be merged unless CI passes. This is enforced via GitHub branch protection rules on both `main` and `dev`.
 
 ## Active Technologies
+
 - TypeScript 5 / Node.js 20+ (CI) / 22+ (local) + Playwright (E2E), Vitest (unit/integration), GitHub Actions (CI), Supabase CLI (028-safe-dev-workflow)
 - N/A — no schema changes, uses existing seeded data in local Supabase (028-safe-dev-workflow)
 

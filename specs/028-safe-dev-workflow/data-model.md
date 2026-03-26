@@ -5,6 +5,7 @@ This feature does not introduce new database tables or modify the schema. It is 
 ## Existing Entities Used
 
 ### Test User (in `supabase/seed.sql`)
+
 - **Email**: `test@typenote.dev`
 - **Password**: `Test1234`
 - **UUID**: `ac3be77d-4566-406c-9ac0-7c410634ad41`
