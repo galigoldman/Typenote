@@ -1,24 +1,9 @@
 import { test, expect } from '@playwright/test';
-
-// Dashboard export requires authentication
-const TEST_EMAIL = process.env.TEST_USER_EMAIL;
-const TEST_PASSWORD = process.env.TEST_USER_PASSWORD;
+import { login } from './helpers/auth';
 
 test.describe('Export PDF from Dashboard', () => {
-  test.skip(
-    !TEST_EMAIL || !TEST_PASSWORD,
-    'Requires TEST_USER_EMAIL and TEST_USER_PASSWORD',
-  );
-
   test.beforeEach(async ({ page }) => {
-    // Login
-    await page.goto('/login');
-    await page.getByLabel('Email').fill(TEST_EMAIL!);
-    await page.getByLabel('Password').fill(TEST_PASSWORD!);
-    await page.getByRole('button', { name: /sign in|log in/i }).click();
-
-    // Wait for redirect to dashboard
-    await page.waitForURL('/dashboard**');
+    await login(page);
   });
 
   test('Export as PDF option exists in document card context menu', async ({

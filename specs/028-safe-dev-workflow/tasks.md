@@ -19,7 +19,7 @@
 
 **Purpose**: Create the `dev` branch from current `main`
 
-- [ ] T001 Create `dev` branch from `main` by running `git branch dev main && git push origin dev`
+- [x] T001 Create `dev` branch from `main` by running `git branch dev main && git push origin dev`
 
 ---
 
@@ -29,7 +29,7 @@
 
 **CRITICAL**: No user story work can begin until this phase is complete
 
-- [ ] T002 Update `.github/workflows/ci.yml` — add `dev` to `on.push.branches` and `on.pull_request.branches` arrays so CI runs on PRs to both `main` and `dev`
+- [x] T002 Update `.github/workflows/ci.yml` — add `dev` to `on.push.branches` and `on.pull_request.branches` arrays so CI runs on PRs to both `main` and `dev`
 
 **Checkpoint**: CI now triggers on PRs to `dev`. Verify by pushing the branch and checking GitHub Actions.
 
@@ -43,9 +43,9 @@
 
 ### Implementation
 
-- [ ] T003 [US1] Add Playwright browser install step to `.github/workflows/ci.yml` — add step `pnpm exec playwright install --with-deps chromium` after the Build step
-- [ ] T004 [US1] Add E2E test run step to `.github/workflows/ci.yml` — run `pnpm test:e2e` with env vars `TEST_USER_EMAIL=test@typenote.dev`, `TEST_USER_PASSWORD=Test1234`, and Supabase URL/key from the existing extracted variables
-- [ ] T005 [US1] Add Playwright artifact upload step to `.github/workflows/ci.yml` — upload `playwright-report/` directory using `actions/upload-artifact@v4` with condition `if: failure()` and `retention-days: 7`
+- [x] T003 [US1] Add Playwright browser install step to `.github/workflows/ci.yml` — add step `pnpm exec playwright install --with-deps chromium` after the Build step
+- [x] T004 [US1] Add E2E test run step to `.github/workflows/ci.yml` — run `pnpm test:e2e` with env vars `TEST_USER_EMAIL=test@typenote.dev`, `TEST_USER_PASSWORD=Test1234`, and Supabase URL/key from the existing extracted variables
+- [x] T005 [US1] Add Playwright artifact upload step to `.github/workflows/ci.yml` — upload `playwright-report/` directory using `actions/upload-artifact@v4` with condition `if: failure()` and `retention-days: 7`
 
 **Checkpoint**: CI pipeline now includes E2E tests. PRs to both `dev` and `main` run the full suite: lint, format, unit, integration, E2E, build.
 
@@ -59,10 +59,10 @@
 
 ### Implementation
 
-- [ ] T006 [US3] Add `screenshot: 'only-on-failure'` to the `use` block in `playwright.config.ts` (FR-006)
-- [ ] T007 [US3] Create shared login helper at `e2e/helpers/auth.ts` — export `async function login(page: Page)` that navigates to `/login`, fills email/password from env vars with fallback defaults (`test@typenote.dev` / `Test1234`), clicks sign in, and waits for dashboard URL
-- [ ] T008 [US3] Fix `e2e/export-pdf-dashboard.spec.ts` — remove `test.skip` block (lines 8-10), import `login` from `e2e/helpers/auth.ts`, replace inline login code in `beforeEach` with shared helper
-- [ ] T009 [US3] Fix `e2e/realtime-sync.spec.ts` — remove `test.skip` block (lines 36-39), import `login` from `e2e/helpers/auth.ts`, replace inline `login` function with shared helper, replace `TEST_DOC_URL` env var usage with a URL derived from seeded test document ID (`ac3be77d-4566-406c-9ac0-7c410634ad41` user's first document)
+- [x] T006 [US3] Add `screenshot: 'only-on-failure'` to the `use` block in `playwright.config.ts` (FR-006)
+- [x] T007 [US3] Create shared login helper at `e2e/helpers/auth.ts` — export `async function login(page: Page)` that navigates to `/login`, fills email/password from env vars with fallback defaults (`test@typenote.dev` / `Test1234`), clicks sign in, and waits for dashboard URL
+- [x] T008 [US3] Fix `e2e/export-pdf-dashboard.spec.ts` — remove `test.skip` block (lines 8-10), import `login` from `e2e/helpers/auth.ts`, replace inline login code in `beforeEach` with shared helper
+- [x] T009 [US3] Fix `e2e/realtime-sync.spec.ts` — remove `test.skip` block (lines 36-39), import `login` from `e2e/helpers/auth.ts`, replace inline `login` function with shared helper, replace `TEST_DOC_URL` env var usage with a URL derived from seeded test document ID (`ac3be77d-4566-406c-9ac0-7c410634ad41` user's first document)
 
 **Checkpoint**: `pnpm test:e2e` runs all 4 test files with zero skipped tests. Screenshots appear in `test-results/` on failure.
 
