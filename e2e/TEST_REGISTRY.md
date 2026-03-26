@@ -4,6 +4,7 @@ This file lists every application feature and the browser tests that must exist 
 When adding or modifying a feature, update this registry and write the corresponding tests.
 
 **Rules:**
+
 - Every feature section lists a target spec file and its implementation status
 - `[x]` = test exists and passes, `[ ]` = test not yet written
 - When you add a new feature, add a section here BEFORE considering the feature complete
@@ -129,16 +130,16 @@ When adding or modifying a feature, update this registry and write the correspon
 
 ## Summary
 
-| Feature | Status | Spec File | Tests |
-|---------|--------|-----------|-------|
-| Auth | Not implemented | `e2e/auth.spec.ts` | 0/7 |
-| Documents | Not implemented | `e2e/documents.spec.ts` | 0/6 |
-| Canvas Editor | Not implemented | `e2e/canvas-editor.spec.ts` | 0/11 |
-| Text Editor Toolbar | Implemented | `e2e/editor-toolbar.spec.ts` | 12/12 |
-| LaTeX Math | Not implemented | `e2e/latex-math.spec.ts` | 0/5 |
-| Courses | Not implemented | `e2e/courses.spec.ts` | 0/6 |
-| File Upload | Not implemented | `e2e/file-upload.spec.ts` | 0/4 |
-| AI Chat | Not implemented | `e2e/ai-chat.spec.ts` | 0/6 |
-| PDF Export | Partial | `e2e/export-pdf-*.spec.ts` | 4/7 |
-| Real-time Sync | Implemented | `e2e/realtime-sync.spec.ts` | 3/3 |
-| **Total** | | | **19/67** |
+| Feature             | Status          | Spec File                    | Tests     |
+| ------------------- | --------------- | ---------------------------- | --------- |
+| Auth                | Not implemented | `e2e/auth.spec.ts`           | 0/7       |
+| Documents           | Not implemented | `e2e/documents.spec.ts`      | 0/6       |
+| Canvas Editor       | Not implemented | `e2e/canvas-editor.spec.ts`  | 0/11      |
+| Text Editor Toolbar | Implemented     | `e2e/editor-toolbar.spec.ts` | 12/12     |
+| LaTeX Math          | Not implemented | `e2e/latex-math.spec.ts`     | 0/5       |
+| Courses             | Not implemented | `e2e/courses.spec.ts`        | 0/6       |
+| File Upload         | Not implemented | `e2e/file-upload.spec.ts`    | 0/4       |
+| AI Chat             | Not implemented | `e2e/ai-chat.spec.ts`        | 0/6       |
+| PDF Export          | Partial         | `e2e/export-pdf-*.spec.ts`   | 4/7       |
+| Real-time Sync      | Implemented     | `e2e/realtime-sync.spec.ts`  | 3/3       |
+| **Total**           |                 |                              | **19/67** |

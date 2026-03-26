@@ -7,6 +7,7 @@
 **Rationale**: The seed.sql already creates this user with confirmed email, free tier subscription, folders, documents, courses, AI conversations, and personal files. No additional setup needed. The seed is idempotent (uses `ON CONFLICT ... DO NOTHING`).
 
 **Alternatives considered**:
+
 - Create users programmatically in test fixtures via Supabase admin API — adds complexity, slower test startup, not needed since seed data is comprehensive
 - Create a separate E2E seed file — unnecessary duplication, the existing seed already has everything needed
 
@@ -17,6 +18,7 @@
 **Rationale**: E2E tests need both a built Next.js app and a running Supabase. The current CI already starts Supabase for integration tests. Playwright's `webServer` config auto-starts `pnpm dev` on `localhost:3000`. Placing E2E after build ensures everything is ready.
 
 **Alternatives considered**:
+
 - Run E2E before build — app wouldn't be verified to compile, and we need Supabase already running
 - Run E2E in a separate job — adds complexity, would need to start Supabase again in a new runner
 
@@ -27,6 +29,7 @@
 **Rationale**: Simplest approach. No code changes needed to existing tests that already use `process.env.TEST_USER_EMAIL`. New tests will follow the same pattern. The credentials are not secrets (they're for local Supabase only).
 
 **Alternatives considered**:
+
 - Store credentials in GitHub secrets — overkill for local-only test credentials
 - Hardcode in Playwright config — less flexible, harder to change
 
@@ -37,6 +40,7 @@
 **Rationale**: Screenshots on failure fulfill FR-006 (browser screenshots on failure). Artifacts allow developers to download the HTML report and inspect exactly what went wrong. Only uploading on failure keeps CI fast and storage low.
 
 **Alternatives considered**:
+
 - Always capture screenshots — wastes storage, makes CI slower
 - Video recording on failure — nice but significantly increases CI time and artifact size. Can add later.
 
@@ -47,6 +51,7 @@
 **Rationale**: Currently CI only triggers on `main`. The whole point of the `dev` branch is that it runs the same CI checks. Both branches need identical protection.
 
 **Alternatives considered**:
+
 - Separate workflow files for `dev` and `main` — unnecessary duplication, same pipeline for both
 
 ## Decision 6: Constitution amendment needed
@@ -56,4 +61,5 @@
 **Rationale**: The constitution currently says "create a feature branch off `main`" — this changes to "off `dev`". The CI Pipeline section doesn't include E2E — it needs to. These are minor amendments (MINOR version bump).
 
 **Alternatives considered**:
+
 - Leave constitution as-is and only update CLAUDE.md — creates contradiction between the two documents, confusing for future Claude sessions

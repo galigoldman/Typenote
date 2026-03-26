@@ -3,6 +3,7 @@
 ## After implementation, the daily workflow is:
 
 ### Starting new work
+
 ```bash
 git checkout dev
 git pull origin dev
@@ -10,6 +11,7 @@ git checkout -b feat/my-feature    # branch off dev, not main
 ```
 
 ### During development
+
 ```bash
 pnpm test                          # run unit tests
 pnpm test:integration              # run integration tests (needs local Supabase)
@@ -17,6 +19,7 @@ pnpm test:e2e                      # run E2E browser tests locally
 ```
 
 ### Submitting work
+
 ```bash
 git push -u origin feat/my-feature
 # Open PR → dev (NOT main)
@@ -25,6 +28,7 @@ git push -u origin feat/my-feature
 ```
 
 ### Releasing to production
+
 ```bash
 # Open PR from dev → main
 # CI runs all tests again on combined code
@@ -32,6 +36,7 @@ git push -u origin feat/my-feature
 ```
 
 ### If dev falls behind main (e.g., after a hotfix)
+
 ```bash
 git checkout dev
 git merge main
@@ -55,6 +60,7 @@ pnpm test:e2e -- e2e/auth.spec.ts
 ```
 
 ## Test credentials (local only)
+
 - **Email**: `test@typenote.dev`
 - **Password**: `Test1234`
 - These are seeded automatically by `supabase/seed.sql`

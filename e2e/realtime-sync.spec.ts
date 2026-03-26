@@ -1,9 +1,4 @@
-import {
-  test,
-  expect,
-  type BrowserContext,
-  type Page,
-} from '@playwright/test';
+import { test, expect, type BrowserContext, type Page } from '@playwright/test';
 import { login } from './helpers/auth';
 
 // First seeded document for the test user
