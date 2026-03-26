@@ -76,7 +76,7 @@
 
 ### Implementation
 
-- [ ] T010 [US4] Create `e2e/TEST_REGISTRY.md` with sections for every application feature: Auth, Documents, Canvas Editor, Text Editor Toolbar, LaTeX Math, Courses, File Upload, AI Chat, PDF Export, Real-time Sync. Each section lists the target spec file, implementation status, and specific test scenarios as checkboxes. Mark existing tests as implemented, all others as NOT YET IMPLEMENTED.
+- [x] T010 [US4] Create `e2e/TEST_REGISTRY.md` with sections for every application feature: Auth, Documents, Canvas Editor, Text Editor Toolbar, LaTeX Math, Courses, File Upload, AI Chat, PDF Export, Real-time Sync. Each section lists the target spec file, implementation status, and specific test scenarios as checkboxes. Mark existing tests as implemented, all others as NOT YET IMPLEMENTED.
 
 **Checkpoint**: Registry exists, is comprehensive, and accurately reflects current test coverage.
 
@@ -90,9 +90,9 @@
 
 ### Implementation
 
-- [ ] T011 [P] [US5] Replace "Testing Best Practices" section in `CLAUDE.md` with specific E2E testing rules: (1) every feature MUST have E2E tests against real user flows, not `/test/*` pages, (2) check and update `e2e/TEST_REGISTRY.md` before completing any feature, (3) ask about E2E scenarios if user doesn't mention them, (4) use shared login helper from `e2e/helpers/auth.ts`, (5) never use `test.skip` for env vars, (6) run all test levels after code changes
-- [ ] T012 [P] [US5] Update "Git Workflow" section in `CLAUDE.md` — change "create branch off `main`" to "create branch off `dev`", document the feature → `dev` → `main` flow, document the `dev` sync procedure when `main` gets ahead
-- [ ] T013 [US5] Amend `.specify/memory/constitution.md` — MINOR version bump 1.1.0 → 1.2.0: update Principle III to say "branch off `dev`" instead of "branch off `main`", add `dev` as protected branch, update CI Pipeline section to include E2E step (step 7: `pnpm test:e2e`)
+- [x] T011 [P] [US5] Replace "Testing Best Practices" section in `CLAUDE.md` with specific E2E testing rules: (1) every feature MUST have E2E tests against real user flows, not `/test/*` pages, (2) check and update `e2e/TEST_REGISTRY.md` before completing any feature, (3) ask about E2E scenarios if user doesn't mention them, (4) use shared login helper from `e2e/helpers/auth.ts`, (5) never use `test.skip` for env vars, (6) run all test levels after code changes
+- [x] T012 [P] [US5] Update "Git Workflow" section in `CLAUDE.md` — change "create branch off `main`" to "create branch off `dev`", document the feature → `dev` → `main` flow, document the `dev` sync procedure when `main` gets ahead
+- [x] T013 [US5] Amend `.specify/memory/constitution.md` — MINOR version bump 1.1.0 → 1.2.0: update Principle III to say "branch off `dev`" instead of "branch off `main`", add `dev` as protected branch, update CI Pipeline section to include E2E step (step 7: `pnpm test:e2e`)
 
 **Checkpoint**: CLAUDE.md rules are specific and actionable. Constitution is consistent with CLAUDE.md and CI workflow. No contradictions between documents.
 

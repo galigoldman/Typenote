@@ -1,15 +1,15 @@
 <!--
 Sync Impact Report
 ==================
-- Version change: 1.0.0 -> 1.1.0
-- Bump rationale: MINOR — expanded Principle II with integration
-  testing requirements and updated CI Pipeline section
+- Version change: 1.1.0 -> 1.2.0
+- Bump rationale: MINOR — updated Principle III for dev branch
+  workflow and added E2E tests to CI Pipeline section
 - Modified principles:
-  - II. Test-Driven Quality — added integration test requirements
-    (Supabase in CI, test levels, file conventions)
+  - III. Protected Branches — feature branches now off `dev`,
+    added `dev` → `main` promotion flow, both branches protected
 - Modified sections:
-  - CI Pipeline — updated to reflect two-phase test execution
-    (unit tests + integration tests with Supabase)
+  - CI Pipeline — added E2E browser tests (Playwright) as step 7,
+    added artifact upload on failure
 - Templates requiring updates:
   - .specify/templates/plan-template.md ✅ (no change needed)
   - .specify/templates/spec-template.md ✅ (no change needed)
@@ -68,23 +68,30 @@ tests verify that migrations, RLS policies, and queries work
 against a real Postgres. Running both in CI ensures the database
 layer is never silently broken by a schema change.
 
-### III. Protected Main Branch
+### III. Protected Branches (main + dev)
 
-Code reaches `main` ONLY through approved, CI-passing Pull Requests.
-Never commit directly to `main`.
+The project uses a two-branch model: `dev` (integration) and
+`main` (production / Vercel auto-deploy). Both are protected.
 
-- MUST create a feature branch off `main` before starting work
+- MUST create a feature branch off `dev` before starting work
   (e.g., `feat/setup-database`, `003-course-materials`).
 - MUST commit frequently with clear messages describing what
   changed and why.
-- MUST push and open a PR when a step is complete and tests
-  pass locally.
-- PR MUST pass all CI checks (lint, test) before merge.
-- Direct push or force push to `main` is forbidden.
+- MUST push and open a PR to `dev` when a step is complete and
+  all tests pass locally (unit, integration, and E2E).
+- PR MUST pass all CI checks (lint, format, unit, integration,
+  E2E, build) before merge to `dev`.
+- To release to production, open a PR from `dev` → `main`.
+  CI runs again on the combined code. Merging deploys via Vercel.
+- If `main` gets ahead of `dev` (e.g., a hotfix), merge `main`
+  back into `dev` to keep them in sync.
+- Direct push or force push to `main` or `dev` is forbidden.
 
-**Rationale**: Branch protection enforces code review and automated
-quality gates, ensuring `main` is always deployable. This is standard
-practice in professional teams and a common interview topic.
+**Rationale**: The two-branch model adds a safety buffer between
+development and production. Features are tested twice (on PR to
+`dev` and on PR to `main`) before reaching users. This is standard
+practice in professional teams and a common interview topic
+(GitFlow-lite, environment promotion).
 
 ### IV. Migrations as Code (Supabase)
 
@@ -180,7 +187,7 @@ interviews.
 
 ### CI Pipeline
 
-- Triggered on every push and PR to `main`
+- Triggered on every push and PR to `main` and `dev`
 - Steps:
   1. Install dependencies (`pnpm install --frozen-lockfile`)
   2. Lint (`pnpm lint`) + format check (`pnpm format:check`)
@@ -189,8 +196,11 @@ interviews.
   5. Integration tests (`pnpm test:integration`) — real Postgres,
      validates migrations + seed + RLS + queries
   6. Build (`pnpm build`)
+  7. E2E browser tests (`pnpm test:e2e`) — Playwright runs
+     Chromium against local Next.js + Supabase, screenshots on
+     failure, `playwright-report/` uploaded as artifact
 - PRs MUST NOT be merged until CI passes (enforced via GitHub
-  branch protection)
+  branch protection on both `main` and `dev`)
 
 ## Governance
 
@@ -206,4 +216,4 @@ code reviews MUST verify compliance with these principles.
 - For runtime development guidance, refer to `CLAUDE.md` at the
   repository root.
 
-**Version**: 1.1.0 | **Ratified**: 2026-03-09 | **Last Amended**: 2026-03-09
+**Version**: 1.2.0 | **Ratified**: 2026-03-09 | **Last Amended**: 2026-03-27
