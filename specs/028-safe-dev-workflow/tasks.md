@@ -102,9 +102,9 @@
 
 **Purpose**: Branch protection and final verification
 
-- [ ] T014 Configure GitHub branch protection for `dev` via `gh` CLI — require status checks to pass before merging (same rules as `main`)
+- [x] T014 Configure GitHub branch protection for `dev` via `gh` CLI — require status checks to pass before merging (same rules as `main`)
 - [ ] T015 Verify end-to-end: push this feature branch as a PR to `dev`, confirm CI runs all checks including E2E, confirm zero skipped tests, confirm artifacts upload works on failure
-- [ ] T016 Update `specs/028-safe-dev-workflow/quickstart.md` with any adjustments discovered during implementation
+- [x] T016 Update `specs/028-safe-dev-workflow/quickstart.md` with any adjustments discovered during implementation
 
 ---
 
