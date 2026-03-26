@@ -34,14 +34,15 @@ test.describe('Editor Toolbar', () => {
         'Italic',
         'Underline',
         'Strikethrough',
+        'Highlight',
         'Align left',
         'Align center',
         'Align right',
         'Bullet list',
         'Numbered list',
         'Task list',
-        'Indent',
-        'Outdent',
+        'Decrease font size',
+        'Increase font size',
         'Link',
         'Code block',
         'Horizontal rule',
@@ -431,7 +432,8 @@ test.describe('Editor Toolbar', () => {
       await page.keyboard.press('Home');
       await page.keyboard.press('Tab');
 
-      // Check for nested list
+      // Check for nested list — Tab may or may not be bound for
+      // indentation depending on the TipTap configuration.
       const hasNested = await editor.locator('ul ul').count();
       if (hasNested > 0) {
         await expect(editor.locator('ul ul')).toBeVisible();
@@ -440,15 +442,10 @@ test.describe('Editor Toolbar', () => {
         await page.keyboard.press('Shift+Tab');
         await expect(editor.locator('ul ul')).toHaveCount(0);
       } else {
-        // Tab may not be bound for indentation in this Tiptap config.
-        // Verify the indent/outdent buttons exist (they're tested as disabled
-        // because sinkListItem requires specific editor state).
-        await expect(
-          page.getByRole('button', { name: 'Indent', exact: true }),
-        ).toBeVisible();
-        await expect(
-          page.getByRole('button', { name: 'Outdent', exact: true }),
-        ).toBeVisible();
+        // Tab not bound for indentation in this config — verify
+        // the bullet list itself was created correctly.
+        await expect(editor.locator('ul')).toBeVisible();
+        await expect(editor.locator('ul li')).toHaveCount(2);
       }
     });
   });
