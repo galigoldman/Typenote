@@ -111,20 +111,20 @@ When adding or modifying a feature, update this registry and write the correspon
 ## PDF Export (`e2e/pdf-export.spec.ts`) — PARTIALLY IMPLEMENTED
 
 - [x] Export as PDF button visible in editor toolbar (`e2e/export-pdf-editor.spec.ts`)
-- [x] Clicking export triggers PDF download (`e2e/export-pdf-editor.spec.ts`)
+- [x] Clicking export triggers PDF download (`e2e/export-pdf-editor.spec.ts`) — ⚠️ SKIPPED IN CI (needs puppeteer Chromium)
 - [x] Export as PDF option in dashboard context menu (`e2e/export-pdf-dashboard.spec.ts`)
-- [x] Dashboard export triggers PDF download (`e2e/export-pdf-dashboard.spec.ts`)
+- [x] Dashboard export triggers PDF download (`e2e/export-pdf-dashboard.spec.ts`) — ⚠️ SKIPPED IN CI (needs puppeteer Chromium)
 - [ ] Exported PDF contains text content
 - [ ] Exported PDF contains drawings/strokes
 - [ ] Multi-page document exports all pages
 
 ---
 
-## Real-time Sync (`e2e/realtime-sync.spec.ts`) — IMPLEMENTED
+## Real-time Sync (`e2e/realtime-sync.spec.ts`) — IMPLEMENTED (local only)
 
-- [x] Typing in Tab A appears in Tab B
-- [x] Lock indicator shows when another tab is editing
-- [x] "Take over editing" transfers edit lock
+- [x] Typing in Tab A appears in Tab B — ⚠️ SKIPPED IN CI (Supabase Realtime too slow locally)
+- [x] Lock indicator shows when another tab is editing — ⚠️ SKIPPED IN CI
+- [x] "Take over editing" transfers edit lock — ⚠️ SKIPPED IN CI
 
 ---
 
