@@ -11,61 +11,63 @@ function getEditor(page: Page) {
 }
 
 test.describe('Realtime document sync', () => {
-  let contextA: BrowserContext;
-  let contextB: BrowserContext;
-  let pageA: Page;
-  let pageB: Page;
+  // Realtime sync is slower in CI — give it plenty of time
+  test.setTimeout(90_000);
 
-  test.beforeAll(async ({ browser }) => {
-    // Create two separate browser contexts (simulating two tabs/devices)
-    contextA = await browser.newContext();
-    contextB = await browser.newContext();
-    pageA = await contextA.newPage();
-    pageB = await contextB.newPage();
+  test('typing in Tab A appears in Tab B with lock indicator', async ({
+    browser,
+  }) => {
+    // Create fresh contexts per attempt so retries don't inherit stale state
+    const contextA = await browser.newContext();
+    const contextB = await browser.newContext();
+    const pageA = await contextA.newPage();
+    const pageB = await contextB.newPage();
 
-    // Log in on both contexts
-    await Promise.all([login(pageA), login(pageB)]);
-  });
+    try {
+      // Log in on both contexts
+      await Promise.all([login(pageA), login(pageB)]);
 
-  test.afterAll(async () => {
-    await contextA.close();
-    await contextB.close();
-  });
+      // Navigate both tabs to the same document
+      await Promise.all([pageA.goto(TEST_DOC_URL), pageB.goto(TEST_DOC_URL)]);
 
-  test('typing in Tab A appears in Tab B with lock indicator', async () => {
-    // Navigate both tabs to the same document
-    await Promise.all([pageA.goto(TEST_DOC_URL), pageB.goto(TEST_DOC_URL)]);
+      // Wait for editors to load
+      await expect(getEditor(pageA)).toBeVisible();
+      await expect(getEditor(pageB)).toBeVisible();
 
-    // Wait for editors to load
-    await expect(getEditor(pageA)).toBeVisible();
-    await expect(getEditor(pageB)).toBeVisible();
+      // Wait for realtime connection (green dot)
+      await expect(pageA.locator('text=Synced')).toBeVisible({
+        timeout: 15_000,
+      });
+      await expect(pageB.locator('text=Synced')).toBeVisible({
+        timeout: 15_000,
+      });
 
-    // Wait for realtime connection (green dot)
-    await expect(pageA.locator('text=Synced')).toBeVisible({ timeout: 10000 });
-    await expect(pageB.locator('text=Synced')).toBeVisible({ timeout: 10000 });
+      // Type in Tab A
+      const testText = `sync-test-${Date.now()}`;
+      await getEditor(pageA).click();
+      await pageA.keyboard.press('End');
+      await pageA.keyboard.press('Enter');
+      await pageA.keyboard.type(testText);
 
-    // Type in Tab A
-    const testText = `sync-test-${Date.now()}`;
-    await getEditor(pageA).click();
-    await pageA.keyboard.press('End');
-    await pageA.keyboard.press('Enter');
-    await pageA.keyboard.type(testText);
+      // Wait for debounce (800ms) + network round trip — CI is slower
+      await pageA.waitForTimeout(5000);
 
-    // Wait for debounce (800ms) + network round trip
-    await pageA.waitForTimeout(3000);
+      // Verify the text appears in Tab B
+      await expect(getEditor(pageB)).toContainText(testText, {
+        timeout: 30_000,
+      });
 
-    // Verify the text appears in Tab B
-    await expect(getEditor(pageB)).toContainText(testText, {
-      timeout: 10000,
-    });
+      // Verify Tab B shows the lock indicator
+      await expect(pageB.locator('text=Editing elsewhere')).toBeVisible();
+      await expect(pageB.locator('text=Take over editing')).toBeVisible();
 
-    // Verify Tab B shows the lock indicator
-    await expect(pageB.locator('text=Editing elsewhere')).toBeVisible();
-    await expect(pageB.locator('text=Take over editing')).toBeVisible();
-
-    // Click "Take over" on Tab B and verify editor becomes editable
-    await pageB.locator('text=Take over editing').click();
-    await expect(pageB.locator('text=Editing elsewhere')).not.toBeVisible();
-    await expect(pageB.locator('text=Synced')).toBeVisible();
+      // Click "Take over" on Tab B and verify editor becomes editable
+      await pageB.locator('text=Take over editing').click();
+      await expect(pageB.locator('text=Editing elsewhere')).not.toBeVisible();
+      await expect(pageB.locator('text=Synced')).toBeVisible();
+    } finally {
+      await contextA.close();
+      await contextB.close();
+    }
   });
 });

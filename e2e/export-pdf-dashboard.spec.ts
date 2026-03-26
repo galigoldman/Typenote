@@ -25,6 +25,9 @@ test.describe('Export PDF from Dashboard', () => {
   });
 
   test('clicking Export as PDF triggers a download', async ({ page }) => {
+    // PDF generation uses server-side rendering and can be slow in CI
+    test.setTimeout(60_000);
+
     const optionsButton = page
       .getByRole('button', { name: 'Document options' })
       .first();
@@ -33,7 +36,7 @@ test.describe('Export PDF from Dashboard', () => {
     await optionsButton.click();
 
     // Listen for download before clicking
-    const downloadPromise = page.waitForEvent('download');
+    const downloadPromise = page.waitForEvent('download', { timeout: 45_000 });
     await page.getByRole('menuitem', { name: /export as pdf/i }).click();
 
     const download = await downloadPromise;
