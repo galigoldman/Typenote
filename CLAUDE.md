@@ -11,30 +11,41 @@ The primary goal for this project is not just to get it working, but to deeply u
 3. **Proactive Questioning:** Always assume the user does not know what technical information or context is needed to proceed. If a requirement is ambiguous, or if there are multiple valid ways to implement something, do not make assumptions. Stop and ask explicit, clarifying questions. Guide through the options.
 4. **Interview-Driven Learning:** Frame explanations using professional industry terminology. Point out concepts that are commonly asked about in R&D interviews (e.g., performance optimization, component state management, database normalization vs. denormalization).
 
-## Testing Best Practices
+## Testing Requirements
 
-- Every new feature or change must include tests that verify it works correctly.
-- After writing code, always run the full test suite to confirm nothing is broken.
-- Test at multiple levels: unit tests for individual functions/modules, integration tests for API endpoints and database operations, and end-to-end tests for critical user flows.
-- When fixing a bug, write a failing test that reproduces the bug first, then fix the code and confirm the test passes (regression testing).
-- Never consider a step "done" until tests pass locally.
+### Unit & Integration Tests
+- Every new feature or change must include unit tests (Vitest) and integration tests where applicable.
+- When fixing a bug, write a failing test first, then fix and confirm it passes.
+- After writing code, run `pnpm test && pnpm test:integration` to confirm nothing is broken.
+
+### E2E Browser Tests (Playwright)
+- Every feature MUST have E2E Playwright tests that test **real user flows**: log in → navigate → use the feature → verify results. Tests against `/test/*` mock pages do NOT count as feature E2E coverage.
+- Before considering any feature complete, check `e2e/TEST_REGISTRY.md` and update it with the new feature's test scenarios, then write the corresponding Playwright tests.
+- If the user doesn't mention E2E tests, ask: **"What E2E test scenarios should we add to the test registry for this feature?"**
+- E2E tests MUST use the shared login helper from `e2e/helpers/auth.ts`. Do not duplicate login code.
+- E2E tests MUST NOT use `test.skip` based on environment variables. All tests must run unconditionally — env vars have defaults that work with the seeded local Supabase.
+- Test credentials (local only): `test@typenote.dev` / `Test1234` (seeded in `supabase/seed.sql`).
+- After all code changes, run the full suite: `pnpm test && pnpm test:integration && pnpm test:e2e`.
+- Never consider a step "done" until all test levels pass locally.
 
 ## Git Workflow
 
-Every step of development must follow this git workflow:
+The project uses a two-branch model: `dev` (integration) and `main` (production).
 
-1. **Branch per step:** Before starting any work, create a new feature branch off `main` (e.g., `feat/setup-database`, `feat/add-user-crud`). Never commit directly to `main`.
+1. **Branch off `dev`:** Before starting any work, create a new feature branch off `dev` (e.g., `feat/setup-database`, `feat/add-user-crud`). Never commit directly to `main` or `dev`.
 2. **Small, focused commits:** Commit frequently with clear messages that describe _what_ changed and _why_.
-3. **Push and open a PR:** When a step is complete and tests pass locally, push the branch and open a Pull Request against `main`.
-4. **CI must pass:** The PR must pass all CI checks (linting, tests) before it can be merged.
-5. **Merge via PR only:** `main` is a protected branch. Code reaches `main` only through approved, CI-passing Pull Requests — never via direct push or force push.
+3. **PR to `dev`:** When a step is complete and tests pass locally (including E2E), push the branch and open a Pull Request against `dev`.
+4. **CI must pass:** The PR must pass all CI checks (lint, format, unit, integration, E2E, build) before it can be merged to `dev`.
+5. **Promote `dev` to `main`:** When `dev` has tested features ready for release, open a PR from `dev` → `main`. CI runs again on the combined code. Merging to `main` triggers Vercel auto-deployment to production.
+6. **Keep `dev` in sync:** If `main` gets ahead of `dev` (e.g., a hotfix), merge `main` back into `dev`: `git checkout dev && git merge main && git push origin dev`.
+7. **Both branches are protected.** Code reaches `main` and `dev` only through CI-passing Pull Requests — never via direct push or force push.
 
 ## CI (Continuous Integration)
 
 - The project uses GitHub Actions for CI.
-- CI runs automatically on every push and pull request to `main`.
-- The CI pipeline must at minimum: install dependencies, run linting, and run the full test suite.
-- PRs cannot be merged unless CI passes. This is enforced via GitHub branch protection rules on `main`.
+- CI runs automatically on every push and pull request to `main` and `dev`.
+- The CI pipeline runs: install dependencies, lint, format check, unit tests, integration tests (with local Supabase), build, E2E browser tests (Playwright with local Supabase), and uploads Playwright reports on failure.
+- PRs cannot be merged unless CI passes. This is enforced via GitHub branch protection rules on both `main` and `dev`.
 
 ## Active Technologies
 - TypeScript 5 / Node.js 20+ (CI) / 22+ (local) + Playwright (E2E), Vitest (unit/integration), GitHub Actions (CI), Supabase CLI (028-safe-dev-workflow)
