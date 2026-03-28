@@ -11,26 +11,26 @@ When adding or modifying a feature, update this registry and write the correspon
 
 ---
 
-## Auth (`e2e/auth.spec.ts`) — NOT YET IMPLEMENTED
+## Auth (`e2e/auth.spec.ts`) — IMPLEMENTED
 
-- [ ] Sign up with email and password
-- [ ] Sign up with invalid email shows error
-- [ ] Log in with valid credentials redirects to dashboard
-- [ ] Log in with wrong password shows error
-- [ ] Log out returns to login page
-- [ ] Password reset sends email
-- [ ] Unauthenticated user is redirected to login
+- [x] Sign up with email and password
+- [x] Sign up with invalid email shows error
+- [x] Log in with valid credentials redirects to dashboard
+- [x] Log in with wrong password shows error
+- [x] Log out returns to login page
+- [x] Password reset sends email (forgot password flow)
+- [x] Unauthenticated user is redirected to login
 
 ---
 
-## Documents (`e2e/documents.spec.ts`) — NOT YET IMPLEMENTED
+## Documents (`e2e/documents.spec.ts`) — IMPLEMENTED
 
-- [ ] Create new document from dashboard
-- [ ] Open existing document navigates to editor
-- [ ] Rename document from dashboard
-- [ ] Delete document with confirmation dialog
-- [ ] Document appears in correct folder
-- [ ] Move document to different folder/course
+- [x] Create new document from dashboard
+- [x] Open existing document navigates to editor
+- [ ] Rename document from dashboard — ⚠️ NOT WIRED UP (onRename prop not passed to DocumentCard)
+- [x] Delete document with confirmation dialog
+- [x] Document appears in correct folder
+- [x] Move document to different folder/course
 
 ---
 
@@ -132,8 +132,8 @@ When adding or modifying a feature, update this registry and write the correspon
 
 | Feature             | Status          | Spec File                    | Tests     |
 | ------------------- | --------------- | ---------------------------- | --------- |
-| Auth                | Not implemented | `e2e/auth.spec.ts`           | 0/7       |
-| Documents           | Not implemented | `e2e/documents.spec.ts`      | 0/6       |
+| Auth                | Implemented     | `e2e/auth.spec.ts`           | 7/7       |
+| Documents           | Implemented     | `e2e/documents.spec.ts`      | 5/6       |
 | Canvas Editor       | Not implemented | `e2e/canvas-editor.spec.ts`  | 0/11      |
 | Text Editor Toolbar | Implemented     | `e2e/editor-toolbar.spec.ts` | 12/12     |
 | LaTeX Math          | Not implemented | `e2e/latex-math.spec.ts`     | 0/5       |
@@ -142,4 +142,4 @@ When adding or modifying a feature, update this registry and write the correspon
 | AI Chat             | Not implemented | `e2e/ai-chat.spec.ts`        | 0/6       |
 | PDF Export          | Partial         | `e2e/export-pdf-*.spec.ts`   | 4/7       |
 | Real-time Sync      | Implemented     | `e2e/realtime-sync.spec.ts`  | 3/3       |
-| **Total**           |                 |                              | **19/67** |
+| **Total**           |                 |                              | **31/67** |
