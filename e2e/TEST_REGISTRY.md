@@ -67,33 +67,32 @@ When adding or modifying a feature, update this registry and write the correspon
 
 ---
 
-## LaTeX Math (`e2e/latex-math.spec.ts`) — NOT YET IMPLEMENTED
+## LaTeX Math (`e2e/latex-math.spec.ts`) — IMPLEMENTED
 
-- [ ] Type LaTeX trigger and enter math expression
-- [ ] Rendered math displays correctly
-- [ ] Edit existing math expression
-- [ ] Delete math expression
-- [ ] Math renders in RTL text context
-
----
-
-## Courses (`e2e/courses.spec.ts`) — NOT YET IMPLEMENTED
-
-- [ ] Create new course
-- [ ] View course with weeks
-- [ ] Add document to course week
-- [ ] Move document between courses
-- [ ] Upload course material
-- [ ] View course material inline
+- [x] Type LaTeX trigger and enter math expression — ⚠️ SKIPPED IN CI (needs AI API key)
+- [x] Rendered math displays correctly
+- [x] Edit existing math expression — ⚠️ SKIPPED IN CI (needs AI API key)
+- [x] Delete math expression
+- [ ] Math renders in RTL text context — deferred to later batch
 
 ---
 
-## File Upload (`e2e/file-upload.spec.ts`) — NOT YET IMPLEMENTED
+## Courses (`e2e/courses.spec.ts`) — IMPLEMENTED
 
-- [ ] Upload personal file (PDF, DOCX)
-- [ ] View uploaded file in file list
-- [ ] Open uploaded file
-- [ ] Delete uploaded file
+- [x] Create new course
+- [x] View course with weeks
+- [x] Create document inside course
+- [x] Add file inside course (import file)
+- [ ] Move document between courses — covered by documents.spec.ts move test
+- [ ] View course material inline — deferred (depends on file conversion)
+
+---
+
+## File Upload (`e2e/file-upload.spec.ts`) — IMPLEMENTED
+
+- [x] Import file into course (PDF upload)
+- [x] Open imported file (creates document)
+- [x] Delete imported file
 
 ---
 
@@ -136,10 +135,10 @@ When adding or modifying a feature, update this registry and write the correspon
 | Documents           | Implemented     | `e2e/documents.spec.ts`      | 5/6       |
 | Canvas Editor       | Not implemented | `e2e/canvas-editor.spec.ts`  | 0/11      |
 | Text Editor Toolbar | Implemented     | `e2e/editor-toolbar.spec.ts` | 12/12     |
-| LaTeX Math          | Not implemented | `e2e/latex-math.spec.ts`     | 0/5       |
-| Courses             | Not implemented | `e2e/courses.spec.ts`        | 0/6       |
-| File Upload         | Not implemented | `e2e/file-upload.spec.ts`    | 0/4       |
+| LaTeX Math          | Implemented     | `e2e/latex-math.spec.ts`     | 4/5       |
+| Courses             | Implemented     | `e2e/courses.spec.ts`        | 4/6       |
+| File Upload         | Implemented     | `e2e/file-upload.spec.ts`    | 3/4       |
 | AI Chat             | Not implemented | `e2e/ai-chat.spec.ts`        | 0/6       |
 | PDF Export          | Partial         | `e2e/export-pdf-*.spec.ts`   | 4/7       |
 | Real-time Sync      | Implemented     | `e2e/realtime-sync.spec.ts`  | 3/3       |
-| **Total**           |                 |                              | **31/67** |
+| **Total**           |                 |                              | **42/67** |
