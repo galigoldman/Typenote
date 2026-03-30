@@ -1,5 +1,6 @@
 import { test, expect } from '@playwright/test';
 import { login } from './helpers/auth';
+import { goToSeededCourse } from './helpers/navigate';
 
 test.describe('Courses', () => {
   test.beforeEach(async ({ page }) => {
@@ -29,38 +30,25 @@ test.describe('Courses', () => {
   });
 
   test('view course with weeks', async ({ page }) => {
-    // Seeded course "Introduction to CS" is at root level with 3 weeks
-    const courseCard = page.locator('[role="button"]', {
-      hasText: 'Introduction to CS',
-    });
-    await expect(courseCard).toBeVisible({ timeout: 10_000 });
-    await courseCard.click();
+    await goToSeededCourse(page);
 
-    // Should navigate to course page
-    await expect(page).toHaveURL(/\/dashboard\/courses\//, {
-      timeout: 10_000,
-    });
+    // The course page should show the course title
+    await expect(
+      page.getByRole('heading', { name: 'Introduction to CS' }),
+    ).toBeVisible({ timeout: 10_000 });
 
-    // Weeks should be visible — seeded weeks have topics like "Variables and Data Types"
+    // Weeks section should be visible with seeded week topics
+    await expect(page.getByText('Weeks')).toBeVisible({ timeout: 10_000 });
     await expect(page.getByText('Variables and Data Types')).toBeVisible({
       timeout: 10_000,
     });
   });
 
   test('create document inside course', async ({ page }) => {
-    // Navigate to seeded course
-    const courseCard = page.locator('[role="button"]', {
-      hasText: 'Introduction to CS',
-    });
-    await expect(courseCard).toBeVisible({ timeout: 10_000 });
-    await courseCard.click();
-    await expect(page).toHaveURL(/\/dashboard\/courses\//, {
-      timeout: 10_000,
-    });
+    await goToSeededCourse(page);
 
     const docTitle = `Course Doc ${Date.now()}`;
 
-    // Click "New Document" inside the course
     await page.getByRole('button', { name: 'New Document' }).click();
     await expect(
       page.getByRole('heading', { name: 'Create New Document' }),
@@ -81,21 +69,13 @@ test.describe('Courses', () => {
   test('add file inside course', async ({ page }) => {
     test.setTimeout(45_000);
 
-    // Navigate to seeded course
-    const courseCard = page.locator('[role="button"]', {
-      hasText: 'Introduction to CS',
-    });
-    await expect(courseCard).toBeVisible({ timeout: 10_000 });
-    await courseCard.click();
-    await expect(page).toHaveURL(/\/dashboard\/courses\//, {
-      timeout: 10_000,
-    });
+    await goToSeededCourse(page);
 
-    // Wait for the Import File button to be visible
+    // Wait for the Import File button
     const importButton = page.getByRole('button', { name: 'Import File' });
     await expect(importButton).toBeVisible({ timeout: 10_000 });
 
-    // The hidden file input is already in the DOM — set files on it directly
+    // The hidden file input is already in the DOM
     const fileInput = page.locator('input[type="file"]').first();
     await fileInput.setInputFiles({
       name: `test-file-${Date.now()}.pdf`,

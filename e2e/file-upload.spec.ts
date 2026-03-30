@@ -1,19 +1,11 @@
 import { test, expect } from '@playwright/test';
 import { login } from './helpers/auth';
+import { goToSeededCourse } from './helpers/navigate';
 
 test.describe('File Upload', () => {
   test.beforeEach(async ({ page }) => {
     await login(page);
-
-    // Navigate to seeded course "Introduction to CS" (files need a course context)
-    const courseCard = page.locator('[role="button"]', {
-      hasText: 'Introduction to CS',
-    });
-    await expect(courseCard).toBeVisible({ timeout: 10_000 });
-    await courseCard.click();
-    await expect(page).toHaveURL(/\/dashboard\/courses\//, {
-      timeout: 10_000,
-    });
+    await goToSeededCourse(page);
 
     // Wait for the Import File button to confirm the page is fully loaded
     await expect(page.getByRole('button', { name: 'Import File' })).toBeVisible(
