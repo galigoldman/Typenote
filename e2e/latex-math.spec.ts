@@ -47,18 +47,16 @@ test.describe('LaTeX Math', () => {
 
     // Wait for AI conversion and rendering
     // A rendered math expression should appear in the editor
-    await expect(
-      page.locator('span[data-type="math-expression"]'),
-    ).toBeVisible({ timeout: 15_000 });
+    await expect(page.locator('span[data-type="math-expression"]')).toBeVisible(
+      { timeout: 15_000 },
+    );
   });
 
   test('rendered math displays as formatted output, not raw text', async ({
     page,
   }) => {
     // Check if seeded documents have any math expressions
-    const mathExpressions = page.locator(
-      'span[data-type="math-expression"]',
-    );
+    const mathExpressions = page.locator('span[data-type="math-expression"]');
     const count = await mathExpressions.count();
 
     if (count > 0) {
@@ -82,9 +80,7 @@ test.describe('LaTeX Math', () => {
     );
     test.setTimeout(30_000);
 
-    const mathExpressions = page.locator(
-      'span[data-type="math-expression"]',
-    );
+    const mathExpressions = page.locator('span[data-type="math-expression"]');
     const count = await mathExpressions.count();
 
     if (count === 0) {
@@ -105,8 +101,7 @@ test.describe('LaTeX Math', () => {
     await editLatexButton.click();
 
     // Find the input and modify it
-    const input = page
-      .locator('input[placeholder="Enter LaTeX code..."]');
+    const input = page.locator('input[placeholder="Enter LaTeX code..."]');
     await expect(input).toBeVisible();
     await input.clear();
     await input.fill('y^2 + z^2');
@@ -117,9 +112,7 @@ test.describe('LaTeX Math', () => {
   });
 
   test('delete math expression', async ({ page }) => {
-    const mathExpressions = page.locator(
-      'span[data-type="math-expression"]',
-    );
+    const mathExpressions = page.locator('span[data-type="math-expression"]');
     const count = await mathExpressions.count();
 
     if (count === 0) {
