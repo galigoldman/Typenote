@@ -5,15 +5,20 @@ test.describe('File Upload', () => {
   test.beforeEach(async ({ page }) => {
     await login(page);
 
-    // Navigate to a seeded course (files need a course context)
+    // Navigate to seeded course "Introduction to CS" (files need a course context)
     const courseCard = page.locator('[role="button"]', {
-      hasText: 'Course',
+      hasText: 'Introduction to CS',
     });
-    await expect(courseCard.first()).toBeVisible({ timeout: 10_000 });
-    await courseCard.first().click();
+    await expect(courseCard).toBeVisible({ timeout: 10_000 });
+    await courseCard.click();
     await expect(page).toHaveURL(/\/dashboard\/courses\//, {
       timeout: 10_000,
     });
+
+    // Wait for the Import File button to confirm the page is fully loaded
+    await expect(page.getByRole('button', { name: 'Import File' })).toBeVisible(
+      { timeout: 10_000 },
+    );
   });
 
   test('import file into course', async ({ page }) => {
@@ -21,7 +26,7 @@ test.describe('File Upload', () => {
 
     const fileName = `test-upload-${Date.now()}.pdf`;
 
-    // The file input is hidden — set files directly
+    // The hidden file input is in the DOM — set files directly
     const fileInput = page.locator('input[type="file"]').first();
     await fileInput.setInputFiles({
       name: fileName,
@@ -36,7 +41,7 @@ test.describe('File Upload', () => {
   });
 
   test('open imported file creates a document', async ({ page }) => {
-    test.setTimeout(30_000);
+    test.setTimeout(45_000);
 
     const fileName = `test-open-${Date.now()}.pdf`;
 
@@ -53,9 +58,8 @@ test.describe('File Upload', () => {
     });
 
     // Find the uploaded file in the list and click it
-    const fileItem = page.locator('button', {
-      hasText: fileName.replace('.pdf', ''),
-    });
+    const displayName = fileName.replace('.pdf', '');
+    const fileItem = page.locator('button', { hasText: displayName });
     await expect(fileItem).toBeVisible({ timeout: 10_000 });
     await fileItem.click();
 
@@ -66,7 +70,7 @@ test.describe('File Upload', () => {
   });
 
   test('delete imported file', async ({ page }) => {
-    test.setTimeout(30_000);
+    test.setTimeout(45_000);
 
     const fileName = `test-delete-${Date.now()}.pdf`;
 
@@ -84,7 +88,10 @@ test.describe('File Upload', () => {
 
     // Find the file row and hover to reveal delete button
     const displayName = fileName.replace('.pdf', '');
-    const fileRow = page.locator('div', { hasText: displayName }).first();
+    const fileRow = page
+      .locator('div')
+      .filter({ hasText: displayName })
+      .first();
     await expect(fileRow).toBeVisible({ timeout: 10_000 });
     await fileRow.hover();
 

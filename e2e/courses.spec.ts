@@ -11,8 +11,10 @@ test.describe('Courses', () => {
 
     await page.getByRole('button', { name: 'New Course' }).click();
 
-    // Dialog should appear
-    await expect(page.getByText('Create Course')).toBeVisible();
+    // Dialog should appear — check the heading, not generic text
+    await expect(
+      page.getByRole('heading', { name: 'Create Course' }),
+    ).toBeVisible();
 
     // Fill in the name
     await page.getByLabel('Name').fill(courseName);
@@ -21,37 +23,37 @@ test.describe('Courses', () => {
     await page.getByRole('button', { name: 'Create Course' }).click();
 
     // Course should appear on the dashboard
-    await expect(page.locator('text=' + courseName)).toBeVisible({
+    await expect(page.getByText(courseName)).toBeVisible({
       timeout: 10_000,
     });
   });
 
   test('view course with weeks', async ({ page }) => {
-    // Seeded data has courses — click the first one
+    // Seeded course "Introduction to CS" is at root level with 3 weeks
     const courseCard = page.locator('[role="button"]', {
-      hasText: 'Course',
+      hasText: 'Introduction to CS',
     });
-    await expect(courseCard.first()).toBeVisible({ timeout: 10_000 });
-    await courseCard.first().click();
+    await expect(courseCard).toBeVisible({ timeout: 10_000 });
+    await courseCard.click();
 
     // Should navigate to course page
     await expect(page).toHaveURL(/\/dashboard\/courses\//, {
       timeout: 10_000,
     });
 
-    // Weeks should be visible (seeded courses have weeks)
-    await expect(page.locator('text=/Week \\d+/')).toBeVisible({
+    // Weeks should be visible — seeded weeks have topics like "Variables and Data Types"
+    await expect(page.getByText('Variables and Data Types')).toBeVisible({
       timeout: 10_000,
     });
   });
 
   test('create document inside course', async ({ page }) => {
-    // Navigate to a seeded course
+    // Navigate to seeded course
     const courseCard = page.locator('[role="button"]', {
-      hasText: 'Course',
+      hasText: 'Introduction to CS',
     });
-    await expect(courseCard.first()).toBeVisible({ timeout: 10_000 });
-    await courseCard.first().click();
+    await expect(courseCard).toBeVisible({ timeout: 10_000 });
+    await courseCard.click();
     await expect(page).toHaveURL(/\/dashboard\/courses\//, {
       timeout: 10_000,
     });
@@ -60,7 +62,9 @@ test.describe('Courses', () => {
 
     // Click "New Document" inside the course
     await page.getByRole('button', { name: 'New Document' }).click();
-    await expect(page.getByText('Create New Document')).toBeVisible();
+    await expect(
+      page.getByRole('heading', { name: 'Create New Document' }),
+    ).toBeVisible();
 
     const titleInput = page.getByLabel('Title');
     await titleInput.clear();
@@ -75,21 +79,23 @@ test.describe('Courses', () => {
   });
 
   test('add file inside course', async ({ page }) => {
-    // Navigate to a seeded course
+    test.setTimeout(45_000);
+
+    // Navigate to seeded course
     const courseCard = page.locator('[role="button"]', {
-      hasText: 'Course',
+      hasText: 'Introduction to CS',
     });
-    await expect(courseCard.first()).toBeVisible({ timeout: 10_000 });
-    await courseCard.first().click();
+    await expect(courseCard).toBeVisible({ timeout: 10_000 });
+    await courseCard.click();
     await expect(page).toHaveURL(/\/dashboard\/courses\//, {
       timeout: 10_000,
     });
 
-    // Click "Import File" to trigger the file input
+    // Wait for the Import File button to be visible
     const importButton = page.getByRole('button', { name: 'Import File' });
     await expect(importButton).toBeVisible({ timeout: 10_000 });
 
-    // Set up a fake PDF file via the hidden file input
+    // The hidden file input is already in the DOM — set files on it directly
     const fileInput = page.locator('input[type="file"]').first();
     await fileInput.setInputFiles({
       name: `test-file-${Date.now()}.pdf`,
@@ -97,9 +103,9 @@ test.describe('Courses', () => {
       buffer: Buffer.from('%PDF-1.4 fake pdf content'),
     });
 
-    // Wait for upload to complete — either a success toast or the file appearing
-    await expect(
-      page.getByText('File imported').or(page.getByText('Uploading...')),
-    ).toBeVisible({ timeout: 15_000 });
+    // Wait for upload to complete
+    await expect(page.getByText('File imported')).toBeVisible({
+      timeout: 20_000,
+    });
   });
 });
