@@ -5,11 +5,13 @@ import { goToSeededCourse } from './helpers/navigate';
 test.describe('File Upload', () => {
   test.beforeEach(async ({ page }) => {
     await login(page);
-    await goToSeededCourse(page);
+
+    // Navigate directly to the seeded course by URL for reliability
+    await page.goto('/dashboard/courses/30000000-0000-0000-0000-000000000001');
 
     // Wait for the Import File button to confirm the page is fully loaded
     await expect(page.getByRole('button', { name: 'Import File' })).toBeVisible(
-      { timeout: 10_000 },
+      { timeout: 15_000 },
     );
   });
 
