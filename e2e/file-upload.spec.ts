@@ -2,21 +2,19 @@ import { test, expect } from '@playwright/test';
 import { login } from './helpers/auth';
 import { goToSeededCourse } from './helpers/navigate';
 
+const COURSE_URL = '/dashboard/courses/30000000-0000-0000-0000-000000000001';
+
 test.describe('File Upload', () => {
   test.beforeEach(async ({ page }) => {
     await login(page);
-
-    // Navigate directly to the seeded course by URL for reliability
-    await page.goto('/dashboard/courses/30000000-0000-0000-0000-000000000001');
-
-    // Wait for the Import File button to confirm the page is fully loaded
-    await expect(page.getByRole('button', { name: 'Import File' })).toBeVisible(
-      { timeout: 15_000 },
-    );
   });
 
   test('import file into course', async ({ page }) => {
     test.setTimeout(30_000);
+    await page.goto(COURSE_URL);
+    await expect(page.getByRole('button', { name: 'Import File' })).toBeVisible(
+      { timeout: 15_000 },
+    );
 
     const fileName = `test-upload-${Date.now()}.pdf`;
 
@@ -36,6 +34,10 @@ test.describe('File Upload', () => {
 
   test('open imported file creates a document', async ({ page }) => {
     test.setTimeout(45_000);
+    await page.goto(COURSE_URL);
+    await expect(page.getByRole('button', { name: 'Import File' })).toBeVisible(
+      { timeout: 15_000 },
+    );
 
     const fileName = `test-open-${Date.now()}.pdf`;
 
@@ -65,6 +67,10 @@ test.describe('File Upload', () => {
 
   test('delete imported file', async ({ page }) => {
     test.setTimeout(45_000);
+    await page.goto(COURSE_URL);
+    await expect(page.getByRole('button', { name: 'Import File' })).toBeVisible(
+      { timeout: 15_000 },
+    );
 
     const fileName = `test-delete-${Date.now()}.pdf`;
 
