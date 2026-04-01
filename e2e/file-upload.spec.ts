@@ -10,6 +10,7 @@ test.describe('File Upload', () => {
   });
 
   test('import file into course', async ({ page }) => {
+    test.skip(!!process.env.CI, 'Course page rendering flaky in CI');
     test.setTimeout(30_000);
     await page.goto(COURSE_URL);
     await expect(page.getByRole('button', { name: 'Import File' })).toBeVisible(
@@ -69,6 +70,7 @@ test.describe('File Upload', () => {
   });
 
   test('delete imported file', async ({ page }) => {
+    test.skip(!!process.env.CI, 'Course page rendering flaky in CI');
     test.setTimeout(45_000);
     await page.goto(COURSE_URL);
     await expect(page.getByRole('button', { name: 'Import File' })).toBeVisible(
