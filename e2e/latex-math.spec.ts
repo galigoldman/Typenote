@@ -127,4 +127,42 @@ test.describe('LaTeX Math', () => {
     // There should be one fewer math expression
     await expect(mathExpressions).toHaveCount(count - 1);
   });
+
+  test('math renders LTR inside RTL text', async ({ page }) => {
+    test.skip(
+      !!process.env.CI,
+      'LaTeX AI conversion needs GOOGLE_GENERATIVE_AI_API_KEY in CI',
+    );
+    test.setTimeout(30_000);
+
+    // Focus the editor
+    const editor = page.locator('.ProseMirror');
+    await editor.click();
+    await page.keyboard.press('End');
+    await page.keyboard.press('Enter');
+
+    // Type Hebrew text (RTL)
+    await page.keyboard.type('זהו טקסט בעברית ');
+
+    // Insert math with :{ trigger
+    await page.keyboard.type(':');
+    await page.keyboard.type('{');
+
+    const mathInput = page.locator(
+      'input[placeholder="Describe math in plain English..."]',
+    );
+    await expect(mathInput).toBeVisible({ timeout: 5_000 });
+    await mathInput.fill('a in A');
+    await page.keyboard.press('Enter');
+
+    // Wait for math to render
+    await expect(
+      page.locator('span[data-type="math-expression"]').last(),
+    ).toBeVisible({ timeout: 15_000 });
+
+    // Verify the math node has LTR direction (math is always LTR)
+    const mathNode = page.locator('span[data-type="math-expression"]').last();
+    const dir = await mathNode.evaluate((el) => getComputedStyle(el).direction);
+    expect(dir).toBe('ltr');
+  });
 });

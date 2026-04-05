@@ -147,4 +147,37 @@ test.describe('Documents', () => {
       });
     }
   });
+
+  test('rename document from editor title input', async ({ page }) => {
+    // Create a document to rename
+    const originalTitle = `Rename Me ${Date.now()}`;
+    await page.getByRole('button', { name: 'New Document' }).click();
+    await expect(page.getByText('Create New Document')).toBeVisible();
+    const dialogTitle = page.getByLabel('Title');
+    await dialogTitle.clear();
+    await dialogTitle.fill(originalTitle);
+    await page.getByRole('button', { name: 'Create', exact: true }).click();
+    await expect(page).toHaveURL(/\/dashboard\/documents\//, {
+      timeout: 10_000,
+    });
+
+    // Find the title input at the top of the editor (placeholder "Untitled")
+    const titleInput = page.getByPlaceholder('Untitled');
+    await expect(titleInput).toBeVisible({ timeout: 10_000 });
+    await expect(titleInput).toHaveValue(originalTitle);
+
+    // Rename it
+    const newTitle = `Renamed ${Date.now()}`;
+    await titleInput.clear();
+    await titleInput.fill(newTitle);
+
+    // Click away to trigger blur (auto-save)
+    await page.locator('body').click({ position: { x: 10, y: 10 } });
+    await page.waitForTimeout(1000);
+
+    // Reload and verify the name stuck
+    await page.reload();
+    await expect(titleInput).toBeVisible({ timeout: 10_000 });
+    await expect(titleInput).toHaveValue(newTitle);
+  });
 });
