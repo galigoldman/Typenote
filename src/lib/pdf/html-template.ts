@@ -208,8 +208,13 @@ const PROSE_CSS = `
   /* Horizontal rule */
   hr { border: none; border-top: 1px solid #e5e7eb; margin: 2em 0; }
 
-  /* Highlights */
-  mark { padding: 0.125em 0; border-radius: 0.125rem; }
+  /* Highlights — force background colors to print */
+  mark {
+    padding: 0.125em 0;
+    border-radius: 0.125rem;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
 
   /* Underline */
   u { text-decoration: underline; }
@@ -227,6 +232,10 @@ const PRINT_CSS_A4 = `
   @media print {
     h1, h2, h3 { break-after: avoid; }
     pre, blockquote, figure { break-inside: avoid; }
+    mark, [style*="background"] {
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
+    }
   }
 `;
 
@@ -299,6 +308,10 @@ const PRINT_CSS_CANVAS = `
   @media print {
     .canvas-page { break-after: page; }
     .canvas-page:last-child { break-after: auto; }
+    mark, [style*="background"] {
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
+    }
   }
 `;
 
@@ -349,7 +362,7 @@ export function buildCanvasPageHtml(
           ${strokePaths}
         </svg>
         ${textBoxesHtml}
-        ${flowHtml ? `<div style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; padding: 16px; box-sizing: border-box; pointer-events: none;">${flowHtml}</div>` : ''}
+        ${flowHtml && page.textBoxes.length === 0 ? `<div style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; padding: 16px; box-sizing: border-box; pointer-events: none;">${flowHtml}</div>` : ''}
       </div>`;
     })
     .join('\n');
@@ -399,6 +412,10 @@ const PRINT_CSS_MIXED = `
     .canvas-page { break-after: page; }
     h1, h2, h3 { break-after: avoid; }
     pre, blockquote, figure { break-inside: avoid; }
+    mark, [style*="background"] {
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
+    }
   }
 `;
 
@@ -445,7 +462,7 @@ export function buildMixedDocumentHtml(
           ${strokePaths}
         </svg>
         ${textBoxesHtml}
-        ${flowHtml ? `<div style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; padding: 16px; box-sizing: border-box;">${flowHtml}</div>` : ''}
+        ${flowHtml && page.textBoxes.length === 0 ? `<div style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; padding: 16px; box-sizing: border-box;">${flowHtml}</div>` : ''}
       </div>`;
     })
     .join('\n');
