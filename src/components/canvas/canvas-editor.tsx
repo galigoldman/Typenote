@@ -13,6 +13,7 @@ import type {
 import { PAGE_WIDTH, PAGE_HEIGHT } from '@/types/canvas';
 import type { Document } from '@/types/database';
 import type { SaveStatus } from '@/hooks/use-auto-save';
+import { pageHasContent, stripTrailingEmptyPages } from './page-utils';
 import type { ConnectionStatus } from '@/hooks/use-realtime-sync';
 import {
   ArrowLeft,
@@ -89,14 +90,7 @@ const CANVAS_CLASSES: Record<string, string> = {
   dotted: 'canvas-dotted',
 };
 
-/** Returns true if a page has any real content (strokes or typed text). */
-function pageHasContent(page: CanvasPageData): boolean {
-  if (page.strokes.length > 0) return true;
-  if (!page.flowContent) return false;
-  // An empty TipTap editor produces { type:'doc', content:[{type:'paragraph'}] }.
-  // Real text contains a "text" key somewhere in the JSON.
-  return JSON.stringify(page.flowContent).includes('"text"');
-}
+// pageHasContent() moved to ./page-utils.ts
 
 const PEN_COLORS = [
   '#000000',
@@ -319,6 +313,11 @@ export function CanvasEditor({
   const [pages, setPages] = useState<CanvasPageData[]>(() =>
     initializePagesFromDocument(document),
   );
+  // Floor = last-known page count from DB. Saves never strip below this.
+  // Prevents cross-device data loss when one device hasn't synced yet.
+  const dbPageCountFloorRef = useRef<number>(
+    (document.pages as CanvasDocument | null)?.pages?.length ?? 1,
+  );
   const [activeTool, setActiveToolRaw] = useState<CanvasTool>('text');
 
   // Wrap setActiveTool to migrate flowContent → text boxes when entering Select
@@ -468,13 +467,12 @@ export function CanvasEditor({
   }, [pages]);
 
   const getPagesData = useCallback((): Record<string, unknown> => {
-    // Strip empty trailing pages — only save pages with content
-    const all = pagesRef.current;
-    let lastContentIndex = all.length - 1;
-    while (lastContentIndex > 0 && !pageHasContent(all[lastContentIndex])) {
-      lastContentIndex--;
-    }
-    const toSave = all.slice(0, lastContentIndex + 1).map((p) => ({
+    // Strip truly empty trailing pages, but never below the DB-known page count
+    const stripped = stripTrailingEmptyPages(
+      pagesRef.current,
+      dbPageCountFloorRef.current,
+    );
+    const toSave = stripped.map((p) => ({
       ...p,
       // Strip transient contentBounds from text boxes before persisting
       textBoxes: p.textBoxes.map(({ contentBounds: _, ...tb }) => tb),
@@ -498,6 +496,11 @@ export function CanvasEditor({
       }
       const remote = remotePagesData as unknown as CanvasDocument;
       if (remote?.pages) {
+        // Update floor so future saves never strip below what the DB now has
+        dbPageCountFloorRef.current = Math.max(
+          dbPageCountFloorRef.current,
+          remote.pages.length,
+        );
         setPages(remote.pages);
         setRemoteUpdateCounter((c) => c + 1);
       }

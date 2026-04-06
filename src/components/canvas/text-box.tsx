@@ -8,6 +8,7 @@ import TextAlign from '@tiptap/extension-text-align';
 import TaskList from '@tiptap/extension-task-list';
 import TaskItem from '@tiptap/extension-task-item';
 import LinkExt from '@tiptap/extension-link';
+import HighlightExt from '@tiptap/extension-highlight';
 import { TextStyle } from '@tiptap/extension-text-style';
 import { AutoDirection } from '@/lib/editor/rtl-extension';
 import { Indent } from '@/lib/editor/indent-extension';
@@ -76,6 +77,7 @@ export function TextBox({
         openOnClick: false,
         HTMLAttributes: { class: 'text-primary underline cursor-pointer' },
       }),
+      HighlightExt.configure({ multicolor: true }),
       TextStyle,
       FontSize,
       AutoDirection,
