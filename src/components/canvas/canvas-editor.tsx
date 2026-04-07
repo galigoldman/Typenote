@@ -1258,6 +1258,48 @@ export function CanvasEditor({
     setCanRedoDraw(redoStackRef.current.length > 0);
   }, [historyVersion]);
 
+  // Track whether the active TipTap editor has anything to undo/redo.
+  // Subscribes to the editor's transaction events so the button stays in sync.
+  const [canUndoText, setCanUndoText] = useState(false);
+  const [canRedoText, setCanRedoText] = useState(false);
+  useEffect(() => {
+    if (!activeEditor) {
+      setCanUndoText(false);
+      setCanRedoText(false);
+      return;
+    }
+    const update = () => {
+      setCanUndoText(activeEditor.can().undo());
+      setCanRedoText(activeEditor.can().redo());
+    };
+    update();
+    activeEditor.on('transaction', update);
+    activeEditor.on('update', update);
+    return () => {
+      activeEditor.off('transaction', update);
+      activeEditor.off('update', update);
+    };
+  }, [activeEditor]);
+
+  // Combined: undo is enabled when the current mode has something to undo.
+  // - Draw modes (pen/highlighter/eraser) → use canvas action stack
+  // - Text mode → use active TipTap editor history
+  // - Select/Read modes → no undo path, disable button
+  const _isDrawingMode =
+    activeTool === 'pen' ||
+    activeTool === 'highlighter' ||
+    activeTool === 'eraser';
+  const canUndo = _isDrawingMode
+    ? canUndoDraw
+    : activeTool === 'text'
+      ? canUndoText
+      : false;
+  const canRedo = _isDrawingMode
+    ? canRedoDraw
+    : activeTool === 'text'
+      ? canRedoText
+      : false;
+
   // Delete selected objects with keyboard
   useEffect(() => {
     if (activeTool !== 'select') return;
@@ -1612,7 +1654,7 @@ export function CanvasEditor({
               e.stopPropagation();
               handleUndo();
             }}
-            disabled={isDrawMode ? !canUndoDraw : false}
+            disabled={!canUndo}
             className="flex items-center justify-center h-8 w-8 min-h-[44px] min-w-[44px] rounded-lg transition-colors hover:bg-accent disabled:opacity-30 disabled:pointer-events-none text-muted-foreground"
             title="Undo"
           >
@@ -1623,7 +1665,7 @@ export function CanvasEditor({
               e.stopPropagation();
               handleRedo();
             }}
-            disabled={isDrawMode ? !canRedoDraw : false}
+            disabled={!canRedo}
             className="flex items-center justify-center h-8 w-8 min-h-[44px] min-w-[44px] rounded-lg transition-colors hover:bg-accent disabled:opacity-30 disabled:pointer-events-none text-muted-foreground"
             title="Redo"
           >
