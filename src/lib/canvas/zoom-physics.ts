@@ -21,8 +21,10 @@ export const SPRING_THRESHOLD = 0.5; // convergence threshold (px or zoom units)
 export const MOMENTUM_DECAY = 0.95; // per-frame multiplier at 60fps
 export const MOMENTUM_STOP = 0.5; // min velocity before stopping (px/frame)
 
-// Rubber-band (Apple's reverse-engineered coefficient)
-export const RUBBER_BAND_C = 0.55;
+// Rubber-band coefficient. Apple's reverse-engineered constant is 0.55, but
+// that produces a fairly subtle overscroll. Bumped to 0.8 for more visible
+// iOS-like bounce — makes draw mode feel closer to native scroll.
+export const RUBBER_BAND_C = 0.8;
 
 // Animation safety
 export const MAX_DT = 0.032; // 32ms cap to prevent physics explosion

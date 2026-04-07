@@ -2,6 +2,22 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 
+/**
+ * Pinch zoom sensitivity dampening (Issue #117.3).
+ * Without this, raw `currentDist / startDistance` ratio is too sensitive on
+ * iPad — a 5px finger movement on ~40px starting distance produces 12.5%
+ * zoom change. Damping with exponent 0.6 maps:
+ *   1.0 → 1.0 (identity)
+ *   1.05 → 1.030 (small pinches dampened)
+ *   1.5 → 1.275 (medium pinches still meaningful)
+ *   2.0 → 1.516 (large pinches still reach typical targets)
+ */
+const PINCH_DAMPING = 0.6;
+export function dampPinchRatio(ratio: number, damping = PINCH_DAMPING): number {
+  if (ratio <= 0) return 1.0;
+  return Math.pow(ratio, damping);
+}
+
 import {
   type Camera,
   type GestureState,
@@ -338,10 +354,13 @@ export function usePinchZoom({
       const g = gestureRef.current;
       const cam = cameraRef.current;
 
-      // Calculate new zoom from pinch ratio
+      // Calculate new zoom from pinch ratio.
+      // Issue #117.3: dampen the ratio so small pinches produce small zoom
+      // changes; large pinches still reach typical targets like 150% / 75%.
       const currentDist = dist(t1, t2);
-      const ratio = currentDist / g.startDistance;
-      const rawZoom = g.startZoom * ratio;
+      const rawRatio = currentDist / g.startDistance;
+      const dampedRatio = dampPinchRatio(rawRatio);
+      const rawZoom = g.startZoom * dampedRatio;
       // Allow exceeding bounds during gesture for rubber-band feel
       const newZoom = rawZoom;
 
@@ -605,8 +624,9 @@ export function usePinchZoom({
       const now = performance.now();
       const dt = now - lastPanTime;
       if (dt > 0) {
-        panVelocityX = ((touch.clientX - lastPanX) / dt) * 16;
-        panVelocityY = ((touch.clientY - lastPanY) / dt) * 16;
+        // Issue #117.2: bumped from 16 → 20 for snappier glide on iPad finger scroll
+        panVelocityX = ((touch.clientX - lastPanX) / dt) * 20;
+        panVelocityY = ((touch.clientY - lastPanY) / dt) * 20;
       }
       lastPanTime = now;
       lastPanX = touch.clientX;
