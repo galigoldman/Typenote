@@ -5,6 +5,22 @@
 
 @custom-variant dark (&:is(.dark *));
 
+/* pointer-touch: matches "pure touch device" — has a coarse pointer AND no fine pointer.
+   Used to switch the document editor between desktop ("page mode") and tablet ("full-width
+   mode") layouts based on device capability instead of viewport width.
+
+   Why not just `pointer: coarse`?
+   On Windows touchscreen laptops, Chrome reports `pointer: coarse` (treating the touchscreen
+   as the primary input) even though there is a trackpad available — so a `pointer-coarse:`
+   rule incorrectly puts those users in the tablet bucket. Checking that there is no fine
+   pointer at all (`not (any-pointer: fine)`) ensures we only switch to tablet mode for
+   real touch-only devices like iPad-without-trackpad and Android tablets.
+
+   Fallback: in browsers that don't support `any-pointer`, both features are unknown, so
+   the entire @media query evaluates to `not all` and the rule never matches — leaving the
+   default page-mode styles in place. */
+@custom-variant pointer-touch (@media (any-pointer: coarse) and (not (any-pointer: fine)));
+
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);

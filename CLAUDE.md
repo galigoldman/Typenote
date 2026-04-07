@@ -51,6 +51,9 @@ The project uses a two-branch model: `dev` (integration) and `main` (production)
 
 ## Active Technologies
 
+- TypeScript 5 / Node.js 22+ + Next.js 16 (App Router), React 19, Tailwind CSS 4 (built-in `pointer-fine:` / `pointer-coarse:` variants — no config changes needed) (034-device-layout-detection)
+- N/A — purely a presentation/CSS change (034-device-layout-detection)
+
 - TypeScript 5 / Node.js 20+ (CI) / 22+ (local) + Playwright (E2E), Vitest (unit/integration), GitHub Actions (CI), Supabase CLI (028-safe-dev-workflow)
 - N/A — no schema changes, uses existing seeded data in local Supabase (028-safe-dev-workflow)
 
