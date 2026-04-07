@@ -243,15 +243,22 @@ export function usePinchZoom({
     const container = containerRef.current;
     if (!container) return;
 
-    const isTouchDevice =
-      'ontouchstart' in window || navigator.maxTouchPoints > 0;
+    // "Pure touch device" = has a coarse pointer AND no fine pointer at all.
+    // We deliberately do NOT use `navigator.maxTouchPoints > 0` here, because that
+    // returns true on Windows touchscreen laptops (which also have a trackpad) and
+    // would incorrectly stretch the page to fill the viewport on those machines.
+    // This media query mirrors the `pointer-touch:` Tailwind variant defined in
+    // `globals.css`, so the JS fit logic and the CSS layout stay in sync.
+    const isPureTouchDevice = window.matchMedia(
+      '(any-pointer: coarse) and (not (any-pointer: fine))',
+    ).matches;
 
     const computeFit = () => {
       const w = container.clientWidth;
       if (w <= 0) return;
 
       const raw = w / pageWidth;
-      const newFit = isTouchDevice ? raw : Math.min(raw, 1);
+      const newFit = isPureTouchDevice ? raw : Math.min(raw, 1);
 
       setCamera((prev) => {
         const updated: Camera = { ...prev, fitScale: newFit };

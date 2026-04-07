@@ -1547,7 +1547,7 @@ export function CanvasEditor({
   return (
     <div className="flex flex-col flex-1 min-h-0">
       {/* Header — hidden on mobile (merged into toolbar) */}
-      <div className="hidden xl:flex items-center justify-between border-b px-4 py-2">
+      <div className="flex pointer-touch:hidden items-center justify-between border-b px-4 py-2">
         <button
           onClick={() => router.back()}
           className="flex items-center justify-center h-8 w-8 min-h-[44px] min-w-[44px] rounded-lg hover:bg-accent transition-colors text-muted-foreground mr-1 shrink-0"
@@ -1631,7 +1631,7 @@ export function CanvasEditor({
       {/* Toolbar — sticky so it stays visible when zoomed */}
       <div className="flex items-center border-b px-2 py-1 overflow-x-auto overflow-y-visible bg-background z-20 shrink-0">
         {/* Mobile: back + home + title (hidden on desktop — shown in header) */}
-        <div className="flex items-center gap-1 mr-2 xl:hidden shrink-0">
+        <div className="hidden pointer-touch:flex items-center gap-1 mr-2 shrink-0">
           <button
             onClick={() => router.back()}
             className="flex items-center justify-center h-8 w-8 rounded-lg hover:bg-accent transition-colors text-muted-foreground"
@@ -1897,7 +1897,7 @@ export function CanvasEditor({
         {/* Canvas scroll area */}
         <div
           ref={scrollContainerRef}
-          className="flex-1 bg-white xl:bg-gray-100"
+          className="flex-1 bg-gray-100 pointer-touch:bg-white"
           data-scroll-container
           style={{
             overflowX: 'hidden',
@@ -1916,7 +1916,7 @@ export function CanvasEditor({
           }}
         >
           <div
-            className="py-8 max-xl:py-0"
+            className="py-8 pointer-touch:py-0"
             style={{
               transform: isDrawMode
                 ? `translate(${camera.x}px, ${camera.y}px) scale(${scale})`

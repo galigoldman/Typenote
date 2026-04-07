@@ -674,7 +674,7 @@ export function CanvasPage({
   return (
     <div
       ref={pageRootRef}
-      className="relative bg-white shadow-md mx-auto max-xl:shadow-none"
+      className="relative bg-white shadow-md mx-auto pointer-touch:shadow-none"
       style={{
         width: PAGE_WIDTH,
         height: PAGE_HEIGHT,
