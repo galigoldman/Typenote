@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { Editor } from '@tiptap/core';
 import type {
   BBox,
@@ -1259,27 +1259,29 @@ export function CanvasEditor({
   }, [historyVersion]);
 
   // Track whether the active TipTap editor has anything to undo/redo.
-  // Subscribes to the editor's transaction events so the button stays in sync.
-  const [canUndoText, setCanUndoText] = useState(false);
-  const [canRedoText, setCanRedoText] = useState(false);
+  // Use a version counter bumped on editor events, then derive canUndo/canRedo
+  // during render. This avoids synchronous setState inside the effect body.
+  const [editorHistoryVersion, setEditorHistoryVersion] = useState(0);
   useEffect(() => {
-    if (!activeEditor) {
-      setCanUndoText(false);
-      setCanRedoText(false);
-      return;
-    }
-    const update = () => {
-      setCanUndoText(activeEditor.can().undo());
-      setCanRedoText(activeEditor.can().redo());
-    };
-    update();
-    activeEditor.on('transaction', update);
-    activeEditor.on('update', update);
+    if (!activeEditor) return;
+    const bump = () => setEditorHistoryVersion((v) => v + 1);
+    activeEditor.on('transaction', bump);
+    activeEditor.on('update', bump);
     return () => {
-      activeEditor.off('transaction', update);
-      activeEditor.off('update', update);
+      activeEditor.off('transaction', bump);
+      activeEditor.off('update', bump);
     };
   }, [activeEditor]);
+  const canUndoText = useMemo(
+    () => (activeEditor ? activeEditor.can().undo() : false),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [activeEditor, editorHistoryVersion],
+  );
+  const canRedoText = useMemo(
+    () => (activeEditor ? activeEditor.can().redo() : false),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [activeEditor, editorHistoryVersion],
+  );
 
   // Combined: undo is enabled when the current mode has something to undo.
   // - Draw modes (pen/highlighter/eraser) → use canvas action stack

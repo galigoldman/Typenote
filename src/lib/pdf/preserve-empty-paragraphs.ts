@@ -25,7 +25,8 @@ export function preserveEmptyParagraphs(node: unknown): unknown {
   if (n.type === 'paragraph') {
     const content = n.content as unknown[] | undefined;
     if (!Array.isArray(content) || content.length === 0) {
-      const { content: _drop, ...rest } = n;
+      const rest: Record<string, unknown> = { ...n };
+      delete rest.content;
       return { ...rest, content: [{ type: 'text', text: NBSP }] };
     }
   }
