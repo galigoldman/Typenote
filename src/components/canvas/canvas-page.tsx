@@ -425,139 +425,159 @@ export function CanvasPage({
       }
 
       // Overflow detection — runs after every edit to check if content
-      // extends past the page boundary. Measures the BOTTOM of document
-      // content (not cursor position) so paste-triggered overflow is
-      // detected even when the cursor is at the top of the page.
+      // extends past the page boundary. Measures the BOTTOM of the last
+      // block child of the editor DOM, so the gate and the per-block split
+      // index use the exact same coordinate system (both ignore the editor's
+      // own padding-bottom, which caused a stuck-gate bug previously).
+      //
+      // The `overflowNotifiedRef` is held for exactly the synchronous body
+      // of this rAF callback and always released in the `finally` block.
+      // That guarantees the gate cannot get stuck on any no-op branch,
+      // which is what made Type-mode reflow unreliable in issue #118.
       requestAnimationFrame(() => {
         const layer = textLayerRef.current;
-        if (!layer || overflowNotifiedRef.current) return;
+        if (!layer) return;
+        if (overflowNotifiedRef.current) return;
+        overflowNotifiedRef.current = true;
         try {
-          // Use scrollHeight to detect overflow — coordsAtPos returns
-          // clipped coordinates when the text layer has overflow:hidden,
-          // making it unable to detect content beyond the page boundary.
           const editorDom = ed.view.dom as HTMLElement;
-          const contentHeight = editorDom.scrollHeight;
+          const domChildren = editorDom.children;
+          const lastChild = domChildren[domChildren.length - 1] as
+            | HTMLElement
+            | undefined;
+          // Measure via offsetTop + offsetHeight of the last block. This is
+          // unaffected by the text layer's `overflow: hidden` clipping AND
+          // by the editor's own padding-bottom, so the measurement agrees
+          // with the per-block loop below.
+          const contentBottom = lastChild
+            ? lastChild.offsetTop + lastChild.offsetHeight
+            : 0;
 
-          if (contentHeight > PAGE_HEIGHT) {
-            overflowNotifiedRef.current = true;
-            const { doc } = ed.state;
+          if (contentBottom <= PAGE_HEIGHT) {
+            return;
+          }
 
-            if (doc.childCount > 1) {
-              // Multi-block: measure each block element's bottom using
-              // DOM offsetTop/offsetHeight which are unaffected by
-              // overflow:hidden clipping.
-              const blockBottoms: number[] = [];
-              const domChildren = editorDom.children;
-              for (let i = 0; i < doc.childCount; i++) {
-                const el = domChildren[i] as HTMLElement | undefined;
-                if (el) {
-                  blockBottoms.push(el.offsetTop + el.offsetHeight);
-                } else {
-                  blockBottoms.push(Infinity);
-                }
-              }
+          const { doc } = ed.state;
 
-              const splitIdx = findOverflowSplitIndex(
-                blockBottoms,
-                PAGE_HEIGHT,
-              );
-
-              if (splitIdx !== null && splitIdx < doc.childCount) {
-                // Collect overflow blocks as JSON
-                const overflowNodes: unknown[] = [];
-                for (let i = splitIdx; i < doc.childCount; i++) {
-                  overflowNodes.push(doc.child(i).toJSON());
-                }
-
-                // Compute the ProseMirror position where overflow starts
-                let deleteFrom = 0;
-                for (let i = 0; i < splitIdx; i++) {
-                  deleteFrom += doc.child(i).nodeSize;
-                }
-
-                ed.chain()
-                  .deleteRange({ from: deleteFrom, to: doc.content.size })
-                  .run();
-                ed.commands.blur();
-
-                // Reset gate — remaining content now fits within the page
-                overflowNotifiedRef.current = false;
-
-                onTextOverflowRef.current?.(pageIdRef.current, {
-                  type: 'doc',
-                  content: overflowNodes,
-                } as Record<string, unknown>);
-              }
-            } else {
-              // Single block: split at page boundary word break
-              const layerRect = layer.getBoundingClientRect();
-              const bottomY = layerRect.top + PAGE_HEIGHT - 20;
-              const posInfo = ed.view.posAtCoords({
-                left: layerRect.left + PAGE_WIDTH / 2,
-                top: bottomY,
-              });
-
-              if (posInfo && posInfo.pos > 2) {
-                let splitPos = posInfo.pos;
-
-                // Walk backward to find a word boundary (space)
-                const $pos = doc.resolve(splitPos);
-                const text = $pos.parent.textContent;
-                const offset = $pos.parentOffset;
-                let wordBreak = offset;
-                while (wordBreak > 0 && text[wordBreak - 1] !== ' ') {
-                  wordBreak--;
-                }
-                if (wordBreak > 0) {
-                  splitPos = $pos.start() + wordBreak;
-                }
-
-                // Split the block, then extract the second half
-                isSplittingRef.current = true;
-                ed.chain().setTextSelection(splitPos).splitBlock().run();
-
-                const newDoc = ed.state.doc;
-                const overflowNodes: unknown[] = [];
-                for (let i = 1; i < newDoc.childCount; i++) {
-                  overflowNodes.push(newDoc.child(i).toJSON());
-                }
-
-                const firstBlockEnd = newDoc.child(0).nodeSize;
-                ed.chain()
-                  .deleteRange({
-                    from: firstBlockEnd,
-                    to: newDoc.content.size,
-                  })
-                  .run();
-
-                isSplittingRef.current = false;
-
-                // Manually save the final state (intermediate was suppressed)
-                onFlowContentUpdateRef.current?.(
-                  pageIdRef.current,
-                  ed.getJSON() as Record<string, unknown>,
-                );
-
-                ed.commands.blur();
-
-                // Reset gate — remaining content fits after split
-                overflowNotifiedRef.current = false;
-
-                onTextOverflowRef.current?.(pageIdRef.current, {
-                  type: 'doc',
-                  content: overflowNodes,
-                } as Record<string, unknown>);
+          // Try the multi-block split path first. It is valid only when:
+          //   (a) the doc has more than one block, AND
+          //   (b) `findOverflowSplitIndex` returns a non-null index, i.e.
+          //       block 0 still fits on the current page so trailing blocks
+          //       can be cleanly moved to the next page.
+          // If block 0 is itself too tall (returns null despite multi-block),
+          // we fall through to the single-block word-boundary path, which
+          // can actually relieve the overflow by splitting inside block 0.
+          let splitIdx: number | null = null;
+          if (doc.childCount > 1) {
+            const blockBottoms: number[] = [];
+            for (let i = 0; i < doc.childCount; i++) {
+              const el = domChildren[i] as HTMLElement | undefined;
+              if (el) {
+                blockBottoms.push(el.offsetTop + el.offsetHeight);
               } else {
-                // Can't determine split position — just navigate
-                ed.commands.blur();
-                onTextOverflowRef.current?.(pageIdRef.current, null);
+                blockBottoms.push(Infinity);
               }
             }
-          } else if (contentHeight < PAGE_HEIGHT - 100) {
-            overflowNotifiedRef.current = false;
+            splitIdx = findOverflowSplitIndex(blockBottoms, PAGE_HEIGHT);
+          }
+
+          if (splitIdx !== null && splitIdx < doc.childCount) {
+            // Multi-block path — move trailing blocks [splitIdx..end) to the
+            // next page. Block 0 (and blocks before splitIdx) stays here.
+            const overflowNodes: unknown[] = [];
+            for (let i = splitIdx; i < doc.childCount; i++) {
+              overflowNodes.push(doc.child(i).toJSON());
+            }
+
+            let deleteFrom = 0;
+            for (let i = 0; i < splitIdx; i++) {
+              deleteFrom += doc.child(i).nodeSize;
+            }
+
+            ed.chain()
+              .deleteRange({ from: deleteFrom, to: doc.content.size })
+              .run();
+            ed.commands.blur();
+
+            onTextOverflowRef.current?.(pageIdRef.current, {
+              type: 'doc',
+              content: overflowNodes,
+            } as Record<string, unknown>);
+          } else {
+            // Single-block path — either doc.childCount === 1, or block 0 is
+            // itself taller than the page (see the fall-through above). In
+            // both cases we split at a word boundary near the page bottom
+            // inside block 0. The resulting overflow includes the second
+            // half of block 0 AND any blocks that were already after it.
+            const layerRect = layer.getBoundingClientRect();
+            const bottomY = layerRect.top + PAGE_HEIGHT - 20;
+            const posInfo = ed.view.posAtCoords({
+              left: layerRect.left + PAGE_WIDTH / 2,
+              top: bottomY,
+            });
+
+            if (posInfo && posInfo.pos > 2) {
+              let splitPos = posInfo.pos;
+
+              // Walk backward to find a word boundary (space)
+              const $pos = doc.resolve(splitPos);
+              const text = $pos.parent.textContent;
+              const offset = $pos.parentOffset;
+              let wordBreak = offset;
+              while (wordBreak > 0 && text[wordBreak - 1] !== ' ') {
+                wordBreak--;
+              }
+              if (wordBreak > 0) {
+                splitPos = $pos.start() + wordBreak;
+              }
+
+              // Split the block, then extract everything after the first
+              // (kept) block as overflow.
+              isSplittingRef.current = true;
+              ed.chain().setTextSelection(splitPos).splitBlock().run();
+
+              const newDoc = ed.state.doc;
+              const overflowNodes: unknown[] = [];
+              for (let i = 1; i < newDoc.childCount; i++) {
+                overflowNodes.push(newDoc.child(i).toJSON());
+              }
+
+              const firstBlockEnd = newDoc.child(0).nodeSize;
+              ed.chain()
+                .deleteRange({
+                  from: firstBlockEnd,
+                  to: newDoc.content.size,
+                })
+                .run();
+
+              isSplittingRef.current = false;
+
+              // Manually save the final state (intermediate was suppressed)
+              onFlowContentUpdateRef.current?.(
+                pageIdRef.current,
+                ed.getJSON() as Record<string, unknown>,
+              );
+
+              ed.commands.blur();
+
+              onTextOverflowRef.current?.(pageIdRef.current, {
+                type: 'doc',
+                content: overflowNodes,
+              } as Record<string, unknown>);
+            } else {
+              // Can't determine split position — just navigate
+              ed.commands.blur();
+              onTextOverflowRef.current?.(pageIdRef.current, null);
+            }
           }
         } catch {
           /* DOM measurements can throw before editor is ready */
+        } finally {
+          // Always release the gate. This is the fix for issue #118's core
+          // "stuck overflow" bug: previously the gate stayed set on several
+          // no-op branches, silently disabling overflow detection until the
+          // user deleted enough content to cross a hysteresis threshold.
+          overflowNotifiedRef.current = false;
         }
       });
     },
