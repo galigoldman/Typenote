@@ -1,6 +1,13 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 import type { Editor } from '@tiptap/core';
 import type {
   BBox,
@@ -14,6 +21,7 @@ import { PAGE_WIDTH, PAGE_HEIGHT } from '@/types/canvas';
 import type { Document } from '@/types/database';
 import type { SaveStatus } from '@/hooks/use-auto-save';
 import { pageHasContent, stripTrailingEmptyPages } from './page-utils';
+import { isDrawTool } from './canvas-tool-helpers';
 import type { ConnectionStatus } from '@/hooks/use-realtime-sync';
 import {
   ArrowLeft,
@@ -320,22 +328,6 @@ export function CanvasEditor({
   );
   const [activeTool, setActiveToolRaw] = useState<CanvasTool>('text');
 
-  // Wrap setActiveTool to migrate flowContent → text boxes when entering Select
-  const setActiveTool = useCallback((tool: CanvasTool) => {
-    if (tool === 'select') {
-      setPages((prev) => {
-        let changed = false;
-        const migrated = prev.map((page) => {
-          const result = migrateFlowContent(page);
-          if (result !== page) changed = true;
-          return result;
-        });
-        return changed ? migrated : prev;
-      });
-    }
-    setActiveToolRaw(tool);
-  }, []);
-
   const [askAiDropdownOpen, setAskAiDropdownOpen] = useState(false);
   const askAiDropdownRef = useRef<HTMLDivElement>(null);
   const [askAiDropdownPos, setAskAiDropdownPos] = useState<{
@@ -393,11 +385,65 @@ export function CanvasEditor({
     containerRef: scrollContainerRef,
     pageWidth: PAGE_WIDTH,
     contentHeight: pages.length * PAGE_HEIGHT,
-    nativeVerticalScroll:
-      activeTool !== 'pen' &&
-      activeTool !== 'highlighter' &&
-      activeTool !== 'eraser',
+    nativeVerticalScroll: !isDrawTool(activeTool),
   });
+
+  // Issue #117.1: sync scroll position across mode switches.
+  //
+  // Type/Read use native scrollTop; Draw modes use camera.y. The browser
+  // PRESERVES scrollTop across overflowY changes (verified empirically on
+  // iPad Safari). So after entering Draw mode, both scrollTop AND cam.y
+  // would be contributing to the visible position — but the pan handler
+  // only updates cam.y, and cam.y is clamped to <= 0. Result: panning up
+  // becomes impossible because cam.y is already at its upper bound (0).
+  //
+  // The fix: on every mode-switch boundary, transfer ownership of the
+  // scroll position. Entering Draw mode → move scrollTop into cam.y and
+  // zero scrollTop. Entering Type mode → move -cam.y into scrollTop and
+  // zero cam.y. This guarantees only ONE coordinate system is active at
+  // a time.
+  const prevIsDrawModeRef = useRef(isDrawTool(activeTool));
+  useLayoutEffect(() => {
+    const was = prevIsDrawModeRef.current;
+    const is = isDrawTool(activeTool);
+    prevIsDrawModeRef.current = is;
+    if (was === is) return;
+    const container = scrollContainerRef.current;
+    if (!container) return;
+    if (is) {
+      // Entering Draw mode: transfer scrollTop → cam.y
+      const currentScrollTop = container.scrollTop;
+      if (currentScrollTop > 0) {
+        setCameraY(-currentScrollTop);
+        container.scrollTop = 0;
+      }
+    } else {
+      // Entering Type/Read mode: transfer cam.y → scrollTop
+      if (camera.y < 0) {
+        container.scrollTop = -camera.y;
+        setCameraY(0);
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTool]);
+
+  // Wrap setActiveTool to migrate flowContent → text boxes when entering
+  // Select. Mode-switch scroll position sync is handled in a useLayoutEffect
+  // (Issue #117.1).
+  const setActiveTool = useCallback((tool: CanvasTool) => {
+    if (tool === 'select') {
+      setPages((prev) => {
+        let changed = false;
+        const migrated = prev.map((page) => {
+          const result = migrateFlowContent(page);
+          if (result !== page) changed = true;
+          return result;
+        });
+        return changed ? migrated : prev;
+      });
+    }
+    setActiveToolRaw(tool);
+  }, []);
 
   // Auto-add missing pages when PDF has more pages than the document.
   const lastSyncedPageCount = useRef(0);
@@ -1286,17 +1332,13 @@ export function CanvasEditor({
   // Combined: undo is enabled when the current mode has something to undo.
   // - Draw modes (pen/highlighter/eraser) → use canvas action stack
   // - Text mode → use active TipTap editor history
-  // - Select/Read modes → no undo path, disable button
-  const _isDrawingMode =
-    activeTool === 'pen' ||
-    activeTool === 'highlighter' ||
-    activeTool === 'eraser';
-  const canUndo = _isDrawingMode
+  // - Read mode → no undo path, disable button
+  const canUndo = isDrawTool(activeTool)
     ? canUndoDraw
     : activeTool === 'text'
       ? canUndoText
       : false;
-  const canRedo = _isDrawingMode
+  const canRedo = isDrawTool(activeTool)
     ? canRedoDraw
     : activeTool === 'text'
       ? canRedoText
@@ -1538,10 +1580,7 @@ export function CanvasEditor({
     [onAskAiWithContext],
   );
 
-  const isDrawMode =
-    activeTool === 'pen' ||
-    activeTool === 'highlighter' ||
-    activeTool === 'eraser';
+  const isDrawMode = isDrawTool(activeTool);
   const isReadMode = activeTool === 'read';
 
   return (
@@ -1696,20 +1735,6 @@ export function CanvasEditor({
           <button
             onPointerDown={(e) => {
               e.stopPropagation();
-              setActiveTool('select');
-            }}
-            className={`flex items-center gap-1.5 px-3 py-1.5 min-h-[44px] min-w-[44px] rounded-md text-sm font-medium transition-colors ${
-              activeTool === 'select'
-                ? 'bg-primary text-primary-foreground'
-                : 'hover:bg-accent text-muted-foreground'
-            }`}
-          >
-            <MousePointer2 className="h-4 w-4" />
-            Select
-          </button>
-          <button
-            onPointerDown={(e) => {
-              e.stopPropagation();
               setActiveTool('text');
             }}
             className={`flex items-center gap-1.5 px-3 py-1.5 min-h-[44px] min-w-[44px] rounded-md text-sm font-medium transition-colors ${
@@ -1828,6 +1853,20 @@ export function CanvasEditor({
                 title="Eraser"
               >
                 <Eraser className="h-4 w-4" />
+              </button>
+              <button
+                onPointerDown={(e) => {
+                  e.stopPropagation();
+                  setActiveTool('select');
+                }}
+                className={`flex items-center justify-center h-8 w-8 min-h-[44px] min-w-[44px] rounded-lg transition-colors ${
+                  activeTool === 'select'
+                    ? 'bg-accent text-accent-foreground'
+                    : 'hover:bg-accent/50 text-muted-foreground'
+                }`}
+                title="Select"
+              >
+                <MousePointer2 className="h-4 w-4" />
               </button>
               <button
                 onPointerDown={(e) => {

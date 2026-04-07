@@ -353,4 +353,78 @@ test.describe('Canvas Editor', () => {
     const newCount = await page.locator('[data-page-id]').count();
     expect(newCount).toBeGreaterThan(initialCount);
   });
+
+  // Issue #117.1 — mode switch must preserve scroll position
+  // Adds a second page, scrolls so page 2 is visible at the top of the
+  // viewport, then switches modes and verifies the SECOND page's top edge
+  // stays at the same viewport Y position (within 50px tolerance).
+  test('mode switch preserves scroll position with multiple pages', async ({
+    page,
+  }) => {
+    // Use the page selector inside the scroll container to avoid stray
+    // [data-page-id] elements elsewhere in the DOM.
+    const scrollContainer = page.locator('[data-scroll-container]');
+    const pagesInContainer = scrollContainer.locator('[data-page-id]');
+
+    // Add a page so the document has at least 2
+    const initialCount = await pagesInContainer.count();
+    if (initialCount < 2) {
+      await page.getByTitle('Add page').click();
+      const blankOption = page.locator('button', { hasText: 'Blank' });
+      if (await blankOption.isVisible()) {
+        await blankOption.click();
+      }
+      await page.waitForTimeout(500);
+    }
+    const pageCount = await pagesInContainer.count();
+    expect(pageCount).toBeGreaterThanOrEqual(2);
+
+    // Start in Type mode (default)
+    await page.getByRole('button', { name: 'Type', exact: true }).click();
+    await page.waitForTimeout(300);
+
+    // Scroll so page 2's top is visible in the upper portion of the viewport.
+    // Pass the page2 element handle directly into evaluate so we don't depend on
+    // querySelector inside the page context (which can pick up stray elements).
+    const page2Handle = await pagesInContainer.nth(1).elementHandle();
+    if (!page2Handle) throw new Error('Could not get page 2 handle');
+
+    await scrollContainer.evaluate((el, page2El: HTMLElement) => {
+      const containerRect = el.getBoundingClientRect();
+      const page2Rect = page2El.getBoundingClientRect();
+      const page2OffsetInContainer =
+        page2Rect.top - containerRect.top + el.scrollTop;
+      el.scrollTop = page2OffsetInContainer - 100;
+    }, page2Handle);
+    await page.waitForTimeout(300);
+
+    // Helper: get page 2's top Y coordinate in viewport space
+    const getPage2ViewportY = async (): Promise<number> => {
+      return await scrollContainer.evaluate((el, page2El: HTMLElement) => {
+        const containerRect = el.getBoundingClientRect();
+        const page2Rect = page2El.getBoundingClientRect();
+        return page2Rect.top - containerRect.top;
+      }, page2Handle);
+    };
+
+    const page2YBefore = await getPage2ViewportY();
+    // Sanity check: page 2 should be visible somewhere reasonable
+    expect(page2YBefore).toBeLessThan(500);
+    expect(page2YBefore).toBeGreaterThan(-500);
+
+    // Switch to Draw mode
+    await page.getByRole('button', { name: 'Draw', exact: true }).click();
+    await page.waitForTimeout(500);
+
+    const page2YAfterDraw = await getPage2ViewportY();
+    // Page 2's top should be within 50px of where it was in Type mode
+    expect(Math.abs(page2YAfterDraw - page2YBefore)).toBeLessThanOrEqual(10);
+
+    // Switch back to Type mode
+    await page.getByRole('button', { name: 'Type', exact: true }).click();
+    await page.waitForTimeout(500);
+
+    const page2YAfterType = await getPage2ViewportY();
+    expect(Math.abs(page2YAfterType - page2YBefore)).toBeLessThanOrEqual(10);
+  });
 });
