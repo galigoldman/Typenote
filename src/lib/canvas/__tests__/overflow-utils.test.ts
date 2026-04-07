@@ -20,15 +20,35 @@ describe('findOverflowSplitIndex', () => {
     expect(findOverflowSplitIndex(blockBottoms, PAGE_HEIGHT)).toBe(3);
   });
 
-  it('returns 1 (not 0) when the first block itself overflows', () => {
-    // Single block that exceeds the page — clamp to 1 so the page is not left empty
+  it('returns null when the first block itself overflows — caller must split within block 0', () => {
+    // Single block that exceeds the page. There is no valid block-level split
+    // (we can't keep "at least one block" on the current page because the
+    // single block is the thing that is overflowing). The caller must fall
+    // through to the word-boundary path inside block 0.
     const blockBottoms = [1500];
+    expect(findOverflowSplitIndex(blockBottoms, PAGE_HEIGHT)).toBeNull();
+  });
+
+  it('returns null when block 0 overflows in a multi-block doc — caller must split block 0 inline', () => {
+    // Block 0 itself is past page height. A multi-block split at index 1 would
+    // leave block 0 still overflowing, so it is not a useful split. Returning
+    // null signals the caller to fall through to the single-block word-boundary
+    // split, which can actually relieve the overflow by breaking block 0.
+    const blockBottoms = [1200, 1500, 1800];
+    expect(findOverflowSplitIndex(blockBottoms, PAGE_HEIGHT)).toBeNull();
+  });
+
+  it('returns correct index when block 0 fits but block 1 overflows', () => {
+    // Regression guard: the block-0 behavior change above must NOT break the
+    // ordinary "middle block overflows" case.
+    const blockBottoms = [600, 1500, 1800];
     expect(findOverflowSplitIndex(blockBottoms, PAGE_HEIGHT)).toBe(1);
   });
 
-  it('clamps to 1 when block 0 overflows in a multi-block doc', () => {
-    // First block is already past page height
-    const blockBottoms = [1200, 1500, 1800];
+  it('handles block 0 exactly at the boundary with block 1 overflowing', () => {
+    // Block 0 bottom === PAGE_HEIGHT (not overflowing — strict >), block 1 overflows.
+    // Expected: split at index 1 (block 0 stays, block 1 moves).
+    const blockBottoms = [PAGE_HEIGHT, 1400];
     expect(findOverflowSplitIndex(blockBottoms, PAGE_HEIGHT)).toBe(1);
   });
 

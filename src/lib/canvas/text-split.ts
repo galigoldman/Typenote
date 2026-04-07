@@ -73,10 +73,15 @@ export function splitDocumentAtBlockIndex(
  */
 /**
  * Given an array of block bottom Y positions (relative to the page top),
- * returns the index of the first block whose bottom exceeds pageHeight.
+ * returns the index `i` such that blocks `[0, i)` fit on the current page
+ * and blocks `[i, end)` must be moved to the next page.
  *
- * The returned index is clamped so at least one block stays on the current
- * page (minimum return value is 1). Returns null if no block overflows.
+ * Returns null in two cases:
+ *   1. No block overflows — nothing to split.
+ *   2. Block 0 itself overflows the page. A multi-block split cannot help
+ *      here because keeping block 0 on the current page would leave the
+ *      page still overflowing. The caller must fall through to a
+ *      within-block (word-boundary) split on block 0 instead.
  *
  * Pure function — no DOM dependency, fully testable.
  */
@@ -86,8 +91,10 @@ export function findOverflowSplitIndex(
 ): number | null {
   for (let i = 0; i < blockBottoms.length; i++) {
     if (blockBottoms[i] > pageHeight) {
-      // Ensure at least one block stays on the current page
-      return Math.max(i, 1);
+      // Block 0 overflowing means there is no valid block-level split — the
+      // caller must split *within* block 0 at a word boundary.
+      if (i === 0) return null;
+      return i;
     }
   }
   return null;

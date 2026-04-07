@@ -51,6 +51,8 @@ When adding or modifying a feature, update this registry and write the correspon
 - [x] Auto-create page when typing at bottom — ⚠️ SKIPPED IN CI
 - [x] Switch between pages — ⚠️ SKIPPED IN CI
 - [x] Add new page manually — ⚠️ SKIPPED IN CI
+- [x] Type mode — multi-paragraph input overflows to new pages (`e2e/canvas-type-mode-flow.spec.ts`)
+- [x] Type mode — long URL wraps at the right edge instead of clipping (`e2e/canvas-type-mode-flow.spec.ts`)
 
 ---
 
