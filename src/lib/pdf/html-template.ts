@@ -1,5 +1,6 @@
 import { generateHTML } from '@tiptap/html';
 import { Node, Extension, mergeAttributes } from '@tiptap/core';
+import { preserveEmptyParagraphs } from './preserve-empty-paragraphs';
 import StarterKit from '@tiptap/starter-kit';
 import Underline from '@tiptap/extension-underline';
 import TextAlign from '@tiptap/extension-text-align';
@@ -251,10 +252,14 @@ export function buildTextDocumentHtml(
 ): string {
   const baseUrl = typeof window !== 'undefined' ? window.location.origin : '';
 
-  // Generate HTML from TipTap JSON
+  // Generate HTML from TipTap JSON.
+  // Preserve empty paragraphs (TipTap's generateHTML strips them by default).
   let bodyHtml: string;
   try {
-    bodyHtml = generateHTML(content, extensions);
+    bodyHtml = generateHTML(
+      preserveEmptyParagraphs(content) as Record<string, unknown>,
+      extensions,
+    );
   } catch {
     // Fallback for empty or invalid content
     bodyHtml = '';
@@ -348,7 +353,13 @@ export function buildCanvasPageHtml(
       if (page.flowContent) {
         try {
           flowHtml = renderMathNodes(
-            generateHTML(page.flowContent, extensions),
+            generateHTML(
+              preserveEmptyParagraphs(page.flowContent) as Record<
+                string,
+                unknown
+              >,
+              extensions,
+            ),
           );
         } catch {
           flowHtml = '';
@@ -388,7 +399,12 @@ function renderTextBox(tb: TextBox): string {
         (tb.content as Record<string, unknown>).type === 'doc'
           ? tb.content
           : { type: 'doc', content: [tb.content] };
-      contentHtml = renderMathNodes(generateHTML(content, extensions));
+      contentHtml = renderMathNodes(
+        generateHTML(
+          preserveEmptyParagraphs(content) as Record<string, unknown>,
+          extensions,
+        ),
+      );
     } catch (e) {
       // Show error + content snapshot for debugging
       const errMsg = e instanceof Error ? e.message : String(e);
@@ -448,7 +464,13 @@ export function buildMixedDocumentHtml(
       if (page.flowContent) {
         try {
           flowHtml = renderMathNodes(
-            generateHTML(page.flowContent, extensions),
+            generateHTML(
+              preserveEmptyParagraphs(page.flowContent) as Record<
+                string,
+                unknown
+              >,
+              extensions,
+            ),
           );
         } catch {
           flowHtml = '';
@@ -470,7 +492,12 @@ export function buildMixedDocumentHtml(
   // Text content
   let textHtml = '';
   try {
-    textHtml = renderMathNodes(generateHTML(content, extensions));
+    textHtml = renderMathNodes(
+      generateHTML(
+        preserveEmptyParagraphs(content) as Record<string, unknown>,
+        extensions,
+      ),
+    );
   } catch {
     textHtml = '';
   }
