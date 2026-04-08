@@ -778,13 +778,14 @@ export function CanvasEditor({
   // overflow detections are skipped for one frame to prevent the
   // move-content → re-measure → move-content feedback loop.
   const isHandlingTextBoxOverflowRef = useRef(false);
-  // Multi-hop cascade focus guard. Only the FIRST hop of an overflow
-  // cascade should move the cursor (to the page containing the user's
-  // content). Subsequent cascade hops (where content we're pushing is
-  // NOT the user's cursor content) must skip the focus call so the
-  // cursor stays near where the user was typing, not at the tail of the
-  // cascade two or three pages later.
-  const inCascadeHopsRef = useRef(false);
+  // Multi-hop cascade focus guard. During an overflow cascade (text
+  // flowing page 1 → 2 → 3 → ...), we want the cursor to land on the
+  // IMMEDIATE next page (where the user's own content went), NOT at the
+  // tail of the cascade several pages later. This ref suppresses ALL
+  // focus calls inside focusPage during the cascade, and we explicitly
+  // restore the cursor to the recorded target page after the cascade
+  // finishes.
+  const cascadeCursorTargetRef = useRef<string | null>(null);
 
   // Register a getter function that extracts text from all page editors
   useEffect(() => {
@@ -869,12 +870,11 @@ export function CanvasEditor({
             );
           }
         }
-        // Only the first cascade hop moves the cursor. Subsequent hops
-        // (triggered asynchronously by ResizeObserver on the just-modified
-        // next page) should NOT move the cursor any further — the user's
-        // content lives on the first next page, not at the end of the
-        // cascade chain.
-        if (!inCascadeHopsRef.current) {
+        // During a cascade, ALL focus calls inside focusPage are suppressed.
+        // The cursor is explicitly restored to the recorded target page
+        // (the immediate next page that received the user's content) at
+        // the end of the cascade — see handleTextBoxOverflow below.
+        if (cascadeCursorTargetRef.current == null) {
           editor.commands.focus('start');
           scrollToPage(pageId);
         }
@@ -1121,32 +1121,66 @@ export function CanvasEditor({
           .deleteRange({ from: deleteFrom, to: doc.content.size })
           .run();
 
-        // Track whether this is the outermost hop. The first hop moves
-        // the cursor to the next page (which contains the user's content);
-        // subsequent hops (triggered async by ResizeObserver on the next
-        // page) are internal cascade steps that must NOT move the cursor.
-        const isOutermostHop = !inCascadeHopsRef.current;
+        // Detect the outermost cascade hop. For the outermost hop, we
+        // record which page the user's content is moving to (the
+        // immediate next page), then set the cascade guard BEFORE
+        // calling handleTextOverflow so that even the FIRST focusPage
+        // call inside the cascade is suppressed. We'll explicitly
+        // restore the cursor to the recorded target page at the end.
+        const isOutermostHop = cascadeCursorTargetRef.current == null;
+        let outerTargetPageId: string | null = null;
+        if (isOutermostHop) {
+          const currentPages = pagesRef.current;
+          const pageIdx = currentPages.findIndex((p) => p.id === pageId);
+          outerTargetPageId =
+            pageIdx >= 0 && pageIdx + 1 < currentPages.length
+              ? currentPages[pageIdx + 1].id
+              : '__NEW__'; // sentinel — a new page will be created
+          // Set the cascade guard NOW so focusPage's focus call is
+          // suppressed for this very first hop as well.
+          cascadeCursorTargetRef.current = outerTargetPageId;
+        }
 
-        // Hand off to the existing page-level overflow handler which
-        // merges into the next page's text box (or creates a new page).
-        // This is synchronous — focusPage runs and moves the cursor to
-        // the next page BEFORE we set the cascade guard below.
+        // Hand off to the existing page-level overflow handler. During
+        // this call the cascade guard is set, so all focusPage focus
+        // calls are suppressed.
         handleTextOverflow(pageId, {
           type: 'doc',
           content: overflowNodes,
         } as Record<string, unknown>);
 
         if (isOutermostHop) {
-          // Outermost hop done. Block subsequent cascade hops from
-          // moving the cursor any further. The cursor now lives on the
-          // immediate next page (where focusPage just placed it) and
-          // should STAY there even as cascading content continues to
-          // flow from page N+1 onwards. Clear the guard after a short
-          // window long enough for all cascade hops to finish.
-          inCascadeHopsRef.current = true;
+          // Schedule cursor restoration after the cascade settles. Any
+          // further async cascade hops (fired by ResizeObserver on the
+          // next page) will ALSO have focus suppressed because the
+          // guard is still set. Once the timeout fires, we explicitly
+          // place the cursor on the recorded target page — which is the
+          // page containing the user's actual content.
           setTimeout(() => {
-            inCascadeHopsRef.current = false;
-          }, 500);
+            const target = cascadeCursorTargetRef.current;
+            cascadeCursorTargetRef.current = null;
+            if (!target) return;
+            // Resolve the target page ID. For the __NEW__ sentinel we
+            // find the page that was created right after the overflow
+            // origin.
+            let targetPageId = target;
+            if (target === '__NEW__') {
+              const currentPages = pagesRef.current;
+              const originIdx = currentPages.findIndex(
+                (p) => p.id === pageId,
+              );
+              targetPageId =
+                originIdx >= 0 && originIdx + 1 < currentPages.length
+                  ? currentPages[originIdx + 1].id
+                  : '';
+            }
+            if (!targetPageId) return;
+            const targetEditor = editorsRef.current.get(targetPageId);
+            if (targetEditor) {
+              targetEditor.commands.focus('start');
+              scrollToPage(targetPageId);
+            }
+          }, 300);
         }
         return;
       }
