@@ -778,6 +778,13 @@ export function CanvasEditor({
   // overflow detections are skipped for one frame to prevent the
   // move-content → re-measure → move-content feedback loop.
   const isHandlingTextBoxOverflowRef = useRef(false);
+  // Multi-hop cascade focus guard. Only the FIRST hop of an overflow
+  // cascade should move the cursor (to the page containing the user's
+  // content). Subsequent cascade hops (where content we're pushing is
+  // NOT the user's cursor content) must skip the focus call so the
+  // cursor stays near where the user was typing, not at the tail of the
+  // cascade two or three pages later.
+  const inCascadeHopsRef = useRef(false);
 
   // Register a getter function that extracts text from all page editors
   useEffect(() => {
@@ -862,8 +869,15 @@ export function CanvasEditor({
             );
           }
         }
-        editor.commands.focus('start');
-        scrollToPage(pageId);
+        // Only the first cascade hop moves the cursor. Subsequent hops
+        // (triggered asynchronously by ResizeObserver on the just-modified
+        // next page) should NOT move the cursor any further — the user's
+        // content lives on the first next page, not at the end of the
+        // cascade chain.
+        if (!inCascadeHopsRef.current) {
+          editor.commands.focus('start');
+          scrollToPage(pageId);
+        }
         return;
       }
       // Editor not mounted yet — retry (up to 1s)
@@ -1107,12 +1121,33 @@ export function CanvasEditor({
           .deleteRange({ from: deleteFrom, to: doc.content.size })
           .run();
 
+        // Track whether this is the outermost hop. The first hop moves
+        // the cursor to the next page (which contains the user's content);
+        // subsequent hops (triggered async by ResizeObserver on the next
+        // page) are internal cascade steps that must NOT move the cursor.
+        const isOutermostHop = !inCascadeHopsRef.current;
+
         // Hand off to the existing page-level overflow handler which
         // merges into the next page's text box (or creates a new page).
+        // This is synchronous — focusPage runs and moves the cursor to
+        // the next page BEFORE we set the cascade guard below.
         handleTextOverflow(pageId, {
           type: 'doc',
           content: overflowNodes,
         } as Record<string, unknown>);
+
+        if (isOutermostHop) {
+          // Outermost hop done. Block subsequent cascade hops from
+          // moving the cursor any further. The cursor now lives on the
+          // immediate next page (where focusPage just placed it) and
+          // should STAY there even as cascading content continues to
+          // flow from page N+1 onwards. Clear the guard after a short
+          // window long enough for all cascade hops to finish.
+          inCascadeHopsRef.current = true;
+          setTimeout(() => {
+            inCascadeHopsRef.current = false;
+          }, 500);
+        }
         return;
       }
 
