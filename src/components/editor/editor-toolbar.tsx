@@ -20,6 +20,7 @@ import {
   Minus,
   Quote,
   Download,
+  FileText,
   Loader2,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -31,6 +32,7 @@ import {
 } from '@/components/ui/tooltip';
 import { HeadingDropdown } from './heading-dropdown';
 import { useExportPdf } from '@/hooks/use-export-pdf';
+import { useExportDocx } from '@/hooks/use-export-docx';
 import type { ExportableDocument } from '@/lib/pdf/export-pdf';
 import { useCallback, useEffect, useRef, useState } from 'react';
 
@@ -291,6 +293,7 @@ export function EditorToolbar({
   document,
 }: EditorToolbarProps) {
   const { exportPdf, isExporting } = useExportPdf();
+  const { exportDocx, isExporting: isExportingDocx } = useExportDocx();
 
   const setLink = useCallback(() => {
     const previousUrl = editor.getAttributes('link').href as string | undefined;
@@ -446,7 +449,7 @@ export function EditorToolbar({
         label="Blockquote"
       />
 
-      {/* Export PDF */}
+      {/* Export */}
       {document && (
         <>
           <VerticalSeparator />
@@ -457,6 +460,18 @@ export function EditorToolbar({
               isExporting ? <Loader2 className="animate-spin" /> : <Download />
             }
             label="Export as PDF"
+          />
+          <ToolbarButton
+            onClick={() => exportDocx(document)}
+            disabled={isExportingDocx}
+            icon={
+              isExportingDocx ? (
+                <Loader2 className="animate-spin" />
+              ) : (
+                <FileText />
+              )
+            }
+            label="Export as DOCX"
           />
         </>
       )}

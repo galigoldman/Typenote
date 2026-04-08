@@ -14,6 +14,7 @@ import { SUBJECTS } from '@/lib/constants/subjects';
 import { deleteDocument } from '@/lib/actions/documents';
 import { trackEvent } from '@/lib/analytics/events';
 import { useExportPdf } from '@/hooks/use-export-pdf';
+import { useExportDocx } from '@/hooks/use-export-docx';
 import { cn } from '@/lib/utils';
 import {
   Card,
@@ -76,6 +77,12 @@ export function DocumentCard({
 }: DocumentCardProps) {
   const router = useRouter();
   const { exportPdf, isExporting } = useExportPdf();
+  const { exportDocx, isExporting: isExportingDocx } = useExportDocx();
+
+  // Canvas documents (with drawn pages) only support PDF export
+  const isTextDocument =
+    !document.pages ||
+    (document.pages as { pages?: unknown[] })?.pages?.length === 0;
 
   const subjectLabel =
     document.subject === 'other' && document.subject_custom
@@ -137,6 +144,19 @@ export function DocumentCard({
                 )}
                 {isExporting ? 'Exporting...' : 'Export as PDF'}
               </DropdownMenuItem>
+              {isTextDocument && (
+                <DropdownMenuItem
+                  disabled={isExportingDocx}
+                  onClick={() => exportDocx(document)}
+                >
+                  {isExportingDocx ? (
+                    <Loader2 className="mr-2 size-4 animate-spin" />
+                  ) : (
+                    <Download className="mr-2 size-4" />
+                  )}
+                  {isExportingDocx ? 'Exporting...' : 'Export as DOCX'}
+                </DropdownMenuItem>
+              )}
               <DropdownMenuItem
                 className="text-destructive focus:text-destructive"
                 onClick={handleDelete}

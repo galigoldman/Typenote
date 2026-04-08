@@ -32,6 +32,7 @@ type AnalyticsEventMap = {
   document_moved: {
     destination_type: 'folder' | 'course' | 'root';
   };
+  docx_exported: Record<string, never>;
   personal_file_uploaded: {
     file_size: number;
     mime_type: string;
