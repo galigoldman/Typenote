@@ -18,6 +18,7 @@ import type {
   TextBox,
 } from '@/types/canvas';
 import { PAGE_WIDTH, PAGE_HEIGHT } from '@/types/canvas';
+import { findOverflowSplitIndex } from '@/lib/canvas/text-split';
 import type { Document } from '@/types/database';
 import type { SaveStatus } from '@/hooks/use-auto-save';
 import { pageHasContent, stripTrailingEmptyPages } from './page-utils';
@@ -669,7 +670,24 @@ export function CanvasEditor({
     [triggerSave],
   );
 
-  // Auto-fit text box height to actual rendered content
+  // Ref that forward-references the linked-text-boxes overflow handler. The
+  // handler itself is declared much later in the component (it depends on
+  // handleTextOverflow, which is also declared later), so we invoke it via a
+  // ref from inside handleTextBoxHeightMeasured below.
+  const handleTextBoxOverflowRef = useRef<
+    ((pageId: string, textBoxId: string) => void) | null
+  >(null);
+  // Per-text-box cascade guard: while processing a text box's overflow, we
+  // ignore further overflow detections for THAT text box (to avoid a
+  // re-measure → re-split → re-measure infinite loop). Other text boxes are
+  // unaffected so a legitimate cascade (box A → box B → box C) still runs.
+  const processingTextBoxOverflowRef = useRef<Set<string>>(new Set());
+
+  // Auto-fit text box height to actual rendered content, and detect linked
+  // text box overflow: if the measured content exceeds the available area
+  // on the current page (PAGE_HEIGHT − textBox.y − margin), move the
+  // overflowing blocks to the next page's text box. See FR-118 — the "act
+  // like one big text box" walk-around for issue #118.
   const handleTextBoxHeightMeasured = useCallback(
     (pageId: string, textBoxId: string, measuredHeight: number) => {
       setPages((prev) =>
@@ -685,6 +703,34 @@ export function CanvasEditor({
           };
         }),
       );
+
+      // Overflow detection — only for the migrated flow text box (the
+      // "main text" on each page, id suffix `-ftb`). User-positioned text
+      // boxes are NOT auto-flowed; they grow freely as they always did.
+      if (!textBoxId.endsWith('-ftb')) return;
+      const currentPages = pagesRef.current;
+      const page = currentPages.find((p) => p.id === pageId);
+      const tb = page?.textBoxes.find((t) => t.id === textBoxId);
+      if (!tb) return;
+      const maxHeight = PAGE_HEIGHT - tb.y - 40; // 40px bottom margin
+      if (measuredHeight <= maxHeight) return;
+      if (processingTextBoxOverflowRef.current.has(textBoxId)) return;
+      processingTextBoxOverflowRef.current.add(textBoxId);
+      // Dispatch on the next animation frame so React has committed the
+      // updated height state and the DOM layout is stable before we
+      // measure individual block positions.
+      requestAnimationFrame(() => {
+        try {
+          handleTextBoxOverflowRef.current?.(pageId, textBoxId);
+        } finally {
+          // Clear the guard after ANOTHER frame so the next measurement
+          // cycle (which will report the new post-split height) doesn't
+          // immediately re-trigger overflow handling on the same box.
+          requestAnimationFrame(() => {
+            processingTextBoxOverflowRef.current.delete(textBoxId);
+          });
+        }
+      });
     },
     [],
   );
@@ -723,6 +769,15 @@ export function CanvasEditor({
   );
 
   const editorsRef = useRef<Map<string, Editor>>(new Map());
+  // Per-text-box editor map. Needed for the "linked text boxes" overflow
+  // walk-around (FR-118): when a specific text box overflows past the page
+  // bottom, we need direct access to ITS editor instance to extract the
+  // overflowing blocks — not just "the active editor on the page".
+  const textBoxEditorsRef = useRef<Map<string, Editor>>(new Map());
+  // Cascade guard. When a text box overflow is being handled, further
+  // overflow detections are skipped for one frame to prevent the
+  // move-content → re-measure → move-content feedback loop.
+  const isHandlingTextBoxOverflowRef = useRef(false);
 
   // Register a getter function that extracts text from all page editors
   useEffect(() => {
@@ -832,11 +887,43 @@ export function CanvasEditor({
     focusPageRef.current = focusPage;
   }, [focusPage]);
 
-  // Editor ready / focus handler — registers editor in the map
-  const handleEditorReady = useCallback((pageId: string, editor: Editor) => {
-    editorsRef.current.set(pageId, editor);
-    setActiveEditor(editor);
-  }, []);
+  // Editor ready / focus handler — registers editor in the map.
+  // textBoxId is optional: when a text box passes its own editor (the
+  // `-ftb` migrated flow text box, or any user-created positioned text
+  // box), we also register it in textBoxEditorsRef for per-text-box access
+  // during the linked-text-boxes overflow walk-around.
+  const handleEditorReady = useCallback(
+    (pageId: string, editor: Editor, textBoxId?: string) => {
+      if (textBoxId) {
+        // Text box editor — always takes precedence for this page. This is
+        // the editor whose DOM is actually mounted and visible on a
+        // migrated document (flowContent → textBoxes migration in
+        // initializePagesFromDocument).
+        editorsRef.current.set(pageId, editor);
+        textBoxEditorsRef.current.set(textBoxId, editor);
+      } else {
+        // Flow editor (canvas-page.tsx's own editor) — only register if
+        // there's no text box editor yet for this page. Otherwise we'd
+        // overwrite a visible text box editor with an unmounted flow
+        // editor, and focusPage would setContent() into the void.
+        const existing = editorsRef.current.get(pageId);
+        let isTextBoxEditor = false;
+        if (existing) {
+          for (const e of textBoxEditorsRef.current.values()) {
+            if (e === existing) {
+              isTextBoxEditor = true;
+              break;
+            }
+          }
+        }
+        if (!isTextBoxEditor) {
+          editorsRef.current.set(pageId, editor);
+        }
+      }
+      setActiveEditor(editor);
+    },
+    [],
+  );
 
   // Listen for math input trigger from ProseMirror plugin ($ key press)
   useEffect(() => {
@@ -942,6 +1029,140 @@ export function CanvasEditor({
     },
     [triggerSave, document.canvas_type, focusPage],
   );
+
+  // Linked-text-boxes overflow handler — the "act like one big text box"
+  // walk-around for issue #118. When a text box's measured height exceeds
+  // the available area on the current page, extract the blocks that don't
+  // fit and move them to the next page's text box via handleTextOverflow
+  // (the existing logic from PR #125 that already handles "prepend to next
+  // page" and "create new page" branches).
+  const handleTextBoxOverflow = useCallback(
+    (pageId: string, textBoxId: string) => {
+      const editor = textBoxEditorsRef.current.get(textBoxId);
+      if (!editor) return;
+      const currentPages = pagesRef.current;
+      const page = currentPages.find((p) => p.id === pageId);
+      const tb = page?.textBoxes.find((t) => t.id === textBoxId);
+      if (!tb) return;
+
+      // Available height for the text box CONTAINER on the page. The
+      // container's scrollHeight must stay below this; anything past it
+      // is overflow that must move to the next page.
+      const availableContainerHeight = PAGE_HEIGHT - tb.y - 40;
+      if (availableContainerHeight <= 0) return;
+
+      const { doc } = editor.state;
+      if (doc.childCount < 1) return;
+
+      // Measure each block's bottom IN THE TEXT BOX CONTAINER'S COORDINATE
+      // SPACE (not in .ProseMirror's local offsetTop space — they differ
+      // by the container padding, and comparing local offsets to a
+      // page-space threshold was the bug that corrupted the cascade).
+      // We use getBoundingClientRect relative to the container element
+      // (the one tagged with `data-textbox-id`) so both blockBottoms and
+      // availableContainerHeight are in the same (container) coordinate space.
+      // `document` is the React prop (the Document being edited), so
+      // reach the global DOM via `window.document`.
+      const containerEl = window.document.querySelector(
+        `[data-textbox-id="${textBoxId}"]`,
+      ) as HTMLElement | null;
+      if (!containerEl) return;
+      const containerRect = containerEl.getBoundingClientRect();
+      const editorDom = editor.view.dom as HTMLElement;
+      const domChildren = editorDom.children;
+      const blockBottoms: number[] = [];
+      for (let i = 0; i < doc.childCount; i++) {
+        const el = domChildren[i] as HTMLElement | undefined;
+        if (el) {
+          const rect = el.getBoundingClientRect();
+          blockBottoms.push(rect.bottom - containerRect.top);
+        } else {
+          blockBottoms.push(Infinity);
+        }
+      }
+
+      if (doc.childCount > 1) {
+        // Multi-block path: split at whole-block boundary.
+        const splitIdx = findOverflowSplitIndex(
+          blockBottoms,
+          availableContainerHeight,
+        );
+        if (splitIdx === null || splitIdx >= doc.childCount) return;
+
+        // Collect overflow blocks as JSON.
+        const overflowNodes: unknown[] = [];
+        for (let i = splitIdx; i < doc.childCount; i++) {
+          overflowNodes.push(doc.child(i).toJSON());
+        }
+
+        // Compute the ProseMirror position where overflow starts.
+        let deleteFrom = 0;
+        for (let i = 0; i < splitIdx; i++) {
+          deleteFrom += doc.child(i).nodeSize;
+        }
+
+        // Remove overflow from the current text box editor.
+        editor
+          .chain()
+          .deleteRange({ from: deleteFrom, to: doc.content.size })
+          .run();
+
+        // Hand off to the existing page-level overflow handler which
+        // merges into the next page's text box (or creates a new page).
+        handleTextOverflow(pageId, {
+          type: 'doc',
+          content: overflowNodes,
+        } as Record<string, unknown>);
+        return;
+      }
+
+      // Single-block path: the whole overflow is inside one paragraph/heading.
+      // Split the block at a word boundary near the bottom of the page.
+      const rect = editorDom.getBoundingClientRect();
+      const bottomY = rect.top + availableContainerHeight - 10;
+      const posInfo = editor.view.posAtCoords({
+        left: rect.left + rect.width / 2,
+        top: bottomY,
+      });
+      if (!posInfo || posInfo.pos <= 2) return;
+
+      // Walk backward to find a word boundary.
+      const $pos = doc.resolve(posInfo.pos);
+      const text = $pos.parent.textContent;
+      const offset = $pos.parentOffset;
+      let wordBreak = offset;
+      while (wordBreak > 0 && text[wordBreak - 1] !== ' ') {
+        wordBreak--;
+      }
+      const splitPos =
+        wordBreak > 0 ? $pos.start() + wordBreak : posInfo.pos;
+
+      // Split, extract the overflow half, delete it from the current editor.
+      editor.chain().setTextSelection(splitPos).splitBlock().run();
+      const newDoc = editor.state.doc;
+      const overflowNodes: unknown[] = [];
+      for (let i = 1; i < newDoc.childCount; i++) {
+        overflowNodes.push(newDoc.child(i).toJSON());
+      }
+      const firstBlockEnd = newDoc.child(0).nodeSize;
+      editor
+        .chain()
+        .deleteRange({ from: firstBlockEnd, to: newDoc.content.size })
+        .run();
+
+      handleTextOverflow(pageId, {
+        type: 'doc',
+        content: overflowNodes,
+      } as Record<string, unknown>);
+    },
+    [handleTextOverflow],
+  );
+
+  // Wire the forward-ref so handleTextBoxHeightMeasured (defined earlier)
+  // can invoke the latest handleTextBoxOverflow closure.
+  useEffect(() => {
+    handleTextBoxOverflowRef.current = handleTextBoxOverflow;
+  }, [handleTextBoxOverflow]);
 
   // Move strokes (used by selection drag)
   const handleStrokesMove = useCallback(

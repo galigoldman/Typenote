@@ -43,7 +43,7 @@ interface CanvasPageProps {
     pageId: string,
     content: Record<string, unknown>,
   ) => void;
-  onEditorReady?: (pageId: string, editor: Editor) => void;
+  onEditorReady?: (pageId: string, editor: Editor, textBoxId?: string) => void;
   onTextOverflow?: (
     pageId: string,
     overflowContent: Record<string, unknown> | null,
@@ -761,7 +761,7 @@ export function CanvasPage({
             onContentUpdate={(id, content) =>
               onTextBoxContentUpdate?.(page.id, id, content)
             }
-            onEditorReady={(ed) => onEditorReady?.(page.id, ed)}
+            onEditorReady={(ed) => onEditorReady?.(page.id, ed, tb.id)}
             onHeightMeasured={(id, height) =>
               onTextBoxHeightMeasured?.(page.id, id, height)
             }
