@@ -51,8 +51,8 @@ The project uses a two-branch model: `dev` (integration) and `main` (production)
 
 ## Active Technologies
 
-- TypeScript 5 / Node.js 22+ + Next.js 16 (App Router), React 19, TipTap 3 (`@tiptap/react`, `@tiptap/starter-kit`), ProseMirror (via TipTap), Tailwind CSS 4 (035-fix-text-reflow)
-- N/A — purely an in-memory editing fix. The serialized `pages[i].flowContent` JSON shape is unchanged. (035-fix-text-reflow)
+- TypeScript 5 / Node.js 22+ + React 19, Next.js 16 (App Router), TipTap 3 (ProseMirror), Playwright (E2E), Vitest (unit/integration). **No new dependencies.** (035-fix-118-cursor-cascade)
+- N/A — purely a client-side editor change. No database, no migrations, no API surface. (035-fix-118-cursor-cascade)
 
 - TypeScript 5 / Node.js 22+ + Next.js 16 (App Router), React 19, Tailwind CSS 4 (built-in `pointer-fine:` / `pointer-coarse:` variants — no config changes needed) (034-device-layout-detection)
 - N/A — purely a presentation/CSS change (034-device-layout-detection)

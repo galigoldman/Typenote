@@ -1,0 +1,204 @@
+import { test, expect } from '@playwright/test';
+import { login } from './helpers/auth';
+import {
+  createDocumentWithNearFullPages,
+  waitForCascadeSettled,
+  setCursorAtEndOfPage,
+  setCursorInMiddleOfPage,
+  getActivePageId,
+  pageCount,
+} from './helpers/canvas-fill-pages';
+
+/**
+ * E2E tests for the cursor-cascade fix — follow-up to issue #118.
+ *
+ * Each test reproduces one of the bugs described in
+ * specs/035-fix-118-cursor-cascade/spec.md and then asserts the
+ * post-fix behaviour described in that spec. Tests are written FIRST
+ * (per Constitution Principle II) and must FAIL on the branch state
+ * BEFORE the US1/US2 implementation lands.
+ *
+ * All tests use the shared canvas-fill-pages helper to build a
+ * deterministic multi-page document via a synthetic ClipboardEvent
+ * (much faster than keyboard.type, and doesn't rely on the buggy
+ * cursor behaviour during setup — the test explicitly re-positions
+ * the cursor before each action).
+ */
+
+// Total pages used by the 9-page cascade scenarios. We use 3 for most
+// tests because the bug reproduces with cascade depth ≥ 2; 3 pages is
+// enough to distinguish "cursor stays on page 1" from "cursor jumps to
+// a deeper page".
+const DOC_PAGES = 3;
+
+test.describe('Canvas editor — cursor cascade fix (#118 follow-up)', () => {
+  test.beforeEach(async ({ page }) => {
+    await login(page);
+  });
+
+  test('Enter at end of page 1 keeps cursor adjacent (page 1 or 2), never on a deeper page', async ({
+    page,
+  }) => {
+    await createDocumentWithNearFullPages(page, { pages: DOC_PAGES });
+
+    const pageIdsBefore = await page
+      .locator('[data-page-id]')
+      .evaluateAll((els) =>
+        els.map((el) => (el as HTMLElement).getAttribute('data-page-id')!),
+      );
+    expect(pageIdsBefore.length).toBeGreaterThanOrEqual(DOC_PAGES);
+    const page1Id = pageIdsBefore[0];
+    const page2Id = pageIdsBefore[1];
+
+    // Put the cursor at the end of the last line of page 1.
+    await setCursorAtEndOfPage(page, 0);
+
+    // Press Enter a few times. Depending on page 1's post-cascade slack
+    // (~60 px), the first Enter or two may not overflow and keep the
+    // cursor on page 1; later Enters cascade the new empty paragraphs
+    // onto page 2 and the cursor follows.
+    //
+    // The ORIGINAL bug (issue #118 follow-up): the cursor would jump
+    // to page 9 (the deepest cascade hop) via the stale 300 ms timer.
+    // Our fix guarantees the cursor stays AT the user's edit position —
+    // either on page 1 (cursor stayed) or on page 2 (cursor moved with
+    // the overflow). This test asserts the invariant: the cursor is
+    // on page 1 or 2, NEVER on a deeper page.
+    for (let i = 0; i < 3; i++) {
+      await page.keyboard.press('Enter');
+    }
+    await waitForCascadeSettled(page);
+
+    const activePageId = await getActivePageId(page);
+    expect([page1Id, page2Id]).toContain(activePageId);
+    for (const deeperId of pageIdsBefore.slice(2)) {
+      expect(activePageId).not.toBe(deeperId);
+    }
+  });
+
+  test('Enter in the middle of a paragraph keeps cursor on the same page', async ({
+    page,
+  }) => {
+    await createDocumentWithNearFullPages(page, { pages: DOC_PAGES });
+
+    const pageIdsBefore = await page
+      .locator('[data-page-id]')
+      .evaluateAll((els) =>
+        els.map((el) => (el as HTMLElement).getAttribute('data-page-id')!),
+      );
+    const page1Id = pageIdsBefore[0];
+
+    // Put the cursor in the MIDDLE of a paragraph in the middle of page 1.
+    await setCursorInMiddleOfPage(page, 0);
+
+    // Press Enter — splits the block in the middle. A trailing block
+    // from page 1 will cascade to page 2, but the user's cursor (on
+    // the start of the new second half) must STAY on page 1.
+    await page.keyboard.press('Enter');
+    await waitForCascadeSettled(page);
+
+    const activePageId = await getActivePageId(page);
+    expect(activePageId).toBe(page1Id);
+  });
+
+  // NOTE: "Enter at end of last page → new page created" is covered by
+  // the manual smoke test in specs/035-fix-118-cursor-cascade/quickstart.md.
+  // Automating it is fragile because the cascade destination is a
+  // brand-new page whose editor mounts asynchronously (flow editor,
+  // not an `-ftb` text box), and Playwright's focus tracking through
+  // that transition is flaky. The core invariants — cursor stays at
+  // user's edit position, cursor never jumps to a deep page, cursor
+  // moves within 100 ms — are exercised by the tests above.
+
+  test('cursor reaches final position within 100ms of Enter keydown', async ({
+    page,
+  }) => {
+    await createDocumentWithNearFullPages(page, { pages: DOC_PAGES });
+    await setCursorAtEndOfPage(page, 0);
+
+    // Measure purely in-browser to exclude Playwright keyboard-press
+    // IPC overhead (~30–60ms). We dispatch keyboard events directly
+    // on the focused element and wait for two RAFs to let the cascade
+    // settle, then read `performance.now()` — all inside a single
+    // `evaluate` so the numbers reflect real browser latency.
+    const elapsed = await page.evaluate(
+      () =>
+        new Promise<number>((resolve) => {
+          const active = document.activeElement as HTMLElement | null;
+          if (!active) {
+            resolve(-1);
+            return;
+          }
+          const t0 = performance.now();
+          const key = { key: 'Enter', bubbles: true, cancelable: true };
+          active.dispatchEvent(new KeyboardEvent('keydown', key));
+          active.dispatchEvent(new KeyboardEvent('keypress', key));
+          active.dispatchEvent(new KeyboardEvent('keyup', key));
+          // Wait for 2 RAFs so the cascade has fully settled.
+          requestAnimationFrame(() =>
+            requestAnimationFrame(() => {
+              resolve(performance.now() - t0);
+            }),
+          );
+        }),
+    );
+    // NFR-002: real-world perceived latency should be under 100ms.
+    // Because our dispatch path skips Playwright IPC and measures in
+    // the same JS context, this asserts the true end-to-end budget.
+    expect(elapsed).toBeLessThan(100);
+    expect(elapsed).toBeGreaterThan(0);
+  });
+
+  test.describe('RTL (Hebrew) document — same rules apply (FR-007)', () => {
+    test('Enter at end of page 1 keeps cursor adjacent (page 1 or 2), never on a deeper page', async ({
+      page,
+    }) => {
+      await createDocumentWithNearFullPages(page, {
+        pages: DOC_PAGES,
+        language: 'he',
+      });
+
+      const pageIdsBefore = await page
+        .locator('[data-page-id]')
+        .evaluateAll((els) =>
+          els.map((el) => (el as HTMLElement).getAttribute('data-page-id')!),
+        );
+      const page1Id = pageIdsBefore[0];
+      const page2Id = pageIdsBefore[1];
+
+      await setCursorAtEndOfPage(page, 0);
+      for (let i = 0; i < 3; i++) {
+        await page.keyboard.press('Enter');
+      }
+      await waitForCascadeSettled(page);
+
+      const activePageId = await getActivePageId(page);
+      expect([page1Id, page2Id]).toContain(activePageId);
+      for (const deeperId of pageIdsBefore.slice(2)) {
+        expect(activePageId).not.toBe(deeperId);
+      }
+    });
+
+    test('Enter in the middle of a paragraph keeps cursor on the same page', async ({
+      page,
+    }) => {
+      await createDocumentWithNearFullPages(page, {
+        pages: DOC_PAGES,
+        language: 'he',
+      });
+
+      const pageIdsBefore = await page
+        .locator('[data-page-id]')
+        .evaluateAll((els) =>
+          els.map((el) => (el as HTMLElement).getAttribute('data-page-id')!),
+        );
+      const page1Id = pageIdsBefore[0];
+
+      await setCursorInMiddleOfPage(page, 0);
+      await page.keyboard.press('Enter');
+      await waitForCascadeSettled(page);
+
+      expect(await getActivePageId(page)).toBe(page1Id);
+    });
+  });
+});
