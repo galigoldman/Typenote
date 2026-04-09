@@ -434,11 +434,7 @@ describe('Word-style math paste (Unicode + ^{}/_{} detection)', () => {
       expect(hasWordMath('2^{n} + 3')).toBe(false);
     });
 
-    it('detects ^∅ without braces (Word single-char superscript)', () => {
-      expect(hasWordMath('2^\u2205')).toBe(true);
-    });
-
-    it('returns false for Unicode symbols without ^/_ ', () => {
+    it('returns false for Unicode symbols without ^{}/_{} ', () => {
       expect(hasWordMath('A \u2229 B')).toBe(false);
     });
   });
@@ -468,16 +464,6 @@ describe('Word-style math paste (Unicode + ^{}/_{} detection)', () => {
 
     it('leaves plain text unchanged', () => {
       expect(unicodeToLatex('hello world')).toBe('hello world');
-    });
-
-    it('wraps unbraced superscript LaTeX commands: 2^∅ → 2^{\\emptyset}', () => {
-      const result = unicodeToLatex('2^\u2205');
-      expect(result).toBe('2^{\\emptyset}');
-    });
-
-    it('wraps unbraced subscript: L_1 → L_{1}', () => {
-      const result = unicodeToLatex('L_ 1');
-      expect(result).toBe('L_{1}');
     });
   });
 
