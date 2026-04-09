@@ -901,23 +901,31 @@ export function CanvasEditor({
         //    compatibility.
         if (cursorTarget) {
           const doc = editor.state.doc;
-          const safeBlockIdx = Math.max(
-            0,
-            Math.min(cursorTarget.blockIndex, doc.childCount - 1),
-          );
-          let pos = 0;
-          for (let i = 0; i < safeBlockIdx; i++) {
-            pos += doc.child(i).nodeSize;
+          // If the target block doesn't exist on this page (it was
+          // cascaded further by an inner hop), skip cursor placement
+          // entirely — the cursor stays on the source page where the
+          // user was editing. This prevents the "cursor goes but the
+          // text doesn't" symptom when pasting large content that
+          // spans multiple cascade hops.
+          if (cursorTarget.blockIndex < doc.childCount) {
+            let pos = 0;
+            for (let i = 0; i < cursorTarget.blockIndex; i++) {
+              pos += doc.child(i).nodeSize;
+            }
+            const blockContentSize = doc.child(
+              cursorTarget.blockIndex,
+            ).content.size;
+            const safeOffset = Math.max(
+              0,
+              Math.min(cursorTarget.offset, blockContentSize),
+            );
+            const selectionPos = pos + 1 + safeOffset;
+            editor.commands.setTextSelection(selectionPos);
+            editor.commands.focus();
+            scrollToPage(pageId);
           }
-          const blockContentSize = doc.child(safeBlockIdx).content.size;
-          const safeOffset = Math.max(
-            0,
-            Math.min(cursorTarget.offset, blockContentSize),
-          );
-          const selectionPos = pos + 1 + safeOffset;
-          editor.commands.setTextSelection(selectionPos);
-          editor.commands.focus();
-          scrollToPage(pageId);
+          // else: target block was pushed further by cascade — don't
+          // move cursor; it stays on the source page.
         } else if (!overflowContent) {
           // Legacy navigate: focus the target page and scroll to it.
           // This path is used by the flow editor's Enter-at-bottom
