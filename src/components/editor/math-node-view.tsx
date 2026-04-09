@@ -2,12 +2,19 @@
 
 import { NodeViewWrapper } from '@tiptap/react';
 import type { NodeViewProps } from '@tiptap/react';
+import type { EditorView } from '@tiptap/pm/view';
 import katex from 'katex';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 type EditMode = 'expression' | 'latex';
 
-export function MathNodeView({ node, updateAttributes }: NodeViewProps) {
+export function MathNodeView({
+  node,
+  updateAttributes,
+  selected,
+  editor,
+  getPos,
+}: NodeViewProps) {
   const latex = node.attrs.latex as string;
   const originalText = (node.attrs.originalText as string) || '';
 
@@ -16,6 +23,7 @@ export function MathNodeView({ node, updateAttributes }: NodeViewProps) {
   const [editValue, setEditValue] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [copied, setCopied] = useState(false);
 
   const inputRef = useRef<HTMLInputElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
@@ -46,6 +54,44 @@ export function MathNodeView({ node, updateAttributes }: NodeViewProps) {
     setError(null);
     setIsLoading(false);
   }, []);
+
+  const handleCopy = useCallback(async () => {
+    const pos = typeof getPos === 'function' ? getPos() : undefined;
+    if (pos === undefined || !editor) return;
+
+    const slice = editor.state.doc.slice(pos, pos + node.nodeSize);
+    // serializeForClipboard is available on EditorView but not in TipTap's type exports
+    const { dom } = (
+      editor.view as EditorView & {
+        serializeForClipboard: (s: typeof slice) => {
+          dom: HTMLElement;
+          text: string;
+        };
+      }
+    ).serializeForClipboard(slice);
+
+    try {
+      await navigator.clipboard.write([
+        new ClipboardItem({
+          'text/html': new Blob([dom.innerHTML], { type: 'text/html' }),
+          'text/plain': new Blob([node.attrs.latex as string], {
+            type: 'text/plain',
+          }),
+        }),
+      ]);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    } catch {
+      // Fallback: try plain text only
+      try {
+        await navigator.clipboard.writeText(node.attrs.latex as string);
+        setCopied(true);
+        setTimeout(() => setCopied(false), 1500);
+      } catch {
+        // Clipboard API not available
+      }
+    }
+  }, [editor, getPos, node]);
 
   const switchMode = useCallback(
     (mode: EditMode) => {
@@ -148,10 +194,46 @@ export function MathNodeView({ node, updateAttributes }: NodeViewProps) {
         position: 'relative',
         borderRadius: '4px',
         padding: '1px 4px',
-        cursor: 'pointer',
+        cursor: 'default',
+        ...(selected
+          ? {
+              outline: '2px solid #8b5cf6',
+              backgroundColor: 'rgba(139, 92, 246, 0.1)',
+            }
+          : {}),
       }}
     >
-      <span dangerouslySetInnerHTML={{ __html: html }} onClick={openEditor} />
+      <span dangerouslySetInnerHTML={{ __html: html }} />
+      {selected && !isEditing && (
+        <div
+          style={{
+            position: 'absolute',
+            left: 0,
+            top: '100%',
+            zIndex: 50,
+            marginTop: '4px',
+          }}
+          className="flex gap-1 rounded-lg border border-zinc-300 bg-white p-1 shadow-lg dark:border-zinc-600 dark:bg-zinc-900"
+        >
+          {/* preventDefault on mouseDown keeps ProseMirror NodeSelection active */}
+          <button
+            type="button"
+            onMouseDown={(e) => e.preventDefault()}
+            onClick={openEditor}
+            className="rounded px-2 py-1 text-xs font-medium text-zinc-700 hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-zinc-800"
+          >
+            Edit
+          </button>
+          <button
+            type="button"
+            onMouseDown={(e) => e.preventDefault()}
+            onClick={handleCopy}
+            className="rounded px-2 py-1 text-xs font-medium text-zinc-700 hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-zinc-800"
+          >
+            {copied ? 'Copied!' : 'Copy'}
+          </button>
+        </div>
+      )}
       {isEditing && (
         <div
           ref={panelRef}
