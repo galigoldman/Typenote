@@ -41,6 +41,7 @@ function createProps(overrides: Record<string, unknown> = {}) {
         originalText: 'one half',
         ...((overrides.attrs as Record<string, unknown>) || {}),
       },
+      nodeSize: 1,
     },
     updateAttributes: vi.fn(),
     // Other NodeViewProps that aren't used
@@ -72,43 +73,31 @@ describe('MathNodeView', () => {
   });
 
   describe('Opening edit panel', () => {
-    it('opens the edit panel when the rendered math is clicked', async () => {
-      const props = createProps();
+    it('opens the edit panel when the Edit button is clicked', async () => {
+      const props = createProps({ selected: true });
       render(<MathNodeView {...props} />);
 
-      // Click the rendered math span (contains the katex output)
-      const mathSpan =
-        screen
-          .getByTestId('node-view-wrapper')
-          .querySelector('span[dangerouslysetinnerhtml]') ||
-        screen.getByTestId('node-view-wrapper').querySelector('span > span');
-      fireEvent.click(mathSpan!);
+      fireEvent.click(screen.getByText('Edit'));
 
       expect(screen.getByText('Edit Expression')).toBeInTheDocument();
       expect(screen.getByText('Edit LaTeX')).toBeInTheDocument();
     });
 
     it('shows "Edit Expression" and "Edit LaTeX" mode buttons', async () => {
-      const props = createProps();
+      const props = createProps({ selected: true });
       render(<MathNodeView {...props} />);
 
-      const mathContent = screen
-        .getByTestId('node-view-wrapper')
-        .querySelectorAll('span');
-      fireEvent.click(mathContent[mathContent.length - 1]);
+      fireEvent.click(screen.getByText('Edit'));
 
       expect(screen.getByText('Edit Expression')).toBeInTheDocument();
       expect(screen.getByText('Edit LaTeX')).toBeInTheDocument();
     });
 
     it('pre-fills input with originalText in expression mode', async () => {
-      const props = createProps();
+      const props = createProps({ selected: true });
       render(<MathNodeView {...props} />);
 
-      const mathContent = screen
-        .getByTestId('node-view-wrapper')
-        .querySelectorAll('span');
-      fireEvent.click(mathContent[mathContent.length - 1]);
+      fireEvent.click(screen.getByText('Edit'));
 
       const input = screen.getByPlaceholderText(
         'Describe math in plain English...',
@@ -117,13 +106,10 @@ describe('MathNodeView', () => {
     });
 
     it('pre-fills input with latex in LaTeX mode', async () => {
-      const props = createProps();
+      const props = createProps({ selected: true });
       render(<MathNodeView {...props} />);
 
-      const mathContent = screen
-        .getByTestId('node-view-wrapper')
-        .querySelectorAll('span');
-      fireEvent.click(mathContent[mathContent.length - 1]);
+      fireEvent.click(screen.getByText('Edit'));
 
       // Switch to LaTeX mode
       fireEvent.click(screen.getByText('Edit LaTeX'));
@@ -134,14 +120,12 @@ describe('MathNodeView', () => {
 
     it('shows empty input in expression mode for legacy nodes without originalText', async () => {
       const props = createProps({
+        selected: true,
         attrs: { latex: '\\frac{1}{2}', originalText: '' },
       });
       render(<MathNodeView {...props} />);
 
-      const mathContent = screen
-        .getByTestId('node-view-wrapper')
-        .querySelectorAll('span');
-      fireEvent.click(mathContent[mathContent.length - 1]);
+      fireEvent.click(screen.getByText('Edit'));
 
       const input = screen.getByPlaceholderText(
         'Describe math in plain English...',
@@ -152,13 +136,10 @@ describe('MathNodeView', () => {
 
   describe('Closing edit panel', () => {
     it('closes the panel on Escape without making changes', async () => {
-      const props = createProps();
+      const props = createProps({ selected: true });
       render(<MathNodeView {...props} />);
 
-      const mathContent = screen
-        .getByTestId('node-view-wrapper')
-        .querySelectorAll('span');
-      fireEvent.click(mathContent[mathContent.length - 1]);
+      fireEvent.click(screen.getByText('Edit'));
 
       expect(screen.getByText('Edit Expression')).toBeInTheDocument();
 
@@ -175,13 +156,10 @@ describe('MathNodeView', () => {
   describe('Expression mode submission', () => {
     it('closes panel without API call when text is unchanged', async () => {
       const fetchSpy = vi.spyOn(globalThis, 'fetch');
-      const props = createProps();
+      const props = createProps({ selected: true });
       render(<MathNodeView {...props} />);
 
-      const mathContent = screen
-        .getByTestId('node-view-wrapper')
-        .querySelectorAll('span');
-      fireEvent.click(mathContent[mathContent.length - 1]);
+      fireEvent.click(screen.getByText('Edit'));
 
       const input = screen.getByPlaceholderText(
         'Describe math in plain English...',
@@ -200,13 +178,10 @@ describe('MathNodeView', () => {
         json: async () => ({ latex: '\\frac{1}{3}' }),
       } as Response);
 
-      const props = createProps();
+      const props = createProps({ selected: true });
       render(<MathNodeView {...props} />);
 
-      const mathContent = screen
-        .getByTestId('node-view-wrapper')
-        .querySelectorAll('span');
-      fireEvent.click(mathContent[mathContent.length - 1]);
+      fireEvent.click(screen.getByText('Edit'));
 
       const input = screen.getByPlaceholderText(
         'Describe math in plain English...',
@@ -238,13 +213,10 @@ describe('MathNodeView', () => {
         ok: false,
       } as Response);
 
-      const props = createProps();
+      const props = createProps({ selected: true });
       render(<MathNodeView {...props} />);
 
-      const mathContent = screen
-        .getByTestId('node-view-wrapper')
-        .querySelectorAll('span');
-      fireEvent.click(mathContent[mathContent.length - 1]);
+      fireEvent.click(screen.getByText('Edit'));
 
       const input = screen.getByPlaceholderText(
         'Describe math in plain English...',
@@ -269,13 +241,10 @@ describe('MathNodeView', () => {
   describe('LaTeX mode submission', () => {
     it('updates attributes directly without fetch', async () => {
       const fetchSpy = vi.spyOn(globalThis, 'fetch');
-      const props = createProps();
+      const props = createProps({ selected: true });
       render(<MathNodeView {...props} />);
 
-      const mathContent = screen
-        .getByTestId('node-view-wrapper')
-        .querySelectorAll('span');
-      fireEvent.click(mathContent[mathContent.length - 1]);
+      fireEvent.click(screen.getByText('Edit'));
 
       // Switch to LaTeX mode
       fireEvent.click(screen.getByText('Edit LaTeX'));
@@ -291,6 +260,128 @@ describe('MathNodeView', () => {
       });
 
       fetchSpy.mockRestore();
+    });
+  });
+
+  describe('Selection and action menu', () => {
+    it('renders selection highlight when selected prop is true', () => {
+      const props = createProps({ selected: true });
+      render(<MathNodeView {...props} />);
+      const wrapper = screen.getByTestId('node-view-wrapper');
+      expect(wrapper).toHaveStyle({ outline: '2px solid #8b5cf6' });
+    });
+
+    it('shows Edit and Copy buttons when selected is true', () => {
+      const props = createProps({ selected: true });
+      render(<MathNodeView {...props} />);
+      expect(screen.getByText('Edit')).toBeInTheDocument();
+      expect(screen.getByText('Copy')).toBeInTheDocument();
+    });
+
+    it('opens edit panel when Edit button is clicked in action menu', () => {
+      const props = createProps({ selected: true });
+      render(<MathNodeView {...props} />);
+      fireEvent.click(screen.getByText('Edit'));
+      expect(screen.getByText('Edit Expression')).toBeInTheDocument();
+      expect(screen.getByText('Edit LaTeX')).toBeInTheDocument();
+    });
+
+    it('calls navigator.clipboard.write with HTML and plain text on Copy click', async () => {
+      // Provide ClipboardItem global if not available (test env)
+      const OriginalClipboardItem = globalThis.ClipboardItem;
+      if (!globalThis.ClipboardItem) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        (globalThis as any).ClipboardItem = class ClipboardItem {
+          readonly types: string[];
+          private items: Record<string, Blob>;
+          constructor(items: Record<string, Blob>) {
+            this.items = items;
+            this.types = Object.keys(items);
+          }
+          getType(type: string) {
+            return Promise.resolve(this.items[type]);
+          }
+        };
+      }
+
+      const writeMock = vi.fn().mockResolvedValue(undefined);
+      Object.assign(navigator, {
+        clipboard: { write: writeMock, writeText: vi.fn() },
+      });
+
+      const mockEditor = {
+        state: {
+          doc: {
+            slice: vi.fn().mockReturnValue({ content: 'mock-slice' }),
+          },
+        },
+        view: {
+          serializeForClipboard: vi.fn().mockReturnValue({
+            dom: {
+              innerHTML:
+                '<span data-type="math-expression" data-latex="\\frac{1}{2}"></span>',
+            },
+            text: '\\frac{1}{2}',
+          }),
+        },
+      };
+
+      const props = createProps({
+        selected: true,
+        editor: mockEditor,
+        getPos: vi.fn().mockReturnValue(1),
+      });
+      render(<MathNodeView {...props} />);
+
+      fireEvent.click(screen.getByText('Copy'));
+
+      await waitFor(() => {
+        expect(writeMock).toHaveBeenCalledTimes(1);
+      });
+
+      // Verify ClipboardItem was created with both MIME types
+      const clipboardItem = writeMock.mock.calls[0][0][0];
+      expect(clipboardItem).toBeInstanceOf(ClipboardItem);
+
+      // Restore original
+      if (OriginalClipboardItem) {
+        globalThis.ClipboardItem = OriginalClipboardItem;
+      } else {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        delete (globalThis as any).ClipboardItem;
+      }
+    });
+
+    it('does not show action menu when selected is false', () => {
+      const props = createProps({ selected: false });
+      render(<MathNodeView {...props} />);
+      expect(screen.queryByText('Edit')).not.toBeInTheDocument();
+      expect(screen.queryByText('Copy')).not.toBeInTheDocument();
+    });
+
+    it('does not show action menu when editing', () => {
+      const props = createProps({ selected: true });
+      render(<MathNodeView {...props} />);
+      // Open the editor
+      fireEvent.click(screen.getByText('Edit'));
+      // Action menu (Edit/Copy buttons) should be replaced by edit panel
+      expect(screen.queryByText('Copy')).not.toBeInTheDocument();
+    });
+  });
+
+  describe('Cursor style (US3)', () => {
+    it('does NOT have cursor: pointer style (T027)', () => {
+      const props = createProps();
+      render(<MathNodeView {...props} />);
+      const wrapper = screen.getByTestId('node-view-wrapper');
+      expect(wrapper.style.cursor).not.toBe('pointer');
+    });
+
+    it('renders with default cursor style (T028)', () => {
+      const props = createProps();
+      render(<MathNodeView {...props} />);
+      const wrapper = screen.getByTestId('node-view-wrapper');
+      expect(wrapper.style.cursor).toBe('default');
     });
   });
 });

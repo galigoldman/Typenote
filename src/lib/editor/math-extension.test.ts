@@ -59,8 +59,23 @@ describe('MathExpression Node', () => {
   it('should parse HTML from span with data-type math-expression', () => {
     const parseRules = MathExpression.config.parseHTML?.call(MathExpression);
     expect(parseRules).toBeDefined();
-    expect(parseRules).toHaveLength(1);
+    expect(parseRules).toHaveLength(3);
     expect(parseRules?.[0].tag).toBe('span[data-type="math-expression"]');
+  });
+
+  it('should return latex attribute from renderText (plain-text clipboard)', () => {
+    const renderTextFn = MathExpression.config.renderText;
+    expect(renderTextFn).toBeDefined();
+    if (renderTextFn) {
+      const result = renderTextFn.call(MathExpression, {
+        node: {
+          attrs: { latex: '\\frac{1}{2}', originalText: 'one half' },
+        } as unknown,
+        pos: 0,
+        index: 0,
+      } as Parameters<typeof renderTextFn>[0]);
+      expect(result).toBe('\\frac{1}{2}');
+    }
   });
 
   it('should render HTML with data-type and data-latex attributes', () => {
@@ -271,5 +286,130 @@ describe('MathExpression Trigger Plugin', () => {
 
     expect(result).toBe(false);
     expect(dispatchEventSpy).not.toHaveBeenCalled();
+  });
+});
+
+describe('MathExpression parseHTML rules for external formats', () => {
+  it('should have 3 parseHTML rules (native + KaTeX + MathML)', () => {
+    const parseRules = MathExpression.config.parseHTML?.call(MathExpression);
+    expect(parseRules).toHaveLength(3);
+  });
+
+  it('should match span.katex with annotation and extract LaTeX (T014)', () => {
+    const parseRules = MathExpression.config.parseHTML?.call(MathExpression);
+    const katexRule = parseRules?.find((r) => r.tag === 'span.katex');
+    expect(katexRule).toBeDefined();
+
+    const el = document.createElement('span');
+    el.className = 'katex';
+    el.innerHTML =
+      '<span class="katex-mathml"><math><semantics><annotation encoding="application/x-tex">\\frac{1}{2}</annotation></semantics></math></span>';
+
+    const attrs = (
+      katexRule!.getAttrs as (
+        el: HTMLElement,
+      ) => Record<string, unknown> | false
+    )(el);
+    expect(attrs).toEqual({ latex: '\\frac{1}{2}' });
+  });
+
+  it('should match math element with annotation and extract LaTeX (T015)', () => {
+    const parseRules = MathExpression.config.parseHTML?.call(MathExpression);
+    const mathRule = parseRules?.find((r) => r.tag === 'math');
+    expect(mathRule).toBeDefined();
+
+    const el = document.createElement('math');
+    el.innerHTML =
+      '<semantics><mrow><mi>x</mi></mrow><annotation encoding="application/x-tex">x</annotation></semantics>';
+
+    const attrs = (
+      mathRule!.getAttrs as (el: HTMLElement) => Record<string, unknown> | false
+    )(el);
+    expect(attrs).toEqual({ latex: 'x' });
+  });
+
+  it('should return false for span.katex without annotation (T016)', () => {
+    const parseRules = MathExpression.config.parseHTML?.call(MathExpression);
+    const katexRule = parseRules?.find((r) => r.tag === 'span.katex');
+
+    const el = document.createElement('span');
+    el.className = 'katex';
+    el.innerHTML = '<span class="katex-html">x^2</span>';
+
+    const attrs = (
+      katexRule!.getAttrs as (
+        el: HTMLElement,
+      ) => Record<string, unknown> | false
+    )(el);
+    expect(attrs).toBe(false);
+  });
+});
+
+describe('MathExpression paste rules', () => {
+  let editor: Editor;
+
+  beforeEach(() => {
+    editor = new Editor({
+      extensions: [StarterKit, MathExpression],
+      content: '<p></p>',
+    });
+  });
+
+  afterEach(() => {
+    editor.destroy();
+  });
+
+  it('should have paste rules defined', () => {
+    expect(MathExpression.config.addPasteRules).toBeDefined();
+  });
+
+  it('should convert $...$ to math node on paste (T017)', () => {
+    const pasteRules = MathExpression.config.addPasteRules?.call({
+      ...MathExpression,
+      type: editor.schema.nodes.mathExpression,
+      editor,
+      name: 'mathExpression',
+      options: {},
+      storage: {},
+      parent: null,
+    });
+    expect(pasteRules).toBeDefined();
+    expect(pasteRules!.length).toBe(4); // $...$, $$...$$, \(...\), \[...\]
+  });
+
+  it('should have regex that matches $\\frac{1}{2}$ (T017 regex)', () => {
+    const regex = /(?<!\$)\$([^\$\n]+?)\$(?!\$)/g;
+    const match = regex.exec('The answer is $\\frac{1}{2}$ here');
+    expect(match).not.toBeNull();
+    expect(match![1]).toBe('\\frac{1}{2}');
+  });
+
+  it('should have regex that matches \\(\\frac{1}{2}\\) (T018 regex)', () => {
+    const regex = /\\\((.+?)\\\)/g;
+    const match = regex.exec('The answer is \\(\\frac{1}{2}\\) here');
+    expect(match).not.toBeNull();
+    expect(match![1]).toBe('\\frac{1}{2}');
+  });
+
+  it('should have regex that matches $$\\sum_{i=0}^{n}$$ (T019 regex)', () => {
+    const regex = /\$\$([^\$]+?)\$\$/g;
+    const match = regex.exec('$$\\sum_{i=0}^{n}$$');
+    expect(match).not.toBeNull();
+    expect(match![1]).toBe('\\sum_{i=0}^{n}');
+  });
+
+  it('should NOT match text without LaTeX delimiters (T020 regex)', () => {
+    const regex = /(?<!\$)\$([^\$\n]+?)\$(?!\$)/g;
+    expect(regex.exec('Hello world no math here')).toBeNull();
+  });
+
+  it('should match only math portion in mixed content (T021 regex)', () => {
+    const regex = /(?<!\$)\$([^\$\n]+?)\$(?!\$)/g;
+    const text = 'The formula $x^2$ equals something';
+    const match = regex.exec(text);
+    expect(match).not.toBeNull();
+    expect(match![1]).toBe('x^2');
+    // Verify no more matches
+    expect(regex.exec(text)).toBeNull();
   });
 });

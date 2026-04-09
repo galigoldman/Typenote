@@ -1,4 +1,4 @@
-import { Node, mergeAttributes } from '@tiptap/core';
+import { Node, mergeAttributes, nodePasteRule } from '@tiptap/core';
 import { ReactNodeViewRenderer } from '@tiptap/react';
 import { Plugin, PluginKey } from '@tiptap/pm/state';
 import { MathNodeView } from '@/components/editor/math-node-view';
@@ -26,6 +26,10 @@ export const MathExpression = Node.create({
 
   draggable: false,
 
+  renderText({ node }) {
+    return node.attrs.latex as string;
+  },
+
   addAttributes() {
     return {
       latex: {
@@ -51,6 +55,26 @@ export const MathExpression = Node.create({
     return [
       {
         tag: 'span[data-type="math-expression"]',
+      },
+      {
+        tag: 'span.katex',
+        getAttrs: (element: HTMLElement) => {
+          const annotation = element.querySelector(
+            'annotation[encoding="application/x-tex"]',
+          );
+          if (!annotation?.textContent) return false;
+          return { latex: annotation.textContent };
+        },
+      },
+      {
+        tag: 'math',
+        getAttrs: (element: HTMLElement) => {
+          const annotation = element.querySelector(
+            'annotation[encoding="application/x-tex"]',
+          );
+          if (!annotation?.textContent) return false;
+          return { latex: annotation.textContent };
+        },
       },
     ];
   },
@@ -84,6 +108,47 @@ export const MathExpression = Node.create({
 
   addNodeView() {
     return ReactNodeViewRenderer(MathNodeView);
+  },
+
+  addPasteRules() {
+    return [
+      // Inline: $...$ (not $$)
+      nodePasteRule({
+        find: /(?<!\$)\$([^\$\n]+?)\$(?!\$)/g,
+        type: this.type,
+        getAttributes: (match) => ({
+          latex: match[1],
+          originalText: match[0],
+        }),
+      }),
+      // Display: $$...$$
+      nodePasteRule({
+        find: /\$\$([^\$]+?)\$\$/g,
+        type: this.type,
+        getAttributes: (match) => ({
+          latex: match[1],
+          originalText: match[0],
+        }),
+      }),
+      // Inline: \(...\)
+      nodePasteRule({
+        find: /\\\((.+?)\\\)/g,
+        type: this.type,
+        getAttributes: (match) => ({
+          latex: match[1],
+          originalText: match[0],
+        }),
+      }),
+      // Display: \[...\]
+      nodePasteRule({
+        find: /\\\[(.+?)\\\]/g,
+        type: this.type,
+        getAttributes: (match) => ({
+          latex: match[1],
+          originalText: match[0],
+        }),
+      }),
+    ];
   },
 
   addProseMirrorPlugins() {
