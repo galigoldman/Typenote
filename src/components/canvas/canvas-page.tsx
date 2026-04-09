@@ -399,9 +399,11 @@ export function CanvasPage({
       }
 
       // Auto-scroll to keep cursor visible while typing (like Word/Docs).
-      // Only runs in text mode — must not fire during drawing or it shifts
-      // the page position and causes jagged strokes.
-      if (!isSplittingRef.current && activeTool === 'text') {
+      // Only runs when THIS editor has focus — otherwise cascade-driven
+      // setContent on a downstream page's flow editor would scroll the
+      // viewport away from the user's actual typing position (the bug
+      // that caused "every Enter jumps to the last page").
+      if (!isSplittingRef.current && activeTool === 'text' && ed.isFocused) {
         requestAnimationFrame(() => {
           const layer = textLayerRef.current;
           if (!layer) return;
