@@ -83,6 +83,7 @@ interface CanvasPageProps {
   renderPdfPage?: (pageNum: number, canvas: HTMLCanvasElement) => Promise<void>;
   materialId?: string | null;
   personalFileId?: string | null;
+  onBackspaceAtStart?: (pageId: string, textBoxId: string) => void;
   onAskAiWithText?: (text: string) => void;
   onAskAiWithRegion?: (bbox: BBox, pageId: string) => void;
   onCanvasRefsReady?: (
@@ -126,6 +127,7 @@ export function CanvasPage({
   renderPdfPage,
   materialId,
   personalFileId,
+  onBackspaceAtStart,
   onAskAiWithText,
   onAskAiWithRegion,
   onCanvasRefsReady,
@@ -769,6 +771,9 @@ export function CanvasPage({
             }
             onContentBoundsMeasured={(id, bounds) =>
               onTextBoxContentBoundsMeasured?.(page.id, id, bounds)
+            }
+            onBackspaceAtStart={() =>
+              onBackspaceAtStart?.(page.id, tb.id)
             }
           />
         ))}

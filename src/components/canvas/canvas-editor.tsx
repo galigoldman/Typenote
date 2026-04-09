@@ -1334,6 +1334,72 @@ export function CanvasEditor({
     handleTextBoxOverflowRef.current = handleTextBoxOverflow;
   }, [handleTextBoxOverflow]);
 
+  // Cross-page Backspace handler. When the user presses Backspace at
+  // position 0 of a text box's first paragraph, ProseMirror can't
+  // join with a previous block (there isn't one in this editor). We
+  // handle it by merging the first block of THIS page with the last
+  // block of the PREVIOUS page — like Word/Docs across a page break.
+  const handleBackspaceAtStart = useCallback(
+    (pageId: string, _textBoxId: string) => {
+      const currentPages = pagesRef.current;
+      const pageIdx = currentPages.findIndex((p) => p.id === pageId);
+      if (pageIdx <= 0) return; // first page — nothing to merge into
+
+      const prevPage = currentPages[pageIdx - 1];
+      const prevTb = prevPage.textBoxes.find((t) => t.id.endsWith('-ftb'));
+      if (!prevTb) return;
+
+      const prevEditor = textBoxEditorsRef.current.get(prevTb.id);
+      const curEditor = editorsRef.current.get(pageId);
+      if (!prevEditor || !curEditor) return;
+
+      const curDoc = curEditor.state.doc;
+      if (curDoc.childCount < 1) return;
+
+      const firstBlock = curDoc.child(0);
+      const firstBlockJSON = firstBlock.toJSON() as {
+        content?: { text?: string }[];
+      };
+      // Extract the text content of the first block (for merging into
+      // the previous page's last paragraph).
+      const firstBlockText = firstBlockJSON.content
+        ?.map((n) => n.text ?? '')
+        .join('') ?? '';
+
+      // 1. Remember the position where the merge will happen: end of
+      //    the previous page's last paragraph's text content.
+      const prevDoc = prevEditor.state.doc;
+      const lastBlockIdx = prevDoc.childCount - 1;
+      let prevCursorPos = 0;
+      for (let i = 0; i < lastBlockIdx; i++) {
+        prevCursorPos += prevDoc.child(i).nodeSize;
+      }
+      // +1 to enter the block, + content.size to reach end of text
+      prevCursorPos += 1 + prevDoc.child(lastBlockIdx).content.size;
+
+      // 2. Delete the first block from the current page.
+      const firstBlockSize = firstBlock.nodeSize;
+      curEditor.chain().deleteRange({ from: 0, to: firstBlockSize }).run();
+
+      // 3. Insert the first block's text at the end of the previous
+      //    page's last paragraph (merging the two paragraphs).
+      if (firstBlockText.length > 0) {
+        prevEditor.chain().insertContentAt(prevCursorPos, firstBlockText).run();
+      }
+
+      // 4. Move cursor to the join point on the previous page and
+      //    focus it. Use the same "move-first" approach as the
+      //    overflow handler — set cursor synchronously, no timer.
+      prevEditor.commands.setTextSelection(prevCursorPos);
+      prevEditor.commands.focus();
+      scrollToPage(prevPage.id);
+
+      // 5. Trigger save so the changes are persisted.
+      triggerSave();
+    },
+    [scrollToPage, triggerSave],
+  );
+
   // Move strokes (used by selection drag)
   const handleStrokesMove = useCallback(
     (
@@ -2394,6 +2460,7 @@ export function CanvasEditor({
                     onTextBoxContentBoundsMeasured={
                       handleTextBoxContentBoundsMeasured
                     }
+                    onBackspaceAtStart={handleBackspaceAtStart}
                     onDeleteSelection={deleteSelected}
                     onEditSelection={handleEditSelection}
                     hasSelectedTextBoxes={selectedTextBoxIds.size > 0}

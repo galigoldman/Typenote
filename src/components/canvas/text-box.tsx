@@ -28,6 +28,9 @@ interface TextBoxProps {
     id: string,
     bounds: { offsetX: number; width: number } | undefined,
   ) => void;
+  /** Called when Backspace is pressed at the very start of the first
+   *  block. The parent (canvas-editor) handles the cross-page merge. */
+  onBackspaceAtStart?: () => void;
 }
 
 export function TextBox({
@@ -38,6 +41,7 @@ export function TextBox({
   onEditorReady,
   onHeightMeasured,
   onContentBoundsMeasured,
+  onBackspaceAtStart,
 }: TextBoxProps) {
   // Store callbacks in refs so the TipTap editor instance (created once)
   // always calls the latest version without needing to be re-created.
@@ -50,11 +54,13 @@ export function TextBox({
   const lastBoundsRef = useRef<{ offsetX: number; width: number } | undefined>(
     undefined,
   );
+  const onBackspaceAtStartRef = useRef(onBackspaceAtStart);
   useEffect(() => {
     onContentUpdateRef.current = onContentUpdate;
     onEditorReadyRef.current = onEditorReady;
     onHeightMeasuredRef.current = onHeightMeasured;
     onContentBoundsMeasuredRef.current = onContentBoundsMeasured;
+    onBackspaceAtStartRef.current = onBackspaceAtStart;
     textBoxIdRef.current = textBox.id;
   });
 
@@ -88,6 +94,26 @@ export function TextBox({
     editorProps: {
       attributes: {
         class: 'prose prose-sm sm:prose-base max-w-none focus:outline-none p-2',
+      },
+      // Intercept Backspace at the very start of the text box (position
+      // 1 = inside the first block, offset 0). ProseMirror's default
+      // joinBackward can't merge across text boxes, so we hand off to
+      // the parent (canvas-editor) for cross-page merge.
+      handleKeyDown: (view, event) => {
+        if (event.key === 'Backspace' && !event.shiftKey) {
+          const { from } = view.state.selection;
+          // Position 1 = start of first block's text content.
+          // Also handle position 0 (before the first block).
+          if (from <= 1) {
+            const cb = onBackspaceAtStartRef.current;
+            if (cb) {
+              event.preventDefault();
+              cb();
+              return true;
+            }
+          }
+        }
+        return false;
       },
     },
     onUpdate: ({ editor: ed }) => {
