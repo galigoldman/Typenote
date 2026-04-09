@@ -882,27 +882,33 @@ export function CanvasEditor({
             );
           }
         }
-        // Move-first strategy (NFR-003): when a cursor target is
-        // provided, place the cursor at its final position in the same
-        // synchronous block as the content move. When omitted, do not
-        // touch focus — either the user's cursor is staying on the
-        // source page, or this is an inner cascade hop propagating
-        // content but not moving the cursor.
+        // Three cursor policies after the content merge:
+        //
+        // 1. cursorTarget provided → "move-first" (NFR-003): place the
+        //    cursor at the computed position on the target page,
+        //    synchronously in the same block as the content move.
+        //
+        // 2. cursorTarget omitted, overflowContent was provided →
+        //    "inner cascade hop": content was pushed forward silently;
+        //    do NOT touch focus or scroll (the cursor is already on an
+        //    earlier page where the user is typing).
+        //
+        // 3. cursorTarget omitted, overflowContent was null → "legacy
+        //    navigate": the flow editor's Enter-at-bottom handler
+        //    called handleTextOverflow(pageId, null) to move the
+        //    cursor to the next page without pushing any content.
+        //    Fall back to focus('start') + scrollToPage for backwards
+        //    compatibility.
         if (cursorTarget) {
           const doc = editor.state.doc;
           const safeBlockIdx = Math.max(
             0,
             Math.min(cursorTarget.blockIndex, doc.childCount - 1),
           );
-          // Walk past preceding blocks to compute the ProseMirror
-          // position at the start of the target block.
           let pos = 0;
           for (let i = 0; i < safeBlockIdx; i++) {
             pos += doc.child(i).nodeSize;
           }
-          // `+1` enters the block (moves past its opening token);
-          // `+ offset` moves to the correct text position within it,
-          // clamped to the block's content size.
           const blockContentSize = doc.child(safeBlockIdx).content.size;
           const safeOffset = Math.max(
             0,
@@ -912,7 +918,15 @@ export function CanvasEditor({
           editor.commands.setTextSelection(selectionPos);
           editor.commands.focus();
           scrollToPage(pageId);
+        } else if (!overflowContent) {
+          // Legacy navigate: focus the target page and scroll to it.
+          // This path is used by the flow editor's Enter-at-bottom
+          // handler (canvas-page.tsx) when the user presses Enter
+          // near the page boundary without overflow content to move.
+          editor.commands.focus('start');
+          scrollToPage(pageId);
         }
+        // else: inner cascade hop — don't touch focus or scroll.
         return;
       }
       // Editor not mounted yet — retry (up to 1s). We pass cursorTarget
