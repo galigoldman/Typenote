@@ -901,31 +901,38 @@ export function CanvasEditor({
         //    compatibility.
         if (cursorTarget) {
           const doc = editor.state.doc;
-          // If the target block doesn't exist on this page (it was
-          // cascaded further by an inner hop), skip cursor placement
-          // entirely — the cursor stays on the source page where the
-          // user was editing. This prevents the "cursor goes but the
-          // text doesn't" symptom when pasting large content that
-          // spans multiple cascade hops.
-          if (cursorTarget.blockIndex < doc.childCount) {
+          // Clamp the target block index to the actual content on
+          // this page. For Enter (blockIndex = 0 or 1) the clamp is
+          // a no-op. For paste, the cursor's block may have been
+          // cascaded further — in that case we place the cursor at
+          // the END of this page's content, which is the closest
+          // valid position to where the user's content went.
+          const safeBlockIdx = Math.min(
+            cursorTarget.blockIndex,
+            doc.childCount - 1,
+          );
+          if (safeBlockIdx >= 0) {
             let pos = 0;
-            for (let i = 0; i < cursorTarget.blockIndex; i++) {
+            for (let i = 0; i < safeBlockIdx; i++) {
               pos += doc.child(i).nodeSize;
             }
-            const blockContentSize = doc.child(
-              cursorTarget.blockIndex,
-            ).content.size;
-            const safeOffset = Math.max(
-              0,
-              Math.min(cursorTarget.offset, blockContentSize),
-            );
+            const blockContentSize =
+              doc.child(safeBlockIdx).content.size;
+            // If we clamped the block index (paste case), put cursor
+            // at the END of the last available block instead of using
+            // the original offset which doesn't apply to this block.
+            const safeOffset =
+              safeBlockIdx < cursorTarget.blockIndex
+                ? blockContentSize
+                : Math.max(
+                    0,
+                    Math.min(cursorTarget.offset, blockContentSize),
+                  );
             const selectionPos = pos + 1 + safeOffset;
             editor.commands.setTextSelection(selectionPos);
             editor.commands.focus();
             scrollToPage(pageId);
           }
-          // else: target block was pushed further by cascade — don't
-          // move cursor; it stays on the source page.
         } else if (!overflowContent) {
           // Legacy navigate: focus the target page and scroll to it.
           // This path is used by the flow editor's Enter-at-bottom
