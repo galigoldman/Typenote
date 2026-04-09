@@ -916,18 +916,14 @@ export function CanvasEditor({
             for (let i = 0; i < safeBlockIdx; i++) {
               pos += doc.child(i).nodeSize;
             }
-            const blockContentSize =
-              doc.child(safeBlockIdx).content.size;
+            const blockContentSize = doc.child(safeBlockIdx).content.size;
             // If we clamped the block index (paste case), put cursor
             // at the END of the last available block instead of using
             // the original offset which doesn't apply to this block.
             const safeOffset =
               safeBlockIdx < cursorTarget.blockIndex
                 ? blockContentSize
-                : Math.max(
-                    0,
-                    Math.min(cursorTarget.offset, blockContentSize),
-                  );
+                : Math.max(0, Math.min(cursorTarget.offset, blockContentSize));
             const selectionPos = pos + 1 + safeOffset;
             editor.commands.setTextSelection(selectionPos);
             editor.commands.focus();
@@ -1167,8 +1163,7 @@ export function CanvasEditor({
       // decideCursorTarget to determine if the cursor's block stays
       // on this page or follows the overflow to the next page.
       const cursorBlockIndex = editor.state.selection.$from.index(0);
-      const cursorOffsetInBlock =
-        editor.state.selection.$from.parentOffset;
+      const cursorOffsetInBlock = editor.state.selection.$from.parentOffset;
 
       // Available height for the text box CONTAINER on the page. The
       // container's scrollHeight must stay below this; anything past it
@@ -1362,9 +1357,8 @@ export function CanvasEditor({
       };
       // Extract the text content of the first block (for merging into
       // the previous page's last paragraph).
-      const firstBlockText = firstBlockJSON.content
-        ?.map((n) => n.text ?? '')
-        .join('') ?? '';
+      const firstBlockText =
+        firstBlockJSON.content?.map((n) => n.text ?? '').join('') ?? '';
 
       // 1. Remember the position where the merge will happen: end of
       //    the previous page's last paragraph's text content.

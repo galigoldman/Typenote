@@ -772,9 +772,7 @@ export function CanvasPage({
             onContentBoundsMeasured={(id, bounds) =>
               onTextBoxContentBoundsMeasured?.(page.id, id, bounds)
             }
-            onBackspaceAtStart={() =>
-              onBackspaceAtStart?.(page.id, tb.id)
-            }
+            onBackspaceAtStart={() => onBackspaceAtStart?.(page.id, tb.id)}
           />
         ))}
       </div>

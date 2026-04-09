@@ -106,7 +106,12 @@ async function resetSeededDocWithPages(
     return {
       type: 'paragraph',
       attrs: { dir, indent: 0, textAlign: null },
-      content: [{ type: 'text', text: `[P${String(idx + 1).padStart(3, '0')}] ${base}` }],
+      content: [
+        {
+          type: 'text',
+          text: `[P${String(idx + 1).padStart(3, '0')}] ${base}`,
+        },
+      ],
     };
   };
 
