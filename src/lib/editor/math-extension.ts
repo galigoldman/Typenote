@@ -1,7 +1,6 @@
 import { Node, mergeAttributes, nodePasteRule } from '@tiptap/core';
 import { ReactNodeViewRenderer } from '@tiptap/react';
 import { Plugin, PluginKey } from '@tiptap/pm/state';
-import { Fragment, Slice } from '@tiptap/pm/model';
 import { MathNodeView } from '@/components/editor/math-node-view';
 
 export const MATH_INPUT_PLUGIN_KEY = new PluginKey('mathInput');
@@ -60,10 +59,9 @@ const UNICODE_MATH_RE = new RegExp(
   `[${Object.keys(UNICODE_TO_LATEX).join('')}]`,
 );
 
-// Check if text contains Word-style math (^/_ notation combined with Unicode math symbols)
+// Check if text contains Word-style math (^{}/_{} notation or Unicode math symbols)
 export function hasWordMath(text: string): boolean {
-  // Require at least one Unicode math symbol AND some math structure (^ or _ for super/subscript)
-  return /[\^_]/.test(text) && UNICODE_MATH_RE.test(text);
+  return /[\^_]\{/.test(text) && UNICODE_MATH_RE.test(text);
 }
 
 // Replace Unicode math symbols with LaTeX commands
@@ -72,12 +70,6 @@ export function unicodeToLatex(text: string): string {
   for (const [unicode, latex] of Object.entries(UNICODE_TO_LATEX)) {
     result = result.replaceAll(unicode, latex);
   }
-  // Fix unbrace superscripts/subscripts that now contain LaTeX commands:
-  // e.g. "2^ \emptyset" → "2^{\emptyset}" and "L_ 1" → "L_{1}"
-  result = result.replace(
-    /([_^])\s*(\\[a-zA-Z]+(?:\s*\{[^}]*\})?|\w)/g,
-    (_, op, content) => `${op}{${content.trim()}}`,
-  );
   return result;
 }
 
@@ -87,14 +79,10 @@ export function unicodeToLatex(text: string): string {
 export function findMathRanges(
   text: string,
 ): Array<{ start: number; end: number }> {
-  // Find positions of math "anchors":
-  // - ^{...} or _{...} (braced super/subscript)
-  // - ^ or _ followed by a single non-space char (Word sometimes omits braces, e.g. 2^∅)
-  // - Unicode math symbols
+  // Find positions of math "anchors": ^{...}, _{...}, and Unicode math symbols
   const anchors: Array<{ start: number; end: number }> = [];
-  const unicodeChars = Object.keys(UNICODE_TO_LATEX).join('');
   const anchorRe = new RegExp(
-    `[\\^_]\\{[^}]*\\}|[\\^_]\\s?[\\w${unicodeChars}]|[${unicodeChars}]`,
+    `[\\^_]\\{[^}]*\\}|[${Object.keys(UNICODE_TO_LATEX).join('')}]`,
     'g',
   );
   let m;
@@ -296,6 +284,11 @@ export const MathExpression = Node.create({
         props: {
           handlePaste(view, event) {
             const text = event.clipboardData?.getData('text/plain');
+            const html = event.clipboardData?.getData('text/html');
+            // DEBUG: log clipboard contents to diagnose Word paste
+            console.log('[math-paste] plain:', JSON.stringify(text?.slice(0, 500)));
+            console.log('[math-paste] html:', JSON.stringify(html?.slice(0, 500)));
+            console.log('[math-paste] hasWordMath:', text ? hasWordMath(text) : 'no text');
             if (!text || !hasWordMath(text)) return false;
 
             const { schema } = view.state;
@@ -351,8 +344,14 @@ export const MathExpression = Node.create({
 
             if (paragraphs.length === 0) return false;
 
-            const slice = new Slice(Fragment.from(paragraphs), 0, 0);
-            view.dispatch(view.state.tr.replaceSelection(slice));
+            // Build and insert the slice using ProseMirror's transaction API
+            let tr = view.state.tr;
+            const { from, to } = tr.selection;
+            tr = tr.deleteRange(from, to);
+            for (let i = paragraphs.length - 1; i >= 0; i--) {
+              tr = tr.insert(from, paragraphs[i]);
+            }
+            view.dispatch(tr);
             return true;
           },
         },
