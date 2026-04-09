@@ -1243,23 +1243,14 @@ export function CanvasEditor({
           cascadeTargetTextBoxIds.current.add(`${nextPage.id}-ftb`);
         }
 
-        // Decide cursor target: if the user's block is in the overflow
-        // (e.g. Enter at end of page), the cursor follows the text.
-        // If the user's block stays (e.g. Enter in the middle), the
-        // cursor stays via ProseMirror's selection mapping.
-        const target = isInnerHop
-          ? null
-          : decideCursorTarget(cursorBlockIndex, cursorOffsetInBlock, splitIdx);
-
-        const cursorTargetForFocus =
-          target?.kind === 'move'
-            ? { blockIndex: target.newBlockIndex, offset: target.offset }
-            : undefined;
-
+        // Cursor ALWAYS stays on the current page. ProseMirror's
+        // selection mapping keeps it at the edge of the remaining
+        // content after deleteRange. The overflow moves silently to
+        // downstream pages. This avoids the jarring viewport jump
+        // that happens when the cursor follows overflow to page 2.
         handleTextOverflow(
           pageId,
           { type: 'doc', content: overflowNodes } as Record<string, unknown>,
-          cursorTargetForFocus,
         );
         return;
       }
