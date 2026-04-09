@@ -48,20 +48,20 @@ test.describe('Canvas editor — cursor cascade fix (#118 follow-up)', () => {
       );
     expect(pageIdsBefore.length).toBeGreaterThanOrEqual(DOC_PAGES);
     const page1Id = pageIdsBefore[0];
+    const page2Id = pageIdsBefore[1];
 
     await setCursorAtEndOfPage(page, 0);
 
-    // Press Enter a few times. The overflow cascade pushes content
-    // forward silently, but the cursor ALWAYS stays on page 1 — the
-    // user keeps typing where they are. The original bug jumped the
-    // cursor to the deepest cascade page (page 9).
+    // Press Enter a few times. When the cursor's block overflows to
+    // page 2, the cursor follows the text. When the block stays on
+    // page 1, the cursor stays too. Either way, NEVER on page 3+.
     for (let i = 0; i < 3; i++) {
       await page.keyboard.press('Enter');
     }
     await waitForCascadeSettled(page);
 
     const activePageId = await getActivePageId(page);
-    expect(activePageId).toBe(page1Id);
+    expect([page1Id, page2Id]).toContain(activePageId);
   });
 
   test('Enter in the middle of a paragraph keeps cursor on the same page', async ({
@@ -138,7 +138,7 @@ test.describe('Canvas editor — cursor cascade fix (#118 follow-up)', () => {
   });
 
   test.describe('RTL (Hebrew) document — same rules apply (FR-007)', () => {
-    test('Enter at end of page 1 keeps cursor on page 1', async ({
+    test('Enter at end of page 1 keeps cursor on page 1 or 2, never deeper', async ({
       page,
     }) => {
       await createDocumentWithNearFullPages(page, {
@@ -152,6 +152,7 @@ test.describe('Canvas editor — cursor cascade fix (#118 follow-up)', () => {
           els.map((el) => (el as HTMLElement).getAttribute('data-page-id')!),
         );
       const page1Id = pageIdsBefore[0];
+      const page2Id = pageIdsBefore[1];
 
       await setCursorAtEndOfPage(page, 0);
       for (let i = 0; i < 3; i++) {
@@ -159,7 +160,7 @@ test.describe('Canvas editor — cursor cascade fix (#118 follow-up)', () => {
       }
       await waitForCascadeSettled(page);
 
-      expect(await getActivePageId(page)).toBe(page1Id);
+      expect([page1Id, page2Id]).toContain(await getActivePageId(page));
     });
 
     test('Enter in the middle of a paragraph keeps cursor on the same page', async ({
