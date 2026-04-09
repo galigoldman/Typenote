@@ -1163,13 +1163,17 @@ export function CanvasEditor({
       const isInnerHop = cascadeTargetTextBoxIds.current.has(textBoxId);
       if (isInnerHop) cascadeTargetTextBoxIds.current.delete(textBoxId);
 
-      // Capture the user's cursor position in the SOURCE editor BEFORE
-      // we mutate anything. `$from.index(0)` is the index of the
-      // top-level block containing the cursor; `$from.parentOffset` is
-      // the text offset within that block. Together they fully identify
-      // "where the cursor is, in direction-agnostic document terms".
-      const cursorBlockIndex = editor.state.selection.$from.index(0);
-      const cursorOffsetInBlock = editor.state.selection.$from.parentOffset;
+      // Cursor policy: the cursor ALWAYS STAYS on the current page.
+      // ProseMirror's selection mapping naturally keeps the cursor at
+      // the edge of the remaining content after the deleteRange
+      // removes overflow blocks. We never move focus to the next page
+      // during a cascade — the user keeps typing where they are, and
+      // overflow flows silently to downstream pages.
+      //
+      // This is simpler and more robust than computing a cursor target
+      // on the next page, which was brittle across cascade hops (the
+      // target block could be pushed further by inner hops, leaving
+      // the cursor on a page without its content).
 
       // Available height for the text box CONTAINER on the page. The
       // container's scrollHeight must stay below this; anything past it
@@ -1215,16 +1219,6 @@ export function CanvasEditor({
         );
         if (splitIdx === null || splitIdx >= doc.childCount) return;
 
-        // Decide where the cursor ends up BEFORE mutating content.
-        // This uses only the pre-split block index, which is stable —
-        // the "stay" case relies on ProseMirror's selection-mapping
-        // keeping positions before the deleted range unchanged.
-        const target = decideCursorTarget(
-          cursorBlockIndex,
-          cursorOffsetInBlock,
-          splitIdx,
-        );
-
         // Collect overflow blocks as JSON.
         const overflowNodes: unknown[] = [];
         for (let i = splitIdx; i < doc.childCount; i++) {
@@ -1259,19 +1253,11 @@ export function CanvasEditor({
           cascadeTargetTextBoxIds.current.add(`${nextPage.id}-ftb`);
         }
 
-        // Compute the cursor target passed to focusPage:
-        //   - Inner hop → never touch cursor (pass undefined).
-        //   - Outermost + "stay" → don't touch cursor (pass undefined).
-        //   - Outermost + "move" → pass the computed position.
-        const cursorTargetForFocus =
-          !isInnerHop && target.kind === 'move'
-            ? { blockIndex: target.newBlockIndex, offset: target.offset }
-            : undefined;
-
+        // Never pass a cursor target — the cursor stays on the
+        // source page via ProseMirror's selection mapping.
         handleTextOverflow(
           pageId,
           { type: 'doc', content: overflowNodes } as Record<string, unknown>,
-          cursorTargetForFocus,
         );
         return;
       }

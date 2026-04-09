@@ -48,32 +48,20 @@ test.describe('Canvas editor — cursor cascade fix (#118 follow-up)', () => {
       );
     expect(pageIdsBefore.length).toBeGreaterThanOrEqual(DOC_PAGES);
     const page1Id = pageIdsBefore[0];
-    const page2Id = pageIdsBefore[1];
 
-    // Put the cursor at the end of the last line of page 1.
     await setCursorAtEndOfPage(page, 0);
 
-    // Press Enter a few times. Depending on page 1's post-cascade slack
-    // (~60 px), the first Enter or two may not overflow and keep the
-    // cursor on page 1; later Enters cascade the new empty paragraphs
-    // onto page 2 and the cursor follows.
-    //
-    // The ORIGINAL bug (issue #118 follow-up): the cursor would jump
-    // to page 9 (the deepest cascade hop) via the stale 300 ms timer.
-    // Our fix guarantees the cursor stays AT the user's edit position —
-    // either on page 1 (cursor stayed) or on page 2 (cursor moved with
-    // the overflow). This test asserts the invariant: the cursor is
-    // on page 1 or 2, NEVER on a deeper page.
+    // Press Enter a few times. The overflow cascade pushes content
+    // forward silently, but the cursor ALWAYS stays on page 1 — the
+    // user keeps typing where they are. The original bug jumped the
+    // cursor to the deepest cascade page (page 9).
     for (let i = 0; i < 3; i++) {
       await page.keyboard.press('Enter');
     }
     await waitForCascadeSettled(page);
 
     const activePageId = await getActivePageId(page);
-    expect([page1Id, page2Id]).toContain(activePageId);
-    for (const deeperId of pageIdsBefore.slice(2)) {
-      expect(activePageId).not.toBe(deeperId);
-    }
+    expect(activePageId).toBe(page1Id);
   });
 
   test('Enter in the middle of a paragraph keeps cursor on the same page', async ({
@@ -150,7 +138,7 @@ test.describe('Canvas editor — cursor cascade fix (#118 follow-up)', () => {
   });
 
   test.describe('RTL (Hebrew) document — same rules apply (FR-007)', () => {
-    test('Enter at end of page 1 keeps cursor adjacent (page 1 or 2), never on a deeper page', async ({
+    test('Enter at end of page 1 keeps cursor on page 1', async ({
       page,
     }) => {
       await createDocumentWithNearFullPages(page, {
@@ -164,7 +152,6 @@ test.describe('Canvas editor — cursor cascade fix (#118 follow-up)', () => {
           els.map((el) => (el as HTMLElement).getAttribute('data-page-id')!),
         );
       const page1Id = pageIdsBefore[0];
-      const page2Id = pageIdsBefore[1];
 
       await setCursorAtEndOfPage(page, 0);
       for (let i = 0; i < 3; i++) {
@@ -172,11 +159,7 @@ test.describe('Canvas editor — cursor cascade fix (#118 follow-up)', () => {
       }
       await waitForCascadeSettled(page);
 
-      const activePageId = await getActivePageId(page);
-      expect([page1Id, page2Id]).toContain(activePageId);
-      for (const deeperId of pageIdsBefore.slice(2)) {
-        expect(activePageId).not.toBe(deeperId);
-      }
+      expect(await getActivePageId(page)).toBe(page1Id);
     });
 
     test('Enter in the middle of a paragraph keeps cursor on the same page', async ({
