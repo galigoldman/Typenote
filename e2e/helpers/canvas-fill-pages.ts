@@ -40,11 +40,56 @@ async function resetSeededDocWithPages(
   pageCount: number,
   language: 'en' | 'he',
 ): Promise<void> {
-  const templateEN =
-    'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.';
-  const templateHE =
-    'ליווית אותי המוזיקה כשהלכתי ברחוב, הצלילים מילאו את האוויר ואת הלב שלי בחיוך קטן.';
-  const template = language === 'he' ? templateHE : templateEN;
+  // Varied paragraph templates so each paragraph is visually distinct —
+  // with identical text you can't tell which content ended up on which
+  // page after a cascade. These are adapted from a real university
+  // exercise sheet (Computational Models, Exercise 1) for realistic
+  // line lengths and mixed formatting.
+  const englishParagraphs = [
+    'Computational Models — Exercise 1. Due Saturday, 4 April 2026.',
+    'Each student must solve the problems on their own. If you encounter difficulties, you may ask a classmate for a hint or the general idea.',
+    'However, detailed discussion, note-taking, or sharing of written solutions is not allowed. Do not write down your answers while communicating with other people.',
+    'Our grading app has severe limitations, such as no zoom tool. To make sure we can grade your work, please follow these technical guidelines.',
+    'Submit a single PDF file through Moodle. The file size is limited to 10 MB. If necessary, google reduce PDF file size.',
+    'Fill in your answers on this form in the allocated spaces. The space provided gives you an indication of the expected length and level of detail.',
+    'Include everything from this form in your submission. In particular, include the problem statements. Do not delete any text or omit pages.',
+    'Ensure your answers are legible (easy to read) at zoom 100% on a standard computer screen. Your text should be large, sharp, and in high contrast.',
+    'Do not squeeze scanned solutions to fit in the space, as the text will become small and hard to grade properly.',
+    'Verify that pages are properly ordered and oriented. The page size must be A4 (21 × 29 cm).',
+    'Before submitting your file, check its page size using Acrobat Reader: go to File > Properties > Description and confirm that Page Size is correct.',
+    'Note that scanning A4 pages does not guarantee the resulting page size will be A4, due to scaling. If necessary, google resize PDF to A4.',
+    'Do not add your answers as PDF comments. If you can drag them in Acrobat Reader, they are comments. If necessary, google flatten PDF.',
+    'A 5-point bonus will be given to solutions typed in a word processor. Hand-sketched illustrations or diagrams will not deny you this bonus.',
+    'If there are technical issues with your submission, you may receive a fine. In extreme cases, your submission may not be graded at all.',
+    'If you need help or have questions, please use the course forum at Piazza. The TAs will respond within 24 hours.',
+    'Problem 1: Read the instructions on page 1 carefully. Have you read the instructions on page 1 carefully?',
+    'Problem 2: Write the elements of the following sets. For each set, list all members and explain why they belong.',
+    'Problem 3: For each of the following languages, give a DFA that recognizes it. Draw the state diagram clearly.',
+    'Problem 4: Prove or disprove: for every regular language L, the reverse of L is also regular.',
+  ];
+  const hebrewParagraphs = [
+    'מודלים חישוביים — תרגיל 1. הגשה עד יום שבת, 4 באפריל 2026.',
+    'על כל סטודנט לפתור את הבעיות בעצמו. אם נתקלתם בקשיים, ניתן לבקש רמז או רעיון כללי מחבר לכיתה.',
+    'אולם, דיון מפורט, רישום הערות או שיתוף פתרונות כתובים אסור. אין לרשום תשובות תוך כדי תקשורת עם אנשים אחרים.',
+    'מערכת הבדיקה שלנו מוגבלת ואין בה כלי זום. כדי שנוכל לבדוק את עבודתכם, עקבו אחר ההנחיות הטכניות הבאות.',
+    'הגישו קובץ PDF יחיד דרך מודל. גודל הקובץ מוגבל ל-10 מגה-בייט. אם צריך, חפשו בגוגל הקטנת קובץ PDF.',
+    'מלאו את התשובות בטופס הזה במקומות המיועדים. השטח שניתן מציין את האורך הצפוי ורמת הפירוט של התשובה.',
+    'כללו הכל מהטופס הזה בהגשה שלכם. בפרט, כללו את ניסוחי הבעיות. אל תמחקו טקסט ואל תשמיטו עמודים.',
+    'ודאו שהתשובות שלכם קריאות בזום 100% על מסך מחשב רגיל. הטקסט צריך להיות גדול, חד ובניגודיות גבוהה.',
+    'אל תדחסו פתרונות סרוקים כדי שיתאימו לשטח, כי הטקסט יהפוך לקטן וקשה לקריאה.',
+    'בדקו שהעמודים בסדר הנכון ובכיוון הנכון. גודל העמוד חייב להיות A4 (21 × 29 ס"מ).',
+    'לפני הגשה, בדקו את גודל העמוד באמצעות Acrobat Reader: קובץ > מאפיינים > תיאור.',
+    'שימו לב שסריקת דפי A4 לא מבטיחה שגודל העמוד שיתקבל יהיה A4, בגלל שינוי קנה מידה.',
+    'אל תוסיפו תשובות כהערות PDF. אם אפשר לגרור אותן ב-Acrobat Reader, הן הערות. אם צריך, חפשו flatten PDF.',
+    'בונוס של 5 נקודות יינתן לפתרונות שהוקלדו במעבד תמלילים. שרטוטים ביד חופשית לא ישללו את הבונוס.',
+    'אם יש בעיות טכניות בהגשה שלכם, ייתכן שתקבלו קנס. במקרים קיצוניים, ההגשה עלולה שלא להיבדק כלל.',
+    'אם אתם צריכים עזרה או יש לכם שאלות, השתמשו בפורום הקורס ב-Piazza. המתרגלים יענו תוך 24 שעות.',
+    'בעיה 1: קראו את ההנחיות בעמוד 1 בקפידה. האם קראתם את ההנחיות בעמוד 1 בקפידה?',
+    'בעיה 2: כתבו את האיברים של הקבוצות הבאות. עבור כל קבוצה, רשמו את כל החברים והסבירו למה הם שייכים.',
+    'בעיה 3: לכל אחת מהשפות הבאות, תנו אוטומט דטרמיניסטי סופי שמזהה אותה. ציירו את דיאגרמת המצבים בבירור.',
+    'בעיה 4: הוכיחו או הפריכו: לכל שפה רגולרית L, ההיפוך של L הוא גם שפה רגולרית.',
+  ];
+  const templates = language === 'he' ? hebrewParagraphs : englishParagraphs;
   const dir = language === 'he' ? 'rtl' : 'ltr';
   // 18 paragraphs × ~60px/paragraph ≈ 1080px of content, which just
   // exceeds the 1043px (PAGE_HEIGHT − tb.y − margin) overflow
@@ -52,11 +97,18 @@ async function resetSeededDocWithPages(
   // the page into overflow.
   const paragraphsPerPage = 18;
 
-  const buildParagraph = () => ({
-    type: 'paragraph',
-    attrs: { dir, indent: 0, textAlign: null },
-    content: [{ type: 'text', text: template }],
-  });
+  // Global counter across all pages so every paragraph in the document
+  // has a unique, traceable prefix (e.g., "P001", "P002", ...).
+  let globalParagraphIndex = 0;
+  const buildParagraph = () => {
+    const idx = globalParagraphIndex++;
+    const base = templates[idx % templates.length];
+    return {
+      type: 'paragraph',
+      attrs: { dir, indent: 0, textAlign: null },
+      content: [{ type: 'text', text: `[P${String(idx + 1).padStart(3, '0')}] ${base}` }],
+    };
+  };
 
   const pages: Record<string, unknown>[] = [];
   for (let i = 0; i < pageCount; i++) {
