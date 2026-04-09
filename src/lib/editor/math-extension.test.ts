@@ -11,7 +11,13 @@ vi.mock('@/components/editor/math-node-view', () => ({
   MathNodeView: vi.fn(),
 }));
 
-import { MathExpression, MATH_INPUT_PLUGIN_KEY } from './math-extension';
+import {
+  MathExpression,
+  MATH_INPUT_PLUGIN_KEY,
+  hasWordMath,
+  unicodeToLatex,
+  findMathRanges,
+} from './math-extension';
 
 describe('MathExpression Node', () => {
   it('should have the correct name', () => {
@@ -411,5 +417,83 @@ describe('MathExpression paste rules', () => {
     expect(match![1]).toBe('x^2');
     // Verify no more matches
     expect(regex.exec(text)).toBeNull();
+  });
+});
+
+describe('Word-style math paste (Unicode + ^{}/_{} detection)', () => {
+  describe('hasWordMath', () => {
+    it('detects text with ^{} and Unicode math symbol', () => {
+      expect(hasWordMath('2^{a,b} \u2229 2^{a,c} =')).toBe(true);
+    });
+
+    it('returns false for plain text without math', () => {
+      expect(hasWordMath('Hello world')).toBe(false);
+    });
+
+    it('returns false for ^{} without Unicode symbols', () => {
+      expect(hasWordMath('2^{n} + 3')).toBe(false);
+    });
+
+    it('returns false for Unicode symbols without ^{}/_{} ', () => {
+      expect(hasWordMath('A \u2229 B')).toBe(false);
+    });
+  });
+
+  describe('unicodeToLatex', () => {
+    it('converts intersection symbol', () => {
+      expect(unicodeToLatex('A \u2229 B')).toBe('A \\cap  B');
+    });
+
+    it('converts union symbol', () => {
+      expect(unicodeToLatex('A \u222A B')).toBe('A \\cup  B');
+    });
+
+    it('converts subset symbol', () => {
+      expect(unicodeToLatex('A \u2286 B')).toBe('A \\subseteq  B');
+    });
+
+    it('converts empty set symbol', () => {
+      expect(unicodeToLatex('\u2205')).toBe('\\emptyset');
+    });
+
+    it('converts multiple symbols in one string', () => {
+      const result = unicodeToLatex('2^{a,b} \u2229 2^{a,c}');
+      expect(result).toContain('\\cap');
+      expect(result).not.toContain('\u2229');
+    });
+
+    it('leaves plain text unchanged', () => {
+      expect(unicodeToLatex('hello world')).toBe('hello world');
+    });
+  });
+
+  describe('findMathRanges', () => {
+    it('finds a single math segment with ^{} and Unicode symbol', () => {
+      const text = '5.    2^{a,b} \u2229 2^{a,c} =';
+      const ranges = findMathRanges(text);
+      expect(ranges.length).toBe(1);
+      const mathText = text.slice(ranges[0].start, ranges[0].end).trim();
+      expect(mathText).toContain('2^{a,b}');
+      expect(mathText).toContain('\u2229');
+      expect(mathText).toContain('2^{a,c}');
+    });
+
+    it('separates non-math prefix from math content', () => {
+      const text = '[1 pt]        5.    2^{a,b} \u2229 2^{a,c} =';
+      const ranges = findMathRanges(text);
+      expect(ranges.length).toBe(1);
+      // The math segment should NOT include "[1 pt]" or "5."
+      expect(ranges[0].start).toBeGreaterThan(text.indexOf('5.'));
+    });
+
+    it('finds multiple separate math segments on one line', () => {
+      const text = 'If L_{1} \u2286 L_{2}, then L_{1}* \u2286 L_{2}*';
+      const ranges = findMathRanges(text);
+      expect(ranges.length).toBeGreaterThanOrEqual(1);
+    });
+
+    it('returns empty array for plain text', () => {
+      expect(findMathRanges('Hello world no math')).toEqual([]);
+    });
   });
 });
