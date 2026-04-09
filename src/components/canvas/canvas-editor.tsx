@@ -1163,17 +1163,12 @@ export function CanvasEditor({
       const isInnerHop = cascadeTargetTextBoxIds.current.has(textBoxId);
       if (isInnerHop) cascadeTargetTextBoxIds.current.delete(textBoxId);
 
-      // Cursor policy: the cursor ALWAYS STAYS on the current page.
-      // ProseMirror's selection mapping naturally keeps the cursor at
-      // the edge of the remaining content after the deleteRange
-      // removes overflow blocks. We never move focus to the next page
-      // during a cascade — the user keeps typing where they are, and
-      // overflow flows silently to downstream pages.
-      //
-      // This is simpler and more robust than computing a cursor target
-      // on the next page, which was brittle across cascade hops (the
-      // target block could be pushed further by inner hops, leaving
-      // the cursor on a page without its content).
+      // Capture cursor position BEFORE mutating content. Used by
+      // decideCursorTarget to determine if the cursor's block stays
+      // on this page or follows the overflow to the next page.
+      const cursorBlockIndex = editor.state.selection.$from.index(0);
+      const cursorOffsetInBlock =
+        editor.state.selection.$from.parentOffset;
 
       // Available height for the text box CONTAINER on the page. The
       // container's scrollHeight must stay below this; anything past it
@@ -1253,11 +1248,23 @@ export function CanvasEditor({
           cascadeTargetTextBoxIds.current.add(`${nextPage.id}-ftb`);
         }
 
-        // Never pass a cursor target — the cursor stays on the
-        // source page via ProseMirror's selection mapping.
+        // Decide cursor target: if the user's block is in the overflow
+        // (e.g. Enter at end of page), the cursor follows the text.
+        // If the user's block stays (e.g. Enter in the middle), the
+        // cursor stays via ProseMirror's selection mapping.
+        const target = isInnerHop
+          ? null
+          : decideCursorTarget(cursorBlockIndex, cursorOffsetInBlock, splitIdx);
+
+        const cursorTargetForFocus =
+          target?.kind === 'move'
+            ? { blockIndex: target.newBlockIndex, offset: target.offset }
+            : undefined;
+
         handleTextOverflow(
           pageId,
           { type: 'doc', content: overflowNodes } as Record<string, unknown>,
+          cursorTargetForFocus,
         );
         return;
       }
