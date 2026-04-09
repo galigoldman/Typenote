@@ -19,6 +19,7 @@ import type {
 } from '@/types/canvas';
 import { PAGE_WIDTH, PAGE_HEIGHT } from '@/types/canvas';
 import { findOverflowSplitIndex } from '@/lib/canvas/text-split';
+import { decideCursorTarget } from '@/lib/canvas/cursor-target';
 import type { Document } from '@/types/database';
 import type { SaveStatus } from '@/hooks/use-auto-save';
 import { pageHasContent, stripTrailingEmptyPages } from './page-utils';
@@ -778,14 +779,17 @@ export function CanvasEditor({
   // overflow detections are skipped for one frame to prevent the
   // move-content → re-measure → move-content feedback loop.
   const isHandlingTextBoxOverflowRef = useRef(false);
-  // Multi-hop cascade focus guard. During an overflow cascade (text
-  // flowing page 1 → 2 → 3 → ...), we want the cursor to land on the
-  // IMMEDIATE next page (where the user's own content went), NOT at the
-  // tail of the cascade several pages later. This ref suppresses ALL
-  // focus calls inside focusPage during the cascade, and we explicitly
-  // restore the cursor to the recorded target page after the cascade
-  // finishes.
-  const cascadeCursorTargetRef = useRef<string | null>(null);
+  // Cascade target tracker. When an outermost (user-initiated)
+  // `handleTextBoxOverflow` hands content off to the next page, it
+  // adds that next text box's id to this set. When the next text
+  // box's own ResizeObserver later fires and runs
+  // `handleTextBoxOverflow`, the function checks this set — if the
+  // id is present, it knows the call is an INNER cascade hop and
+  // must NOT touch any editor's focus or selection. The inner hop
+  // then propagates the set entry to its own downstream next page
+  // before returning. The set drains naturally as the cascade
+  // ripples through the document, with no wall-clock timer.
+  const cascadeTargetTextBoxIds = useRef<Set<string>>(new Set());
 
   // Register a getter function that extracts text from all page editors
   useEffect(() => {
@@ -827,11 +831,18 @@ export function CanvasEditor({
   // This is reliable for both existing pages and newly created ones
   // (where the editor mounts asynchronously after React renders).
   // Uses a ref for self-reference to satisfy lint rules.
+  //
+  // cursorTarget (optional): when provided, the cursor is placed at
+  // `(blockIndex, offset)` in the target editor AND the viewport is
+  // scrolled to the target page. When OMITTED, the function does NOT
+  // touch focus or selection or viewport scroll — which is exactly
+  // what we need for "stay" cases and inner cascade hops.
   const focusPageRef = useRef<
     (
       pageId: string,
       overflowContent: Record<string, unknown> | null,
       isExistingPage: boolean,
+      cursorTarget?: { blockIndex: number; offset: number },
       attempt?: number,
     ) => void
   >(() => {});
@@ -841,6 +852,7 @@ export function CanvasEditor({
       pageId: string,
       overflowContent: Record<string, unknown> | null,
       isExistingPage: boolean,
+      cursorTarget?: { blockIndex: number; offset: number },
       attempt = 0,
     ) => {
       const editor = editorsRef.current.get(pageId);
@@ -870,17 +882,43 @@ export function CanvasEditor({
             );
           }
         }
-        // During a cascade, ALL focus calls inside focusPage are suppressed.
-        // The cursor is explicitly restored to the recorded target page
-        // (the immediate next page that received the user's content) at
-        // the end of the cascade — see handleTextBoxOverflow below.
-        if (cascadeCursorTargetRef.current == null) {
-          editor.commands.focus('start');
+        // Move-first strategy (NFR-003): when a cursor target is
+        // provided, place the cursor at its final position in the same
+        // synchronous block as the content move. When omitted, do not
+        // touch focus — either the user's cursor is staying on the
+        // source page, or this is an inner cascade hop propagating
+        // content but not moving the cursor.
+        if (cursorTarget) {
+          const doc = editor.state.doc;
+          const safeBlockIdx = Math.max(
+            0,
+            Math.min(cursorTarget.blockIndex, doc.childCount - 1),
+          );
+          // Walk past preceding blocks to compute the ProseMirror
+          // position at the start of the target block.
+          let pos = 0;
+          for (let i = 0; i < safeBlockIdx; i++) {
+            pos += doc.child(i).nodeSize;
+          }
+          // `+1` enters the block (moves past its opening token);
+          // `+ offset` moves to the correct text position within it,
+          // clamped to the block's content size.
+          const blockContentSize = doc.child(safeBlockIdx).content.size;
+          const safeOffset = Math.max(
+            0,
+            Math.min(cursorTarget.offset, blockContentSize),
+          );
+          const selectionPos = pos + 1 + safeOffset;
+          editor.commands.setTextSelection(selectionPos);
+          editor.commands.focus();
           scrollToPage(pageId);
         }
         return;
       }
-      // Editor not mounted yet — retry (up to 1s)
+      // Editor not mounted yet — retry (up to 1s). We pass cursorTarget
+      // through the retry so the brand-new-page case (where the editor
+      // mounts asynchronously) still lands the cursor at the right
+      // position once the mount completes.
       if (attempt < 20) {
         setTimeout(
           () =>
@@ -888,6 +926,7 @@ export function CanvasEditor({
               pageId,
               overflowContent,
               isExistingPage,
+              cursorTarget,
               attempt + 1,
             ),
           50,
@@ -1001,10 +1040,21 @@ export function CanvasEditor({
     [document.canvas_type],
   );
 
-  // Text overflow handler — moves cursor (and optionally content) to the
-  // next page, creating one if needed. Works on any page, like Word/Docs.
+  // Text overflow handler — moves content (and optionally the cursor)
+  // to the next page, creating one if needed. Works on any page, like
+  // Word/Docs.
+  //
+  // `cursorTarget` is forwarded to `focusPage`: when provided, the
+  // caller wants the cursor to land at a specific `(blockIndex, offset)`
+  // in the next page's editor; when omitted, the cursor is left alone
+  // (either because the user's edit is staying on the source page, or
+  // because this is an inner cascade hop just propagating content).
   const handleTextOverflow = useCallback(
-    (pageId: string, overflowContent: Record<string, unknown> | null) => {
+    (
+      pageId: string,
+      overflowContent: Record<string, unknown> | null,
+      cursorTarget?: { blockIndex: number; offset: number },
+    ) => {
       // Read the current pages synchronously via ref — we can't rely on
       // the setPages updater function setting local variables because
       // React 19's automatic batching defers updater execution when
@@ -1017,7 +1067,7 @@ export function CanvasEditor({
 
       if (nextPage) {
         // Existing next page — pass overflow content to merge
-        focusPage(nextPage.id, overflowContent, true);
+        focusPage(nextPage.id, overflowContent, true, cursorTarget);
         triggerSave();
         return;
       }
@@ -1038,7 +1088,7 @@ export function CanvasEditor({
       // focusPage polls for the editor — the new page will mount after
       // React processes the setPages update. Pass overflow content so
       // setContent() fires onUpdate and enables cascade.
-      focusPage(newPage.id, overflowContent, false);
+      focusPage(newPage.id, overflowContent, false, cursorTarget);
       triggerSave();
     },
     [triggerSave, document.canvas_type, focusPage],
@@ -1050,6 +1100,23 @@ export function CanvasEditor({
   // fit and move them to the next page's text box via handleTextOverflow
   // (the existing logic from PR #125 that already handles "prepend to next
   // page" and "create new page" branches).
+  //
+  // Cursor policy (spec 035-fix-118-cursor-cascade):
+  // - OUTERMOST hop (user-initiated): capture the cursor's current
+  //   block index and within-block offset BEFORE mutating anything,
+  //   then use `decideCursorTarget` to compute whether the cursor
+  //   stays on this page or follows the overflow into the next page.
+  //   If it stays, we don't touch focus. If it moves, we pass a
+  //   cursorTarget through handleTextOverflow → focusPage so the
+  //   cursor lands at its final position in the same synchronous
+  //   block as the content move (no wall-clock timer).
+  // - INNER hop (fired by ResizeObserver on a downstream text box
+  //   that was a cascade destination): never touch any editor's
+  //   focus or selection. Just propagate the content forward and
+  //   add the next downstream text box to `cascadeTargetTextBoxIds`.
+  // - The distinction is made by checking `cascadeTargetTextBoxIds`
+  //   for this text box id. Entries are added by the previous hop
+  //   when handing content forward, and consumed (removed) on entry.
   const handleTextBoxOverflow = useCallback(
     (pageId: string, textBoxId: string) => {
       const editor = textBoxEditorsRef.current.get(textBoxId);
@@ -1058,6 +1125,22 @@ export function CanvasEditor({
       const page = currentPages.find((p) => p.id === pageId);
       const tb = page?.textBoxes.find((t) => t.id === textBoxId);
       if (!tb) return;
+
+      // Inner-vs-outermost detection: if this text box is a registered
+      // cascade target, this call is an inner cascade hop (triggered by
+      // the ResizeObserver that fired after the previous hop merged
+      // overflow into us). Consume the entry so subsequent user-initiated
+      // overflows on the same text box are classified as outermost.
+      const isInnerHop = cascadeTargetTextBoxIds.current.has(textBoxId);
+      if (isInnerHop) cascadeTargetTextBoxIds.current.delete(textBoxId);
+
+      // Capture the user's cursor position in the SOURCE editor BEFORE
+      // we mutate anything. `$from.index(0)` is the index of the
+      // top-level block containing the cursor; `$from.parentOffset` is
+      // the text offset within that block. Together they fully identify
+      // "where the cursor is, in direction-agnostic document terms".
+      const cursorBlockIndex = editor.state.selection.$from.index(0);
+      const cursorOffsetInBlock = editor.state.selection.$from.parentOffset;
 
       // Available height for the text box CONTAINER on the page. The
       // container's scrollHeight must stay below this; anything past it
@@ -1103,6 +1186,16 @@ export function CanvasEditor({
         );
         if (splitIdx === null || splitIdx >= doc.childCount) return;
 
+        // Decide where the cursor ends up BEFORE mutating content.
+        // This uses only the pre-split block index, which is stable —
+        // the "stay" case relies on ProseMirror's selection-mapping
+        // keeping positions before the deleted range unchanged.
+        const target = decideCursorTarget(
+          cursorBlockIndex,
+          cursorOffsetInBlock,
+          splitIdx,
+        );
+
         // Collect overflow blocks as JSON.
         const overflowNodes: unknown[] = [];
         for (let i = splitIdx; i < doc.childCount; i++) {
@@ -1115,78 +1208,54 @@ export function CanvasEditor({
           deleteFrom += doc.child(i).nodeSize;
         }
 
-        // Remove overflow from the current text box editor.
+        // Remove overflow from the current text box editor. In the
+        // "stay" case, the cursor is before `deleteFrom` and survives
+        // this deletion unchanged via ProseMirror's selection mapping.
         editor
           .chain()
           .deleteRange({ from: deleteFrom, to: doc.content.size })
           .run();
 
-        // Detect the outermost cascade hop. For the outermost hop, we
-        // record which page the user's content is moving to (the
-        // immediate next page), then set the cascade guard BEFORE
-        // calling handleTextOverflow so that even the FIRST focusPage
-        // call inside the cascade is suppressed. We'll explicitly
-        // restore the cursor to the recorded target page at the end.
-        const isOutermostHop = cascadeCursorTargetRef.current == null;
-        let outerTargetPageId: string | null = null;
-        if (isOutermostHop) {
-          const currentPages = pagesRef.current;
-          const pageIdx = currentPages.findIndex((p) => p.id === pageId);
-          outerTargetPageId =
-            pageIdx >= 0 && pageIdx + 1 < currentPages.length
-              ? currentPages[pageIdx + 1].id
-              : '__NEW__'; // sentinel — a new page will be created
-          // Set the cascade guard NOW so focusPage's focus call is
-          // suppressed for this very first hop as well.
-          cascadeCursorTargetRef.current = outerTargetPageId;
+        // Propagate the cascade: register the next page's text box as
+        // a downstream cascade target so its own handleTextBoxOverflow
+        // (fired later by its ResizeObserver) will classify itself as
+        // an inner hop. We do this unconditionally — the set drains
+        // naturally as each inner hop consumes its own entry.
+        const pageIdx = currentPages.findIndex((p) => p.id === pageId);
+        const nextPage =
+          pageIdx >= 0 && pageIdx + 1 < currentPages.length
+            ? currentPages[pageIdx + 1]
+            : null;
+        if (nextPage) {
+          cascadeTargetTextBoxIds.current.add(`${nextPage.id}-ftb`);
         }
 
-        // Hand off to the existing page-level overflow handler. During
-        // this call the cascade guard is set, so all focusPage focus
-        // calls are suppressed.
-        handleTextOverflow(pageId, {
-          type: 'doc',
-          content: overflowNodes,
-        } as Record<string, unknown>);
+        // Compute the cursor target passed to focusPage:
+        //   - Inner hop → never touch cursor (pass undefined).
+        //   - Outermost + "stay" → don't touch cursor (pass undefined).
+        //   - Outermost + "move" → pass the computed position.
+        const cursorTargetForFocus =
+          !isInnerHop && target.kind === 'move'
+            ? { blockIndex: target.newBlockIndex, offset: target.offset }
+            : undefined;
 
-        if (isOutermostHop) {
-          // Schedule cursor restoration after the cascade settles. Any
-          // further async cascade hops (fired by ResizeObserver on the
-          // next page) will ALSO have focus suppressed because the
-          // guard is still set. Once the timeout fires, we explicitly
-          // place the cursor on the recorded target page — which is the
-          // page containing the user's actual content.
-          setTimeout(() => {
-            const target = cascadeCursorTargetRef.current;
-            cascadeCursorTargetRef.current = null;
-            if (!target) return;
-            // Resolve the target page ID. For the __NEW__ sentinel we
-            // find the page that was created right after the overflow
-            // origin.
-            let targetPageId = target;
-            if (target === '__NEW__') {
-              const currentPages = pagesRef.current;
-              const originIdx = currentPages.findIndex(
-                (p) => p.id === pageId,
-              );
-              targetPageId =
-                originIdx >= 0 && originIdx + 1 < currentPages.length
-                  ? currentPages[originIdx + 1].id
-                  : '';
-            }
-            if (!targetPageId) return;
-            const targetEditor = editorsRef.current.get(targetPageId);
-            if (targetEditor) {
-              targetEditor.commands.focus('start');
-              scrollToPage(targetPageId);
-            }
-          }, 300);
-        }
+        handleTextOverflow(
+          pageId,
+          { type: 'doc', content: overflowNodes } as Record<string, unknown>,
+          cursorTargetForFocus,
+        );
         return;
       }
 
       // Single-block path: the whole overflow is inside one paragraph/heading.
       // Split the block at a word boundary near the bottom of the page.
+      // Cursor handling for this path is simpler — ProseMirror's
+      // setTextSelection + splitBlock + deleteRange sequence naturally
+      // leaves the cursor at the end of the first (remaining) block on
+      // the current page, which is where the user expects it to be.
+      // We do not pass a cursor target to handleTextOverflow in this
+      // case, so the overflow half moves to the next page without
+      // dragging focus with it.
       const rect = editorDom.getBoundingClientRect();
       const bottomY = rect.top + availableContainerHeight - 10;
       const posInfo = editor.view.posAtCoords({
@@ -1203,8 +1272,7 @@ export function CanvasEditor({
       while (wordBreak > 0 && text[wordBreak - 1] !== ' ') {
         wordBreak--;
       }
-      const splitPos =
-        wordBreak > 0 ? $pos.start() + wordBreak : posInfo.pos;
+      const splitPos = wordBreak > 0 ? $pos.start() + wordBreak : posInfo.pos;
 
       // Split, extract the overflow half, delete it from the current editor.
       editor.chain().setTextSelection(splitPos).splitBlock().run();
@@ -1218,6 +1286,17 @@ export function CanvasEditor({
         .chain()
         .deleteRange({ from: firstBlockEnd, to: newDoc.content.size })
         .run();
+
+      // Propagate the cascade target for the single-block path too,
+      // so downstream ResizeObserver hops are classified as inner.
+      const singleBlockPageIdx = currentPages.findIndex((p) => p.id === pageId);
+      const singleBlockNextPage =
+        singleBlockPageIdx >= 0 && singleBlockPageIdx + 1 < currentPages.length
+          ? currentPages[singleBlockPageIdx + 1]
+          : null;
+      if (singleBlockNextPage) {
+        cascadeTargetTextBoxIds.current.add(`${singleBlockNextPage.id}-ftb`);
+      }
 
       handleTextOverflow(pageId, {
         type: 'doc',
