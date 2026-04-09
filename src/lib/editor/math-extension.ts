@@ -286,9 +286,18 @@ export const MathExpression = Node.create({
             const text = event.clipboardData?.getData('text/plain');
             const html = event.clipboardData?.getData('text/html');
             // DEBUG: log clipboard contents to diagnose Word paste
-            console.log('[math-paste] plain:', JSON.stringify(text?.slice(0, 500)));
-            console.log('[math-paste] html:', JSON.stringify(html?.slice(0, 500)));
-            console.log('[math-paste] hasWordMath:', text ? hasWordMath(text) : 'no text');
+            console.log(
+              '[math-paste] plain:',
+              JSON.stringify(text?.slice(0, 500)),
+            );
+            console.log(
+              '[math-paste] html:',
+              JSON.stringify(html?.slice(0, 500)),
+            );
+            console.log(
+              '[math-paste] hasWordMath:',
+              text ? hasWordMath(text) : 'no text',
+            );
             if (!text || !hasWordMath(text)) return false;
 
             const { schema } = view.state;
