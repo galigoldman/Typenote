@@ -1243,14 +1243,29 @@ export function CanvasEditor({
           cascadeTargetTextBoxIds.current.add(`${nextPage.id}-ftb`);
         }
 
-        // Cursor ALWAYS stays on the current page. ProseMirror's
-        // selection mapping keeps it at the edge of the remaining
-        // content after deleteRange. The overflow moves silently to
-        // downstream pages. This avoids the jarring viewport jump
-        // that happens when the cursor follows overflow to page 2.
+        // Cursor follows overflow when the user's block moves to the
+        // next page (e.g. Enter at the last line). Stays when the
+        // user's block remains (e.g. Enter in the middle). The
+        // viewport-jump-to-page-9 bug is prevented by the
+        // cascadeTargetTextBoxIds set (inner hops don't touch focus)
+        // and the ed.isFocused auto-scroll guard (canvas-page.tsx).
+        const target = isInnerHop
+          ? null
+          : decideCursorTarget(
+              cursorBlockIndex,
+              cursorOffsetInBlock,
+              splitIdx,
+            );
+
+        const cursorTargetForFocus =
+          target?.kind === 'move'
+            ? { blockIndex: target.newBlockIndex, offset: target.offset }
+            : undefined;
+
         handleTextOverflow(
           pageId,
           { type: 'doc', content: overflowNodes } as Record<string, unknown>,
+          cursorTargetForFocus,
         );
         return;
       }
