@@ -52,16 +52,14 @@ test.describe('Canvas editor — cursor cascade fix (#118 follow-up)', () => {
 
     await setCursorAtEndOfPage(page, 0);
 
-    // Press Enter a few times. When the cursor's block overflows to
-    // page 2, the cursor follows the text. When the block stays on
-    // page 1, the cursor stays too. Either way, NEVER on page 3+.
+    // Cursor stays on page 1 or moves to page 2 (adjacent). Never
+    // jumps to a deep page like page 9 (the original bug).
     for (let i = 0; i < 3; i++) {
       await page.keyboard.press('Enter');
     }
     await waitForCascadeSettled(page);
 
-    const activePageId = await getActivePageId(page);
-    expect([page1Id, page2Id]).toContain(activePageId);
+    expect([page1Id, page2Id]).toContain(await getActivePageId(page));
   });
 
   test('Enter in the middle of a paragraph keeps cursor on the same page', async ({
@@ -138,7 +136,7 @@ test.describe('Canvas editor — cursor cascade fix (#118 follow-up)', () => {
   });
 
   test.describe('RTL (Hebrew) document — same rules apply (FR-007)', () => {
-    test('Enter at end of page 1 keeps cursor on page 1 or 2, never deeper', async ({
+    test('Enter at end of page 1 keeps cursor on page 1 or 2', async ({
       page,
     }) => {
       await createDocumentWithNearFullPages(page, {
@@ -185,4 +183,81 @@ test.describe('Canvas editor — cursor cascade fix (#118 follow-up)', () => {
       expect(await getActivePageId(page)).toBe(page1Id);
     });
   });
+
+  test.describe('Enter on pasted 5-page document', () => {
+    test('Enter at beginning of last line pushes text to next page, viewport stays near', async ({
+      page,
+    }) => {
+      await createDocumentWithNearFullPages(page, { pages: 5 });
+      await waitForCascadeSettled(page);
+
+      const pageIdsBefore = await page
+        .locator('[data-page-id]')
+        .evaluateAll((els) =>
+          els.map((el) => (el as HTMLElement).getAttribute('data-page-id')!),
+        );
+      const page1Id = pageIdsBefore[0];
+      const page2Id = pageIdsBefore[1];
+
+      // Get the text of the last block on page 1.
+      const lastLineText = await page.evaluate(() => {
+        const p1 = document.querySelector('[data-page-id]');
+        const pm = p1?.querySelector('.ProseMirror');
+        if (!pm || pm.children.length === 0) return null;
+        return pm.children[pm.children.length - 1].textContent;
+      });
+      expect(lastLineText).toBeTruthy();
+
+      // Place cursor at the BEGINNING of the last block on page 1.
+      await page.evaluate(() => {
+        const p1 = document.querySelector('[data-page-id]');
+        const pm = p1?.querySelector('.ProseMirror');
+        if (!pm) throw new Error('no ProseMirror');
+        const lastBlock = pm.children[pm.children.length - 1];
+        const textNode = lastBlock.firstChild;
+        if (!textNode) throw new Error('no text');
+        const range = document.createRange();
+        range.setStart(textNode, 0);
+        range.collapse(true);
+        window.getSelection()?.removeAllRanges();
+        window.getSelection()?.addRange(range);
+        (pm as HTMLElement).focus();
+      });
+
+      // Press Enter — creates empty line above, pushes last line down.
+      await page.keyboard.press('Enter');
+      await waitForCascadeSettled(page);
+
+      // Cursor should be on page 1 or 2 (adjacent), NEVER deeper.
+      const afterEnter = await getActivePageId(page);
+      expect([page1Id, page2Id]).toContain(afterEnter);
+
+      // The pushed text should now be on page 2.
+      const page2HasText = await page.evaluate((text) => {
+        const pages = document.querySelectorAll('[data-page-id]');
+        if (pages.length < 2) return false;
+        const pm2 = pages[1].querySelector('.ProseMirror');
+        if (!pm2) return false;
+        for (const child of pm2.children) {
+          if (child.textContent === text) return true;
+        }
+        return false;
+      }, lastLineText);
+      expect(page2HasText).toBe(true);
+
+      // Viewport must NOT jump to a deep page (the original bug).
+      const scroll = await page.evaluate(() => {
+        const c = document.querySelector('[data-scroll-container]');
+        return Math.round(c?.scrollTop || 0);
+      });
+      expect(scroll).toBeLessThan(3000);
+    });
+  });
+
+  // NOTE: Cross-page Backspace (merging page 2's first line with
+  // page 1's last line) is tested manually — Playwright's cursor
+  // positioning via Selection API doesn't reliably sync with
+  // ProseMirror's internal selection state, making the automated
+  // test flaky. The feature itself works correctly (verified via
+  // Chrome DevTools MCP interaction).
 });

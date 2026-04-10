@@ -1243,10 +1243,12 @@ export function CanvasEditor({
           cascadeTargetTextBoxIds.current.add(`${nextPage.id}-ftb`);
         }
 
-        // Decide cursor target: if the user's block is in the overflow
-        // (e.g. Enter at end of page), the cursor follows the text.
-        // If the user's block stays (e.g. Enter in the middle), the
-        // cursor stays via ProseMirror's selection mapping.
+        // Cursor follows overflow when the user's block moves to the
+        // next page (e.g. Enter at the last line). Stays when the
+        // user's block remains (e.g. Enter in the middle). The
+        // viewport-jump-to-page-9 bug is prevented by the
+        // cascadeTargetTextBoxIds set (inner hops don't touch focus)
+        // and the ed.isFocused auto-scroll guard (canvas-page.tsx).
         const target = isInnerHop
           ? null
           : decideCursorTarget(cursorBlockIndex, cursorOffsetInBlock, splitIdx);

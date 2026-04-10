@@ -501,7 +501,9 @@ export function CanvasPage({
             ed.chain()
               .deleteRange({ from: deleteFrom, to: doc.content.size })
               .run();
-            ed.commands.blur();
+            // Don't blur — let ProseMirror's selection mapping keep
+            // the cursor at the edge of the remaining content (same
+            // approach as the -ftb text box overflow path).
 
             onTextOverflowRef.current?.(pageIdRef.current, {
               type: 'doc',
@@ -562,15 +564,14 @@ export function CanvasPage({
                 ed.getJSON() as Record<string, unknown>,
               );
 
-              ed.commands.blur();
+              // Don't blur — cursor stays via selection mapping.
 
               onTextOverflowRef.current?.(pageIdRef.current, {
                 type: 'doc',
                 content: overflowNodes,
               } as Record<string, unknown>);
             } else {
-              // Can't determine split position — just navigate
-              ed.commands.blur();
+              // Can't determine split position — navigate to next page
               onTextOverflowRef.current?.(pageIdRef.current, null);
             }
           }
