@@ -1251,11 +1251,7 @@ export function CanvasEditor({
         // and the ed.isFocused auto-scroll guard (canvas-page.tsx).
         const target = isInnerHop
           ? null
-          : decideCursorTarget(
-              cursorBlockIndex,
-              cursorOffsetInBlock,
-              splitIdx,
-            );
+          : decideCursorTarget(cursorBlockIndex, cursorOffsetInBlock, splitIdx);
 
         const cursorTargetForFocus =
           target?.kind === 'move'
