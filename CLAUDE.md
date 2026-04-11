@@ -51,6 +51,8 @@ The project uses a two-branch model: `dev` (integration) and `main` (production)
 
 ## Active Technologies
 
+- N/A — purely client-side editor change, no database changes (037-fix-cross-page-editing)
+
 - TypeScript 5 / Node.js 22+ + React 19, Next.js 16 (App Router), TipTap 3 (ProseMirror), Playwright (E2E), Vitest (unit/integration). **No new dependencies.** (035-fix-118-cursor-cascade)
 - N/A — purely a client-side editor change. No database, no migrations, no API surface. (035-fix-118-cursor-cascade)
 
