@@ -281,14 +281,25 @@ test.describe('Canvas editor — cursor cascade fix (#118 follow-up)', () => {
       expect(firstLineOfPage2).toBeTruthy();
 
       // Place cursor at the very start of page 2's first block.
+      // Must find the deepest text node (not a <span> element) so
+      // ProseMirror's selectionchange listener correctly syncs
+      // the internal state to from=1.
       await page.evaluate(() => {
+        function firstTextNode(node: Node): Text | null {
+          if (node.nodeType === Node.TEXT_NODE) return node as Text;
+          for (const child of node.childNodes) {
+            const found = firstTextNode(child);
+            if (found) return found;
+          }
+          return null;
+        }
         const pages = document.querySelectorAll('[data-page-id]');
         if (pages.length < 2) throw new Error('need at least 2 pages');
         const pm2 = pages[1].querySelector('.ProseMirror') as HTMLElement;
         if (!pm2) throw new Error('no ProseMirror on page 2');
         const firstBlock = pm2.children[0];
-        const textNode = firstBlock.firstChild;
-        if (!textNode) throw new Error('no text in first block');
+        const textNode = firstTextNode(firstBlock);
+        if (!textNode) throw new Error('no text node in first block');
         const range = document.createRange();
         range.setStart(textNode, 0);
         range.collapse(true);
@@ -296,6 +307,9 @@ test.describe('Canvas editor — cursor cascade fix (#118 follow-up)', () => {
         window.getSelection()?.addRange(range);
         pm2.focus();
       });
+
+      // Small delay for ProseMirror to sync DOM selection → internal state.
+      await page.waitForTimeout(200);
 
       // Press Backspace — should merge page 2's first line to page 1.
       await page.keyboard.press('Backspace');
