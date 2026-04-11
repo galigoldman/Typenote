@@ -54,6 +54,7 @@ The current `handleBackspaceAtStart` (canvas-editor.tsx lines 1339-1397) has sev
 ### Rationale
 
 The overflow cascade system (handleTextBoxOverflow, lines 1145-1326) already:
+
 - Detects overflow via ResizeObserver and rAF
 - Finds the split point (block-level or word-boundary)
 - Extracts overflowing content as JSON

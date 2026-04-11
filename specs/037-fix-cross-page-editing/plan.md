@@ -23,13 +23,13 @@ Fix Enter and Backspace at page boundaries so the multi-page text editor behaves
 
 _GATE: Must pass before Phase 0 research. Re-check after Phase 1 design._
 
-| Principle | Status | Notes |
-|-----------|--------|-------|
-| I. Incremental Development | PASS | Bug fix on existing infrastructure, no new features |
-| II. Test-Driven Quality | PASS | Plan includes unit tests and E2E tests |
-| III. Protected Branches | PASS | Working on feature branch `037-fix-cross-page-editing` off `dev` |
-| IV. Migrations as Code | N/A | No database changes |
-| V. Interview-Ready Architecture | PASS | Will document reasoning for approach |
+| Principle                       | Status | Notes                                                            |
+| ------------------------------- | ------ | ---------------------------------------------------------------- |
+| I. Incremental Development      | PASS   | Bug fix on existing infrastructure, no new features              |
+| II. Test-Driven Quality         | PASS   | Plan includes unit tests and E2E tests                           |
+| III. Protected Branches         | PASS   | Working on feature branch `037-fix-cross-page-editing` off `dev` |
+| IV. Migrations as Code          | N/A    | No database changes                                              |
+| V. Interview-Ready Architecture | PASS   | Will document reasoning for approach                             |
 
 No violations. Gate passed.
 
@@ -50,6 +50,7 @@ No violations. Gate passed.
 ### Backspace Bug — "Formatting lost on merge"
 
 **Current implementation** (canvas-editor.tsx lines 1339-1397):
+
 - Extracts only `.text` from first block's JSON, discarding bold/italic/link marks
 - Uses `insertContentAt(position, plainText)` instead of inserting the full inline node array
 
@@ -62,6 +63,7 @@ No violations. Gate passed.
 **File: `src/components/canvas/canvas-page.tsx`**
 
 Remove the `handleKeyDown` Enter interception block (lines 346-365). This is the "legacy navigate" path that:
+
 - Intercepts Enter when cursor Y is near the page bottom
 - Calls `event.preventDefault()` (blocks TipTap)
 - Calls `onTextOverflow(pageId, null)` (navigates cursor without content)
@@ -77,12 +79,15 @@ Remove the `handleKeyDown` Enter interception block (lines 346-365). This is the
 In `handleBackspaceAtStart` (lines 1339-1397):
 
 1. Instead of extracting plain text:
+
    ```typescript
    // BEFORE (loses formatting):
-   const firstBlockText = firstBlockJSON.content?.map((n) => n.text ?? '').join('') ?? '';
+   const firstBlockText =
+     firstBlockJSON.content?.map((n) => n.text ?? '').join('') ?? '';
    ```
 
 2. Extract the full inline content array (preserves marks):
+
    ```typescript
    // AFTER (preserves formatting):
    const firstBlockContent = firstBlockJSON.content || [];
@@ -103,6 +108,7 @@ Also remove the `handleTextOverflow` handling of the `null` content case from ca
 **File: `e2e/canvas-editor-cursor-cascade.spec.ts`**
 
 Add tests for:
+
 1. Enter at last line pushes text + cursor to next page
 2. Enter in middle of last line splits text correctly
 3. Backspace at start of page 2 merges with page 1
@@ -113,11 +119,13 @@ Add tests for:
 ### Phase 5: Verify No Regressions
 
 Run full test suite:
+
 ```bash
 pnpm test && pnpm test:integration && pnpm test:e2e
 ```
 
 Verify manually:
+
 - Drawing on pages still works
 - User-positioned text boxes unaffected
 - PDF backgrounds render correctly

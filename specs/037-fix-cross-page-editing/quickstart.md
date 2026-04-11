@@ -20,11 +20,11 @@ No database changes needed — this is a client-side-only fix.
 
 ## Key Files to Modify
 
-| File | Change |
-|------|--------|
-| `src/components/canvas/canvas-page.tsx` | Remove/rework the Enter interception in `handleKeyDown` (lines 346-365) |
-| `src/components/canvas/canvas-editor.tsx` | Fix `handleBackspaceAtStart` to preserve formatting (lines 1339-1397) |
-| `e2e/canvas-editor-cursor-cascade.spec.ts` | Add E2E tests for Enter overflow and Backspace merge |
+| File                                       | Change                                                                  |
+| ------------------------------------------ | ----------------------------------------------------------------------- |
+| `src/components/canvas/canvas-page.tsx`    | Remove/rework the Enter interception in `handleKeyDown` (lines 346-365) |
+| `src/components/canvas/canvas-editor.tsx`  | Fix `handleBackspaceAtStart` to preserve formatting (lines 1339-1397)   |
+| `e2e/canvas-editor-cursor-cascade.spec.ts` | Add E2E tests for Enter overflow and Backspace merge                    |
 
 ## Running Tests
 

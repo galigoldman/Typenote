@@ -743,9 +743,7 @@ export function CanvasPage({
             key={tb.id}
             textBox={tb}
             maxHeight={
-              tb.id.endsWith('-ftb')
-                ? PAGE_HEIGHT - tb.y - 40
-                : undefined
+              tb.id.endsWith('-ftb') ? PAGE_HEIGHT - tb.y - 40 : undefined
             }
             isSelected={selectedTextBoxIds.has(tb.id)}
             readOnly={activeTool === 'read'}
