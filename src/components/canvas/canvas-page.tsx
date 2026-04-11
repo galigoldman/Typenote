@@ -343,27 +343,8 @@ export function CanvasPage({
       attributes: {
         class: `prose prose-sm sm:prose-base max-w-none focus:outline-none min-h-full ${editorPaddingTop} pb-4 px-4`,
       },
-      // Intercept Enter / ArrowDown near the bottom → move to next page
+      // Intercept ArrowDown near the bottom → move to next page
       handleKeyDown: (view, event) => {
-        // Enter near bottom → move to next page
-        if (event.key === 'Enter' && !event.shiftKey) {
-          const layer = textLayerRef.current;
-          if (!layer) return false;
-          try {
-            const coords = view.coordsAtPos(view.state.selection.from);
-            const layerRect = layer.getBoundingClientRect();
-            const cursorY = coords.bottom - layerRect.top;
-            if (cursorY > PAGE_HEIGHT - 60) {
-              event.preventDefault();
-              view.dom.blur();
-              onTextOverflowRef.current?.(pageIdRef.current, null);
-              return true;
-            }
-          } catch {
-            /* coordsAtPos can throw before DOM is ready */
-          }
-        }
-
         // ArrowDown at end of content near page bottom → next page
         if (event.key === 'ArrowDown') {
           const { state } = view;
@@ -501,7 +482,9 @@ export function CanvasPage({
             ed.chain()
               .deleteRange({ from: deleteFrom, to: doc.content.size })
               .run();
-            ed.commands.blur();
+            // Don't blur — let ProseMirror's selection mapping keep
+            // the cursor at the edge of the remaining content (same
+            // approach as the -ftb text box overflow path).
 
             onTextOverflowRef.current?.(pageIdRef.current, {
               type: 'doc',
@@ -562,15 +545,14 @@ export function CanvasPage({
                 ed.getJSON() as Record<string, unknown>,
               );
 
-              ed.commands.blur();
+              // Don't blur — cursor stays via selection mapping.
 
               onTextOverflowRef.current?.(pageIdRef.current, {
                 type: 'doc',
                 content: overflowNodes,
               } as Record<string, unknown>);
             } else {
-              // Can't determine split position — just navigate
-              ed.commands.blur();
+              // Can't determine split position — navigate to next page
               onTextOverflowRef.current?.(pageIdRef.current, null);
             }
           }
@@ -760,6 +742,11 @@ export function CanvasPage({
           <TextBoxComponent
             key={tb.id}
             textBox={tb}
+            maxHeight={
+              tb.id.endsWith('-ftb')
+                ? PAGE_HEIGHT - tb.y - 40
+                : undefined
+            }
             isSelected={selectedTextBoxIds.has(tb.id)}
             readOnly={activeTool === 'read'}
             onContentUpdate={(id, content) =>

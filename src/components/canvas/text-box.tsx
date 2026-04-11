@@ -21,6 +21,10 @@ interface TextBoxProps {
   textBox: TextBoxData;
   isSelected: boolean;
   readOnly?: boolean;
+  /** Max height the text box can visually grow to (clips overflow).
+   *  For -ftb flow text boxes this is PAGE_HEIGHT - y - margin so
+   *  content that overflows the page boundary is never visible. */
+  maxHeight?: number;
   onContentUpdate: (id: string, content: Record<string, unknown>) => void;
   onEditorReady?: (editor: Editor) => void;
   onHeightMeasured?: (id: string, height: number) => void;
@@ -37,6 +41,7 @@ export function TextBox({
   textBox,
   isSelected,
   readOnly = false,
+  maxHeight,
   onContentUpdate,
   onEditorReady,
   onHeightMeasured,
@@ -121,6 +126,19 @@ export function TextBox({
         textBoxIdRef.current,
         ed.getJSON() as Record<string, unknown>,
       );
+      // When the container is already at maxHeight (full page), adding
+      // content via Enter doesn't change the border box, so the
+      // ResizeObserver won't fire. We must report the scrollHeight on
+      // every content change so the overflow handler can detect and
+      // cascade the overflowing blocks.
+      requestAnimationFrame(() => {
+        const el = containerRef.current;
+        if (!el) return;
+        const measured = el.scrollHeight;
+        if (measured > 0) {
+          onHeightMeasuredRef.current?.(textBoxIdRef.current, measured);
+        }
+      });
     },
     onFocus: ({ editor: ed }) => {
       onEditorReadyRef.current?.(ed);
@@ -233,6 +251,10 @@ export function TextBox({
         top: textBox.y,
         width: textBox.width,
         minHeight: textBox.height,
+        // Clip content that grows past the page boundary so the
+        // overflow handler can remove it without a visual flash.
+        maxHeight: maxHeight,
+        overflow: maxHeight ? 'hidden' : undefined,
       }}
     >
       {/* Wrapper that scales font. Uses a CSS variable + inline style on the

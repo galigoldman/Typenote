@@ -58,14 +58,18 @@ When adding or modifying a feature, update this registry and write the correspon
 
 ## Canvas Editor — Cursor Cascade (`e2e/canvas-editor-cursor-cascade.spec.ts`) — IMPLEMENTED
 
-Follow-up to issue #118. Guards against cursor jumps when a multi-page overflow cascade is triggered by an Enter key.
+Follow-up to issue #118. Guards against cursor jumps when a multi-page overflow cascade is triggered by an Enter key. Extended with cross-page Backspace merge and continuous typing tests (037-fix-cross-page-editing).
 
 - [x] Enter at end of last line of page 1 places cursor on page 2 (never on a deeper page)
+- [x] Enter at beginning of last line pushes text to next page, viewport stays near
 - [x] Enter at end of last line of the last page creates new page and cursor lands on it
 - [x] Enter in the middle of a paragraph keeps cursor on the same page
 - [x] Cursor reaches its final position within 100ms of the keydown (3, 6, 9 pages)
 - [x] RTL (Hebrew) document: same rules apply — cursor is direction-agnostic
 - [x] 53-block scenario from commit 381bd6b still passes with zero data loss (regression gate)
+- [x] Backspace at start of page 2 merges first line with page 1, cursor at join point
+- [x] Backspace at start of page 1 does nothing (no previous page to merge into)
+- [x] Continuous typing across page boundary flows text and cursor seamlessly
 
 ---
 
