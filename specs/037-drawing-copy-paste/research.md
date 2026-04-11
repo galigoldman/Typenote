@@ -10,6 +10,7 @@
 **Rationale**: The canvas uses a simple ref-based undo stack (`undoStackRef` / `redoStackRef`, max 100 entries) with a `CanvasAction` discriminated union. Each action knows how to reverse itself. For paste, we need a single undo step that removes all elements from one paste operation. Adding a `'paste'` action type that holds arrays of strokes and text boxes lets undo remove them all at once while keeping it as one stack entry.
 
 **Alternatives considered**:
+
 - Push individual `stroke-add` / `textbox-add` per element: rejected because undo would remove them one-by-one, not as a group. User explicitly wants "remove only the last pasted item."
 - Wrap in a `'batch'` action: over-engineered for a single use case. A dedicated `'paste'` type is clearer.
 
@@ -20,6 +21,7 @@
 **Rationale**: The select mode already filters out `pointerType === 'touch'` (finger input never enters selection logic). On `pointerDown` with pen/mouse on empty space, the hook currently starts a 'drawing' state for lasso/rect selection. We can delay entering 'drawing' state by introducing a brief "pending" phase where the long-press timer runs. If the timer fires (500ms, no movement), paste executes. If the pen moves >5px, cancel timer and fall through to normal selection behavior.
 
 **Alternatives considered**:
+
 - Separate `use-long-press.ts` hook: adds indirection. Since long-press only matters in select mode and interacts with selection state, keeping it co-located is simpler.
 - Using `pointerType === 'pen'` filter for paste only: the spec says pen-only for long-press paste, but desktop users use Cmd+V instead. Since select mode already filters touch, and mouse long-press is uncommon, filtering pen-only for the long-press timer is correct.
 
@@ -30,6 +32,7 @@
 **Rationale**: The clipboard must survive across React re-renders and page navigation within a document, but clear on document switch. A ref is ideal — no unnecessary re-renders, persists across component updates, and can be cleared in a `useEffect` cleanup when the document ID changes.
 
 **Alternatives considered**:
+
 - React state (`useState`): triggers re-renders on copy, unnecessary.
 - Context/global store: over-engineered for single-component scope.
 - OS clipboard (`navigator.clipboard`): can't preserve full object fidelity (stroke points, bbox, etc.) and would require serialization/deserialization.
@@ -41,6 +44,7 @@
 **Rationale**: The codebase already uses this pattern for `Cmd+S` (save) and `Delete/Backspace` (delete selection). Adding two more shortcuts in the same style keeps the code consistent. The handler checks `activeTool === 'select'` and whether a selection exists before acting.
 
 **Alternatives considered**:
+
 - ProseMirror plugin: only for TipTap text editor, not canvas.
 - Custom hook: unnecessary abstraction for two simple shortcuts.
 
@@ -57,5 +61,6 @@
 **Rationale**: The canvas already renders SVG overlays for selection (dashed rectangle, resize handles) via `selection-overlay.tsx`. Adding a paste indicator as another SVG element keeps rendering consistent and avoids DOM layering issues. CSS animation handles the growth/pulse.
 
 **Alternatives considered**:
+
 - Canvas 2D drawing: would require manual animation loop, more complex.
 - HTML overlay: z-index and positioning complexity with the SVG canvas.

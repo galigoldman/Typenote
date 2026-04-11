@@ -50,6 +50,7 @@ The project uses a two-branch model: `dev` (integration) and `main` (production)
 - PRs cannot be merged unless CI passes. This is enforced via GitHub branch protection rules on both `main` and `dev`.
 
 ## Active Technologies
+
 - TypeScript 5 / Node.js 22+ + React 19, Next.js 16 (App Router), TipTap 3 (ProseMirror), perfect-freehand (037-drawing-copy-paste)
 
 - N/A — purely client-side editor change, no database changes (037-fix-cross-page-editing)

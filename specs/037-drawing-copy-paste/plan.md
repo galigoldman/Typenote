@@ -23,13 +23,13 @@ Add drawing copy/paste to the canvas editor. Users select strokes/text boxes, co
 
 _GATE: Must pass before Phase 0 research. Re-check after Phase 1 design._
 
-| Principle | Status | Notes |
-| --------- | ------ | ----- |
-| I. Incremental Development | PASS | Pure client-side feature, no DB infrastructure needed. Built in phases: copy → paste → keyboard → visual feedback. |
-| II. Test-Driven Quality | PASS | Unit tests for clipboard logic, E2E for full user flow. No integration tests needed (no DB). |
-| III. Protected Branches | PASS | On feature branch `037-drawing-copy-paste`, will PR to `dev`. |
-| IV. Migrations as Code | N/A | No schema changes. |
-| V. Interview-Ready Architecture | PASS | Documents: clipboard data structure design, undo system integration, pointer event state machine, pen input discrimination. |
+| Principle                       | Status | Notes                                                                                                                       |
+| ------------------------------- | ------ | --------------------------------------------------------------------------------------------------------------------------- |
+| I. Incremental Development      | PASS   | Pure client-side feature, no DB infrastructure needed. Built in phases: copy → paste → keyboard → visual feedback.          |
+| II. Test-Driven Quality         | PASS   | Unit tests for clipboard logic, E2E for full user flow. No integration tests needed (no DB).                                |
+| III. Protected Branches         | PASS   | On feature branch `037-drawing-copy-paste`, will PR to `dev`.                                                               |
+| IV. Migrations as Code          | N/A    | No schema changes.                                                                                                          |
+| V. Interview-Ready Architecture | PASS   | Documents: clipboard data structure design, undo system integration, pointer event state machine, pen input discrimination. |
 
 **Post-Phase 1 Re-check**: All gates still pass. No new dependencies, no DB changes, no infrastructure additions.
 
@@ -76,6 +76,7 @@ e2e/
 **Goal**: Add Copy button to selection action bar and internal clipboard.
 
 **Changes**:
+
 1. **`src/types/canvas.ts`** — Add `ClipboardData` interface:
    ```
    { strokes: Stroke[], textBoxes: TextBox[], originX: number, originY: number, sourcePageId: string }
@@ -93,6 +94,7 @@ e2e/
 **Goal**: Detect pen long-press in select mode and paste clipboard contents.
 
 **Changes**:
+
 1. **`src/types/canvas.ts`** — Extend `CanvasAction` union with:
    ```
    { type: 'paste', pageId: string, strokes: Stroke[], textBoxes: TextBox[] }
@@ -115,6 +117,7 @@ e2e/
 **Goal**: Cmd/Ctrl+C and Cmd/Ctrl+V for desktop.
 
 **Changes**:
+
 1. **`src/components/canvas/canvas-editor.tsx`** — Add `useEffect` with window keydown listener:
    - `Cmd/Ctrl+C` when `activeTool === 'select'` and selection exists → call `copySelection()`
    - `Cmd/Ctrl+V` when clipboard has data → paste at viewport center (compute center from scroll position + viewport dimensions)
@@ -127,6 +130,7 @@ e2e/
 **Goal**: Show expanding circle during long-press to indicate paste is imminent.
 
 **Changes**:
+
 1. **`src/components/canvas/paste-indicator.tsx`** — New component:
    - SVG `<circle>` with CSS animation: grows from r=0 to r=20 over 500ms
    - Semi-transparent fill (e.g., blue with 20% opacity)
@@ -140,15 +144,19 @@ e2e/
 ## Key Technical Decisions
 
 ### Why internal clipboard (not OS clipboard)?
+
 Stroke data includes point arrays, bounding boxes, opacity, and color — serializing to OS clipboard and back would be lossy or require a custom MIME type. An in-memory ref is simpler and preserves full fidelity. Trade-off: can't paste across browser tabs or apps.
 
 ### Why compound 'paste' undo action?
+
 The user explicitly requested that undo removes "only the last pasted item." If we pushed individual stroke-add actions, undo would remove strokes one at a time. A compound action groups all pasted elements into one undo step.
 
 ### Why delay 'drawing' state entry for long-press?
+
 In select mode, pointerDown on empty space normally starts lasso/rect selection ('drawing' state). For long-press, we need a ~500ms window before committing to selection. If the pen moves >5px during that window, we cancel and enter 'drawing' as normal. This is the minimal change to the existing state machine.
 
 ### Why pen-only for long-press paste?
+
 Touch input is already filtered out in select mode (`pointerType === 'touch'` → early return). For long-press specifically, we additionally filter mouse to avoid accidental right-click or slow-click pastes on desktop. Desktop users use Cmd/Ctrl+V instead.
 
 ## Complexity Tracking

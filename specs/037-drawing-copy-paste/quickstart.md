@@ -9,17 +9,17 @@ Adds the ability to copy selected drawings (strokes and text boxes) and paste th
 
 ## Key Files to Modify
 
-| File | Change |
-| ---- | ------ |
-| `src/hooks/use-selection.ts` | Add long-press detection, clipboard ref, copy/paste logic |
+| File                                      | Change                                                                 |
+| ----------------------------------------- | ---------------------------------------------------------------------- |
+| `src/hooks/use-selection.ts`              | Add long-press detection, clipboard ref, copy/paste logic              |
 | `src/components/canvas/canvas-editor.tsx` | Add 'paste' CanvasAction type, keyboard shortcuts, undo/redo for paste |
-| `src/components/canvas/canvas-page.tsx` | Add Copy button to floating action bar, render paste indicator |
-| `src/types/canvas.ts` | Add ClipboardData type and 'paste' action variant to CanvasAction |
+| `src/components/canvas/canvas-page.tsx`   | Add Copy button to floating action bar, render paste indicator         |
+| `src/types/canvas.ts`                     | Add ClipboardData type and 'paste' action variant to CanvasAction      |
 
 ## Key Files to Create
 
-| File | Purpose |
-| ---- | ------- |
+| File                                        | Purpose                                                |
+| ------------------------------------------- | ------------------------------------------------------ |
 | `src/components/canvas/paste-indicator.tsx` | SVG circle overlay during long-press (visual feedback) |
 
 ## Architecture Decisions
