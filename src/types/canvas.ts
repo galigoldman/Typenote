@@ -75,3 +75,15 @@ export interface ViewTransform {
   offsetX: number;
   offsetY: number;
 }
+
+/** In-memory clipboard holding deep-cloned elements from a copy operation */
+export interface ClipboardData {
+  strokes: Stroke[];
+  textBoxes: TextBox[];
+  /** X center of the original selection bounding box */
+  originX: number;
+  /** Y center of the original selection bounding box */
+  originY: number;
+  /** Page ID where the copy was performed */
+  sourcePageId: string;
+}

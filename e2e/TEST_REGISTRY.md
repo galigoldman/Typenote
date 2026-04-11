@@ -150,18 +150,32 @@ Follow-up to issue #118. Guards against cursor jumps when a multi-page overflow 
 
 ---
 
+## Drawing Copy/Paste (`e2e/drawing-copy-paste.spec.ts`) — IMPLEMENTED (local only)
+
+- [x] Draw → select → copy → paste cycle is stable — ⚠️ SKIPPED IN CI
+- [x] Pasted drawing can be deleted independently — ⚠️ SKIPPED IN CI
+- [x] Undo after paste is stable — ⚠️ SKIPPED IN CI
+- [x] Shape snap still works in draw mode (no regression) — ⚠️ SKIPPED IN CI
+- [x] Copy and paste with no selection does nothing — ⚠️ SKIPPED IN CI
+- [x] Select mode toolbar shows Select button — ⚠️ SKIPPED IN CI
+- [x] Draw mode toolbar shows Pen and Eraser — ⚠️ SKIPPED IN CI
+- [x] Mode switching between Draw and Type is stable — ⚠️ SKIPPED IN CI
+
+---
+
 ## Summary
 
-| Feature             | Status      | Spec File                    | Tests     |
-| ------------------- | ----------- | ---------------------------- | --------- |
-| Auth                | Implemented | `e2e/auth.spec.ts`           | 7/7       |
-| Documents           | Implemented | `e2e/documents.spec.ts`      | 6/6       |
-| Canvas Editor       | Implemented | `e2e/canvas-editor.spec.ts`  | 15/15     |
-| Text Editor Toolbar | Implemented | `e2e/editor-toolbar.spec.ts` | 12/12     |
-| LaTeX Math          | Implemented | `e2e/latex-math.spec.ts`     | 5/5       |
-| Courses             | Implemented | `e2e/courses.spec.ts`        | 5/6       |
-| File Upload         | Implemented | `e2e/file-upload.spec.ts`    | 3/4       |
-| AI Chat             | Implemented | `e2e/ai-chat.spec.ts`        | 6/6       |
-| PDF Export          | Implemented | `e2e/export-pdf-*.spec.ts`   | 6/7       |
-| Real-time Sync      | Implemented | `e2e/realtime-sync.spec.ts`  | 3/3       |
-| **Total**           |             |                              | **67/68** |
+| Feature             | Status      | Spec File                        | Tests     |
+| ------------------- | ----------- | -------------------------------- | --------- |
+| Auth                | Implemented | `e2e/auth.spec.ts`               | 7/7       |
+| Documents           | Implemented | `e2e/documents.spec.ts`          | 6/6       |
+| Canvas Editor       | Implemented | `e2e/canvas-editor.spec.ts`      | 15/15     |
+| Text Editor Toolbar | Implemented | `e2e/editor-toolbar.spec.ts`     | 12/12     |
+| LaTeX Math          | Implemented | `e2e/latex-math.spec.ts`         | 5/5       |
+| Courses             | Implemented | `e2e/courses.spec.ts`            | 5/6       |
+| File Upload         | Implemented | `e2e/file-upload.spec.ts`        | 3/4       |
+| AI Chat             | Implemented | `e2e/ai-chat.spec.ts`            | 6/6       |
+| PDF Export          | Implemented | `e2e/export-pdf-*.spec.ts`       | 6/7       |
+| Real-time Sync      | Implemented | `e2e/realtime-sync.spec.ts`      | 3/3       |
+| Drawing Copy/Paste  | Implemented | `e2e/drawing-copy-paste.spec.ts` | 8/8       |
+| **Total**           |             |                                  | **75/76** |

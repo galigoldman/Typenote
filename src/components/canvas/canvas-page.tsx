@@ -14,7 +14,7 @@ import { TextStyle } from '@tiptap/extension-text-style';
 import { Indent } from '@/lib/editor/indent-extension';
 import { FontSize } from '@/lib/editor/font-size-extension';
 import { MathExpression } from '@/lib/editor/math-extension';
-import { Pencil, Sparkles, Trash2, X } from 'lucide-react';
+import { Pencil, Sparkles, Trash2, X, Copy, Check } from 'lucide-react';
 import { PdfTextLayer } from './pdf-text-layer';
 import { findOverflowSplitIndex } from '@/lib/canvas/text-split';
 import type {
@@ -29,6 +29,30 @@ import { DEFAULT_ERASER_RADIUS } from '@/hooks/use-eraser';
 import { SelectionOverlay } from './selection-overlay';
 import { TextBox as TextBoxComponent } from './text-box';
 import type { Editor } from '@tiptap/core';
+
+/** Small Copy button with "Copied!" feedback for the floating action bar */
+function CopyButton({ onCopy }: { onCopy: () => void }) {
+  const [copied, setCopied] = useState(false);
+  const handleCopy = (e: React.PointerEvent) => {
+    e.stopPropagation();
+    onCopy();
+    setCopied(true);
+    setTimeout(() => setCopied(false), 1500);
+  };
+  return (
+    <button
+      onPointerDown={handleCopy}
+      className="flex items-center justify-center h-7 w-7 rounded-full hover:bg-blue-50 hover:text-blue-600 transition-colors text-gray-600"
+      title={copied ? 'Copied!' : 'Copy'}
+    >
+      {copied ? (
+        <Check className="h-3.5 w-3.5 text-green-500" />
+      ) : (
+        <Copy className="h-3.5 w-3.5" />
+      )}
+    </button>
+  );
+}
 
 interface CanvasPageProps {
   page: CanvasPageData;
@@ -79,6 +103,8 @@ interface CanvasPageProps {
   ) => void;
   onDeleteSelection?: () => void;
   onEditSelection?: () => void;
+  onCopySelection?: () => void;
+  longPressIndicator?: { x: number; y: number; isVisible: boolean };
   hasSelectedTextBoxes?: boolean;
   renderPdfPage?: (pageNum: number, canvas: HTMLCanvasElement) => Promise<void>;
   materialId?: string | null;
@@ -123,6 +149,8 @@ export function CanvasPage({
   onTextBoxContentBoundsMeasured,
   onDeleteSelection,
   onEditSelection,
+  onCopySelection,
+  longPressIndicator,
   hasSelectedTextBoxes = false,
   renderPdfPage,
   materialId,
@@ -791,6 +819,32 @@ export function CanvasPage({
         </svg>
       )}
 
+      {/* Layer 5.4: Paste long-press indicator */}
+      {longPressIndicator?.isVisible && (
+        <svg
+          className="absolute inset-0 pointer-events-none"
+          viewBox={`0 0 ${PAGE_WIDTH} ${PAGE_HEIGHT}`}
+          style={{ zIndex: 9 }}
+        >
+          <circle
+            cx={longPressIndicator.x}
+            cy={longPressIndicator.y}
+            r="0"
+            fill="rgba(59, 130, 246, 0.2)"
+            stroke="rgba(59, 130, 246, 0.5)"
+            strokeWidth="1.5"
+          >
+            <animate
+              attributeName="r"
+              from="0"
+              to="20"
+              dur="0.5s"
+              fill="freeze"
+            />
+          </circle>
+        </svg>
+      )}
+
       {/* Layer 5.5: Selection overlay */}
       {activeTool === 'select' && (
         <SelectionOverlay
@@ -832,6 +886,7 @@ export function CanvasPage({
                 <Pencil className="h-3.5 w-3.5" />
               </button>
             )}
+            {onCopySelection && <CopyButton onCopy={onCopySelection} />}
             {onAskAiWithRegion && selectionBBox && (
               <button
                 onPointerDown={(e) => {
