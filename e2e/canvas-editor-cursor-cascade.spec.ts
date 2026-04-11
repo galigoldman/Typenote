@@ -280,13 +280,18 @@ test.describe('Canvas editor — cursor cascade fix (#118 follow-up)', () => {
       });
       expect(firstLineOfPage2).toBeTruthy();
 
-      // Click on page 2's editor to focus it, then Ctrl+Home to place
-      // cursor at position 0 (start of first block). This avoids DOM
-      // Selection API which doesn't reliably sync with ProseMirror in
+      // Click at the very start of page 2's first block to place the
+      // cursor at position 1. We click at x=1 (left edge) of the first
+      // child element, which reliably sets ProseMirror's internal
+      // selection — unlike DOM Selection API which doesn't sync in
       // headless Chromium.
-      const pm2 = page.locator('[data-page-id]').nth(1).locator('.ProseMirror');
-      await pm2.click();
-      await page.keyboard.press('Control+Home');
+      const firstBlock = page
+        .locator('[data-page-id]')
+        .nth(1)
+        .locator('.ProseMirror > :first-child');
+      await firstBlock.click({ position: { x: 1, y: 5 } });
+      // Press Home to ensure we're at column 0 (click might land mid-char).
+      await page.keyboard.press('Home');
       await page.waitForTimeout(100);
 
       // Press Backspace — should merge page 2's first line to page 1.
