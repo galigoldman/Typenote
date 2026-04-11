@@ -1,7 +1,13 @@
 'use client';
 
 import { useCallback, useRef, useState } from 'react';
-import type { CanvasTool, Stroke, TextBox, BBox } from '@/types/canvas';
+import type {
+  CanvasTool,
+  Stroke,
+  TextBox,
+  BBox,
+  ClipboardData,
+} from '@/types/canvas';
 import { PAGE_WIDTH, PAGE_HEIGHT } from '@/types/canvas';
 import {
   isStrokeInSelection,
@@ -46,6 +52,8 @@ interface UseSelectionOptions {
   ) => void;
   /** Called when user draws a rectangle that contains no objects (empty area crop) */
   onEmptyRectSelection?: (pageId: string, bbox: BBox) => void;
+  /** Called when user pastes clipboard contents at a position */
+  onPaste?: (pageId: string, strokes: Stroke[], textBoxes: TextBox[]) => void;
 }
 
 interface UseSelectionReturn {
@@ -66,6 +74,11 @@ interface UseSelectionReturn {
   resizeBBox: BBox | null;
   clearSelection: () => void;
   deleteSelected: () => void;
+  copySelection: () => void;
+  hasClipboardData: boolean;
+  pasteAtPosition: (x: number, y: number, pageId: string) => void;
+  clearClipboard: () => void;
+  longPressIndicator: { x: number; y: number; isVisible: boolean };
 }
 
 const TAP_THRESHOLD = 5;
@@ -169,6 +182,7 @@ export function useSelection({
   onModeChange,
   onDeleteSelected,
   onEmptyRectSelection,
+  onPaste,
 }: UseSelectionOptions): UseSelectionReturn {
   const [selectionPath, setSelectionPath] = useState<[number, number][] | null>(
     null,
@@ -202,6 +216,20 @@ export function useSelection({
   const resizeStartBBoxRef = useRef<BBox | null>(null);
   const resizeBBoxRef = useRef<BBox | null>(null);
   const unlockScrollRef = useRef<(() => void) | null>(null);
+
+  // Clipboard for copy/paste
+  const clipboardRef = useRef<ClipboardData | null>(null);
+  const [hasClipboardData, setHasClipboardData] = useState(false);
+
+  // Long-press detection for paste
+  const longPressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const longPressOriginRef = useRef<{ x: number; y: number } | null>(null);
+  const longPressPageIdRef = useRef<string | null>(null);
+  const [longPressIndicator, setLongPressIndicator] = useState<{
+    x: number;
+    y: number;
+    isVisible: boolean;
+  }>({ x: 0, y: 0, isVisible: false });
 
   const screenToPageCoords = (
     e: React.PointerEvent,
@@ -255,6 +283,184 @@ export function useSelection({
     );
     clearSelection();
   }, [onDeleteSelected, clearSelection]);
+
+  const cancelLongPress = useCallback(() => {
+    if (longPressTimerRef.current) {
+      clearTimeout(longPressTimerRef.current);
+      longPressTimerRef.current = null;
+    }
+    longPressOriginRef.current = null;
+    longPressPageIdRef.current = null;
+    setLongPressIndicator((prev) =>
+      prev.isVisible ? { ...prev, isVisible: false } : prev,
+    );
+  }, []);
+
+  const copySelection = useCallback(() => {
+    if (!activePageIdRef.current) return;
+    if (
+      selectedStrokesRef.current.length === 0 &&
+      selectedTextBoxIdsRef.current.size === 0
+    )
+      return;
+
+    const pageId = activePageIdRef.current;
+    const strokes = selectedStrokesRef.current;
+    const textBoxes =
+      selectedTextBoxIdsRef.current.size > 0
+        ? getPageTextBoxes(pageId).filter((tb) =>
+            selectedTextBoxIdsRef.current.has(tb.id),
+          )
+        : [];
+
+    // Compute origin as center of selection bbox
+    const allBBoxes: BBox[] = [
+      ...strokes.map((s) => s.bbox),
+      ...textBoxes.map((tb) => ({
+        minX: tb.x,
+        minY: tb.y,
+        maxX: tb.x + tb.width,
+        maxY: tb.y + tb.height,
+      })),
+    ];
+    if (allBBoxes.length === 0) return;
+    const unionBBox = {
+      minX: Math.min(...allBBoxes.map((b) => b.minX)),
+      minY: Math.min(...allBBoxes.map((b) => b.minY)),
+      maxX: Math.max(...allBBoxes.map((b) => b.maxX)),
+      maxY: Math.max(...allBBoxes.map((b) => b.maxY)),
+    };
+    const originX = (unionBBox.minX + unionBBox.maxX) / 2;
+    const originY = (unionBBox.minY + unionBBox.maxY) / 2;
+
+    // Deep-clone strokes and text boxes
+    clipboardRef.current = {
+      strokes: strokes.map((s) => ({
+        ...s,
+        points: s.points.map(
+          ([px, py, pr]) => [px, py, pr] as Stroke['points'][0],
+        ),
+        bbox: { ...s.bbox },
+      })),
+      textBoxes: textBoxes.map((tb) => ({
+        ...tb,
+        content: tb.content ? JSON.parse(JSON.stringify(tb.content)) : null,
+      })),
+      originX,
+      originY,
+      sourcePageId: pageId,
+    };
+    setHasClipboardData(true);
+  }, [getPageTextBoxes]);
+
+  const clearClipboard = useCallback(() => {
+    clipboardRef.current = null;
+    setHasClipboardData(false);
+  }, []);
+
+  /** Compute union bounding box from raw arrays (used by paste before state is set) */
+  const computeUnionBBoxFromArrays = (
+    strokes: Stroke[],
+    textBoxes: TextBox[],
+  ): BBox | null => {
+    const bboxes: BBox[] = [];
+    for (const s of strokes) bboxes.push(s.bbox);
+    for (const tb of textBoxes) {
+      bboxes.push({
+        minX: tb.x,
+        minY: tb.y,
+        maxX: tb.x + tb.width,
+        maxY: tb.y + tb.height,
+      });
+    }
+    if (bboxes.length === 0) return null;
+    return {
+      minX: Math.min(...bboxes.map((b) => b.minX)),
+      minY: Math.min(...bboxes.map((b) => b.minY)),
+      maxX: Math.max(...bboxes.map((b) => b.maxX)),
+      maxY: Math.max(...bboxes.map((b) => b.maxY)),
+    };
+  };
+
+  const pasteAtPosition = useCallback(
+    (targetX: number, targetY: number, pageId: string) => {
+      const clipboard = clipboardRef.current;
+      if (!clipboard) return;
+
+      let dx = targetX - clipboard.originX;
+      let dy = targetY - clipboard.originY;
+
+      // Clamp: compute what the pasted union bbox would be and adjust if out of bounds
+      const allSourceBBoxes: BBox[] = [
+        ...clipboard.strokes.map((s) => s.bbox),
+        ...clipboard.textBoxes.map((tb) => ({
+          minX: tb.x,
+          minY: tb.y,
+          maxX: tb.x + tb.width,
+          maxY: tb.y + tb.height,
+        })),
+      ];
+      if (allSourceBBoxes.length > 0) {
+        const srcUnion = {
+          minX: Math.min(...allSourceBBoxes.map((b) => b.minX)),
+          minY: Math.min(...allSourceBBoxes.map((b) => b.minY)),
+          maxX: Math.max(...allSourceBBoxes.map((b) => b.maxX)),
+          maxY: Math.max(...allSourceBBoxes.map((b) => b.maxY)),
+        };
+        const pastedMinX = srcUnion.minX + dx;
+        const pastedMinY = srcUnion.minY + dy;
+        const pastedMaxX = srcUnion.maxX + dx;
+        const pastedMaxY = srcUnion.maxY + dy;
+        if (pastedMinX < 0) dx -= pastedMinX;
+        if (pastedMinY < 0) dy -= pastedMinY;
+        if (pastedMaxX > PAGE_WIDTH) dx -= pastedMaxX - PAGE_WIDTH;
+        if (pastedMaxY > PAGE_HEIGHT) dy -= pastedMaxY - PAGE_HEIGHT;
+      }
+
+      // Clone strokes with new IDs and offset positions
+      const newStrokes: Stroke[] = clipboard.strokes.map((s) => {
+        const newPoints = s.points.map(
+          ([px, py, pr]) => [px + dx, py + dy, pr] as Stroke['points'][0],
+        );
+        const newBBox = computeBBox(newPoints);
+        return {
+          ...s,
+          id: Math.random().toString(36).slice(2) + Date.now().toString(36),
+          points: newPoints,
+          bbox: newBBox,
+          createdAt: Date.now(),
+        };
+      });
+
+      // Clone text boxes with new IDs and offset positions
+      const newTextBoxes: TextBox[] = clipboard.textBoxes.map((tb) => ({
+        ...tb,
+        id: Math.random().toString(36).slice(2) + Date.now().toString(36),
+        x: tb.x + dx,
+        y: tb.y + dy,
+        content: tb.content ? JSON.parse(JSON.stringify(tb.content)) : null,
+      }));
+
+      // Notify parent to add pasted elements and push undo action
+      onPaste?.(pageId, newStrokes, newTextBoxes);
+
+      // Auto-select pasted elements
+      const newStrokeIds = new Set(newStrokes.map((s) => s.id));
+      const newTextBoxIds = new Set(newTextBoxes.map((tb) => tb.id));
+      stateRef.current = 'selected';
+      activePageIdRef.current = pageId;
+      setSelectedStrokeIds(newStrokeIds);
+      selectedStrokesRef.current = newStrokes;
+      setSelectedTextBoxIds(newTextBoxIds);
+      selectedTextBoxIdsRef.current = newTextBoxIds;
+
+      const unionBBox = computeUnionBBoxFromArrays(newStrokes, newTextBoxes);
+      setSelectionBBox(unionBBox);
+      setTightSelectionBBox(unionBBox);
+      setSelectionPath(null);
+    },
+    [onPaste],
+  );
 
   const computeUnionBBox = (
     strokes: Stroke[],
@@ -339,14 +545,29 @@ export function useSelection({
         clearSelection();
       }
 
-      // Start new selection
-      stateRef.current = 'drawing';
+      // Start new selection — but first check for pen long-press paste
       activePageIdRef.current = pageId;
       startPointRef.current = [x, y];
+
+      if (e.pointerType === 'pen' && clipboardRef.current) {
+        // Start long-press timer for paste
+        longPressOriginRef.current = { x, y };
+        longPressPageIdRef.current = pageId;
+        setLongPressIndicator({ x, y, isVisible: true });
+        longPressTimerRef.current = setTimeout(() => {
+          longPressTimerRef.current = null;
+          longPressOriginRef.current = null;
+          setLongPressIndicator((prev) => ({ ...prev, isVisible: false }));
+          // Execute paste at the long-press position
+          pasteAtPosition(x, y, pageId);
+        }, 500);
+      }
+
+      stateRef.current = 'drawing';
       setSelectionPath([[x, y]]);
       setIsRectMode(true);
     },
-    [activeTool, selectionBBox, clearSelection],
+    [activeTool, selectionBBox, clearSelection, pasteAtPosition],
   );
 
   const handlePointerMove = useCallback(
@@ -355,6 +576,17 @@ export function useSelection({
       if (e.pointerType === 'touch') return;
 
       const { x, y } = screenToPageCoords(e);
+
+      // Cancel long-press timer if pen moves too far
+      if (longPressOriginRef.current && longPressTimerRef.current) {
+        const dist = Math.hypot(
+          x - longPressOriginRef.current.x,
+          y - longPressOriginRef.current.y,
+        );
+        if (dist > TAP_THRESHOLD) {
+          cancelLongPress();
+        }
+      }
 
       if (stateRef.current === 'drawing') {
         e.preventDefault();
@@ -412,7 +644,7 @@ export function useSelection({
         setResizeBBox(newBBox);
       }
     },
-    [activeTool],
+    [activeTool, cancelLongPress],
   );
 
   const handlePointerUp = useCallback(
@@ -421,6 +653,9 @@ export function useSelection({
       if (e.pointerType === 'touch') return;
 
       e.preventDefault();
+
+      // Cancel any pending long-press timer
+      cancelLongPress();
 
       if (stateRef.current === 'drawing') {
         const targetPageId = activePageIdRef.current ?? pageId;
@@ -737,6 +972,7 @@ export function useSelection({
       onModeChange,
       onEmptyRectSelection,
       clearSelection,
+      cancelLongPress,
     ],
   );
 
@@ -756,5 +992,10 @@ export function useSelection({
     resizeBBox,
     clearSelection,
     deleteSelected,
+    copySelection,
+    hasClipboardData,
+    pasteAtPosition,
+    clearClipboard,
+    longPressIndicator,
   };
 }

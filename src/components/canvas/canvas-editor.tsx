@@ -517,6 +517,12 @@ export function CanvasEditor({
         fromY: number;
         toX: number;
         toY: number;
+      }
+    | {
+        type: 'paste';
+        pageId: string;
+        strokes: Stroke[];
+        textBoxes: TextBox[];
       };
   const undoStackRef = useRef<CanvasAction[]>([]);
   const redoStackRef = useRef<CanvasAction[]>([]);
@@ -1505,6 +1511,31 @@ export function CanvasEditor({
     [triggerSave],
   );
 
+  // Paste elements onto a page (called from useSelection long-press or keyboard shortcut)
+  const handlePaste = useCallback(
+    (pageId: string, strokes: Stroke[], textBoxes: TextBox[]) => {
+      // Add pasted elements to the page
+      setPages((prev) =>
+        prev.map((p) =>
+          p.id === pageId
+            ? {
+                ...p,
+                strokes: [...p.strokes, ...strokes],
+                textBoxes: [...p.textBoxes, ...textBoxes],
+              }
+            : p,
+        ),
+      );
+      // Push compound undo action
+      undoStackRef.current.push({ type: 'paste', pageId, strokes, textBoxes });
+      redoStackRef.current = [];
+      if (undoStackRef.current.length > 100) undoStackRef.current.shift();
+      setHistoryVersion((v) => v + 1);
+      triggerSave();
+    },
+    [triggerSave],
+  );
+
   // Delete selected objects
   const handleDeleteSelected = useCallback(
     (pageId: string, strokeIds: string[], textBoxIds: string[]) => {
@@ -1567,6 +1598,11 @@ export function CanvasEditor({
     resizeBBox: selectionResizeBBox,
     clearSelection,
     deleteSelected,
+    copySelection,
+    hasClipboardData,
+    pasteAtPosition,
+    clearClipboard,
+    longPressIndicator,
   } = useSelection({
     activeTool,
     getPageStrokes,
@@ -1576,7 +1612,13 @@ export function CanvasEditor({
     onTextBoxResize: handleTextBoxResize,
     onModeChange: setActiveTool,
     onDeleteSelected: handleDeleteSelected,
+    onPaste: handlePaste,
   });
+
+  // Clear clipboard when switching documents
+  useEffect(() => {
+    clearClipboard();
+  }, [document.id, clearClipboard]);
 
   // Drawing hook
   const {
@@ -1700,6 +1742,24 @@ export function CanvasEditor({
           ),
         );
         break;
+      case 'paste': {
+        const pasteStrokeIds = new Set(action.strokes.map((s) => s.id));
+        const pasteTextBoxIds = new Set(action.textBoxes.map((tb) => tb.id));
+        setPages((prev) =>
+          prev.map((p) =>
+            p.id === action.pageId
+              ? {
+                  ...p,
+                  strokes: p.strokes.filter((s) => !pasteStrokeIds.has(s.id)),
+                  textBoxes: p.textBoxes.filter(
+                    (tb) => !pasteTextBoxIds.has(tb.id),
+                  ),
+                }
+              : p,
+          ),
+        );
+        break;
+      }
     }
     redoStackRef.current.push(action);
     setHistoryVersion((v) => v + 1);
@@ -1774,6 +1834,19 @@ export function CanvasEditor({
           ),
         );
         break;
+      case 'paste':
+        setPages((prev) =>
+          prev.map((p) =>
+            p.id === action.pageId
+              ? {
+                  ...p,
+                  strokes: [...p.strokes, ...action.strokes],
+                  textBoxes: [...p.textBoxes, ...action.textBoxes],
+                }
+              : p,
+          ),
+        );
+        break;
     }
     undoStackRef.current.push(action);
     setHistoryVersion((v) => v + 1);
@@ -1830,7 +1903,7 @@ export function CanvasEditor({
       ? canRedoText
       : false;
 
-  // Delete selected objects with keyboard
+  // Keyboard shortcuts for select mode (delete, copy, paste, escape)
   useEffect(() => {
     if (activeTool !== 'select') return;
     const handler = (e: KeyboardEvent) => {
@@ -1840,10 +1913,71 @@ export function CanvasEditor({
       if (e.key === 'Escape') {
         clearSelection();
       }
+      // Copy: Cmd/Ctrl+C
+      if ((e.metaKey || e.ctrlKey) && e.key === 'c') {
+        if (selectedStrokeIds.size > 0 || selectedTextBoxIds.size > 0) {
+          e.preventDefault();
+          copySelection();
+        }
+      }
+      // Paste: Cmd/Ctrl+V
+      if ((e.metaKey || e.ctrlKey) && e.key === 'v') {
+        if (hasClipboardData) {
+          e.preventDefault();
+          // Paste at viewport center
+          const container = globalThis.document.querySelector(
+            '[data-canvas-scroll]',
+          ) as HTMLElement | null;
+          if (container) {
+            const scrollLeft = container.scrollLeft;
+            const scrollTop = container.scrollTop;
+            const viewW = container.clientWidth;
+            const viewH = container.clientHeight;
+            // Convert viewport center to page coordinates
+            const centerClientX = viewW / 2;
+            const centerClientY = viewH / 2;
+            // Find which page is near center and compute coordinates
+            const pageEls = container.querySelectorAll('[data-page-id]');
+            for (const pageEl of pageEls) {
+              const rect = pageEl.getBoundingClientRect();
+              const containerRect = container.getBoundingClientRect();
+              const relY = rect.top - containerRect.top + scrollTop;
+              if (
+                relY <= scrollTop + centerClientY &&
+                relY + rect.height >= scrollTop + centerClientY
+              ) {
+                const pageId = pageEl.getAttribute('data-page-id');
+                if (!pageId) continue;
+                const scaleX = PAGE_WIDTH / rect.width;
+                const scaleY = PAGE_HEIGHT / rect.height;
+                const x =
+                  (centerClientX - (rect.left - containerRect.left)) * scaleX;
+                const y =
+                  (centerClientY - (rect.top - containerRect.top)) * scaleY;
+                pasteAtPosition(
+                  Math.max(0, Math.min(PAGE_WIDTH, x)),
+                  Math.max(0, Math.min(PAGE_HEIGHT, y)),
+                  pageId,
+                );
+                break;
+              }
+            }
+          }
+        }
+      }
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, [activeTool, deleteSelected, clearSelection]);
+  }, [
+    activeTool,
+    deleteSelected,
+    clearSelection,
+    copySelection,
+    hasClipboardData,
+    pasteAtPosition,
+    selectedStrokeIds,
+    selectedTextBoxIds,
+  ]);
 
   // Edit selected text boxes — switch to text mode and focus the editor
   const handleEditSelection = useCallback(() => {
@@ -2424,6 +2558,7 @@ export function CanvasEditor({
           ref={scrollContainerRef}
           className="flex-1 bg-gray-100 pointer-touch:bg-white"
           data-scroll-container
+          data-canvas-scroll
           style={{
             overflowX: 'hidden',
             overflowY: isDrawMode ? 'hidden' : 'auto',
@@ -2491,6 +2626,8 @@ export function CanvasEditor({
                     }
                     onBackspaceAtStart={handleBackspaceAtStart}
                     onDeleteSelection={deleteSelected}
+                    onCopySelection={copySelection}
+                    longPressIndicator={longPressIndicator}
                     onEditSelection={handleEditSelection}
                     hasSelectedTextBoxes={selectedTextBoxIds.size > 0}
                     renderPdfPage={renderPdfPage}
