@@ -10,7 +10,7 @@ describe('MathInputBox', () => {
     onCancel: vi.fn(),
   };
 
-  it('should render an input element', () => {
+  it('should render a textarea element', () => {
     render(<MathInputBox {...defaultProps} />);
     expect(
       screen.getByPlaceholderText('Describe math in plain English...'),

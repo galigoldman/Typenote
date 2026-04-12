@@ -25,7 +25,7 @@ export function MathNodeView({
   const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
 
-  const inputRef = useRef<HTMLInputElement>(null);
+  const inputRef = useRef<HTMLTextAreaElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
 
   const html = useMemo(() => {
@@ -102,14 +102,29 @@ export function MathNodeView({
     [originalText, latex],
   );
 
+  const resizeTextarea = useCallback(() => {
+    const el = inputRef.current;
+    if (!el) return;
+    el.style.height = 'auto';
+    el.style.height = el.scrollHeight + 'px';
+  }, []);
+
   // Auto-focus input when edit panel opens or mode switches
   useEffect(() => {
     if (isEditing) {
       requestAnimationFrame(() => {
         inputRef.current?.focus();
+        resizeTextarea();
       });
     }
-  }, [isEditing, editMode]);
+  }, [isEditing, editMode, resizeTextarea]);
+
+  // Auto-resize textarea when content or mode changes
+  useEffect(() => {
+    if (isEditing) {
+      resizeTextarea();
+    }
+  }, [editValue, editMode, isEditing, resizeTextarea]);
 
   // Click outside to close
   useEffect(() => {
@@ -124,7 +139,7 @@ export function MathNodeView({
   }, [isEditing, closeEditor]);
 
   const handleKeyDown = useCallback(
-    async (e: React.KeyboardEvent<HTMLInputElement>) => {
+    async (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
       if (e.key === 'Escape') {
         e.preventDefault();
         e.stopPropagation();
@@ -273,9 +288,9 @@ export function MathNodeView({
           </div>
           {/* Input */}
           <div className="flex items-center gap-2">
-            <input
+            <textarea
               ref={inputRef}
-              type="text"
+              rows={1}
               value={editValue}
               onChange={(e) => setEditValue(e.target.value)}
               onKeyDown={handleKeyDown}
@@ -285,7 +300,7 @@ export function MathNodeView({
                   : 'Enter LaTeX code...'
               }
               disabled={isLoading}
-              className="min-w-[220px] border-none bg-transparent text-sm outline-none placeholder:text-zinc-400 disabled:opacity-50"
+              className="min-w-[220px] max-h-[200px] resize-none overflow-y-auto border-none bg-transparent text-sm outline-none placeholder:text-zinc-400 disabled:opacity-50"
             />
             {isLoading && (
               <div className="h-4 w-4 animate-spin rounded-full border-2 border-zinc-300 border-t-violet-500" />

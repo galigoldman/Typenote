@@ -19,14 +19,26 @@ export function MathInputBox({
     remaining: number;
     limit: number;
   } | null>(null);
-  const inputRef = useRef<HTMLInputElement>(null);
+  const inputRef = useRef<HTMLTextAreaElement>(null);
+
+  const resizeTextarea = useCallback(() => {
+    const el = inputRef.current;
+    if (!el) return;
+    el.style.height = 'auto';
+    el.style.height = el.scrollHeight + 'px';
+  }, []);
 
   useEffect(() => {
     // Auto-focus the input on mount, delayed to ensure ProseMirror's focus cycle completes
     requestAnimationFrame(() => {
       inputRef.current?.focus();
+      resizeTextarea();
     });
-  }, []);
+  }, [resizeTextarea]);
+
+  useEffect(() => {
+    resizeTextarea();
+  }, [inputValue, resizeTextarea]);
 
   // Fetch LaTeX quota on mount
   useEffect(() => {
@@ -44,7 +56,7 @@ export function MathInputBox({
   }, []);
 
   const handleKeyDown = useCallback(
-    async (e: React.KeyboardEvent<HTMLInputElement>) => {
+    async (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
       if (e.key === 'Escape') {
         e.preventDefault();
         onCancel();
@@ -83,9 +95,9 @@ export function MathInputBox({
     >
       <div className="flex items-center gap-2">
         <span className="text-sm font-medium text-violet-500">∑</span>
-        <input
+        <textarea
           ref={inputRef}
-          type="text"
+          rows={1}
           value={inputValue}
           onChange={(e) => setInputValue(e.target.value)}
           onKeyDown={handleKeyDown}
@@ -95,7 +107,7 @@ export function MathInputBox({
               : 'Describe math in plain English...'
           }
           disabled={isLoading || isQuotaExhausted}
-          className="min-w-[220px] flex-1 border-none bg-transparent text-sm outline-none placeholder:text-zinc-400 disabled:opacity-50"
+          className="min-w-[220px] max-h-[200px] resize-none overflow-y-auto flex-1 border-none bg-transparent text-sm outline-none placeholder:text-zinc-400 disabled:opacity-50"
         />
         {isLoading ? (
           <div className="h-4 w-4 animate-spin rounded-full border-2 border-zinc-300 border-t-violet-500" />
