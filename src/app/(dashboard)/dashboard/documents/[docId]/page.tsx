@@ -69,15 +69,17 @@ export default async function DocumentPage({ params }: DocumentPageProps) {
       )}
 
       {isTextDocument ? (
-        <>
+        <div className="flex min-h-0 flex-1">
+          <div className="flex min-h-0 min-w-0 flex-1 flex-col">
+            <TiptapEditor document={typedDocument} />
+          </div>
           <AiChatWrapper
             courseId={course?.id}
             courseName={course?.name}
             weekId={typedDocument.week_id ?? undefined}
             weekLabel={weekLabel}
           />
-          <TiptapEditor document={typedDocument} />
-        </>
+        </div>
       ) : (
         <DocumentWithAi
           courseId={course?.id}

@@ -60,7 +60,17 @@ export function DocumentWithAi({
   }, []);
 
   return (
-    <>
+    <div className="flex min-h-0 flex-1">
+      <div className="flex min-h-0 min-w-0 flex-1 flex-col">
+        <CanvasEditor
+          document={document}
+          onDocumentTextReady={handleDocumentTextReady}
+          materialId={materialId}
+          personalFileId={personalFileId}
+          courseName={courseName}
+          onAskAiWithContext={handleAskAiWithContext}
+        />
+      </div>
       <AiChatWrapper
         courseId={courseId}
         courseName={courseName}
@@ -74,14 +84,6 @@ export function DocumentWithAi({
         onToggle={() => setIsAiOpen((prev) => !prev)}
         onClose={() => setIsAiOpen(false)}
       />
-      <CanvasEditor
-        document={document}
-        onDocumentTextReady={handleDocumentTextReady}
-        materialId={materialId}
-        personalFileId={personalFileId}
-        courseName={courseName}
-        onAskAiWithContext={handleAskAiWithContext}
-      />
-    </>
+    </div>
   );
 }
