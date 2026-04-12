@@ -12,7 +12,7 @@ interface ConversationItem {
 }
 
 interface ConversationListProps {
-  courseId: string;
+  courseId?: string;
   activeConversationId?: string | null;
   onSelect: (conversationId: string) => void;
   onNew: () => void;
@@ -49,6 +49,11 @@ export function ConversationList({
 
   useEffect(() => {
     async function fetchConversations() {
+      if (!courseId) {
+        setConversations([]);
+        setLoading(false);
+        return;
+      }
       setLoading(true);
       try {
         const res = await fetch(`/api/ai/conversations?courseId=${courseId}`);

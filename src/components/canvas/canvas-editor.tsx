@@ -2134,62 +2134,40 @@ export function CanvasEditor({
   );
 
   const handleAskAiWithRegion = useCallback(
-    (bbox: BBox, pageId: string) => {
+    async (bbox: BBox, pageId: string) => {
       const refs = pageCanvasRefsMap.current.get(pageId);
-      if (!refs) return;
+      if (!refs?.element) return;
 
       const w = bbox.maxX - bbox.minX;
       const h = bbox.maxY - bbox.minY;
       if (w < 20 || h < 20) return;
 
       try {
+        // Use html-to-image to capture the full page DOM (text + canvases)
+        const { toCanvas } = await import('html-to-image');
+        const fullCanvas = await toCanvas(refs.element, {
+          backgroundColor: 'white',
+        });
+
+        // Crop to the selected region
         const dpr = window.devicePixelRatio || 1;
-        // Composite PDF + strokes canvases directly (avoids html-to-image DOM cloning issues)
         const offscreen = window.document.createElement('canvas');
         offscreen.width = Math.round(w * dpr);
         offscreen.height = Math.round(h * dpr);
         const ctx = offscreen.getContext('2d');
         if (!ctx) return;
 
-        // White background
-        ctx.fillStyle = 'white';
-        ctx.fillRect(0, 0, offscreen.width, offscreen.height);
-
-        // Source rect in internal canvas pixels (high-DPI backing buffer)
-        const sx = bbox.minX * dpr;
-        const sy = bbox.minY * dpr;
-        const sw = w * dpr;
-        const sh = h * dpr;
-
-        // Draw PDF background layer (if available)
-        if (refs.pdf && refs.pdf.width > 0) {
-          ctx.drawImage(
-            refs.pdf,
-            sx,
-            sy,
-            sw,
-            sh,
-            0,
-            0,
-            offscreen.width,
-            offscreen.height,
-          );
-        }
-
-        // Draw committed strokes layer
-        if (refs.strokes && refs.strokes.width > 0) {
-          ctx.drawImage(
-            refs.strokes,
-            sx,
-            sy,
-            sw,
-            sh,
-            0,
-            0,
-            offscreen.width,
-            offscreen.height,
-          );
-        }
+        ctx.drawImage(
+          fullCanvas,
+          bbox.minX * dpr,
+          bbox.minY * dpr,
+          w * dpr,
+          h * dpr,
+          0,
+          0,
+          offscreen.width,
+          offscreen.height,
+        );
 
         const dataUrl = offscreen.toDataURL('image/png');
         onAskAiWithContext?.({ type: 'image', dataUrl });

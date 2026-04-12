@@ -53,7 +53,7 @@ export type AiContextItem =
   | { type: 'image'; dataUrl: string };
 
 interface AiChatPanelProps {
-  courseId: string;
+  courseId?: string;
   weekId?: string;
   courseName?: string;
   weekLabel?: string;
@@ -113,6 +113,12 @@ export function AiChatPanel({
     initialLoadDone.current = true;
 
     async function loadMostRecent() {
+      if (!courseId) {
+        // No course — no conversation persistence
+        setCurrentConversationId(null);
+        setMessages([]);
+        return;
+      }
       setLoadingConversation(true);
       try {
         const res = await fetch(`/api/ai/conversations?courseId=${courseId}`);

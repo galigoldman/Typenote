@@ -20,7 +20,7 @@ type AnalyticsEventMap = {
     week_id: string;
   };
   ai_chat_message_sent: {
-    course_id: string;
+    course_id: string | undefined;
     mode: 'quick' | 'deep';
   };
   pdf_exported: {

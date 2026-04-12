@@ -9,8 +9,8 @@ import type { AiContextItem } from './ai-chat-panel';
 import { AiChatWrapper } from './ai-chat-wrapper';
 
 interface DocumentWithAiProps {
-  courseId: string;
-  courseName: string;
+  courseId?: string;
+  courseName?: string;
   weekId?: string;
   weekLabel?: string;
   document: Document;

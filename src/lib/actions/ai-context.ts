@@ -61,7 +61,7 @@ export type SearchResult = {
 
 export type QuestionParams = {
   question: string;
-  courseId: string;
+  courseId?: string;
   weekId?: string;
   documentId?: string;
   mode: 'quick' | 'deep';
@@ -308,7 +308,7 @@ export async function searchContext(
     segmentText: m.segment_text,
     pageStart: m.page_start,
     pageEnd: m.page_end,
-    courseId: params.courseId,
+    courseId: params.courseId ?? '',
     weekId: m.week_id,
     mimeType: m.mime_type,
     similarity: m.similarity,
@@ -341,12 +341,14 @@ export async function askQuestion(
     hasDocumentContent,
   });
 
-  // RAG search — find relevant text chunks
-  const results = await searchContext({
-    query: question,
-    courseId,
-    maxResults: 8,
-  });
+  // RAG search — find relevant text chunks (skip when no course)
+  const results = courseId
+    ? await searchContext({
+        query: question,
+        courseId,
+        maxResults: 8,
+      })
+    : [];
 
   // Collect text context and sources from search results
   const contextTexts: string[] = [];
@@ -506,11 +508,14 @@ export async function buildAiContext(params: QuestionParams): Promise<{
     hasDocumentContent,
   });
 
-  const results = await searchContext({
-    query: question,
-    courseId,
-    maxResults: 8,
-  });
+  // Skip RAG search when there's no course (no materials to search)
+  const results = courseId
+    ? await searchContext({
+        query: question,
+        courseId,
+        maxResults: 8,
+      })
+    : [];
 
   const contextTexts: string[] = [];
   const sources: QuestionResult['sources'] = [];
