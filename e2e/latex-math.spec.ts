@@ -37,7 +37,7 @@ test.describe('LaTeX Math', () => {
 
     // The math input box should appear
     const mathInput = page.locator(
-      'input[placeholder="Describe math in plain English..."]',
+      'textarea[placeholder="Describe math in plain English..."]',
     );
     await expect(mathInput).toBeVisible({ timeout: 5_000 });
 
@@ -101,7 +101,7 @@ test.describe('LaTeX Math', () => {
     await editLatexButton.click();
 
     // Find the input and modify it
-    const input = page.locator('input[placeholder="Enter LaTeX code..."]');
+    const input = page.locator('textarea[placeholder="Enter LaTeX code..."]');
     await expect(input).toBeVisible();
     await input.clear();
     await input.fill('y^2 + z^2');
@@ -128,6 +128,61 @@ test.describe('LaTeX Math', () => {
     await expect(mathExpressions).toHaveCount(count - 1);
   });
 
+  test('LaTeX edit textarea auto-expands for long expressions', async ({
+    page,
+  }) => {
+    const mathExpressions = page.locator('span[data-type="math-expression"]');
+    const count = await mathExpressions.count();
+
+    if (count === 0) {
+      test.skip(true, 'No math expressions in seeded document to edit');
+      return;
+    }
+
+    // Click on the first math expression to select it
+    await mathExpressions.first().click();
+
+    // Open the edit panel
+    const editButton = page.getByRole('button', { name: 'Edit' });
+    await expect(editButton).toBeVisible({ timeout: 5_000 });
+    await editButton.click();
+
+    // Switch to raw LaTeX mode
+    const editLatexButton = page.getByRole('button', { name: 'Edit LaTeX' });
+    await expect(editLatexButton).toBeVisible();
+    await editLatexButton.click();
+
+    const textarea = page.locator(
+      'textarea[placeholder="Enter LaTeX code..."]',
+    );
+    await expect(textarea).toBeVisible();
+
+    // Measure baseline height with short content
+    await textarea.fill('x^2');
+    const shortBox = await textarea.boundingBox();
+    expect(shortBox).not.toBeNull();
+    const shortHeight = shortBox!.height;
+
+    // Type a long LaTeX expression (200+ chars)
+    const longLatex =
+      '\\frac{\\partial^2 u}{\\partial t^2} = c^2 \\left( \\frac{\\partial^2 u}{\\partial x^2} + \\frac{\\partial^2 u}{\\partial y^2} + \\frac{\\partial^2 u}{\\partial z^2} \\right) + \\sum_{n=1}^{\\infty} a_n \\sin(n\\pi x)';
+    await textarea.fill(longLatex);
+
+    // Wait a frame for resize to take effect
+    await page.waitForTimeout(100);
+
+    const longBox = await textarea.boundingBox();
+    expect(longBox).not.toBeNull();
+    // The textarea should have grown taller
+    expect(longBox!.height).toBeGreaterThan(shortHeight);
+
+    // Verify max-height cap: textarea should not exceed 200px
+    expect(longBox!.height).toBeLessThanOrEqual(210); // small tolerance for borders/padding
+
+    // Press Escape to close without saving
+    await page.keyboard.press('Escape');
+  });
+
   test('math renders LTR inside RTL text', async ({ page }) => {
     test.skip(
       !!process.env.CI,
@@ -149,7 +204,7 @@ test.describe('LaTeX Math', () => {
     await page.keyboard.type('{');
 
     const mathInput = page.locator(
-      'input[placeholder="Describe math in plain English..."]',
+      'textarea[placeholder="Describe math in plain English..."]',
     );
     await expect(mathInput).toBeVisible({ timeout: 5_000 });
     await mathInput.fill('a in A');
