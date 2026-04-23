@@ -492,3 +492,46 @@ VALUES (
   'pro',
   '2026-03-15 09:08:00+00'
 ) ON CONFLICT (id) DO NOTHING;
+
+-- ============================================
+-- DOCUMENT VERSIONS (test data for version history)
+-- ============================================
+
+-- Version 1 for "Limits and Continuity" — idle snapshot (older content)
+INSERT INTO public.document_versions (id, document_id, user_id, content, pages, title, trigger, created_at)
+VALUES (
+  '90000000-0000-0000-0000-000000000001',
+  '20000000-0000-0000-0000-000000000001',
+  'ac3be77d-4566-406c-9ac0-7c410634ad41',
+  '{"type":"doc","content":[{"type":"heading","attrs":{"level":1,"textAlign":null},"content":[{"type":"text","text":"Limits and Continuity"}]},{"type":"paragraph","content":[{"type":"text","text":"Draft: A limit describes the value a function approaches."}]}]}',
+  NULL,
+  'Limits and Continuity',
+  'idle',
+  '2026-04-10 14:00:00+00'
+) ON CONFLICT (id) DO NOTHING;
+
+-- Version 2 for "Limits and Continuity" — periodic snapshot
+INSERT INTO public.document_versions (id, document_id, user_id, content, pages, title, trigger, created_at)
+VALUES (
+  '90000000-0000-0000-0000-000000000002',
+  '20000000-0000-0000-0000-000000000001',
+  'ac3be77d-4566-406c-9ac0-7c410634ad41',
+  '{"type":"doc","content":[{"type":"heading","attrs":{"level":1,"textAlign":null},"content":[{"type":"text","text":"Limits and Continuity"}]},{"type":"paragraph","content":[{"type":"text","text":"A limit describes the value a function approaches as the input approaches a given point."}]},{"type":"heading","attrs":{"level":2,"textAlign":null},"content":[{"type":"text","text":"Key Definitions"}]}]}',
+  NULL,
+  'Limits and Continuity',
+  'periodic',
+  '2026-04-10 14:05:00+00'
+) ON CONFLICT (id) DO NOTHING;
+
+-- Version 3 for "Limits and Continuity" — close snapshot (latest)
+INSERT INTO public.document_versions (id, document_id, user_id, content, pages, title, trigger, created_at)
+VALUES (
+  '90000000-0000-0000-0000-000000000003',
+  '20000000-0000-0000-0000-000000000001',
+  'ac3be77d-4566-406c-9ac0-7c410634ad41',
+  '{"type":"doc","content":[{"type":"heading","attrs":{"level":1,"textAlign":null},"content":[{"type":"text","text":"Limits and Continuity"}]},{"type":"paragraph","content":[{"type":"text","text":"A limit describes the value a function approaches as the input approaches a given point."}]},{"type":"heading","attrs":{"level":2,"textAlign":null},"content":[{"type":"text","text":"Key Definitions"}]},{"type":"bulletList","content":[{"type":"listItem","content":[{"type":"paragraph","content":[{"type":"text","text":"Limit: lim x→a f(x) = L"}]}]}]}]}',
+  NULL,
+  'Limits and Continuity',
+  'close',
+  '2026-04-10 14:30:00+00'
+) ON CONFLICT (id) DO NOTHING;

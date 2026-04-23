@@ -45,6 +45,7 @@ import {
   Sparkles,
   Download,
   Loader2,
+  Clock,
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useSidebar } from '@/components/dashboard/sidebar-layout';
@@ -91,6 +92,7 @@ interface CanvasEditorProps {
       | { type: 'text'; content: string }
       | { type: 'image'; dataUrl: string },
   ) => void;
+  onToggleVersionHistory?: () => void;
 }
 
 const CANVAS_CLASSES: Record<string, string> = {
@@ -330,6 +332,7 @@ export function CanvasEditor({
   personalFileId,
   courseName,
   onAskAiWithContext,
+  onToggleVersionHistory,
 }: CanvasEditorProps) {
   const router = useRouter();
   const { isOpen: sidebarOpen, toggle: toggleSidebar } = useSidebar();
@@ -2494,10 +2497,24 @@ export function CanvasEditor({
           </>
         )}
 
-        {/* Export PDF — always visible */}
+        {/* Version History — always visible */}
+        <div className="flex-1" />
+        {onToggleVersionHistory && (
+          <button
+            onPointerDown={(e) => {
+              e.stopPropagation();
+              onToggleVersionHistory();
+            }}
+            className="flex items-center justify-center h-8 w-8 min-h-[44px] min-w-[44px] rounded-lg transition-colors hover:bg-accent/50 text-muted-foreground"
+            title="Version history"
+          >
+            <Clock className="h-4 w-4" />
+          </button>
+        )}
+
+        {/* Export PDF — hidden in text mode */}
         {activeTool !== 'text' && (
           <>
-            <div className="flex-1" />
             <button
               onPointerDown={(e) => {
                 e.stopPropagation();

@@ -3,6 +3,7 @@
 import { useCallback, useRef, useState } from 'react';
 
 import { CanvasEditor } from '@/components/canvas/canvas-editor';
+import { VersionSidebar } from '@/components/version-history/version-sidebar';
 import type { Document } from '@/types/database';
 import type { AiContextItem } from './ai-chat-panel';
 
@@ -30,6 +31,7 @@ export function DocumentWithAi({
   const getDocumentTextRef = useRef<(() => string) | null>(null);
   const [contextItems, setContextItems] = useState<AiContextItem[]>([]);
   const [isAiOpen, setIsAiOpen] = useState(false);
+  const [isVersionHistoryOpen, setIsVersionHistoryOpen] = useState(false);
 
   const handleDocumentTextReady = useCallback((getter: () => string) => {
     getDocumentTextRef.current = getter;
@@ -69,8 +71,16 @@ export function DocumentWithAi({
           personalFileId={personalFileId}
           courseName={courseName}
           onAskAiWithContext={handleAskAiWithContext}
+          onToggleVersionHistory={() =>
+            setIsVersionHistoryOpen((prev) => !prev)
+          }
         />
       </div>
+      <VersionSidebar
+        documentId={document.id}
+        isOpen={isVersionHistoryOpen}
+        onClose={() => setIsVersionHistoryOpen(false)}
+      />
       <AiChatWrapper
         courseId={courseId}
         courseName={courseName}

@@ -163,6 +163,16 @@ Follow-up to issue #118. Guards against cursor jumps when a multi-page overflow 
 
 ---
 
+## Version History (`e2e/version-history.spec.ts`) — PLANNED
+
+- [ ] Open version history sidebar from canvas editor toolbar
+- [ ] Version sidebar shows seeded version entries with timestamps
+- [ ] Edit document → wait for idle snapshot → version appears in sidebar
+- [ ] Restore a version → document content changes and "Before restore" entry appears
+- [ ] Empty state shown for document with no versions
+
+---
+
 ## Summary
 
 | Feature             | Status      | Spec File                        | Tests     |
@@ -178,4 +188,5 @@ Follow-up to issue #118. Guards against cursor jumps when a multi-page overflow 
 | PDF Export          | Implemented | `e2e/export-pdf-*.spec.ts`       | 6/7       |
 | Real-time Sync      | Implemented | `e2e/realtime-sync.spec.ts`      | 3/3       |
 | Drawing Copy/Paste  | Implemented | `e2e/drawing-copy-paste.spec.ts` | 8/8       |
-| **Total**           |             |                                  | **75/76** |
+| Version History     | Planned     | `e2e/version-history.spec.ts`    | 0/5       |
+| **Total**           |             |                                  | **75/81** |
