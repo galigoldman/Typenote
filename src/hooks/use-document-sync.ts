@@ -7,6 +7,7 @@ import {
   type SaveErrorType,
 } from './use-auto-save';
 import { useRealtimeSync, type ConnectionStatus } from './use-realtime-sync';
+import { useVersionSnapshots } from './use-version-snapshots';
 import {
   updateDocumentContent,
   updateDocumentTitle,
@@ -72,6 +73,25 @@ export function useDocumentSync({
     errorType,
     retryNow,
   } = useAutoSave(saveFn);
+
+  // Version snapshots — content hash for change detection
+  const getContentHash = useCallback(() => {
+    const content = editor ? JSON.stringify(editor.getJSON()) : '{}';
+    const pages = getPagesData?.();
+    const pagesStr = pages ? JSON.stringify(pages) : '';
+    return content + pagesStr;
+  }, [editor, getPagesData]);
+
+  const { onActivity: onVersionActivity } = useVersionSnapshots({
+    documentId,
+    getContentHash,
+  });
+
+  // Wrap triggerSave to also signal version snapshot activity
+  const triggerSaveWithVersioning = useCallback(() => {
+    triggerSave();
+    onVersionActivity();
+  }, [triggerSave, onVersionActivity]);
 
   const manualSave = useCallback(async () => {
     await flushSave();
@@ -158,7 +178,7 @@ export function useDocumentSync({
     connectionStatus,
     isLockedByRemote,
     unlockEditor,
-    triggerSave,
+    triggerSave: triggerSaveWithVersioning,
     flushSave,
     lastSaveTimestampRef,
     saveTitle,

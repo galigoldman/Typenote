@@ -202,3 +202,16 @@ export interface AiMessage {
   model: 'flash' | 'pro' | null;
   created_at: string;
 }
+
+export type VersionTrigger = 'idle' | 'periodic' | 'close' | 'before_restore';
+
+export interface DocumentVersion {
+  id: string;
+  document_id: string;
+  user_id: string;
+  content: Record<string, unknown>;
+  pages: Record<string, unknown> | null;
+  title: string;
+  trigger: VersionTrigger;
+  created_at: string;
+}

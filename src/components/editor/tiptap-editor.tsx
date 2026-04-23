@@ -18,12 +18,14 @@ import { Indent } from '@/lib/editor/indent-extension';
 import { MathExpression } from '@/lib/editor/math-extension';
 import { MathInputBox } from '@/lib/editor/math-input-box';
 import { EditorToolbar } from './editor-toolbar';
+import { Clock } from 'lucide-react';
 import { toast } from 'sonner';
 import 'katex/dist/katex.min.css';
 
 interface TiptapEditorProps {
   document: Document;
   courseName?: string;
+  onToggleVersionHistory?: () => void;
 }
 
 const CANVAS_CLASSES: Record<string, string> = {
@@ -84,7 +86,11 @@ function ConnectionIndicator({
   );
 }
 
-export function TiptapEditor({ document, courseName }: TiptapEditorProps) {
+export function TiptapEditor({
+  document,
+  courseName,
+  onToggleVersionHistory,
+}: TiptapEditorProps) {
   const [title, setTitle] = useState(document.title);
   const [mathInputPosition, setMathInputPosition] = useState<{
     x: number;
@@ -230,6 +236,15 @@ export function TiptapEditor({ document, courseName }: TiptapEditorProps) {
           placeholder="Untitled"
         />
         <div className="flex items-center gap-3">
+          {onToggleVersionHistory && (
+            <button
+              onClick={onToggleVersionHistory}
+              className="flex h-8 w-8 items-center justify-center rounded-md hover:bg-accent text-muted-foreground"
+              title="Version history"
+            >
+              <Clock className="h-4 w-4" />
+            </button>
+          )}
           <ConnectionIndicator
             status={connectionStatus}
             isLockedByRemote={isLockedByRemote}
