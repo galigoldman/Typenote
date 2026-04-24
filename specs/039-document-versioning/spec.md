@@ -26,6 +26,7 @@ A user is editing a document and wants to see previous versions. They open a ver
 ### User Story 2 - Automatic Version Snapshots (Priority: P1)
 
 The system automatically creates version snapshots at smart intervals without user action. Snapshots are created when:
+
 - The user stops typing for ~30 seconds (idle timeout)
 - Every ~5 minutes during active editing (periodic safety net)
 - When the user navigates away from the document or closes the browser (session close)

@@ -7,6 +7,7 @@
 **Rationale**: The existing auto-save fires every 800ms (debounced). Version snapshots need different timing (30s idle, 5min periodic). Mixing them into `useAutoSave` would couple two unrelated concerns. A separate hook tracks idle/periodic timers and calls its own server action (`createVersionSnapshot`) when triggered.
 
 **Alternatives considered**:
+
 - Postgres trigger on `documents` UPDATE — rejected because it would fire on every 800ms save, creating far too many versions. Pruning logic in a trigger adds complexity.
 - Server-side debounce — rejected because the server doesn't know when the user stopped typing; only the client has that context.
 
@@ -17,6 +18,7 @@
 **Rationale**: With a cap of 8 versions and typical document sizes of 10-100 KB, the worst case is 800 KB per document (8 × 100 KB). Even with 1,000 documents, that's 800 MB — well within Supabase Pro limits (8 GB) and manageable on free tier (500 MB) for typical usage. Full snapshots make restore trivial (single row read) and avoid the complexity of reconstructing state from diffs.
 
 **Alternatives considered**:
+
 - JSONB diff/patch (RFC 6902) — rejected: complex to implement, reconstruct, and debug. Savings not needed at this scale.
 - Supabase Storage (JSON files) — rejected: can't query metadata efficiently, harder to enforce cap atomically.
 
@@ -27,6 +29,7 @@
 **Rationale**: Using an RPC function (`create_document_version`) ensures atomicity — no race condition where two tabs both see 8 versions and both insert, ending up with 10. The function does: INSERT new version → DELETE oldest if count > 8, all in one transaction. This follows the existing pattern used by `increment_ai_usage`.
 
 **Alternatives considered**:
+
 - Client-side count check before insert — rejected: TOCTOU race with multiple tabs.
 - Postgres trigger on INSERT — viable but less explicit; RPC is the established pattern in this project.
 
@@ -37,6 +40,7 @@
 **Rationale**: Before creating a snapshot, the client compares the current `content` + `pages` JSON strings against the last snapshot's content (stored in a ref). If identical, skip. This is fast (string comparison) and avoids unnecessary DB writes. No need for cryptographic hashing at this scale.
 
 **Alternatives considered**:
+
 - Server-side hash column — adds migration complexity for minimal benefit.
 - Deep object comparison — slower and more error-prone than string comparison.
 
@@ -47,6 +51,7 @@
 **Rationale**: The AI chat sidebar already established this pattern in the codebase. Reusing it keeps the UX consistent and reduces implementation effort. The version sidebar is simpler (read-only list + restore button), so the same responsive pattern works well.
 
 **Alternatives considered**:
+
 - Modal dialog — rejected: version history benefits from staying open while viewing the document.
 - Sheet (Radix slide-over) — viable but the inline pattern is already proven for document-context panels.
 
@@ -57,5 +62,6 @@
 **Rationale**: `beforeunload` is unreliable for async operations — the browser may kill the page before a `fetch()` completes. `sendBeacon()` is designed specifically for this: it queues the request and the browser guarantees delivery even after the page unloads. This is the standard approach for analytics and save-on-exit.
 
 **Alternatives considered**:
+
 - `visibilitychange` event — good complement (fires when tab becomes hidden) but doesn't cover tab close. Use both.
 - Rely only on idle/periodic — leaves a gap if user types continuously then closes tab. `sendBeacon` closes this gap.

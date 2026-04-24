@@ -34,8 +34,8 @@
 - [x] T006 [P] Create `getDocumentVersions` query function in src/lib/queries/document-versions.ts — fetches versions for a document ordered by created_at DESC
 - [x] T007 [P] Create `restoreDocumentVersion` server action in src/lib/actions/document-versions.ts — calls `restore_document_version` RPC
 - [x] T008 [P] Create beacon endpoint POST handler in src/app/api/version-snapshot/route.ts — authenticates via Supabase cookie, calls `create_document_version` RPC with trigger='close', returns 204
-- [x] T009 Write integration tests for `create_document_version` RPC (insert, cap enforcement at 8, duplicate prevention) in src/lib/actions/__tests__/document-versions.integration.test.ts
-- [x] T010 Write integration tests for `restore_document_version` RPC (before_restore snapshot creation, document overwrite, cap enforcement) in src/lib/actions/__tests__/document-versions.integration.test.ts
+- [x] T009 Write integration tests for `create_document_version` RPC (insert, cap enforcement at 8, duplicate prevention) in src/lib/actions/**tests**/document-versions.integration.test.ts
+- [x] T010 Write integration tests for `restore_document_version` RPC (before_restore snapshot creation, document overwrite, cap enforcement) in src/lib/actions/**tests**/document-versions.integration.test.ts
 
 **Checkpoint**: Foundation ready — all server-side endpoints and queries work and are tested. User story implementation can now begin.
 
@@ -49,7 +49,7 @@
 
 ### Tests for User Story 1
 
-- [x] T011 [P] [US1] Write unit test for relative timestamp formatting (e.g., "30 min ago", "2 hours ago", "Yesterday") in src/components/version-history/__tests__/version-sidebar.test.tsx
+- [x] T011 [P] [US1] Write unit test for relative timestamp formatting (e.g., "30 min ago", "2 hours ago", "Yesterday") in src/components/version-history/**tests**/version-sidebar.test.tsx
 
 ### Implementation for User Story 1
 
@@ -69,7 +69,7 @@
 
 ### Tests for User Story 2
 
-- [x] T015 [P] [US2] Write unit tests for `useVersionSnapshots` hook — idle timer fires after 30s, periodic timer fires after 5min, timers reset on activity, skip when content unchanged — in src/hooks/__tests__/use-version-snapshots.test.ts
+- [x] T015 [P] [US2] Write unit tests for `useVersionSnapshots` hook — idle timer fires after 30s, periodic timer fires after 5min, timers reset on activity, skip when content unchanged — in src/hooks/**tests**/use-version-snapshots.test.ts
 
 ### Implementation for User Story 2
 
@@ -89,7 +89,7 @@
 
 ### Tests for User Story 3
 
-- [x] T019 [P] [US3] Write integration test for restore flow — verify document content is overwritten, "before_restore" snapshot is created, sidebar reflects new state — in src/lib/actions/__tests__/document-versions.integration.test.ts
+- [x] T019 [P] [US3] Write integration test for restore flow — verify document content is overwritten, "before_restore" snapshot is created, sidebar reflects new state — in src/lib/actions/**tests**/document-versions.integration.test.ts
 
 ### Implementation for User Story 3
 

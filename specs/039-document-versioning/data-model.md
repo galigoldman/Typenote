@@ -2,25 +2,25 @@
 
 ## New Entity: `document_versions`
 
-| Column       | Type                     | Constraints                              | Description                                      |
-| ------------ | ------------------------ | ---------------------------------------- | ------------------------------------------------ |
-| `id`         | `uuid`                   | PK, default `gen_random_uuid()`          | Unique version identifier                        |
-| `document_id`| `uuid`                   | FK → `documents.id` ON DELETE CASCADE    | Parent document                                  |
-| `user_id`    | `uuid`                   | FK → `auth.users(id)`, NOT NULL          | Who created this version (for RLS)               |
-| `content`    | `jsonb`                  | NOT NULL, default `'{}'`                 | TipTap editor state snapshot                     |
-| `pages`      | `jsonb`                  | default `NULL`                           | Canvas/drawing state snapshot (null if text-only) |
-| `title`      | `text`                   | NOT NULL                                 | Document title at time of snapshot               |
-| `trigger`    | `text`                   | NOT NULL                                 | What caused the snapshot (see below)             |
-| `created_at` | `timestamptz`            | NOT NULL, default `now()`                | When the snapshot was created                    |
+| Column        | Type          | Constraints                           | Description                                       |
+| ------------- | ------------- | ------------------------------------- | ------------------------------------------------- |
+| `id`          | `uuid`        | PK, default `gen_random_uuid()`       | Unique version identifier                         |
+| `document_id` | `uuid`        | FK → `documents.id` ON DELETE CASCADE | Parent document                                   |
+| `user_id`     | `uuid`        | FK → `auth.users(id)`, NOT NULL       | Who created this version (for RLS)                |
+| `content`     | `jsonb`       | NOT NULL, default `'{}'`              | TipTap editor state snapshot                      |
+| `pages`       | `jsonb`       | default `NULL`                        | Canvas/drawing state snapshot (null if text-only) |
+| `title`       | `text`        | NOT NULL                              | Document title at time of snapshot                |
+| `trigger`     | `text`        | NOT NULL                              | What caused the snapshot (see below)              |
+| `created_at`  | `timestamptz` | NOT NULL, default `now()`             | When the snapshot was created                     |
 
 ### Trigger values
 
-| Value              | When created                                   |
-| ------------------ | ---------------------------------------------- |
-| `'idle'`           | User stopped editing for ~30 seconds           |
-| `'periodic'`       | 5-minute safety net during active editing      |
-| `'close'`          | User navigated away or closed the tab          |
-| `'before_restore'` | Automatically created before a restore action  |
+| Value              | When created                                  |
+| ------------------ | --------------------------------------------- |
+| `'idle'`           | User stopped editing for ~30 seconds          |
+| `'periodic'`       | 5-minute safety net during active editing     |
+| `'close'`          | User navigated away or closed the tab         |
+| `'before_restore'` | Automatically created before a restore action |
 
 ### Indexes
 
@@ -48,6 +48,7 @@ DELETE: auth.uid() = user_id
 **Purpose**: Atomically insert a new version and prune oldest if count exceeds 8.
 
 **Parameters**:
+
 - `p_document_id` (uuid)
 - `p_content` (jsonb)
 - `p_pages` (jsonb, nullable)
@@ -57,6 +58,7 @@ DELETE: auth.uid() = user_id
 **Returns**: The new version's `id` and `created_at`.
 
 **Logic**:
+
 1. Get `auth.uid()` as user_id
 2. INSERT new row into `document_versions`
 3. COUNT versions for this document_id
@@ -70,11 +72,13 @@ DELETE: auth.uid() = user_id
 **Purpose**: Atomically create a "before_restore" snapshot, then overwrite the document.
 
 **Parameters**:
+
 - `p_version_id` (uuid) — the version to restore
 
 **Returns**: The restored document's `updated_at`.
 
 **Logic**:
+
 1. Get `auth.uid()` as user_id
 2. SELECT the target version (verify user_id matches)
 3. SELECT the current document state (content, pages, title)
