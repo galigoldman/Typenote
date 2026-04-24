@@ -23,13 +23,13 @@ Add automatic document versioning that saves up to 8 snapshots per document at s
 
 _GATE: Must pass before Phase 0 research. Re-check after Phase 1 design._
 
-| Principle | Status | Notes |
-| --------- | ------ | ----- |
-| I. Incremental Development | PASS | Database schema + RPC first, then hook, then UI. Each phase produces a working increment. |
-| II. Test-Driven Quality | PASS | Integration tests for migration/RPC, unit tests for hook logic, E2E for full user flow. |
-| III. Protected Branches | PASS | Feature branch `039-document-versioning` off `dev`. PR to `dev` after CI passes. |
-| IV. Migrations as Code | PASS | New migration file for `document_versions` table + RPC functions. Seed data updated. |
-| V. Interview-Ready Architecture | PASS | Covers: ring-buffer pattern, atomic RPC, sendBeacon API, JSONB snapshots vs diffs trade-off. |
+| Principle                       | Status | Notes                                                                                        |
+| ------------------------------- | ------ | -------------------------------------------------------------------------------------------- |
+| I. Incremental Development      | PASS   | Database schema + RPC first, then hook, then UI. Each phase produces a working increment.    |
+| II. Test-Driven Quality         | PASS   | Integration tests for migration/RPC, unit tests for hook logic, E2E for full user flow.      |
+| III. Protected Branches         | PASS   | Feature branch `039-document-versioning` off `dev`. PR to `dev` after CI passes.             |
+| IV. Migrations as Code          | PASS   | New migration file for `document_versions` table + RPC functions. Seed data updated.         |
+| V. Interview-Ready Architecture | PASS   | Covers: ring-buffer pattern, atomic RPC, sendBeacon API, JSONB snapshots vs diffs trade-off. |
 
 **Post-Phase 1 re-check**: All gates still pass. No constitution violations.
 
