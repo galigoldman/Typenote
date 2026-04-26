@@ -12,8 +12,10 @@ const nextConfig: NextConfig = {
   turbopack: {},
   // Large canvas documents (many pages with math/strokes) can exceed the
   // default 1 MB Server Action body limit, causing silent save failures.
-  serverActions: {
-    bodySizeLimit: '4mb',
+  experimental: {
+    serverActions: {
+      bodySizeLimit: '4mb',
+    },
   },
   // Allow iPad/mobile devices on the local network to access dev server
   allowedDevOrigins: [
