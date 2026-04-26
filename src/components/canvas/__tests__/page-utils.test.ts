@@ -91,6 +91,51 @@ describe('pageHasContent', () => {
     });
     expect(pageHasContent(page)).toBe(false);
   });
+
+  it('returns true for -ftb text box with only math content', () => {
+    const page = makePage({
+      textBoxes: [
+        {
+          ...makeTextBox({
+            type: 'doc',
+            content: [
+              {
+                type: 'paragraph',
+                content: [
+                  {
+                    type: 'mathExpression',
+                    attrs: { latex: 'x^2 + y^2 = z^2' },
+                  },
+                ],
+              },
+            ],
+          }),
+          id: 'p1-ftb',
+        },
+      ],
+    });
+    expect(pageHasContent(page)).toBe(true);
+  });
+
+  it('returns true for flowContent with only math content', () => {
+    const page = makePage({
+      flowContent: {
+        type: 'doc',
+        content: [
+          {
+            type: 'paragraph',
+            content: [
+              {
+                type: 'mathExpression',
+                attrs: { latex: '\\int_0^1 f(x) dx' },
+              },
+            ],
+          },
+        ],
+      },
+    });
+    expect(pageHasContent(page)).toBe(true);
+  });
 });
 
 // ─── stripTrailingEmptyPages() ───────────────────────────────
@@ -144,6 +189,33 @@ describe('stripTrailingEmptyPages', () => {
     const pages = [makePage({ order: 0 })];
     const result = stripTrailingEmptyPages(pages, 0);
     expect(result).toHaveLength(1);
+  });
+
+  it('preserves trailing math-only pages', () => {
+    const pages = [
+      makePage({ order: 0, strokes: [makeStroke()] }),
+      makePage({
+        order: 1,
+        flowContent: {
+          type: 'doc',
+          content: [
+            {
+              type: 'paragraph',
+              content: [
+                {
+                  type: 'mathExpression',
+                  attrs: { latex: 'E = mc^2' },
+                },
+              ],
+            },
+          ],
+        },
+      }),
+      makePage({ order: 2 }), // trailing empty
+    ];
+    // Floor is 1. The math page should NOT be stripped.
+    const result = stripTrailingEmptyPages(pages, 1);
+    expect(result).toHaveLength(2); // page 0 (strokes) + page 1 (math)
   });
 
   it('preserves intermediate blank pages when later pages have content', () => {

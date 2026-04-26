@@ -18,14 +18,18 @@ export function pageHasContent(page: CanvasPageData): boolean {
   // now get an -ftb text box by default).
   for (const tb of page.textBoxes) {
     if (!tb.id.endsWith('-ftb')) return true; // user-positioned box
-    // -ftb box: check if it has real text content
-    if (tb.content && JSON.stringify(tb.content).includes('"text"'))
-      return true;
+    // -ftb box: check if it has real text or math content
+    if (tb.content) {
+      const json = JSON.stringify(tb.content);
+      if (json.includes('"text"') || json.includes('"mathExpression"'))
+        return true;
+    }
   }
   if (!page.flowContent) return false;
   // An empty TipTap editor produces { type:'doc', content:[{type:'paragraph'}] }.
-  // Real text contains a "text" key somewhere in the JSON.
-  return JSON.stringify(page.flowContent).includes('"text"');
+  // Real content contains a "text" or "mathExpression" node somewhere in the JSON.
+  const flowJson = JSON.stringify(page.flowContent);
+  return flowJson.includes('"text"') || flowJson.includes('"mathExpression"');
 }
 
 /**

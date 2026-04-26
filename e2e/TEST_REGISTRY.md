@@ -142,6 +142,13 @@ Follow-up to issue #118. Guards against cursor jumps when a multi-page overflow 
 
 ---
 
+## Page Persistence After Export (`e2e/export-pdf-page-persistence.spec.ts`) — IMPLEMENTED
+
+- [x] All 6 pages remain in editor after PDF export and 60-second wait
+- Covers: math content detection, auto-save page stripping, Realtime echo guard race condition
+
+---
+
 ## Real-time Sync (`e2e/realtime-sync.spec.ts`) — IMPLEMENTED (local only)
 
 - [x] Typing in Tab A appears in Tab B — ⚠️ SKIPPED IN CI (Supabase Realtime too slow locally)

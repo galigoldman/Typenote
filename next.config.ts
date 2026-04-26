@@ -10,6 +10,11 @@ const nextConfig: NextConfig = {
   // Required: next-pwa uses webpack, so turbopack must be explicitly configured
   // to avoid a conflict error in Next.js 16
   turbopack: {},
+  // Large canvas documents (many pages with math/strokes) can exceed the
+  // default 1 MB Server Action body limit, causing silent save failures.
+  serverActions: {
+    bodySizeLimit: '4mb',
+  },
   // Allow iPad/mobile devices on the local network to access dev server
   allowedDevOrigins: [
     '172.20.10.2',
