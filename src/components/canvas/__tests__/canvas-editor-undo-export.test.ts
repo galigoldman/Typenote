@@ -17,9 +17,13 @@ import type { SaveStatus } from '@/hooks/use-auto-save';
  * Creates the onRemotePagesUpdate handler with the save-status guard,
  * matching the implementation in canvas-editor.tsx.
  */
-function createRemotePagesHandler(saveStatusRef: { current: SaveStatus }) {
+function createRemotePagesHandler(
+  saveStatusRef: { current: SaveStatus },
+  localPageCount: number = 0,
+) {
   const setPages = vi.fn();
   const setRemoteUpdateCounter = vi.fn();
+  const pagesRef = { current: { length: localPageCount } };
 
   const onRemotePagesUpdate = (remotePagesData: Record<string, unknown>) => {
     // Guard: skip remote updates when we have unsaved local changes
@@ -31,6 +35,12 @@ function createRemotePagesHandler(saveStatusRef: { current: SaveStatus }) {
     }
     const remote = remotePagesData as { pages?: unknown[] };
     if (remote?.pages) {
+      // Guard: never accept remote pages with fewer pages than local.
+      // This prevents the echo guard race condition from overwriting
+      // local state with stripped DB pages after PDF export.
+      if (remote.pages.length < pagesRef.current.length) {
+        return;
+      }
       setPages(remote.pages);
       setRemoteUpdateCounter((c: number) => c + 1);
     }
@@ -230,6 +240,70 @@ describe('onRemotePagesUpdate guard', () => {
       onRemotePagesUpdate(remoteMultiPages as Record<string, unknown>);
 
       expect(setPages).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('page-count guard (PDF export race condition)', () => {
+    it('blocks remote update with fewer pages than local state', () => {
+      const saveStatusRef = { current: 'saved' as SaveStatus };
+      // Local has 5 pages
+      const { onRemotePagesUpdate, setPages } = createRemotePagesHandler(
+        saveStatusRef,
+        5,
+      );
+
+      // Remote echo has only 3 pages (stripped by auto-save)
+      const remotePages = {
+        pages: [
+          makePage('p1', 0, [makeStroke('s1')]),
+          makePage('p2', 1, [makeStroke('s2')]),
+          makePage('p3', 2),
+        ],
+      };
+
+      onRemotePagesUpdate(remotePages as Record<string, unknown>);
+
+      // setPages should NOT be called — fewer pages means stale echo
+      expect(setPages).not.toHaveBeenCalled();
+    });
+
+    it('allows remote update with equal page count', () => {
+      const saveStatusRef = { current: 'saved' as SaveStatus };
+      const { onRemotePagesUpdate, setPages } = createRemotePagesHandler(
+        saveStatusRef,
+        2,
+      );
+
+      const remotePages = {
+        pages: [
+          makePage('p1', 0, [makeStroke('s1')]),
+          makePage('p2', 1, [makeStroke('s2')]),
+        ],
+      };
+
+      onRemotePagesUpdate(remotePages as Record<string, unknown>);
+
+      expect(setPages).toHaveBeenCalledWith(remotePages.pages);
+    });
+
+    it('allows remote update with more pages than local', () => {
+      const saveStatusRef = { current: 'saved' as SaveStatus };
+      const { onRemotePagesUpdate, setPages } = createRemotePagesHandler(
+        saveStatusRef,
+        2,
+      );
+
+      const remotePages = {
+        pages: [
+          makePage('p1', 0, [makeStroke('s1')]),
+          makePage('p2', 1, [makeStroke('s2')]),
+          makePage('p3', 2, [makeStroke('s3')]),
+        ],
+      };
+
+      onRemotePagesUpdate(remotePages as Record<string, unknown>);
+
+      expect(setPages).toHaveBeenCalledWith(remotePages.pages);
     });
   });
 

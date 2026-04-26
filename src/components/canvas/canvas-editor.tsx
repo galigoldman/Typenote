@@ -568,6 +568,12 @@ export function CanvasEditor({
       }
       const remote = remotePagesData as unknown as CanvasDocument;
       if (remote?.pages) {
+        // Guard: never accept remote pages with fewer pages than local.
+        // This prevents the echo guard race condition from overwriting
+        // local state with stripped DB pages after PDF export.
+        if (remote.pages.length < pagesRef.current.length) {
+          return;
+        }
         // Update floor so future saves never strip below what the DB now has
         dbPageCountFloorRef.current = Math.max(
           dbPageCountFloorRef.current,
