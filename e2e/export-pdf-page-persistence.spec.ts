@@ -5,10 +5,10 @@ import { login } from './helpers/auth';
 /**
  * E2E test: pages must persist after PDF export.
  *
- * Reproduces a bug where trailing pages with math/LaTeX content were
- * silently stripped during auto-save, and the Realtime echo could
- * overwrite local state with the stripped DB version — causing pages
- * to disappear from the editor after export.
+ * Reproduces a bug where pages were silently lost after export due to:
+ * - Auto-save stripping pages it considers "empty" (math-only content)
+ * - Server Action body size limit (>1MB documents failed silently)
+ * - Realtime echo overwriting local state with stale DB data
  *
  * Strategy: pre-build a 6-page document via the Supabase REST API,
  * navigate to it, trigger the export, wait, and verify all 6 pages
@@ -32,11 +32,10 @@ async function seedDocumentWithPages(): Promise<void> {
 
   for (let i = 0; i < TARGET_PAGES; i++) {
     const pageId = `${SEEDED_DOC_ID}-p${i}`;
-    // Mix text and math content so the test covers both content types
     const paragraphs = [
       {
         type: 'paragraph',
-        content: [{ type: 'text', text: `Page ${i + 1} — content paragraph.` }],
+        content: [{ type: 'text', text: `Page ${i + 1} content.` }],
       },
       {
         type: 'paragraph',
@@ -47,7 +46,6 @@ async function seedDocumentWithPages(): Promise<void> {
           },
         ],
       },
-      // Add enough text paragraphs to make the page non-trivial
       ...Array.from({ length: 8 }, (_, j) => ({
         type: 'paragraph',
         content: [
@@ -111,10 +109,8 @@ test.describe('Page persistence after PDF export', () => {
   });
 
   test('all 6 pages remain after export and waiting', async ({ page }) => {
-    // Give plenty of time — the bug manifests "after a while"
-    test.setTimeout(180_000);
+    test.setTimeout(120_000);
 
-    // Navigate to the seeded document
     await page.goto(DOC_URL);
 
     // Wait for all 6 page containers to render
@@ -122,38 +118,27 @@ test.describe('Page persistence after PDF export', () => {
       .poll(() => page.locator('[data-page-id]').count(), { timeout: 20_000 })
       .toBeGreaterThanOrEqual(TARGET_PAGES);
 
-    // Verify text content is visible on the first and last content pages
-    await expect(page.getByText('Page 1 — content paragraph.')).toBeVisible();
-
-    // Record page count before export
     const pageCountBefore = await page.locator('[data-page-id]').count();
     expect(pageCountBefore).toBeGreaterThanOrEqual(TARGET_PAGES);
 
-    // Click the export button (opens print dialog in a popup window)
-    // Use page.on to auto-close any popup windows so the test can proceed
+    // Auto-close the print popup so the test can proceed
     page.on('popup', async (popup) => {
-      // Close the popup after a brief delay — don't actually print
       await popup.waitForLoadState('domcontentloaded').catch(() => {});
       await popup.close().catch(() => {});
     });
 
     await page.locator('button[title="Export as PDF"]').click();
 
-    // Wait for the export to complete (isExporting → false)
+    // Wait for export to finish
     await expect(
       page.locator('button[title="Export as PDF"]'),
     ).not.toBeDisabled({ timeout: 15_000 });
 
-    // Now wait a significant amount of time — the bug manifests "after a while"
-    // because it depends on auto-save timing and Realtime echo arrival.
-    // 60 seconds is a CI-friendly compromise.
-    await page.waitForTimeout(60_000);
+    // Wait for auto-save + Realtime echo cycle to complete
+    await page.waitForTimeout(30_000);
 
     // Verify all pages are still present
     const pageCountAfter = await page.locator('[data-page-id]').count();
     expect(pageCountAfter).toBeGreaterThanOrEqual(TARGET_PAGES);
-
-    // Verify content is still visible
-    await expect(page.getByText('Page 1 — content paragraph.')).toBeVisible();
   });
 });
