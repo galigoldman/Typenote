@@ -127,12 +127,12 @@ test.describe('Page persistence after PDF export', () => {
       await popup.close().catch(() => {});
     });
 
-    await page.locator('button[title="Export as PDF"]').click();
+    const exportBtn = page.locator('button[title="Export as PDF"]');
+    await exportBtn.waitFor({ state: 'visible', timeout: 10_000 });
+    await exportBtn.click();
 
     // Wait for export to finish
-    await expect(
-      page.locator('button[title="Export as PDF"]'),
-    ).not.toBeDisabled({ timeout: 15_000 });
+    await expect(exportBtn).not.toBeDisabled({ timeout: 15_000 });
 
     // Wait for auto-save + Realtime echo cycle to complete
     await page.waitForTimeout(30_000);
