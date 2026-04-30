@@ -7,7 +7,7 @@ const TEST_DOC_URL =
   '/dashboard/documents/20000000-0000-0000-0000-000000000001';
 
 function getEditor(page: Page) {
-  return page.locator('.ProseMirror');
+  return page.locator('.ProseMirror').first();
 }
 
 test.describe('Realtime document sync', () => {

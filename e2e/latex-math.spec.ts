@@ -1,27 +1,132 @@
 import { test, expect } from '@playwright/test';
 import { login } from './helpers/auth';
 
+/**
+ * Seed the test document with math content via Supabase REST API,
+ * then navigate to it. This ensures math expressions exist in the
+ * editor regardless of prior test state.
+ */
+// Use "Quick Notes" (loose doc, not in any folder) to avoid contaminating folder-based tests
+const SEEDED_DOC_ID = '20000000-0000-0000-0000-000000000006';
+const DOC_URL = `/dashboard/documents/${SEEDED_DOC_ID}`;
+
+const SUPABASE_URL = 'http://127.0.0.1:54321';
+const LOCAL_SERVICE_ROLE_KEY =
+  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImV4cCI6MTk4MzgxMjk5Nn0.EGIM96RAZx35lJzdJsyH-qQwv8Hdp7fsn3W0YpN81IU';
+
+/** Pages JSON with math expressions inside textBoxes */
+function buildMathPages() {
+  const pageId = `${SEEDED_DOC_ID}-math-p0`;
+  return {
+    pages: [
+      {
+        id: pageId,
+        order: 0,
+        strokes: [],
+        pageType: 'lined',
+        textBoxes: [
+          {
+            id: `${pageId}-ftb`,
+            x: 40,
+            y: 40,
+            width: 714,
+            height: 400,
+            isFullWidth: true,
+            content: {
+              type: 'doc',
+              content: [
+                {
+                  type: 'heading',
+                  attrs: { level: 1, textAlign: null },
+                  content: [{ type: 'text', text: 'Math Test Document' }],
+                },
+                {
+                  type: 'paragraph',
+                  content: [
+                    { type: 'text', text: 'Here is a formula: ' },
+                    {
+                      type: 'mathExpression',
+                      attrs: { latex: 'x^2 + y', originalText: 'x squared plus y' },
+                    },
+                    { type: 'text', text: ' and more text.' },
+                  ],
+                },
+                {
+                  type: 'paragraph',
+                  content: [
+                    { type: 'text', text: 'Another: ' },
+                    {
+                      type: 'mathExpression',
+                      attrs: { latex: '\\frac{a}{b}', originalText: 'a over b' },
+                    },
+                  ],
+                },
+                {
+                  type: 'paragraph',
+                  content: [{ type: 'text', text: 'End of document.' }],
+                },
+              ],
+            },
+          },
+        ],
+      },
+    ],
+  };
+}
+
+async function seedMathDocument(): Promise<void> {
+  const res = await fetch(
+    `${SUPABASE_URL}/rest/v1/documents?id=eq.${SEEDED_DOC_ID}`,
+    {
+      method: 'PATCH',
+      headers: {
+        'Content-Type': 'application/json',
+        apikey: LOCAL_SERVICE_ROLE_KEY,
+        Authorization: `Bearer ${LOCAL_SERVICE_ROLE_KEY}`,
+        Prefer: 'return=minimal',
+      },
+      body: JSON.stringify({ pages: buildMathPages() }),
+    },
+  );
+  if (!res.ok) {
+    throw new Error(`Failed to seed math document: ${res.status} ${await res.text()}`);
+  }
+}
+
+/** Restore the document to its original state (no pages, original content) */
+async function restoreDocument(): Promise<void> {
+  await fetch(
+    `${SUPABASE_URL}/rest/v1/documents?id=eq.${SEEDED_DOC_ID}`,
+    {
+      method: 'PATCH',
+      headers: {
+        'Content-Type': 'application/json',
+        apikey: LOCAL_SERVICE_ROLE_KEY,
+        Authorization: `Bearer ${LOCAL_SERVICE_ROLE_KEY}`,
+        Prefer: 'return=minimal',
+      },
+      body: JSON.stringify({ pages: null }),
+    },
+  );
+}
+
 test.describe('LaTeX Math', () => {
   test.beforeEach(async ({ page }) => {
-    await login(page);
+    await seedMathDocument();
 
-    // Open the first seeded document to get into the editor
-    const firstDoc = page.locator('[data-testid="document-card"]').first();
-    await expect(firstDoc).toBeVisible({ timeout: 10_000 });
-    await firstDoc.click();
+    await login(page);
+    await page.goto(DOC_URL);
     await expect(page).toHaveURL(/\/dashboard\/documents\//, {
       timeout: 10_000,
     });
 
     // Wait for the editor to load
-    await expect(page.locator('.ProseMirror')).toBeVisible({
+    await expect(page.locator('.ProseMirror').first()).toBeVisible({
       timeout: 10_000,
     });
   });
 
   test('insert math with :{ trigger', async ({ page }) => {
-    // LaTeX uses AI conversion which may not be available in CI.
-    // Skip if AI key is not configured.
     test.skip(
       !!process.env.CI,
       'LaTeX AI conversion needs GOOGLE_GENERATIVE_AI_API_KEY in CI',
@@ -29,7 +134,7 @@ test.describe('LaTeX Math', () => {
     test.setTimeout(30_000);
 
     // Focus the editor and type the trigger sequence
-    await page.locator('.ProseMirror').click();
+    await page.locator('.ProseMirror').first().click();
     await page.keyboard.press('End');
     await page.keyboard.press('Enter');
     await page.keyboard.type(':');
@@ -45,59 +150,40 @@ test.describe('LaTeX Math', () => {
     await mathInput.fill('x squared plus y');
     await page.keyboard.press('Enter');
 
-    // Wait for AI conversion and rendering
-    // A rendered math expression should appear in the editor
-    await expect(page.locator('span[data-type="math-expression"]')).toBeVisible(
-      { timeout: 15_000 },
-    );
+    // Wait for AI conversion and rendering — more than the 2 seeded math nodes
+    await expect(page.locator('.math-expression-node')).toHaveCount(3, {
+      timeout: 15_000,
+    });
   });
 
   test('rendered math displays as formatted output, not raw text', async ({
     page,
   }) => {
-    // Check if seeded documents have any math expressions
-    const mathExpressions = page.locator('span[data-type="math-expression"]');
-    const count = await mathExpressions.count();
+    const mathExpressions = page.locator('.math-expression-node');
+    await expect(mathExpressions.first()).toBeVisible({ timeout: 5_000 });
 
-    if (count > 0) {
-      // Math expressions should contain KaTeX rendered HTML, not raw LaTeX
-      const firstMath = mathExpressions.first();
-      await expect(firstMath).toBeVisible();
-
-      // KaTeX renders into spans with class "katex"
-      await expect(firstMath.locator('.katex')).toBeVisible();
-    } else {
-      // No math in this document — test passes vacuously
-      // This will be properly tested when we have seeded math content
-      test.skip(true, 'No math expressions in seeded document');
-    }
+    // KaTeX renders into spans with class "katex"
+    await expect(mathExpressions.first().locator('.katex')).toBeVisible();
   });
 
   test('edit existing math expression', async ({ page }) => {
-    test.skip(
-      !!process.env.CI,
-      'LaTeX AI conversion needs GOOGLE_GENERATIVE_AI_API_KEY in CI',
-    );
-    test.setTimeout(30_000);
+    const mathExpressions = page.locator('.math-expression-node');
+    await expect(mathExpressions.first()).toBeVisible({ timeout: 5_000 });
 
-    const mathExpressions = page.locator('span[data-type="math-expression"]');
-    const count = await mathExpressions.count();
+    // Click at the math node's coordinates — ProseMirror needs a real positional click
+    const box = await mathExpressions.first().boundingBox();
+    expect(box).not.toBeNull();
+    await page.mouse.click(box!.x + box!.width / 2, box!.y + box!.height / 2);
+    await page.waitForTimeout(200);
 
-    if (count === 0) {
-      test.skip(true, 'No math expressions in seeded document to edit');
-      return;
-    }
+    // First panel: "Edit" and "Copy" buttons appear when node is selected
+    const editButton = page.getByRole('button', { name: 'Edit', exact: true });
+    await expect(editButton).toBeVisible({ timeout: 5_000 });
+    await editButton.click();
 
-    // Click on the first math expression to open the editor
-    await mathExpressions.first().click();
-
-    // Edit panel should appear with mode buttons
-    const editLatexButton = page.getByRole('button', {
-      name: 'Edit LaTeX',
-    });
+    // Second panel: mode buttons "Edit Expression" and "Edit LaTeX"
+    const editLatexButton = page.getByRole('button', { name: 'Edit LaTeX' });
     await expect(editLatexButton).toBeVisible({ timeout: 5_000 });
-
-    // Switch to raw LaTeX mode
     await editLatexButton.click();
 
     // Find the input and modify it
@@ -112,16 +198,14 @@ test.describe('LaTeX Math', () => {
   });
 
   test('delete math expression', async ({ page }) => {
-    const mathExpressions = page.locator('span[data-type="math-expression"]');
+    const mathExpressions = page.locator('.math-expression-node');
+    await expect(mathExpressions.first()).toBeVisible({ timeout: 5_000 });
     const count = await mathExpressions.count();
 
-    if (count === 0) {
-      test.skip(true, 'No math expressions in seeded document to delete');
-      return;
-    }
-
-    // Click on the math expression to select it, then delete
-    await mathExpressions.first().click();
+    const box = await mathExpressions.first().boundingBox();
+    expect(box).not.toBeNull();
+    await page.mouse.click(box!.x + box!.width / 2, box!.y + box!.height / 2);
+    await page.waitForTimeout(200);
     await page.keyboard.press('Backspace');
 
     // There should be one fewer math expression
@@ -131,25 +215,20 @@ test.describe('LaTeX Math', () => {
   test('LaTeX edit textarea auto-expands for long expressions', async ({
     page,
   }) => {
-    const mathExpressions = page.locator('span[data-type="math-expression"]');
-    const count = await mathExpressions.count();
+    const mathExpressions = page.locator('.math-expression-node');
+    await expect(mathExpressions.first()).toBeVisible({ timeout: 5_000 });
 
-    if (count === 0) {
-      test.skip(true, 'No math expressions in seeded document to edit');
-      return;
-    }
+    const box = await mathExpressions.first().boundingBox();
+    expect(box).not.toBeNull();
+    await page.mouse.click(box!.x + box!.width / 2, box!.y + box!.height / 2);
+    await page.waitForTimeout(200);
 
-    // Click on the first math expression to select it
-    await mathExpressions.first().click();
-
-    // Open the edit panel
-    const editButton = page.getByRole('button', { name: 'Edit' });
+    const editButton = page.getByRole('button', { name: 'Edit', exact: true });
     await expect(editButton).toBeVisible({ timeout: 5_000 });
     await editButton.click();
 
-    // Switch to raw LaTeX mode
     const editLatexButton = page.getByRole('button', { name: 'Edit LaTeX' });
-    await expect(editLatexButton).toBeVisible();
+    await expect(editLatexButton).toBeVisible({ timeout: 5_000 });
     await editLatexButton.click();
 
     const textarea = page.locator(
@@ -177,7 +256,7 @@ test.describe('LaTeX Math', () => {
     expect(longBox!.height).toBeGreaterThan(shortHeight);
 
     // Verify max-height cap: textarea should not exceed 200px
-    expect(longBox!.height).toBeLessThanOrEqual(210); // small tolerance for borders/padding
+    expect(longBox!.height).toBeLessThanOrEqual(210);
 
     // Press Escape to close without saving
     await page.keyboard.press('Escape');
@@ -191,7 +270,7 @@ test.describe('LaTeX Math', () => {
     test.setTimeout(30_000);
 
     // Focus the editor
-    const editor = page.locator('.ProseMirror');
+    const editor = page.locator('.ProseMirror').first();
     await editor.click();
     await page.keyboard.press('End');
     await page.keyboard.press('Enter');
@@ -212,11 +291,11 @@ test.describe('LaTeX Math', () => {
 
     // Wait for math to render
     await expect(
-      page.locator('span[data-type="math-expression"]').last(),
+      page.locator('.math-expression-node').last(),
     ).toBeVisible({ timeout: 15_000 });
 
     // Verify the math node has LTR direction (math is always LTR)
-    const mathNode = page.locator('span[data-type="math-expression"]').last();
+    const mathNode = page.locator('.math-expression-node').last();
     const dir = await mathNode.evaluate((el) => getComputedStyle(el).direction);
     expect(dir).toBe('ltr');
   });

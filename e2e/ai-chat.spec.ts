@@ -46,9 +46,7 @@ test.describe('AI Chat', () => {
 
     // Wait for response — should see either loading or a response bubble
     await expect(
-      page
-        .getByText('Searching materials...')
-        .or(page.locator('div.bg-muted.rounded-2xl').first()),
+      page.locator('div.bg-muted.rounded-2xl').first(),
     ).toBeVisible({ timeout: 30_000 });
   });
 

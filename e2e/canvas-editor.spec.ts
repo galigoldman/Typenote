@@ -8,7 +8,16 @@ const DOC_URL = '/dashboard/documents/20000000-0000-0000-0000-000000000001';
 const PAGE_WIDTH = 794;
 const PAGE_HEIGHT = 1123;
 
-/** Dispatch a pointer event on the canvas page container */
+/** Get the interaction layer inside the first canvas page */
+function getInteractionLayer(page: Page) {
+  return page
+    .locator('[data-page-id]')
+    .first()
+    .locator('div.absolute.inset-0')
+    .last();
+}
+
+/** Dispatch a pointer event on the canvas interaction layer */
 async function penEvent(
   page: Page,
   type: 'pointerdown' | 'pointermove' | 'pointerup',
@@ -16,8 +25,8 @@ async function penEvent(
   y: number,
   pressure = 0.5,
 ) {
-  const canvas = page.locator('[data-page-id]').first();
-  await canvas.dispatchEvent(type, {
+  const layer = getInteractionLayer(page);
+  await layer.dispatchEvent(type, {
     pointerType: 'pen',
     pressure,
     clientX: x,
@@ -93,7 +102,7 @@ test.describe('Canvas Editor', () => {
 
   test('draw continuous strokes with pen', async ({ page }) => {
     // Switch to Draw mode
-    await page.getByTitle('Draw').click();
+    await page.getByRole('button', { name: 'Draw', exact: true }).click();
 
     // Draw several strokes to simulate writing "hello"
     // H
@@ -111,7 +120,7 @@ test.describe('Canvas Editor', () => {
   });
 
   test('pen does not trigger scroll or selection', async ({ page }) => {
-    await page.getByTitle('Draw').click();
+    await page.getByRole('button', { name: 'Draw', exact: true }).click();
 
     // Record scroll position before drawing
     const scrollBefore = await page.evaluate(() => window.scrollY);
@@ -131,10 +140,10 @@ test.describe('Canvas Editor', () => {
   });
 
   test('mouse does NOT draw strokes', async ({ page }) => {
-    await page.getByTitle('Draw').click();
+    await page.getByRole('button', { name: 'Draw', exact: true }).click();
 
     // Try to draw with mouse (pointerType: 'mouse')
-    const canvas = page.locator('[data-page-id]').first();
+    const canvas = getInteractionLayer(page);
     await canvas.dispatchEvent('pointerdown', {
       pointerType: 'mouse',
       clientX: 200,
@@ -162,7 +171,7 @@ test.describe('Canvas Editor', () => {
 
   test('circle snap — draw rough circle and hold', async ({ page }) => {
     test.setTimeout(30_000);
-    await page.getByTitle('Draw').click();
+    await page.getByRole('button', { name: 'Draw', exact: true }).click();
 
     // Draw a rough circle and hold at end
     await drawRoughCircle(page, 400, 400, 60);
@@ -176,7 +185,7 @@ test.describe('Canvas Editor', () => {
 
   test('straight line snap — draw rough line and hold', async ({ page }) => {
     test.setTimeout(30_000);
-    await page.getByTitle('Draw').click();
+    await page.getByRole('button', { name: 'Draw', exact: true }).click();
 
     // Draw a slightly wobbly line
     await penEvent(page, 'pointerdown', 100, 500);
@@ -195,7 +204,7 @@ test.describe('Canvas Editor', () => {
 
   test('erase stroke', async ({ page }) => {
     // Draw a stroke first
-    await page.getByTitle('Draw').click();
+    await page.getByRole('button', { name: 'Draw', exact: true }).click();
     await drawStroke(page, 200, 200, 300, 200);
 
     // Switch to eraser
@@ -208,7 +217,8 @@ test.describe('Canvas Editor', () => {
   });
 
   test('add text box and type', async ({ page }) => {
-    // Click the "Add text box" button
+    // Enter Draw mode first — "Add text box" is a Draw sub-tool
+    await page.getByRole('button', { name: 'Draw', exact: true }).click();
     await page.getByTitle('Add text box').click();
 
     // Click on the canvas to place the text box
@@ -223,7 +233,8 @@ test.describe('Canvas Editor', () => {
   });
 
   test('select and move text box', async ({ page }) => {
-    // First add a text box
+    // Enter Draw mode — "Add text box" is a Draw sub-tool
+    await page.getByRole('button', { name: 'Draw', exact: true }).click();
     await page.getByTitle('Add text box').click();
     const pageContainer = page.locator('[data-page-id]').first();
     await pageContainer.click({ position: { x: 200, y: 200 } });
@@ -242,7 +253,7 @@ test.describe('Canvas Editor', () => {
 
   test('select and move drawing', async ({ page }) => {
     // Draw a stroke
-    await page.getByTitle('Draw').click();
+    await page.getByRole('button', { name: 'Draw', exact: true }).click();
     await drawStroke(page, 300, 300, 400, 300);
 
     // Switch to select mode
@@ -257,7 +268,7 @@ test.describe('Canvas Editor', () => {
   });
 
   test('undo drawing', async ({ page }) => {
-    await page.getByTitle('Draw').click();
+    await page.getByRole('button', { name: 'Draw', exact: true }).click();
     await drawStroke(page, 150, 400, 250, 400);
 
     // Undo
@@ -267,7 +278,7 @@ test.describe('Canvas Editor', () => {
   });
 
   test('redo drawing', async ({ page }) => {
-    await page.getByTitle('Draw').click();
+    await page.getByRole('button', { name: 'Draw', exact: true }).click();
     await drawStroke(page, 150, 450, 250, 450);
 
     // Undo then redo
@@ -278,7 +289,7 @@ test.describe('Canvas Editor', () => {
   });
 
   test('auto-create page when drawing at bottom', async ({ page }) => {
-    await page.getByTitle('Draw').click();
+    await page.getByRole('button', { name: 'Draw', exact: true }).click();
 
     // Count initial pages
     const initialPageCount = await page.locator('[data-page-id]').count();
@@ -296,7 +307,8 @@ test.describe('Canvas Editor', () => {
   });
 
   test('auto-create page when typing at bottom', async ({ page }) => {
-    // Add text box near the bottom of the page
+    // Enter Draw mode — "Add text box" is a Draw sub-tool
+    await page.getByRole('button', { name: 'Draw', exact: true }).click();
     await page.getByTitle('Add text box').click();
     const pageContainer = page.locator('[data-page-id]').first();
 
@@ -325,7 +337,7 @@ test.describe('Canvas Editor', () => {
       await expect(pages.nth(1)).toBeVisible();
     } else {
       // Add a new page first
-      await page.getByTitle('Add page').click();
+      await page.getByTitle('Add page').first().click();
       // Select page type
       const pageTypeButton = page.locator('button', { hasText: 'Blank' });
       if (await pageTypeButton.isVisible()) {
@@ -341,7 +353,7 @@ test.describe('Canvas Editor', () => {
     const initialCount = await page.locator('[data-page-id]').count();
 
     // Click the add page button
-    await page.getByTitle('Add page').click();
+    await page.getByTitle('Add page').first().click();
 
     // Select blank page type from popover
     const blankOption = page.locator('button', { hasText: 'Blank' });
@@ -369,7 +381,7 @@ test.describe('Canvas Editor', () => {
     // Add a page so the document has at least 2
     const initialCount = await pagesInContainer.count();
     if (initialCount < 2) {
-      await page.getByTitle('Add page').click();
+      await page.getByTitle('Add page').first().click();
       const blankOption = page.locator('button', { hasText: 'Blank' });
       if (await blankOption.isVisible()) {
         await blankOption.click();
