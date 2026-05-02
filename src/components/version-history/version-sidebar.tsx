@@ -82,9 +82,10 @@ export function VersionSidebar({
     try {
       await restoreDocumentVersion(selectedId);
       onRestore?.(version);
-      // Full page reload to pick up restored content — router.refresh()
-      // doesn't work because the editor keeps its client-side state
-      window.location.reload();
+      // Reload with search param so sidebar stays open and shows "Before restore"
+      const url = new URL(window.location.href);
+      url.searchParams.set('versionHistory', 'open');
+      window.location.href = url.toString();
     } catch {
       setRestoring(false);
     }

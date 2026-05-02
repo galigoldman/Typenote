@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { CanvasEditor } from '@/components/canvas/canvas-editor';
 import { VersionSidebar } from '@/components/version-history/version-sidebar';
@@ -32,6 +32,19 @@ export function DocumentWithAi({
   const [contextItems, setContextItems] = useState<AiContextItem[]>([]);
   const [isAiOpen, setIsAiOpen] = useState(false);
   const [isVersionHistoryOpen, setIsVersionHistoryOpen] = useState(false);
+
+  // Re-open sidebar after a version restore (reload with ?versionHistory=open)
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('versionHistory') === 'open') {
+      setIsVersionHistoryOpen(true);
+      params.delete('versionHistory');
+      const clean = params.toString()
+        ? `${window.location.pathname}?${params}`
+        : window.location.pathname;
+      window.history.replaceState({}, '', clean);
+    }
+  }, []);
 
   const handleDocumentTextReady = useCallback((getter: () => string) => {
     getDocumentTextRef.current = getter;

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import type { Document } from '@/types/database';
 import { TiptapEditor } from './tiptap-editor';
 import { VersionSidebar } from '@/components/version-history/version-sidebar';
@@ -22,6 +22,19 @@ export function TiptapEditorWithVersions({
   weekLabel,
 }: TiptapEditorWithVersionsProps) {
   const [isVersionHistoryOpen, setIsVersionHistoryOpen] = useState(false);
+
+  // Re-open sidebar after a version restore (reload with ?versionHistory=open)
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('versionHistory') === 'open') {
+      setIsVersionHistoryOpen(true);
+      params.delete('versionHistory');
+      const clean = params.toString()
+        ? `${window.location.pathname}?${params}`
+        : window.location.pathname;
+      window.history.replaceState({}, '', clean);
+    }
+  }, []);
 
   return (
     <div className="flex min-h-0 flex-1">
