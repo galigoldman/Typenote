@@ -53,7 +53,7 @@ export type AiContextItem =
   | { type: 'image'; dataUrl: string };
 
 interface AiChatPanelProps {
-  courseId: string;
+  courseId?: string;
   weekId?: string;
   courseName?: string;
   weekLabel?: string;
@@ -113,6 +113,12 @@ export function AiChatPanel({
     initialLoadDone.current = true;
 
     async function loadMostRecent() {
+      if (!courseId) {
+        // No course — no conversation persistence
+        setCurrentConversationId(null);
+        setMessages([]);
+        return;
+      }
       setLoadingConversation(true);
       try {
         const res = await fetch(`/api/ai/conversations?courseId=${courseId}`);
@@ -455,7 +461,7 @@ export function AiChatPanel({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex h-full w-full flex-col border-l bg-background shadow-xl md:inset-auto md:right-0 md:top-0 md:w-[420px]">
+    <div className="fixed inset-0 z-50 flex h-full w-full flex-col border-l bg-background shadow-xl lg:static lg:z-auto lg:w-[340px] lg:shrink-0 xl:w-[420px] 2xl:w-[500px]">
       {/* Header */}
       <div className="flex items-center justify-between border-b px-4 py-3">
         <div className="flex min-w-0 items-center gap-2">

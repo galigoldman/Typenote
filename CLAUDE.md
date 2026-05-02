@@ -51,6 +51,11 @@ The project uses a two-branch model: `dev` (integration) and `main` (production)
 
 ## Active Technologies
 
+- TypeScript 5 / Node.js 18+ + React 19, Next.js 16 (App Router), Supabase Realtime (034-fix-pages-disappearing)
+- PostgreSQL via Supabase (JSONB `pages` column on `documents` table) (034-fix-pages-disappearing)
+- TypeScript 5 / Node.js 18+ + React 19, Next.js 16, lucide-react (icons) (036-canvas-ux-ipad-fixes)
+- N/A (client-side state only) (036-canvas-ux-ipad-fixes)
+
 - TypeScript 5 / Node.js 22+ + React 19, Next.js 16 (App Router), TipTap 3 (ProseMirror), Playwright (E2E), Vitest (unit/integration). **No new dependencies.** (035-fix-118-cursor-cascade)
 - N/A — purely a client-side editor change. No database, no migrations, no API surface. (035-fix-118-cursor-cascade)
 

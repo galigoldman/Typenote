@@ -32,9 +32,9 @@ export async function POST(req: Request) {
       );
     }
 
-    if (!courseId || typeof courseId !== 'string') {
+    if (courseId !== undefined && typeof courseId !== 'string') {
       return NextResponse.json(
-        { error: 'courseId is required' },
+        { error: 'courseId must be a string' },
         { status: 400 },
       );
     }
@@ -199,8 +199,9 @@ export async function POST(req: Request) {
           .reverse()
           .map((m) => ({ role: m.role, content: m.content }));
       }
-    } else {
+    } else if (courseId) {
       // Create new conversation with title from first ~50 chars
+      // (only when a course is linked — course_id is required in the DB)
       const title = question.slice(0, 50);
       const { data: newConv, error: convError } = await supabase
         .from('ai_conversations')

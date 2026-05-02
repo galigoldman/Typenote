@@ -234,14 +234,29 @@ function createEmptyPage(
   pageType?: string,
   seed?: string,
 ): CanvasPageData {
+  const id = seed
+    ? `${seed}-p${order}`
+    : Math.random().toString(36).slice(2) + Date.now().toString(36);
   return {
-    id: seed
-      ? `${seed}-p${order}`
-      : Math.random().toString(36).slice(2) + Date.now().toString(36),
+    id,
     order,
     pageType: pageType as CanvasPageData['pageType'],
     strokes: [],
-    textBoxes: [],
+    // Always include a flow text box so the -ftb overflow path handles
+    // text cascade uniformly on every page (the flow editor's Enter
+    // interception is bypassed when textBoxes.length > 0).
+    textBoxes: [
+      {
+        id: `${id}-ftb`,
+        x: 40,
+        y: 40,
+        width: PAGE_WIDTH - 80,
+        height: 60,
+        content: null,
+        isFullPage: false,
+        zIndex: 0,
+      },
+    ],
     flowContent: null,
   };
 }
@@ -970,6 +985,9 @@ export function CanvasEditor({
   // `-ftb` migrated flow text box, or any user-created positioned text
   // box), we also register it in textBoxEditorsRef for per-text-box access
   // during the linked-text-boxes overflow walk-around.
+  // Track whether we've auto-focused the first page on load.
+  const hasAutoFocusedRef = useRef(false);
+
   const handleEditorReady = useCallback(
     (pageId: string, editor: Editor, textBoxId?: string) => {
       if (textBoxId) {
@@ -999,6 +1017,19 @@ export function CanvasEditor({
         }
       }
       setActiveEditor(editor);
+
+      // Auto-focus the first page's -ftb editor on document load so the
+      // blinking cursor appears immediately — the user can start typing
+      // without clicking first.
+      if (!hasAutoFocusedRef.current && textBoxId?.endsWith('-ftb')) {
+        const firstPage = pagesRef.current[0];
+        if (firstPage && pageId === firstPage.id) {
+          hasAutoFocusedRef.current = true;
+          requestAnimationFrame(() => {
+            editor.commands.focus('start');
+          });
+        }
+      }
     },
     [],
   );
@@ -1243,12 +1274,10 @@ export function CanvasEditor({
           cascadeTargetTextBoxIds.current.add(`${nextPage.id}-ftb`);
         }
 
-        // Cursor follows overflow when the user's block moves to the
-        // next page (e.g. Enter at the last line). Stays when the
-        // user's block remains (e.g. Enter in the middle). The
-        // viewport-jump-to-page-9 bug is prevented by the
-        // cascadeTargetTextBoxIds set (inner hops don't touch focus)
-        // and the ed.isFocused auto-scroll guard (canvas-page.tsx).
+        // Decide cursor target: if the user's block is in the overflow
+        // (e.g. Enter at end of page), the cursor follows the text.
+        // If the user's block stays (e.g. Enter in the middle), the
+        // cursor stays via ProseMirror's selection mapping.
         const target = isInnerHop
           ? null
           : decideCursorTarget(cursorBlockIndex, cursorOffsetInBlock, splitIdx);
@@ -1355,12 +1384,13 @@ export function CanvasEditor({
 
       const firstBlock = curDoc.child(0);
       const firstBlockJSON = firstBlock.toJSON() as {
-        content?: { text?: string }[];
+        content?: unknown[];
+        type?: string;
       };
-      // Extract the text content of the first block (for merging into
-      // the previous page's last paragraph).
-      const firstBlockText =
-        firstBlockJSON.content?.map((n) => n.text ?? '').join('') ?? '';
+      // Extract the full inline content array of the first block,
+      // preserving marks (bold, italic, links, etc.). Previously
+      // only plain text was extracted, losing all formatting.
+      const firstBlockContent = firstBlockJSON.content ?? [];
 
       // 1. Remember the position where the merge will happen: end of
       //    the previous page's last paragraph's text content.
@@ -1377,10 +1407,13 @@ export function CanvasEditor({
       const firstBlockSize = firstBlock.nodeSize;
       curEditor.chain().deleteRange({ from: 0, to: firstBlockSize }).run();
 
-      // 3. Insert the first block's text at the end of the previous
-      //    page's last paragraph (merging the two paragraphs).
-      if (firstBlockText.length > 0) {
-        prevEditor.chain().insertContentAt(prevCursorPos, firstBlockText).run();
+      // 3. Insert the first block's inline content (with marks) at the
+      //    end of the previous page's last paragraph, merging them.
+      if (firstBlockContent.length > 0) {
+        prevEditor
+          .chain()
+          .insertContentAt(prevCursorPos, firstBlockContent)
+          .run();
       }
 
       // 4. Move cursor to the join point on the previous page and
@@ -1967,62 +2000,40 @@ export function CanvasEditor({
   );
 
   const handleAskAiWithRegion = useCallback(
-    (bbox: BBox, pageId: string) => {
+    async (bbox: BBox, pageId: string) => {
       const refs = pageCanvasRefsMap.current.get(pageId);
-      if (!refs) return;
+      if (!refs?.element) return;
 
       const w = bbox.maxX - bbox.minX;
       const h = bbox.maxY - bbox.minY;
       if (w < 20 || h < 20) return;
 
       try {
+        // Use html-to-image to capture the full page DOM (text + canvases)
+        const { toCanvas } = await import('html-to-image');
+        const fullCanvas = await toCanvas(refs.element, {
+          backgroundColor: 'white',
+        });
+
+        // Crop to the selected region
         const dpr = window.devicePixelRatio || 1;
-        // Composite PDF + strokes canvases directly (avoids html-to-image DOM cloning issues)
         const offscreen = window.document.createElement('canvas');
         offscreen.width = Math.round(w * dpr);
         offscreen.height = Math.round(h * dpr);
         const ctx = offscreen.getContext('2d');
         if (!ctx) return;
 
-        // White background
-        ctx.fillStyle = 'white';
-        ctx.fillRect(0, 0, offscreen.width, offscreen.height);
-
-        // Source rect in internal canvas pixels (high-DPI backing buffer)
-        const sx = bbox.minX * dpr;
-        const sy = bbox.minY * dpr;
-        const sw = w * dpr;
-        const sh = h * dpr;
-
-        // Draw PDF background layer (if available)
-        if (refs.pdf && refs.pdf.width > 0) {
-          ctx.drawImage(
-            refs.pdf,
-            sx,
-            sy,
-            sw,
-            sh,
-            0,
-            0,
-            offscreen.width,
-            offscreen.height,
-          );
-        }
-
-        // Draw committed strokes layer
-        if (refs.strokes && refs.strokes.width > 0) {
-          ctx.drawImage(
-            refs.strokes,
-            sx,
-            sy,
-            sw,
-            sh,
-            0,
-            0,
-            offscreen.width,
-            offscreen.height,
-          );
-        }
+        ctx.drawImage(
+          fullCanvas,
+          bbox.minX * dpr,
+          bbox.minY * dpr,
+          w * dpr,
+          h * dpr,
+          0,
+          0,
+          offscreen.width,
+          offscreen.height,
+        );
 
         const dataUrl = offscreen.toDataURL('image/png');
         onAskAiWithContext?.({ type: 'image', dataUrl });

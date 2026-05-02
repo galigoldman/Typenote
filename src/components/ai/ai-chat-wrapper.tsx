@@ -8,7 +8,7 @@ import type { AiContextItem } from './ai-chat-panel';
 import { AiChatPanel } from './ai-chat-panel';
 
 interface AiChatWrapperProps {
-  courseId: string;
+  courseId?: string;
   weekId?: string;
   courseName?: string;
   weekLabel?: string;
