@@ -21,13 +21,15 @@ export function TiptapEditorWithVersions({
   weekId,
   weekLabel,
 }: TiptapEditorWithVersionsProps) {
-  const [isVersionHistoryOpen, setIsVersionHistoryOpen] = useState(false);
+  const [isVersionHistoryOpen, setIsVersionHistoryOpen] = useState(() => {
+    if (typeof window === 'undefined') return false;
+    return new URLSearchParams(window.location.search).get('versionHistory') === 'open';
+  });
 
-  // Re-open sidebar after a version restore (reload with ?versionHistory=open)
+  // Clean up the URL parameter after reading it
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     if (params.get('versionHistory') === 'open') {
-      setIsVersionHistoryOpen(true);
       params.delete('versionHistory');
       const clean = params.toString()
         ? `${window.location.pathname}?${params}`
