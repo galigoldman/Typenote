@@ -45,9 +45,9 @@ test.describe('AI Chat', () => {
     await page.keyboard.press('Enter');
 
     // Wait for response — should see either loading or a response bubble
-    await expect(
-      page.locator('div.bg-muted.rounded-2xl').first(),
-    ).toBeVisible({ timeout: 30_000 });
+    await expect(page.locator('div.bg-muted.rounded-2xl').first()).toBeVisible({
+      timeout: 30_000,
+    });
   });
 
   test('chat shows quota usage', async ({ page }) => {
