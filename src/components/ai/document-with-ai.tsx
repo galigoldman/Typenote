@@ -33,7 +33,10 @@ export function DocumentWithAi({
   const [isAiOpen, setIsAiOpen] = useState(false);
   const [isVersionHistoryOpen, setIsVersionHistoryOpen] = useState(() => {
     if (typeof window === 'undefined') return false;
-    return new URLSearchParams(window.location.search).get('versionHistory') === 'open';
+    return (
+      new URLSearchParams(window.location.search).get('versionHistory') ===
+      'open'
+    );
   });
 
   // Clean up the URL parameter after reading it

@@ -46,7 +46,10 @@ function buildMathPages() {
                     { type: 'text', text: 'Here is a formula: ' },
                     {
                       type: 'mathExpression',
-                      attrs: { latex: 'x^2 + y', originalText: 'x squared plus y' },
+                      attrs: {
+                        latex: 'x^2 + y',
+                        originalText: 'x squared plus y',
+                      },
                     },
                     { type: 'text', text: ' and more text.' },
                   ],
@@ -57,7 +60,10 @@ function buildMathPages() {
                     { type: 'text', text: 'Another: ' },
                     {
                       type: 'mathExpression',
-                      attrs: { latex: '\\frac{a}{b}', originalText: 'a over b' },
+                      attrs: {
+                        latex: '\\frac{a}{b}',
+                        originalText: 'a over b',
+                      },
                     },
                   ],
                 },
@@ -89,25 +95,24 @@ async function seedMathDocument(): Promise<void> {
     },
   );
   if (!res.ok) {
-    throw new Error(`Failed to seed math document: ${res.status} ${await res.text()}`);
+    throw new Error(
+      `Failed to seed math document: ${res.status} ${await res.text()}`,
+    );
   }
 }
 
 /** Restore the document to its original state (no pages, original content) */
 async function restoreDocument(): Promise<void> {
-  await fetch(
-    `${SUPABASE_URL}/rest/v1/documents?id=eq.${SEEDED_DOC_ID}`,
-    {
-      method: 'PATCH',
-      headers: {
-        'Content-Type': 'application/json',
-        apikey: LOCAL_SERVICE_ROLE_KEY,
-        Authorization: `Bearer ${LOCAL_SERVICE_ROLE_KEY}`,
-        Prefer: 'return=minimal',
-      },
-      body: JSON.stringify({ pages: null }),
+  await fetch(`${SUPABASE_URL}/rest/v1/documents?id=eq.${SEEDED_DOC_ID}`, {
+    method: 'PATCH',
+    headers: {
+      'Content-Type': 'application/json',
+      apikey: LOCAL_SERVICE_ROLE_KEY,
+      Authorization: `Bearer ${LOCAL_SERVICE_ROLE_KEY}`,
+      Prefer: 'return=minimal',
     },
-  );
+    body: JSON.stringify({ pages: null }),
+  });
 }
 
 test.describe('LaTeX Math', () => {
@@ -290,9 +295,9 @@ test.describe('LaTeX Math', () => {
     await page.keyboard.press('Enter');
 
     // Wait for math to render
-    await expect(
-      page.locator('.math-expression-node').last(),
-    ).toBeVisible({ timeout: 15_000 });
+    await expect(page.locator('.math-expression-node').last()).toBeVisible({
+      timeout: 15_000,
+    });
 
     // Verify the math node has LTR direction (math is always LTR)
     const mathNode = page.locator('.math-expression-node').last();
