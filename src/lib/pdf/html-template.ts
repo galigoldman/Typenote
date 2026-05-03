@@ -342,6 +342,14 @@ export function buildCanvasPageHtml(
         .filter(Boolean)
         .join('\n');
 
+      // Render images as positioned img tags (above strokes, below text)
+      const imagesHtml = (page.images ?? [])
+        .map(
+          (img) =>
+            `<img src="${img.src}" alt="" style="position: absolute; left: ${img.x}px; top: ${img.y}px; width: ${img.width}px; height: ${img.height}px; pointer-events: none;" />`,
+        )
+        .join('\n');
+
       // Render text boxes as positioned divs
       const textBoxesHtml = page.textBoxes
         .sort((a, b) => a.zIndex - b.zIndex)
@@ -372,6 +380,7 @@ export function buildCanvasPageHtml(
           ${bgSvg}
           ${strokePaths}
         </svg>
+        ${imagesHtml}
         ${textBoxesHtml}
         ${flowHtml && page.textBoxes.length === 0 ? `<div style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; padding: 16px; box-sizing: border-box; pointer-events: none;">${flowHtml}</div>` : ''}
       </div>`;
@@ -456,6 +465,12 @@ export function buildMixedDocumentHtml(
         .map((s) => strokeToSvgPath(s))
         .filter(Boolean)
         .join('\n');
+      const imagesHtml = (page.images ?? [])
+        .map(
+          (img) =>
+            `<img src="${img.src}" alt="" style="position: absolute; left: ${img.x}px; top: ${img.y}px; width: ${img.width}px; height: ${img.height}px; pointer-events: none;" />`,
+        )
+        .join('\n');
       const textBoxesHtml = page.textBoxes
         .sort((a, b) => a.zIndex - b.zIndex)
         .map((tb) => renderTextBox(tb))
@@ -483,6 +498,7 @@ export function buildMixedDocumentHtml(
           ${bgSvg}
           ${strokePaths}
         </svg>
+        ${imagesHtml}
         ${textBoxesHtml}
         ${flowHtml && page.textBoxes.length === 0 ? `<div style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; padding: 16px; box-sizing: border-box;">${flowHtml}</div>` : ''}
       </div>`;

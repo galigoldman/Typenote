@@ -10,6 +10,7 @@ type CanvasPageData = CanvasPage & {
 /** Returns true if a page has any real content (strokes, text boxes, PDF background, or typed text). */
 export function pageHasContent(page: CanvasPageData): boolean {
   if (page.strokes.length > 0) return true;
+  if ((page.images ?? []).length > 0) return true;
   // PDF-backed pages are always considered content (T007)
   if (page.pdfPage !== undefined) return true;
   // User-positioned text boxes (non-ftb) count as intentional content.

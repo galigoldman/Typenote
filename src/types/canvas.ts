@@ -39,6 +39,20 @@ export interface TextBox {
   contentBounds?: { offsetX: number; width: number };
 }
 
+/** A positioned image on a canvas page (pasted from clipboard) */
+export interface ImageObject {
+  id: string;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  /** Base64 data URL (data:image/jpeg;base64,... or data:image/png;base64,...) */
+  src: string;
+  /** Original width / height ratio for proportional resize */
+  aspectRatio: number;
+  createdAt: number;
+}
+
 /** A single A4 page in the document */
 export interface CanvasPage {
   id: string;
@@ -46,6 +60,8 @@ export interface CanvasPage {
   pageType?: 'blank' | 'lined' | 'grid' | 'dotted';
   strokes: Stroke[];
   textBoxes: TextBox[];
+  /** Pasted images on this page (defaults to [] for backward compatibility) */
+  images?: ImageObject[];
   flowContent: Record<string, unknown> | null;
   /** 0-indexed PDF page number for background rendering (material-backed documents only) */
   pdfPage?: number;
@@ -80,6 +96,7 @@ export interface ViewTransform {
 export interface ClipboardData {
   strokes: Stroke[];
   textBoxes: TextBox[];
+  images?: ImageObject[];
   /** X center of the original selection bounding box */
   originX: number;
   /** Y center of the original selection bounding box */
