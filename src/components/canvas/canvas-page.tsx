@@ -747,36 +747,23 @@ export function CanvasPage({
         style={{ pointerEvents: 'none' }}
       />
 
-      {/* Layer 3.5: Pasted images — above strokes, below text */}
-      {(page.images ?? []).map((img) => {
-        const isClickable = activeTool === 'text' || activeTool === 'read';
-        return (
-          <img
-            key={img.id}
-            src={img.src}
-            alt=""
-            draggable={false}
-            className="absolute"
-            style={{
-              left: img.x,
-              top: img.y,
-              width: img.width,
-              height: img.height,
-              pointerEvents: isClickable ? 'auto' : 'none',
-              cursor: isClickable ? 'pointer' : undefined,
-            }}
-            onPointerDown={
-              isClickable
-                ? (e) => {
-                    e.stopPropagation();
-                    // Switch to select mode with this image selected
-                    onImageSelect?.(page.id, img.id);
-                  }
-                : undefined
-            }
-          />
-        );
-      })}
+      {/* Layer 3.5: Pasted images — above strokes, below text (visual only) */}
+      {(page.images ?? []).map((img) => (
+        <img
+          key={img.id}
+          src={img.src}
+          alt=""
+          draggable={false}
+          className="absolute"
+          style={{
+            left: img.x,
+            top: img.y,
+            width: img.width,
+            height: img.height,
+            pointerEvents: 'none',
+          }}
+        />
+      ))}
 
       {/* Layer 4: Text content layer — only interactive in text mode */}
       <div
@@ -822,6 +809,28 @@ export function CanvasPage({
           />
         ))}
       </div>
+
+      {/* Layer 4.1: Image click targets — above text layer so images are clickable in type/read mode */}
+      {(activeTool === 'text' || activeTool === 'read') &&
+        (page.images ?? []).map((img) => (
+          <div
+            key={`img-click-${img.id}`}
+            className="absolute"
+            style={{
+              left: img.x,
+              top: img.y,
+              width: img.width,
+              height: img.height,
+              cursor: 'pointer',
+              pointerEvents: 'auto',
+              zIndex: 5,
+            }}
+            onPointerDown={(e) => {
+              e.stopPropagation();
+              onImageSelect?.(page.id, img.id);
+            }}
+          />
+        ))}
 
       {/* Layer 4.5: PDF text layer (Read tool) — above text content so it's selectable */}
       {page.pdfPage != null && (materialId || personalFileId) && (
