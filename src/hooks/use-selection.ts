@@ -3,6 +3,7 @@
 import { useCallback, useRef, useState } from 'react';
 import type {
   CanvasTool,
+  ImageObject,
   Stroke,
   TextBox,
   BBox,
@@ -25,6 +26,7 @@ interface UseSelectionOptions {
   activeTool: CanvasTool;
   getPageStrokes: (pageId: string) => Stroke[];
   getPageTextBoxes: (pageId: string) => TextBox[];
+  getPageImages?: (pageId: string) => ImageObject[];
   onStrokesMove: (
     pageId: string,
     movedStrokes: { id: string; points: Stroke['points']; bbox: BBox }[],
@@ -44,16 +46,29 @@ interface UseSelectionOptions {
     height: number,
     fontScale: number,
   ) => void;
+  onImagesMove?: (pageId: string, imageIds: string[], dx: number, dy: number) => void;
+  onImageResize?: (
+    pageId: string,
+    imageId: string,
+    x: number,
+    y: number,
+    width: number,
+    height: number,
+  ) => void;
   onModeChange?: (mode: CanvasTool) => void;
   onDeleteSelected?: (
     pageId: string,
     strokeIds: string[],
     textBoxIds: string[],
+    imageIds?: string[],
   ) => void;
   /** Called when user draws a rectangle that contains no objects (empty area crop) */
   onEmptyRectSelection?: (pageId: string, bbox: BBox) => void;
   /** Called when user pastes clipboard contents at a position */
   onPaste?: (pageId: string, strokes: Stroke[], textBoxes: TextBox[]) => void;
+  /** Signal from parent to auto-select a just-pasted image */
+  pendingImageSelect?: { pageId: string; imageId: string } | null;
+  onPendingImageSelectConsumed?: () => void;
 }
 
 interface UseSelectionReturn {
@@ -63,6 +78,9 @@ interface UseSelectionReturn {
   selectionPath: [number, number][] | null;
   selectedStrokeIds: Set<string>;
   selectedTextBoxIds: Set<string>;
+  selectedImageIds: Set<string>;
+  /** Page ID that owns the current selection */
+  selectionPageId: string | null;
   /** Container-based selection bbox (used for resize handles and drag) */
   selectionBBox: BBox | null;
   /** Tight content-based selection bbox (used for selection highlight border) */
@@ -176,13 +194,18 @@ export function useSelection({
   activeTool,
   getPageStrokes,
   getPageTextBoxes,
+  getPageImages,
   onStrokesMove,
   onTextBoxMove,
   onTextBoxResize,
+  onImagesMove,
+  onImageResize,
   onModeChange,
   onDeleteSelected,
   onEmptyRectSelection,
   onPaste,
+  pendingImageSelect,
+  onPendingImageSelectConsumed,
 }: UseSelectionOptions): UseSelectionReturn {
   const [selectionPath, setSelectionPath] = useState<[number, number][] | null>(
     null,
@@ -193,6 +216,10 @@ export function useSelection({
   const [selectedTextBoxIds, setSelectedTextBoxIds] = useState<Set<string>>(
     new Set(),
   );
+  const [selectedImageIds, setSelectedImageIds] = useState<Set<string>>(
+    new Set(),
+  );
+  const [selectionPageId, setSelectionPageId] = useState<string | null>(null);
   const [selectionBBox, setSelectionBBox] = useState<BBox | null>(null);
   const [tightSelectionBBox, setTightSelectionBBox] = useState<BBox | null>(
     null,
@@ -209,6 +236,7 @@ export function useSelection({
   const dragStartRef = useRef<{ x: number; y: number } | null>(null);
   const selectedStrokesRef = useRef<Stroke[]>([]);
   const selectedTextBoxIdsRef = useRef<Set<string>>(new Set());
+  const selectedImageIdsRef = useRef<Set<string>>(new Set());
   const lastTapRef = useRef<{ time: number; x: number; y: number } | null>(
     null,
   );
@@ -249,6 +277,8 @@ export function useSelection({
     setSelectionPath(null);
     setSelectedStrokeIds(new Set());
     setSelectedTextBoxIds(new Set());
+    setSelectedImageIds(new Set());
+    setSelectionPageId(null);
     setSelectionBBox(null);
     setTightSelectionBBox(null);
     setIsDragging(false);
@@ -257,6 +287,7 @@ export function useSelection({
     setResizeBBox(null);
     selectedStrokesRef.current = [];
     selectedTextBoxIdsRef.current = new Set();
+    selectedImageIdsRef.current = new Set();
     activePageIdRef.current = null;
     startPointRef.current = null;
     dragStartRef.current = null;
@@ -273,13 +304,15 @@ export function useSelection({
     if (!activePageIdRef.current) return;
     if (
       selectedStrokesRef.current.length === 0 &&
-      selectedTextBoxIdsRef.current.size === 0
+      selectedTextBoxIdsRef.current.size === 0 &&
+      selectedImageIdsRef.current.size === 0
     )
       return;
     onDeleteSelected?.(
       activePageIdRef.current,
       selectedStrokesRef.current.map((s) => s.id),
       Array.from(selectedTextBoxIdsRef.current),
+      Array.from(selectedImageIdsRef.current),
     );
     clearSelection();
   }, [onDeleteSelected, clearSelection]);
@@ -300,7 +333,8 @@ export function useSelection({
     if (!activePageIdRef.current) return;
     if (
       selectedStrokesRef.current.length === 0 &&
-      selectedTextBoxIdsRef.current.size === 0
+      selectedTextBoxIdsRef.current.size === 0 &&
+      selectedImageIdsRef.current.size === 0
     )
       return;
 
@@ -312,6 +346,12 @@ export function useSelection({
             selectedTextBoxIdsRef.current.has(tb.id),
           )
         : [];
+    const images =
+      selectedImageIdsRef.current.size > 0
+        ? (getPageImages?.(pageId) ?? []).filter((img) =>
+            selectedImageIdsRef.current.has(img.id),
+          )
+        : [];
 
     // Compute origin as center of selection bbox
     const allBBoxes: BBox[] = [
@@ -321,6 +361,12 @@ export function useSelection({
         minY: tb.y,
         maxX: tb.x + tb.width,
         maxY: tb.y + tb.height,
+      })),
+      ...images.map((img) => ({
+        minX: img.x,
+        minY: img.y,
+        maxX: img.x + img.width,
+        maxY: img.y + img.height,
       })),
     ];
     if (allBBoxes.length === 0) return;
@@ -346,12 +392,13 @@ export function useSelection({
         ...tb,
         content: tb.content ? JSON.parse(JSON.stringify(tb.content)) : null,
       })),
+      images: images.map((img) => ({ ...img })),
       originX,
       originY,
       sourcePageId: pageId,
     };
     setHasClipboardData(true);
-  }, [getPageTextBoxes]);
+  }, [getPageTextBoxes, getPageImages]);
 
   const clearClipboard = useCallback(() => {
     clipboardRef.current = null;
@@ -449,6 +496,7 @@ export function useSelection({
       const newTextBoxIds = new Set(newTextBoxes.map((tb) => tb.id));
       stateRef.current = 'selected';
       activePageIdRef.current = pageId;
+      setSelectionPageId(pageId);
       setSelectedStrokeIds(newStrokeIds);
       selectedStrokesRef.current = newStrokes;
       setSelectedTextBoxIds(newTextBoxIds);
@@ -465,12 +513,15 @@ export function useSelection({
   const computeUnionBBox = (
     strokes: Stroke[],
     textBoxes: TextBox[],
+    images: ImageObject[] = [],
   ): BBox | null => {
     const bboxes: BBox[] = [];
     for (const s of strokes) bboxes.push(s.bbox);
     for (const tb of textBoxes) {
-      // Use container bounds for display/resize (not tight selection bounds)
       bboxes.push(getContainerBBox(tb));
+    }
+    for (const img of images) {
+      bboxes.push({ minX: img.x, minY: img.y, maxX: img.x + img.width, maxY: img.y + img.height });
     }
     if (bboxes.length === 0) return null;
     return {
@@ -484,11 +535,15 @@ export function useSelection({
   const computeTightUnionBBox = (
     strokes: Stroke[],
     textBoxes: TextBox[],
+    images: ImageObject[] = [],
   ): BBox | null => {
     const bboxes: BBox[] = [];
     for (const s of strokes) bboxes.push(s.bbox);
     for (const tb of textBoxes) {
       bboxes.push(getSelectableBBox(tb));
+    }
+    for (const img of images) {
+      bboxes.push({ minX: img.x, minY: img.y, maxX: img.x + img.width, maxY: img.y + img.height });
     }
     if (bboxes.length === 0) return null;
     return {
@@ -564,6 +619,7 @@ export function useSelection({
       }
 
       stateRef.current = 'drawing';
+      setSelectionPageId(pageId);
       setSelectionPath([[x, y]]);
       setIsRectMode(true);
     },
@@ -697,7 +753,37 @@ export function useSelection({
           }
           lastTapRef.current = { time: now, x, y };
 
-          // Single tap — select one stroke at tap point (text boxes are not selectable)
+          // Single tap — check images first (higher z-layer), then strokes
+          const pageImages = getPageImages?.(targetPageId) ?? [];
+          const tappedImage = pageImages.find(
+            (img) =>
+              x >= img.x &&
+              x <= img.x + img.width &&
+              y >= img.y &&
+              y <= img.y + img.height,
+          );
+          if (tappedImage) {
+            stateRef.current = 'selected';
+            activePageIdRef.current = targetPageId;
+            setSelectionPageId(targetPageId);
+            setSelectedStrokeIds(new Set());
+            selectedStrokesRef.current = [];
+            setSelectedTextBoxIds(new Set());
+            selectedTextBoxIdsRef.current = new Set();
+            setSelectedImageIds(new Set([tappedImage.id]));
+            selectedImageIdsRef.current = new Set([tappedImage.id]);
+            const imgBBox: BBox = {
+              minX: tappedImage.x,
+              minY: tappedImage.y,
+              maxX: tappedImage.x + tappedImage.width,
+              maxY: tappedImage.y + tappedImage.height,
+            };
+            setSelectionBBox(imgBBox);
+            setTightSelectionBBox(imgBBox);
+            setSelectionPath(null);
+            return;
+          }
+
           // Check strokes (tap within 10px of any stroke point)
           const tappedStroke = strokes.find((s) => {
             if (
@@ -714,10 +800,13 @@ export function useSelection({
           if (tappedStroke) {
             stateRef.current = 'selected';
             activePageIdRef.current = targetPageId;
+            setSelectionPageId(targetPageId);
             setSelectedStrokeIds(new Set([tappedStroke.id]));
             selectedStrokesRef.current = [tappedStroke];
             setSelectedTextBoxIds(new Set());
             selectedTextBoxIdsRef.current = new Set();
+            setSelectedImageIds(new Set());
+            selectedImageIdsRef.current = new Set();
             const strokeBBox = getSelectionBBox([tappedStroke]);
             setSelectionBBox(strokeBBox);
             setTightSelectionBBox(strokeBBox);
@@ -764,16 +853,28 @@ export function useSelection({
             }
           }
 
-          // Text boxes are not selectable — only strokes
+          // Hit-test images (AABB overlap)
+          const rectPageImages = getPageImages?.(targetPageId) ?? [];
+          const selectedImgs: ImageObject[] = [];
+          for (const img of rectPageImages) {
+            const imgBBox: BBox = { minX: img.x, minY: img.y, maxX: img.x + img.width, maxY: img.y + img.height };
+            if (aabbIntersectsRect(imgBBox, selectionRect)) {
+              selectedImgs.push(img);
+            }
+          }
 
-          if (selectedStrokes.length > 0) {
+          if (selectedStrokes.length > 0 || selectedImgs.length > 0) {
             stateRef.current = 'selected';
             activePageIdRef.current = targetPageId;
+            setSelectionPageId(targetPageId);
             setSelectedStrokeIds(new Set(selectedStrokes.map((s) => s.id)));
             selectedStrokesRef.current = selectedStrokes;
             setSelectedTextBoxIds(new Set());
             selectedTextBoxIdsRef.current = new Set();
-            const unionBBox = computeUnionBBox(selectedStrokes, []);
+            const imgIds = new Set(selectedImgs.map((img) => img.id));
+            setSelectedImageIds(imgIds);
+            selectedImageIdsRef.current = imgIds;
+            const unionBBox = computeUnionBBox(selectedStrokes, [], selectedImgs);
             setSelectionBBox(unionBBox);
             setTightSelectionBBox(unionBBox);
             setSelectionPath(null);
@@ -832,6 +933,16 @@ export function useSelection({
           // Move text boxes
           for (const tbId of selectedTextBoxIdsRef.current) {
             onTextBoxMove?.(targetPageId, tbId, dx, dy);
+          }
+
+          // Move images
+          if (selectedImageIdsRef.current.size > 0) {
+            onImagesMove?.(
+              targetPageId,
+              Array.from(selectedImageIdsRef.current),
+              dx,
+              dy,
+            );
           }
 
           // Update selection bboxes
@@ -938,10 +1049,67 @@ export function useSelection({
             }
           }
 
-          // Update selection bbox to the new bbox
-          setSelectionBBox(newBBox);
-          // Tight bbox will be recalculated when content re-renders after resize
-          setTightSelectionBBox(newBBox);
+          // Scale images proportionally (aspect-ratio locked)
+          // Track actual image bounds to update selection bbox correctly
+          let imageBoundsAfterResize: BBox | null = null;
+          if (
+            selectedImageIdsRef.current.size > 0 &&
+            origW > 0 &&
+            origH > 0
+          ) {
+            const allImages = getPageImages?.(targetPageId) ?? [];
+            for (const imgId of selectedImageIdsRef.current) {
+              const img = allImages.find((i) => i.id === imgId);
+              if (!img) continue;
+              // Use uniform scale: pick the axis the user dragged most
+              const scaleX = newW / origW;
+              const scaleY = newH / origH;
+              // For aspect-locked images, use the scale that preserves ratio
+              // Use average of both axes to be more responsive to user intent
+              const scale = (scaleX + scaleY) / 2;
+              const newImgW = Math.max(MIN_RESIZE_SIZE, img.width * scale);
+              const newImgH = newImgW / img.aspectRatio;
+              // Position: anchor at the same relative position within the bbox
+              const relX = origW > 0 ? (img.x - origBBox.minX) / origW : 0;
+              const relY = origH > 0 ? (img.y - origBBox.minY) / origH : 0;
+              const newImgX = newBBox.minX + relX * (newW - newImgW);
+              const newImgY = newBBox.minY + relY * (newH - newImgH);
+              onImageResize?.(
+                targetPageId,
+                imgId,
+                newImgX,
+                newImgY,
+                newImgW,
+                newImgH,
+              );
+              // Track bounds for selection bbox update
+              const imgBBox: BBox = {
+                minX: newImgX,
+                minY: newImgY,
+                maxX: newImgX + newImgW,
+                maxY: newImgY + newImgH,
+              };
+              if (!imageBoundsAfterResize) {
+                imageBoundsAfterResize = { ...imgBBox };
+              } else {
+                imageBoundsAfterResize.minX = Math.min(imageBoundsAfterResize.minX, imgBBox.minX);
+                imageBoundsAfterResize.minY = Math.min(imageBoundsAfterResize.minY, imgBBox.minY);
+                imageBoundsAfterResize.maxX = Math.max(imageBoundsAfterResize.maxX, imgBBox.maxX);
+                imageBoundsAfterResize.maxY = Math.max(imageBoundsAfterResize.maxY, imgBBox.maxY);
+              }
+            }
+          }
+
+          // Update selection bbox — use actual image bounds if images were resized
+          // (prevents bbox/image mismatch from aspect-ratio locking)
+          const finalBBox =
+            imageBoundsAfterResize &&
+            selectedStrokesRef.current.length === 0 &&
+            selectedTextBoxIdsRef.current.size === 0
+              ? imageBoundsAfterResize
+              : newBBox;
+          setSelectionBBox(finalBBox);
+          setTightSelectionBBox(finalBBox);
         }
 
         setIsResizing(false);
@@ -966,15 +1134,50 @@ export function useSelection({
       dragOffset,
       getPageStrokes,
       getPageTextBoxes,
+      getPageImages,
       onStrokesMove,
       onTextBoxMove,
       onTextBoxResize,
+      onImagesMove,
+      onImageResize,
       onModeChange,
       onEmptyRectSelection,
       clearSelection,
       cancelLongPress,
     ],
   );
+
+  // Auto-select a just-pasted image when signaled by parent
+  if (pendingImageSelect && getPageImages) {
+    const { pageId, imageId } = pendingImageSelect;
+    const images = getPageImages(pageId);
+    const img = images.find((i) => i.id === imageId);
+    if (img) {
+      // Only trigger once — check if not already selected
+      if (!selectedImageIdsRef.current.has(imageId)) {
+        stateRef.current = 'selected';
+        activePageIdRef.current = pageId;
+        setSelectionPageId(pageId);
+        setSelectedStrokeIds(new Set());
+        selectedStrokesRef.current = [];
+        setSelectedTextBoxIds(new Set());
+        selectedTextBoxIdsRef.current = new Set();
+        const imgIds = new Set([imageId]);
+        setSelectedImageIds(imgIds);
+        selectedImageIdsRef.current = imgIds;
+        const imgBBox: BBox = {
+          minX: img.x,
+          minY: img.y,
+          maxX: img.x + img.width,
+          maxY: img.y + img.height,
+        };
+        setSelectionBBox(imgBBox);
+        setTightSelectionBBox(imgBBox);
+        setSelectionPath(null);
+      }
+      onPendingImageSelectConsumed?.();
+    }
+  }
 
   return {
     handlePointerDown,
@@ -983,6 +1186,8 @@ export function useSelection({
     selectionPath,
     selectedStrokeIds,
     selectedTextBoxIds,
+    selectedImageIds,
+    selectionPageId,
     selectionBBox,
     tightSelectionBBox,
     isRectMode,
