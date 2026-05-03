@@ -112,7 +112,6 @@ interface CanvasPageProps {
   onBackspaceAtStart?: (pageId: string, textBoxId: string) => void;
   onAskAiWithText?: (text: string) => void;
   onAskAiWithRegion?: (bbox: BBox, pageId: string) => void;
-  onImageDelete?: (pageId: string, imageId: string) => void;
   onImageSelect?: (pageId: string, imageId: string) => void;
   onCanvasRefsReady?: (
     pageId: string,
@@ -160,7 +159,6 @@ export function CanvasPage({
   onBackspaceAtStart,
   onAskAiWithText,
   onAskAiWithRegion,
-  onImageDelete,
   onImageSelect,
   onCanvasRefsReady,
 }: CanvasPageProps) {
@@ -174,14 +172,6 @@ export function CanvasPage({
   const workingCtxRef = useRef<CanvasRenderingContext2D | null>(null);
   const overflowNotifiedRef = useRef(false);
   const isSplittingRef = useRef(false);
-
-  // Image focus state (type mode): clicking an image shows a floating bar
-  const [focusedImageId, setFocusedImageId] = useState<string | null>(null);
-
-  // Clear focused image when switching tools
-  useEffect(() => {
-    if (activeTool !== 'text') setFocusedImageId(null);
-  }, [activeTool]);
 
   // Crop tool state: draw a rectangle to screenshot
   const [cropRect, setCropRect] = useState<BBox | null>(null);
@@ -759,72 +749,32 @@ export function CanvasPage({
 
       {/* Layer 3.5: Pasted images — above strokes, below text */}
       {(page.images ?? []).map((img) => {
-        const isFocused = focusedImageId === img.id;
         const isClickable = activeTool === 'text' || activeTool === 'read';
         return (
-          <div key={img.id}>
-            <img
-              src={img.src}
-              alt=""
-              draggable={false}
-              className="absolute"
-              style={{
-                left: img.x,
-                top: img.y,
-                width: img.width,
-                height: img.height,
-                pointerEvents: isClickable ? 'auto' : 'none',
-                cursor: isClickable ? 'pointer' : undefined,
-                outline: isFocused ? '2px solid #3b82f6' : undefined,
-                outlineOffset: isFocused ? '2px' : undefined,
-              }}
-              onPointerDown={
-                isClickable
-                  ? (e) => {
-                      e.stopPropagation();
-                      setFocusedImageId(isFocused ? null : img.id);
-                    }
-                  : undefined
-              }
-            />
-            {/* Floating action bar for focused image in type mode */}
-            {isFocused && isClickable && (
-              <div
-                className="absolute flex items-center gap-1 bg-white rounded-full shadow-lg border px-2 py-1"
-                style={{
-                  left: img.x + img.width / 2,
-                  top: img.y - 40,
-                  transform: 'translateX(-50%)',
-                  pointerEvents: 'auto',
-                  zIndex: 10,
-                }}
-              >
-                <button
-                  onPointerDown={(e) => {
+          <img
+            key={img.id}
+            src={img.src}
+            alt=""
+            draggable={false}
+            className="absolute"
+            style={{
+              left: img.x,
+              top: img.y,
+              width: img.width,
+              height: img.height,
+              pointerEvents: isClickable ? 'auto' : 'none',
+              cursor: isClickable ? 'pointer' : undefined,
+            }}
+            onPointerDown={
+              isClickable
+                ? (e) => {
                     e.stopPropagation();
-                    setFocusedImageId(null);
+                    // Switch to select mode with this image selected
                     onImageSelect?.(page.id, img.id);
-                  }}
-                  className="flex items-center justify-center h-7 px-2 rounded-full hover:bg-blue-50 hover:text-blue-600 transition-colors text-gray-600 text-xs font-medium"
-                  title="Select & resize"
-                >
-                  <Pencil className="h-3.5 w-3.5 mr-1" />
-                  Edit
-                </button>
-                <button
-                  onPointerDown={(e) => {
-                    e.stopPropagation();
-                    setFocusedImageId(null);
-                    onImageDelete?.(page.id, img.id);
-                  }}
-                  className="flex items-center justify-center h-7 w-7 rounded-full hover:bg-red-50 hover:text-red-500 transition-colors text-gray-600"
-                  title="Delete image"
-                >
-                  <Trash2 className="h-3.5 w-3.5" />
-                </button>
-              </div>
-            )}
-          </div>
+                  }
+                : undefined
+            }
+          />
         );
       })}
 
