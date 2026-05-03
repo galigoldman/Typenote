@@ -3052,9 +3052,6 @@ export function CanvasEditor({
                     personalFileId={personalFileId}
                     onAskAiWithText={handleAskAiWithText}
                     onAskAiWithRegion={handleAskAiWithRegion}
-                    onImageDelete={(pid, imgId) => {
-                      handleDeleteSelected(pid, [], [], [imgId]);
-                    }}
                     onImageSelect={(pid, imgId) => {
                       pendingImageSelectRef.current = { pageId: pid, imageId: imgId };
                       setActiveTool('select');
