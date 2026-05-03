@@ -65,7 +65,7 @@ interface UseSelectionOptions {
   /** Called when user draws a rectangle that contains no objects (empty area crop) */
   onEmptyRectSelection?: (pageId: string, bbox: BBox) => void;
   /** Called when user pastes clipboard contents at a position */
-  onPaste?: (pageId: string, strokes: Stroke[], textBoxes: TextBox[]) => void;
+  onPaste?: (pageId: string, strokes: Stroke[], textBoxes: TextBox[], images?: ImageObject[]) => void;
   /** Signal from parent to auto-select a just-pasted image */
   pendingImageSelect?: { pageId: string; imageId: string } | null;
   onPendingImageSelectConsumed?: () => void;
@@ -438,6 +438,7 @@ export function useSelection({
       let dy = targetY - clipboard.originY;
 
       // Clamp: compute what the pasted union bbox would be and adjust if out of bounds
+      const clipImages = clipboard.images ?? [];
       const allSourceBBoxes: BBox[] = [
         ...clipboard.strokes.map((s) => s.bbox),
         ...clipboard.textBoxes.map((tb) => ({
@@ -445,6 +446,12 @@ export function useSelection({
           minY: tb.y,
           maxX: tb.x + tb.width,
           maxY: tb.y + tb.height,
+        })),
+        ...clipImages.map((img) => ({
+          minX: img.x,
+          minY: img.y,
+          maxX: img.x + img.width,
+          maxY: img.y + img.height,
         })),
       ];
       if (allSourceBBoxes.length > 0) {
@@ -488,12 +495,22 @@ export function useSelection({
         content: tb.content ? JSON.parse(JSON.stringify(tb.content)) : null,
       }));
 
+      // Clone images with new IDs and offset positions
+      const newImages: ImageObject[] = clipImages.map((img) => ({
+        ...img,
+        id: Math.random().toString(36).slice(2) + Date.now().toString(36),
+        x: img.x + dx,
+        y: img.y + dy,
+        createdAt: Date.now(),
+      }));
+
       // Notify parent to add pasted elements and push undo action
-      onPaste?.(pageId, newStrokes, newTextBoxes);
+      onPaste?.(pageId, newStrokes, newTextBoxes, newImages);
 
       // Auto-select pasted elements
       const newStrokeIds = new Set(newStrokes.map((s) => s.id));
       const newTextBoxIds = new Set(newTextBoxes.map((tb) => tb.id));
+      const newImageIds = new Set(newImages.map((img) => img.id));
       stateRef.current = 'selected';
       activePageIdRef.current = pageId;
       setSelectionPageId(pageId);
@@ -501,8 +518,28 @@ export function useSelection({
       selectedStrokesRef.current = newStrokes;
       setSelectedTextBoxIds(newTextBoxIds);
       selectedTextBoxIdsRef.current = newTextBoxIds;
+      setSelectedImageIds(newImageIds);
+      selectedImageIdsRef.current = newImageIds;
 
-      const unionBBox = computeUnionBBoxFromArrays(newStrokes, newTextBoxes);
+      // Compute union bbox including images
+      const imgBBoxes: BBox[] = newImages.map((img) => ({
+        minX: img.x, minY: img.y,
+        maxX: img.x + img.width, maxY: img.y + img.height,
+      }));
+      const allBBoxes: BBox[] = [
+        ...newStrokes.map((s) => s.bbox),
+        ...newTextBoxes.map((tb) => ({
+          minX: tb.x, minY: tb.y,
+          maxX: tb.x + tb.width, maxY: tb.y + tb.height,
+        })),
+        ...imgBBoxes,
+      ];
+      const unionBBox = allBBoxes.length > 0 ? {
+        minX: Math.min(...allBBoxes.map((b) => b.minX)),
+        minY: Math.min(...allBBoxes.map((b) => b.minY)),
+        maxX: Math.max(...allBBoxes.map((b) => b.maxX)),
+        maxY: Math.max(...allBBoxes.map((b) => b.maxY)),
+      } : null;
       setSelectionBBox(unionBBox);
       setTightSelectionBBox(unionBBox);
       setSelectionPath(null);

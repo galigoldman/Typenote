@@ -1547,7 +1547,7 @@ export function CanvasEditor({
 
   // Paste elements onto a page (called from useSelection long-press or keyboard shortcut)
   const handlePaste = useCallback(
-    (pageId: string, strokes: Stroke[], textBoxes: TextBox[]) => {
+    (pageId: string, strokes: Stroke[], textBoxes: TextBox[], images?: ImageObject[]) => {
       // Add pasted elements to the page
       setPages((prev) =>
         prev.map((p) =>
@@ -1556,12 +1556,13 @@ export function CanvasEditor({
                 ...p,
                 strokes: [...p.strokes, ...strokes],
                 textBoxes: [...p.textBoxes, ...textBoxes],
+                images: [...(p.images ?? []), ...(images ?? [])],
               }
             : p,
         ),
       );
       // Push compound undo action
-      undoStackRef.current.push({ type: 'paste', pageId, strokes, textBoxes });
+      undoStackRef.current.push({ type: 'paste', pageId, strokes, textBoxes, images });
       redoStackRef.current = [];
       if (undoStackRef.current.length > 100) undoStackRef.current.shift();
       setHistoryVersion((v) => v + 1);
@@ -2201,7 +2202,7 @@ export function CanvasEditor({
       }
       // Copy: Cmd/Ctrl+C
       if ((e.metaKey || e.ctrlKey) && e.key === 'c') {
-        if (selectedStrokeIds.size > 0 || selectedTextBoxIds.size > 0) {
+        if (selectedStrokeIds.size > 0 || selectedTextBoxIds.size > 0 || selectedImageIds.size > 0) {
           e.preventDefault();
           copySelection();
         }
@@ -2263,6 +2264,7 @@ export function CanvasEditor({
     pasteAtPosition,
     selectedStrokeIds,
     selectedTextBoxIds,
+    selectedImageIds,
   ]);
 
   // System clipboard paste — intercept image data from Ctrl/Cmd+V
