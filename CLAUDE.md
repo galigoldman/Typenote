@@ -51,6 +51,9 @@ The project uses a two-branch model: `dev` (integration) and `main` (production)
 
 ## Active Technologies
 
+- TypeScript 5 / Node.js 22+ + React 19, Next.js 16 (App Router), Canvas 2D API (image processing), Pointer Events API (interaction) (040-image-paste-select)
+- PostgreSQL via Supabase — existing `pages` JSONB column on `documents` table (no migration) (040-image-paste-select)
+
 - TypeScript 5 / Node.js 22+ + React 19, Next.js 16 (App Router), TipTap 3 (ProseMirror), KaTeX, Supabase Realtime (039-fix-pdf-export-page-loss)
 
 - TypeScript 5 / Node.js 22+ + Next.js 16 (App Router), React 19, Supabase SSR, TipTap 3, shadcn/ui (039-document-versioning)
