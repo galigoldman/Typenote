@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import type {
   CanvasTool,
   ImageObject,
@@ -1184,37 +1184,45 @@ export function useSelection({
     ],
   );
 
-  // Auto-select a just-pasted image when signaled by parent
-  if (pendingImageSelect && getPageImages) {
+  // Auto-select a just-pasted image when signaled by parent.
+  // Uses requestAnimationFrame to avoid synchronous setState inside useEffect.
+  useEffect(() => {
+    if (!pendingImageSelect || !getPageImages) return;
     const { pageId, imageId } = pendingImageSelect;
-    const images = getPageImages(pageId);
-    const img = images.find((i) => i.id === imageId);
-    if (img) {
-      // Only trigger once — check if not already selected
-      if (!selectedImageIdsRef.current.has(imageId)) {
-        stateRef.current = 'selected';
-        activePageIdRef.current = pageId;
-        setSelectionPageId(pageId);
-        setSelectedStrokeIds(new Set());
-        selectedStrokesRef.current = [];
-        setSelectedTextBoxIds(new Set());
-        selectedTextBoxIdsRef.current = new Set();
-        const imgIds = new Set([imageId]);
-        setSelectedImageIds(imgIds);
-        selectedImageIdsRef.current = imgIds;
-        const imgBBox: BBox = {
-          minX: img.x,
-          minY: img.y,
-          maxX: img.x + img.width,
-          maxY: img.y + img.height,
-        };
-        setSelectionBBox(imgBBox);
-        setTightSelectionBBox(imgBBox);
-        setSelectionPath(null);
+    const raf = requestAnimationFrame(() => {
+      const images = getPageImages(pageId);
+      const img = images.find((i) => i.id === imageId);
+      if (img) {
+        if (!selectedImageIdsRef.current.has(imageId)) {
+          stateRef.current = 'selected';
+          activePageIdRef.current = pageId;
+          setSelectionPageId(pageId);
+          setSelectedStrokeIds(new Set());
+          selectedStrokesRef.current = [];
+          setSelectedTextBoxIds(new Set());
+          selectedTextBoxIdsRef.current = new Set();
+          const imgIds = new Set([imageId]);
+          setSelectedImageIds(imgIds);
+          selectedImageIdsRef.current = imgIds;
+          setSelectionBBox({
+            minX: img.x,
+            minY: img.y,
+            maxX: img.x + img.width,
+            maxY: img.y + img.height,
+          });
+          setTightSelectionBBox({
+            minX: img.x,
+            minY: img.y,
+            maxX: img.x + img.width,
+            maxY: img.y + img.height,
+          });
+          setSelectionPath(null);
+        }
+        onPendingImageSelectConsumed?.();
       }
-      onPendingImageSelectConsumed?.();
-    }
-  }
+    });
+    return () => cancelAnimationFrame(raf);
+  }, [pendingImageSelect, getPageImages, onPendingImageSelectConsumed]);
 
   return {
     handlePointerDown,
