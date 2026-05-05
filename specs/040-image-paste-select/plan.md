@@ -23,13 +23,13 @@ Add image paste support to the canvas editor. Users paste images from the system
 
 _GATE: Must pass before Phase 0 research. Re-check after Phase 1 design._
 
-| Principle | Status | Notes |
-| --------- | ------ | ----- |
-| I. Incremental Development | PASS | Extends existing canvas infrastructure. Data model (ImageObject type) defined before interaction logic. Each user story is independently testable. |
-| II. Test-Driven Quality | PASS | Unit tests for image processing utility + hit testing. E2E tests for paste → select → move → resize → delete flow. |
-| III. Protected Branches | PASS | Feature branch `040-image-paste-select` off `dev`. PR to `dev` when complete. |
-| IV. Migrations as Code | PASS (N/A) | No database migration needed. Images stored in existing JSONB column. Backward compatible — `images` defaults to `[]`. |
-| V. Interview-Ready Architecture | PASS | Key concepts: Clipboard API, base64 encoding, aspect ratio locking, JSONB schema flexibility, undo/redo stack patterns, hit testing algorithms. |
+| Principle                       | Status     | Notes                                                                                                                                              |
+| ------------------------------- | ---------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
+| I. Incremental Development      | PASS       | Extends existing canvas infrastructure. Data model (ImageObject type) defined before interaction logic. Each user story is independently testable. |
+| II. Test-Driven Quality         | PASS       | Unit tests for image processing utility + hit testing. E2E tests for paste → select → move → resize → delete flow.                                 |
+| III. Protected Branches         | PASS       | Feature branch `040-image-paste-select` off `dev`. PR to `dev` when complete.                                                                      |
+| IV. Migrations as Code          | PASS (N/A) | No database migration needed. Images stored in existing JSONB column. Backward compatible — `images` defaults to `[]`.                             |
+| V. Interview-Ready Architecture | PASS       | Key concepts: Clipboard API, base64 encoding, aspect ratio locking, JSONB schema flexibility, undo/redo stack patterns, hit testing algorithms.    |
 
 **Post-Phase 1 re-check**: All gates still pass. No new storage, no new dependencies, no schema changes.
 

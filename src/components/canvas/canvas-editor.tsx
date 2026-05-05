@@ -1547,7 +1547,12 @@ export function CanvasEditor({
 
   // Paste elements onto a page (called from useSelection long-press or keyboard shortcut)
   const handlePaste = useCallback(
-    (pageId: string, strokes: Stroke[], textBoxes: TextBox[], images?: ImageObject[]) => {
+    (
+      pageId: string,
+      strokes: Stroke[],
+      textBoxes: TextBox[],
+      images?: ImageObject[],
+    ) => {
       // Add pasted elements to the page
       setPages((prev) =>
         prev.map((p) =>
@@ -1562,7 +1567,13 @@ export function CanvasEditor({
         ),
       );
       // Push compound undo action
-      undoStackRef.current.push({ type: 'paste', pageId, strokes, textBoxes, images });
+      undoStackRef.current.push({
+        type: 'paste',
+        pageId,
+        strokes,
+        textBoxes,
+        images,
+      });
       redoStackRef.current = [];
       if (undoStackRef.current.length > 100) undoStackRef.current.shift();
       setHistoryVersion((v) => v + 1);
@@ -1576,9 +1587,7 @@ export function CanvasEditor({
     (pageId: string, image: ImageObject) => {
       setPages((prev) => {
         const updated = prev.map((p) =>
-          p.id === pageId
-            ? { ...p, images: [...(p.images ?? []), image] }
-            : p,
+          p.id === pageId ? { ...p, images: [...(p.images ?? []), image] } : p,
         );
         // Auto-add page when the last page now has content
         const lastPage = updated[updated.length - 1];
@@ -1650,9 +1659,7 @@ export function CanvasEditor({
           return {
             ...p,
             strokes: p.strokes.filter((s) => !strokeIds.includes(s.id)),
-            textBoxes: p.textBoxes.filter(
-              (tb) => !textBoxIds.includes(tb.id),
-            ),
+            textBoxes: p.textBoxes.filter((tb) => !textBoxIds.includes(tb.id)),
             images: imageIds
               ? (p.images ?? []).filter((img) => !imageIds.includes(img.id))
               : p.images,
@@ -1681,7 +1688,13 @@ export function CanvasEditor({
           };
         }),
       );
-      undoStackRef.current.push({ type: 'image-move', pageId, imageIds, dx, dy });
+      undoStackRef.current.push({
+        type: 'image-move',
+        pageId,
+        imageIds,
+        dx,
+        dy,
+      });
       redoStackRef.current = [];
       if (undoStackRef.current.length > 100) undoStackRef.current.shift();
       setHistoryVersion((v) => v + 1);
@@ -1719,7 +1732,12 @@ export function CanvasEditor({
           type: 'image-resize',
           pageId,
           imageId,
-          from: { x: prevImg.x, y: prevImg.y, width: prevImg.width, height: prevImg.height },
+          from: {
+            x: prevImg.x,
+            y: prevImg.y,
+            width: prevImg.width,
+            height: prevImg.height,
+          },
           to: { x, y, width, height },
         });
         redoStackRef.current = [];
@@ -2068,10 +2086,7 @@ export function CanvasEditor({
                   ...p,
                   strokes: [...p.strokes, ...action.strokes],
                   textBoxes: [...p.textBoxes, ...action.textBoxes],
-                  images: [
-                    ...(p.images ?? []),
-                    ...(action.images ?? []),
-                  ],
+                  images: [...(p.images ?? []), ...(action.images ?? [])],
                 }
               : p,
           ),
@@ -2093,9 +2108,7 @@ export function CanvasEditor({
             p.id === action.pageId
               ? {
                   ...p,
-                  images: (p.images ?? []).filter(
-                    (img) => !delIds.has(img.id),
-                  ),
+                  images: (p.images ?? []).filter((img) => !delIds.has(img.id)),
                 }
               : p,
           ),
@@ -2125,9 +2138,7 @@ export function CanvasEditor({
               ? {
                   ...p,
                   images: (p.images ?? []).map((img) =>
-                    img.id === action.imageId
-                      ? { ...img, ...action.to }
-                      : img,
+                    img.id === action.imageId ? { ...img, ...action.to } : img,
                   ),
                 }
               : p,
@@ -2202,7 +2213,11 @@ export function CanvasEditor({
       }
       // Copy: Cmd/Ctrl+C
       if ((e.metaKey || e.ctrlKey) && e.key === 'c') {
-        if (selectedStrokeIds.size > 0 || selectedTextBoxIds.size > 0 || selectedImageIds.size > 0) {
+        if (
+          selectedStrokeIds.size > 0 ||
+          selectedTextBoxIds.size > 0 ||
+          selectedImageIds.size > 0
+        ) {
           e.preventDefault();
           copySelection();
         }
@@ -2317,10 +2332,8 @@ export function CanvasEditor({
             targetPageId = pageEl.getAttribute('data-page-id');
             const scaleX = PAGE_WIDTH / rect.width;
             const scaleY = PAGE_HEIGHT / rect.height;
-            pageX =
-              (viewW / 2 - (rect.left - containerRect.left)) * scaleX;
-            pageY =
-              (centerClientY - (rect.top - containerRect.top)) * scaleY;
+            pageX = (viewW / 2 - (rect.left - containerRect.left)) * scaleX;
+            pageY = (centerClientY - (rect.top - containerRect.top)) * scaleY;
             break;
           }
         }
@@ -2345,10 +2358,7 @@ export function CanvasEditor({
 
         // Center image at the paste position
         const x = Math.max(0, Math.min(PAGE_WIDTH - imgW, pageX - imgW / 2));
-        const y = Math.max(
-          0,
-          Math.min(PAGE_HEIGHT - imgH, pageY - imgH / 2),
-        );
+        const y = Math.max(0, Math.min(PAGE_HEIGHT - imgH, pageY - imgH / 2));
 
         const imageId =
           Math.random().toString(36).slice(2) + Date.now().toString(36);
@@ -3010,9 +3020,7 @@ export function CanvasEditor({
                       selectionPageId === page.id ? selectionBBox : null
                     }
                     tightSelectionBBox={
-                      selectionPageId === page.id
-                        ? tightSelectionBBox
-                        : null
+                      selectionPageId === page.id ? tightSelectionBBox : null
                     }
                     isSelectionDragging={
                       selectionPageId === page.id && isSelectionDragging
@@ -3022,9 +3030,7 @@ export function CanvasEditor({
                       selectionPageId === page.id && isSelectionResizing
                     }
                     selectionResizeBBox={
-                      selectionPageId === page.id
-                        ? selectionResizeBBox
-                        : null
+                      selectionPageId === page.id ? selectionResizeBBox : null
                     }
                     selectedStrokeIds={
                       selectionPageId === page.id
@@ -3053,7 +3059,10 @@ export function CanvasEditor({
                     onAskAiWithText={handleAskAiWithText}
                     onAskAiWithRegion={handleAskAiWithRegion}
                     onImageSelect={(pid, imgId) => {
-                      pendingImageSelectRef.current = { pageId: pid, imageId: imgId };
+                      pendingImageSelectRef.current = {
+                        pageId: pid,
+                        imageId: imgId,
+                      };
                       setActiveTool('select');
                     }}
                     onCanvasRefsReady={handleCanvasRefsReady}

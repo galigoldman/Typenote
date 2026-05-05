@@ -9,18 +9,19 @@
 
 A positioned raster image on a canvas page.
 
-| Field       | Type     | Description                                            |
-| ----------- | -------- | ------------------------------------------------------ |
-| id          | string   | Unique identifier (UUID)                               |
-| x           | number   | X position on page (px, 0 = left edge)                 |
-| y           | number   | Y position on page (px, 0 = top edge)                  |
-| width       | number   | Display width on page (px)                             |
-| height      | number   | Display height on page (px)                            |
-| src         | string   | Base64 data URL (`data:image/jpeg;base64,...`)          |
-| aspectRatio | number   | Original width/height ratio (for proportional resize)  |
-| createdAt   | number   | Timestamp of creation (epoch ms)                       |
+| Field       | Type   | Description                                           |
+| ----------- | ------ | ----------------------------------------------------- |
+| id          | string | Unique identifier (UUID)                              |
+| x           | number | X position on page (px, 0 = left edge)                |
+| y           | number | Y position on page (px, 0 = top edge)                 |
+| width       | number | Display width on page (px)                            |
+| height      | number | Display height on page (px)                           |
+| src         | string | Base64 data URL (`data:image/jpeg;base64,...`)        |
+| aspectRatio | number | Original width/height ratio (for proportional resize) |
+| createdAt   | number | Timestamp of creation (epoch ms)                      |
 
 **Validation rules**:
+
 - `width` and `height` must be > 0 and ≤ page dimensions (794x1123)
 - `x` must be ≥ 0 and `x + width` ≤ 794
 - `y` must be ≥ 0 and `y + height` ≤ 1123
@@ -31,8 +32,8 @@ A positioned raster image on a canvas page.
 
 Add `images` array alongside existing `strokes` and `textBoxes`.
 
-| Field (new) | Type          | Description                           |
-| ----------- | ------------- | ------------------------------------- |
+| Field (new) | Type          | Description                            |
+| ----------- | ------------- | -------------------------------------- |
 | images      | ImageObject[] | Array of positioned images on the page |
 
 **Default**: `[]` (empty array). Existing pages without `images` field are treated as having no images (backward compatible).
@@ -41,9 +42,9 @@ Add `images` array alongside existing `strokes` and `textBoxes`.
 
 Extend to include images for internal copy/paste.
 
-| Field (new) | Type          | Description                         |
-| ----------- | ------------- | ----------------------------------- |
-| images      | ImageObject[] | Deep-cloned images from selection   |
+| Field (new) | Type          | Description                       |
+| ----------- | ------------- | --------------------------------- |
+| images      | ImageObject[] | Deep-cloned images from selection |
 
 ## Relationships
 
@@ -83,13 +84,13 @@ selected → Delete key → idle (image removed)
 
 New action types for the existing undo stack:
 
-| Action Type    | Payload                                      |
-| -------------- | -------------------------------------------- |
-| add-image      | pageId, image (the added ImageObject)        |
-| delete-images  | pageId, images[] (the removed ImageObjects)  |
-| move-images    | pageId, images[], previousPositions[]        |
-| resize-image   | pageId, imageId, previousDimensions          |
-| paste (modified) | pageId, strokes[], textBoxes[], images[]   |
+| Action Type      | Payload                                     |
+| ---------------- | ------------------------------------------- |
+| add-image        | pageId, image (the added ImageObject)       |
+| delete-images    | pageId, images[] (the removed ImageObjects) |
+| move-images      | pageId, images[], previousPositions[]       |
+| resize-image     | pageId, imageId, previousDimensions         |
+| paste (modified) | pageId, strokes[], textBoxes[], images[]    |
 
 ## Backward Compatibility
 
