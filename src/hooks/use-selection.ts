@@ -46,7 +46,12 @@ interface UseSelectionOptions {
     height: number,
     fontScale: number,
   ) => void;
-  onImagesMove?: (pageId: string, imageIds: string[], dx: number, dy: number) => void;
+  onImagesMove?: (
+    pageId: string,
+    imageIds: string[],
+    dx: number,
+    dy: number,
+  ) => void;
   onImageResize?: (
     pageId: string,
     imageId: string,
@@ -65,7 +70,12 @@ interface UseSelectionOptions {
   /** Called when user draws a rectangle that contains no objects (empty area crop) */
   onEmptyRectSelection?: (pageId: string, bbox: BBox) => void;
   /** Called when user pastes clipboard contents at a position */
-  onPaste?: (pageId: string, strokes: Stroke[], textBoxes: TextBox[], images?: ImageObject[]) => void;
+  onPaste?: (
+    pageId: string,
+    strokes: Stroke[],
+    textBoxes: TextBox[],
+    images?: ImageObject[],
+  ) => void;
   /** Signal from parent to auto-select a just-pasted image */
   pendingImageSelect?: { pageId: string; imageId: string } | null;
   onPendingImageSelectConsumed?: () => void;
@@ -523,23 +533,30 @@ export function useSelection({
 
       // Compute union bbox including images
       const imgBBoxes: BBox[] = newImages.map((img) => ({
-        minX: img.x, minY: img.y,
-        maxX: img.x + img.width, maxY: img.y + img.height,
+        minX: img.x,
+        minY: img.y,
+        maxX: img.x + img.width,
+        maxY: img.y + img.height,
       }));
       const allBBoxes: BBox[] = [
         ...newStrokes.map((s) => s.bbox),
         ...newTextBoxes.map((tb) => ({
-          minX: tb.x, minY: tb.y,
-          maxX: tb.x + tb.width, maxY: tb.y + tb.height,
+          minX: tb.x,
+          minY: tb.y,
+          maxX: tb.x + tb.width,
+          maxY: tb.y + tb.height,
         })),
         ...imgBBoxes,
       ];
-      const unionBBox = allBBoxes.length > 0 ? {
-        minX: Math.min(...allBBoxes.map((b) => b.minX)),
-        minY: Math.min(...allBBoxes.map((b) => b.minY)),
-        maxX: Math.max(...allBBoxes.map((b) => b.maxX)),
-        maxY: Math.max(...allBBoxes.map((b) => b.maxY)),
-      } : null;
+      const unionBBox =
+        allBBoxes.length > 0
+          ? {
+              minX: Math.min(...allBBoxes.map((b) => b.minX)),
+              minY: Math.min(...allBBoxes.map((b) => b.minY)),
+              maxX: Math.max(...allBBoxes.map((b) => b.maxX)),
+              maxY: Math.max(...allBBoxes.map((b) => b.maxY)),
+            }
+          : null;
       setSelectionBBox(unionBBox);
       setTightSelectionBBox(unionBBox);
       setSelectionPath(null);
@@ -558,7 +575,12 @@ export function useSelection({
       bboxes.push(getContainerBBox(tb));
     }
     for (const img of images) {
-      bboxes.push({ minX: img.x, minY: img.y, maxX: img.x + img.width, maxY: img.y + img.height });
+      bboxes.push({
+        minX: img.x,
+        minY: img.y,
+        maxX: img.x + img.width,
+        maxY: img.y + img.height,
+      });
     }
     if (bboxes.length === 0) return null;
     return {
@@ -580,7 +602,12 @@ export function useSelection({
       bboxes.push(getSelectableBBox(tb));
     }
     for (const img of images) {
-      bboxes.push({ minX: img.x, minY: img.y, maxX: img.x + img.width, maxY: img.y + img.height });
+      bboxes.push({
+        minX: img.x,
+        minY: img.y,
+        maxX: img.x + img.width,
+        maxY: img.y + img.height,
+      });
     }
     if (bboxes.length === 0) return null;
     return {
@@ -894,7 +921,12 @@ export function useSelection({
           const rectPageImages = getPageImages?.(targetPageId) ?? [];
           const selectedImgs: ImageObject[] = [];
           for (const img of rectPageImages) {
-            const imgBBox: BBox = { minX: img.x, minY: img.y, maxX: img.x + img.width, maxY: img.y + img.height };
+            const imgBBox: BBox = {
+              minX: img.x,
+              minY: img.y,
+              maxX: img.x + img.width,
+              maxY: img.y + img.height,
+            };
             if (aabbIntersectsRect(imgBBox, selectionRect)) {
               selectedImgs.push(img);
             }
@@ -911,7 +943,11 @@ export function useSelection({
             const imgIds = new Set(selectedImgs.map((img) => img.id));
             setSelectedImageIds(imgIds);
             selectedImageIdsRef.current = imgIds;
-            const unionBBox = computeUnionBBox(selectedStrokes, [], selectedImgs);
+            const unionBBox = computeUnionBBox(
+              selectedStrokes,
+              [],
+              selectedImgs,
+            );
             setSelectionBBox(unionBBox);
             setTightSelectionBBox(unionBBox);
             setSelectionPath(null);
@@ -1089,11 +1125,7 @@ export function useSelection({
           // Scale images proportionally (aspect-ratio locked)
           // Track actual image bounds to update selection bbox correctly
           let imageBoundsAfterResize: BBox | null = null;
-          if (
-            selectedImageIdsRef.current.size > 0 &&
-            origW > 0 &&
-            origH > 0
-          ) {
+          if (selectedImageIdsRef.current.size > 0 && origW > 0 && origH > 0) {
             const allImages = getPageImages?.(targetPageId) ?? [];
             for (const imgId of selectedImageIdsRef.current) {
               const img = allImages.find((i) => i.id === imgId);
@@ -1129,10 +1161,22 @@ export function useSelection({
               if (!imageBoundsAfterResize) {
                 imageBoundsAfterResize = { ...imgBBox };
               } else {
-                imageBoundsAfterResize.minX = Math.min(imageBoundsAfterResize.minX, imgBBox.minX);
-                imageBoundsAfterResize.minY = Math.min(imageBoundsAfterResize.minY, imgBBox.minY);
-                imageBoundsAfterResize.maxX = Math.max(imageBoundsAfterResize.maxX, imgBBox.maxX);
-                imageBoundsAfterResize.maxY = Math.max(imageBoundsAfterResize.maxY, imgBBox.maxY);
+                imageBoundsAfterResize.minX = Math.min(
+                  imageBoundsAfterResize.minX,
+                  imgBBox.minX,
+                );
+                imageBoundsAfterResize.minY = Math.min(
+                  imageBoundsAfterResize.minY,
+                  imgBBox.minY,
+                );
+                imageBoundsAfterResize.maxX = Math.max(
+                  imageBoundsAfterResize.maxX,
+                  imgBBox.maxX,
+                );
+                imageBoundsAfterResize.maxY = Math.max(
+                  imageBoundsAfterResize.maxY,
+                  imgBBox.maxY,
+                );
               }
             }
           }

@@ -70,7 +70,9 @@ describe('processClipboardImage', () => {
 
   it('returns correct aspect ratio for landscape image', async () => {
     mockImage(800, 600);
-    const result = await processClipboardImage(new Blob([''], { type: 'image/jpeg' }));
+    const result = await processClipboardImage(
+      new Blob([''], { type: 'image/jpeg' }),
+    );
     expect(result.aspectRatio).toBeCloseTo(800 / 600);
     expect(result.width).toBe(800);
     expect(result.height).toBe(600);
@@ -78,13 +80,17 @@ describe('processClipboardImage', () => {
 
   it('returns correct aspect ratio for portrait image', async () => {
     mockImage(600, 800);
-    const result = await processClipboardImage(new Blob([''], { type: 'image/jpeg' }));
+    const result = await processClipboardImage(
+      new Blob([''], { type: 'image/jpeg' }),
+    );
     expect(result.aspectRatio).toBeCloseTo(600 / 800);
   });
 
   it('resizes landscape image exceeding max dimension', async () => {
     mockImage(2400, 1200);
-    const result = await processClipboardImage(new Blob([''], { type: 'image/jpeg' }));
+    const result = await processClipboardImage(
+      new Blob([''], { type: 'image/jpeg' }),
+    );
     expect(result.width).toBe(1200);
     expect(result.height).toBe(600);
     expect(result.aspectRatio).toBeCloseTo(2);
@@ -92,7 +98,9 @@ describe('processClipboardImage', () => {
 
   it('resizes portrait image exceeding max dimension', async () => {
     mockImage(900, 1800);
-    const result = await processClipboardImage(new Blob([''], { type: 'image/jpeg' }));
+    const result = await processClipboardImage(
+      new Blob([''], { type: 'image/jpeg' }),
+    );
     expect(result.height).toBe(1200);
     expect(result.width).toBe(600);
     expect(result.aspectRatio).toBeCloseTo(0.5);
@@ -100,14 +108,18 @@ describe('processClipboardImage', () => {
 
   it('does not resize image within max dimension', async () => {
     mockImage(500, 400);
-    const result = await processClipboardImage(new Blob([''], { type: 'image/jpeg' }));
+    const result = await processClipboardImage(
+      new Blob([''], { type: 'image/jpeg' }),
+    );
     expect(result.width).toBe(500);
     expect(result.height).toBe(400);
   });
 
   it('outputs JPEG for non-transparent images', async () => {
     mockImage(800, 600);
-    const result = await processClipboardImage(new Blob([''], { type: 'image/jpeg' }));
+    const result = await processClipboardImage(
+      new Blob([''], { type: 'image/jpeg' }),
+    );
     expect(result.src).toContain('image/jpeg');
   });
 
@@ -117,13 +129,17 @@ describe('processClipboardImage', () => {
     transparentData[3] = 0; // first pixel fully transparent
     setup({ pixelData: transparentData });
 
-    const result = await processClipboardImage(new Blob([''], { type: 'image/png' }));
+    const result = await processClipboardImage(
+      new Blob([''], { type: 'image/png' }),
+    );
     expect(result.src).toContain('image/png');
   });
 
   it('outputs JPEG for PNG images without transparency', async () => {
     mockImage(100, 100);
-    const result = await processClipboardImage(new Blob([''], { type: 'image/png' }));
+    const result = await processClipboardImage(
+      new Blob([''], { type: 'image/png' }),
+    );
     expect(result.src).toContain('image/jpeg');
   });
 });

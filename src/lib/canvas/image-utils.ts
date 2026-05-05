@@ -43,7 +43,8 @@ export async function processClipboardImage(
   const ctx = canvas.getContext('2d')!;
   ctx.drawImage(img, 0, 0, targetW, targetH);
 
-  const usePng = blob.type === 'image/png' && hasTransparency(ctx, targetW, targetH);
+  const usePng =
+    blob.type === 'image/png' && hasTransparency(ctx, targetW, targetH);
   const mimeType = usePng ? 'image/png' : 'image/jpeg';
   const src = canvas.toDataURL(mimeType, usePng ? undefined : JPEG_QUALITY);
 
