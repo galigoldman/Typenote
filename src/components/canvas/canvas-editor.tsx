@@ -2677,7 +2677,7 @@ export function CanvasEditor({
       )}
 
       {/* Toolbar — sticky so it stays visible when zoomed */}
-      <div className="glass-panel flex items-center mx-2 my-2 px-3 py-1.5 overflow-x-auto overflow-y-visible z-20 shrink-0 min-h-[52px] w-fit max-w-full rounded-2xl border border-white/60 shadow-lg">
+      <div className="glass-panel flex items-center mx-auto my-2 px-3 py-1.5 overflow-x-auto overflow-y-visible z-20 shrink-0 min-h-[52px] w-fit max-w-full rounded-2xl border border-white/60 shadow-lg">
         {/* Mobile: back + home + title (hidden on desktop — shown in header) */}
         <div className="hidden pointer-touch:flex items-center gap-1 mr-2 shrink-0">
           <button
