@@ -2954,7 +2954,7 @@ export function CanvasEditor({
       )}
 
       {/* Main content: canvas + optional right sidebar */}
-      <div className="flex flex-1 min-h-0 overflow-hidden">
+      <div className="relative flex flex-1 min-h-0 overflow-hidden">
         {/* Canvas scroll area */}
         <div
           ref={scrollContainerRef}
@@ -3138,7 +3138,7 @@ export function CanvasEditor({
         {/* Right sidebar — draw mode settings */}
         {isDrawMode && (
           <div
-            className="flex flex-col items-center gap-1 border-l bg-background py-3 overflow-y-auto"
+            className="absolute right-0 top-0 bottom-0 z-10 flex flex-col items-center gap-1 border-l bg-background/90 backdrop-blur-sm py-3 overflow-y-auto"
             style={{ width: 48 }}
           >
             {/* Pen: thickness + colors */}
