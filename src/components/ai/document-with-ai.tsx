@@ -88,6 +88,7 @@ export function DocumentWithAi({
           materialId={materialId}
           personalFileId={personalFileId}
           courseName={courseName}
+          isAiPanelOpen={isAiOpen}
           onAskAiWithContext={handleAskAiWithContext}
           onToggleVersionHistory={() =>
             setIsVersionHistoryOpen((prev) => !prev)

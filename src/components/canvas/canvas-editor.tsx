@@ -89,6 +89,7 @@ interface CanvasEditorProps {
   materialId?: string | null;
   personalFileId?: string | null;
   courseName?: string;
+  isAiPanelOpen?: boolean;
   onAskAiWithContext?: (
     context:
       | { type: 'text'; content: string }
@@ -334,6 +335,7 @@ export function CanvasEditor({
   materialId,
   personalFileId,
   courseName,
+  isAiPanelOpen,
   onAskAiWithContext,
   onToggleVersionHistory,
 }: CanvasEditorProps) {
@@ -2893,6 +2895,19 @@ export function CanvasEditor({
             </>
           )}
 
+          {/* Type mode: inline text formatting (when chat is closed) */}
+          {!isAiPanelOpen && activeTool === 'text' && activeEditor && (
+            <>
+              <div className="h-6 w-px bg-border mx-2" />
+              <EditorToolbar
+                editor={activeEditor}
+                hideUndoRedo
+                compact
+                document={{ ...document, pages: { pages } }}
+              />
+            </>
+          )}
+
           {/* Version History — always visible */}
           <div className="flex-1" />
           {onToggleVersionHistory && (
@@ -2929,8 +2944,8 @@ export function CanvasEditor({
             </>
           )}
         </div>
-        {/* Type mode: text formatting toolbar (second row) */}
-        {activeTool === 'text' && activeEditor && (
+        {/* Type mode: text formatting toolbar (second row, only when chat is open) */}
+        {isAiPanelOpen && activeTool === 'text' && activeEditor && (
           <div className="glass-panel flex items-center mx-auto px-3 py-1 w-fit max-w-full overflow-x-auto rounded-2xl border border-white/60 shadow-md">
             <EditorToolbar
               editor={activeEditor}
