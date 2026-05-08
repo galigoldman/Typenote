@@ -306,7 +306,13 @@ export function EditorToolbar({
   }, [editor]);
 
   return (
-    <div className={compact ? 'flex items-center gap-0.5' : 'glass-panel flex items-center gap-0.5 px-5 py-2 w-fit max-w-full overflow-x-auto rounded-2xl border border-white/60 shadow-lg mx-auto my-2'}>
+    <div
+      className={
+        compact
+          ? 'flex items-center gap-0.5'
+          : 'glass-panel flex items-center gap-0.5 px-5 py-2 w-fit max-w-full overflow-x-auto rounded-2xl border border-white/60 shadow-lg mx-auto my-2'
+      }
+    >
       {/* History */}
       {!hideUndoRedo && (
         <>
