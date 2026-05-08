@@ -454,8 +454,8 @@ export function EditorToolbar({
         label="Blockquote"
       />
 
-      {/* Export PDF */}
-      {document && (
+      {/* Export PDF — hidden in compact mode (canvas toolbar has its own) */}
+      {!compact && document && (
         <>
           <VerticalSeparator />
           <ToolbarButton
