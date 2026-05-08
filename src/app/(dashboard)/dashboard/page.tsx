@@ -106,10 +106,8 @@ export default async function DashboardPage() {
           )}
 
           {typedCourses.length > 0 && (
-            <div className={typedFolders.length > 0 ? 'mt-6' : ''}>
-              <h2 className="mb-3 text-sm font-medium text-muted-foreground">
-                Courses
-              </h2>
+            <div className={typedFolders.length > 0 ? 'mt-8' : ''}>
+              <h2 className="mb-4 text-lg font-semibold">Courses</h2>
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
                 {typedCourses.map((course) => (
                   <CourseCard key={course.id} course={course} />
@@ -121,12 +119,10 @@ export default async function DashboardPage() {
           {typedDocuments.length > 0 && (
             <div
               className={
-                typedFolders.length > 0 || typedCourses.length > 0 ? 'mt-6' : ''
+                typedFolders.length > 0 || typedCourses.length > 0 ? 'mt-8' : ''
               }
             >
-              <h2 className="mb-3 text-sm font-medium text-muted-foreground">
-                Documents
-              </h2>
+              <h2 className="mb-4 text-lg font-semibold">Documents</h2>
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
                 <DocumentListWithMove documents={typedDocuments} />
               </div>

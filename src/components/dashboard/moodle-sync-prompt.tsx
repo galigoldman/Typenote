@@ -28,7 +28,7 @@ export function MoodleSyncPrompt({
 
   if (!isInstalled) {
     return (
-      <Card>
+      <Card className="p-6">
         <CardHeader>
           <CardTitle className="text-base">Moodle Integration</CardTitle>
           <CardDescription>
@@ -47,7 +47,7 @@ export function MoodleSyncPrompt({
 
   if (!moodleConnection) {
     return (
-      <Card>
+      <Card className="p-6">
         <CardHeader>
           <CardTitle className="text-base">Moodle Integration</CardTitle>
           <CardDescription>
@@ -62,7 +62,7 @@ export function MoodleSyncPrompt({
   }
 
   return (
-    <Card>
+    <Card className="p-6">
       <CardHeader>
         <CardTitle className="text-base">Moodle Integration</CardTitle>
         <CardDescription>
@@ -71,7 +71,7 @@ export function MoodleSyncPrompt({
         </CardDescription>
       </CardHeader>
       <CardContent>
-        <Button size="sm" onClick={onSyncClick}>
+        <Button variant="default" onClick={onSyncClick}>
           Sync with Moodle
         </Button>
       </CardContent>

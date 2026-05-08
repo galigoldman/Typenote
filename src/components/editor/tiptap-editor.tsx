@@ -226,20 +226,20 @@ export function TiptapEditor({
   return (
     <div className="flex flex-col h-full">
       {/* Header */}
-      <div className="flex items-center justify-between border-b px-4 py-2">
+      <div className="flex items-center justify-between px-4 py-2 border-b border-border/50">
         <input
           type="text"
           value={title}
           onChange={(e) => setTitle(e.target.value)}
           onBlur={handleTitleBlur}
-          className="text-xl font-semibold bg-transparent border-none outline-none flex-1"
+          className="text-3xl font-bold bg-transparent border-none outline-none flex-1 text-primary"
           placeholder="Untitled"
         />
         <div className="flex items-center gap-3">
           {onToggleVersionHistory && (
             <button
               onClick={onToggleVersionHistory}
-              className="flex h-8 w-8 items-center justify-center rounded-md hover:bg-accent text-muted-foreground"
+              className="flex h-8 w-8 items-center justify-center rounded-lg hover:bg-accent text-muted-foreground transition-colors"
               title="Version history"
             >
               <Clock className="h-4 w-4" />
@@ -273,8 +273,10 @@ export function TiptapEditor({
       />
 
       {/* Editor Canvas */}
-      <div className={`flex-1 overflow-y-auto ${canvasClass}`}>
-        <EditorContent editor={editor} />
+      <div className={`flex-1 overflow-y-auto bg-background ${canvasClass}`}>
+        <div className="mx-auto max-w-4xl">
+          <EditorContent editor={editor} />
+        </div>
       </div>
 
       {/* Math Input Box */}

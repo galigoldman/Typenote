@@ -303,7 +303,7 @@ describe('AiChatPanel', () => {
 
     // Type a question and submit
     const input = screen.getByPlaceholderText(
-      'Ask about your course materials...',
+      'Ask anything about your course materials...',
     );
     await user.type(input, 'What is calculus?');
     fireEvent.submit(input.closest('form')!);
@@ -377,7 +377,7 @@ describe('AiChatPanel', () => {
 
     // Type a new question and submit
     const input = screen.getByPlaceholderText(
-      'Ask about your course materials...',
+      'Ask anything about your course materials...',
     );
     await user.type(input, 'Follow-up question');
     fireEvent.submit(input.closest('form')!);
