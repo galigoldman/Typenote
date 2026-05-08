@@ -2677,267 +2677,268 @@ export function CanvasEditor({
       )}
 
       {/* Toolbar — sticky so it stays visible when zoomed */}
-      <div className="glass-panel flex items-center mx-auto my-2 px-3 py-1.5 overflow-x-auto overflow-y-visible z-20 shrink-0 min-h-[52px] w-fit max-w-full rounded-2xl border border-white/60 shadow-lg">
-        {/* Mobile: back + home + title (hidden on desktop — shown in header) */}
-        <div className="hidden pointer-touch:flex items-center gap-1 mr-2 shrink-0">
-          <button
-            onClick={() => router.back()}
-            className="flex items-center justify-center h-8 w-8 rounded-lg hover:bg-accent transition-colors text-muted-foreground"
-          >
-            <ArrowLeft className="h-4 w-4" />
-          </button>
-          <a
-            href="/dashboard"
-            className="flex items-center justify-center h-8 w-8 rounded-lg hover:bg-accent transition-colors text-muted-foreground"
-            title="Go to dashboard"
-          >
-            <Home className="h-4 w-4" />
-          </a>
-          <span className="text-sm font-medium truncate max-w-[100px]">
-            {title || 'Untitled'}
-          </span>
-        </div>
-        {/* Undo / Redo — always visible */}
-        <div className="flex items-center gap-0.5 mr-2">
-          <button
-            onPointerDown={(e) => {
-              e.stopPropagation();
-              handleUndo();
-            }}
-            disabled={!canUndo}
-            className="flex items-center justify-center h-8 w-8 min-h-[44px] min-w-[44px] rounded-lg transition-colors hover:bg-accent disabled:opacity-30 disabled:pointer-events-none text-muted-foreground"
-            title="Undo"
-          >
-            <Undo2 className="h-4 w-4" />
-          </button>
-          <button
-            onPointerDown={(e) => {
-              e.stopPropagation();
-              handleRedo();
-            }}
-            disabled={!canRedo}
-            className="flex items-center justify-center h-8 w-8 min-h-[44px] min-w-[44px] rounded-lg transition-colors hover:bg-accent disabled:opacity-30 disabled:pointer-events-none text-muted-foreground"
-            title="Redo"
-          >
-            <Redo2 className="h-4 w-4" />
-          </button>
-        </div>
-
-        <div className="h-6 w-px bg-border mr-2" />
-
-        {/* Mode toggle: Draw / Select / Type */}
-        <div className="flex items-center gap-1">
-          <button
-            onPointerDown={(e) => {
-              e.stopPropagation();
-              if (!isDrawMode) setActiveTool('pen');
-            }}
-            className={`flex items-center gap-1.5 px-3 py-1.5 min-h-[44px] min-w-[44px] rounded-md text-sm font-medium transition-colors ${
-              isDrawMode
-                ? 'bg-primary text-primary-foreground'
-                : 'hover:bg-accent text-muted-foreground'
-            }`}
-          >
-            <Pen className="h-4 w-4" />
-            Draw
-          </button>
-          <button
-            onPointerDown={(e) => {
-              e.stopPropagation();
-              setActiveTool('text');
-            }}
-            className={`flex items-center gap-1.5 px-3 py-1.5 min-h-[44px] min-w-[44px] rounded-md text-sm font-medium transition-colors ${
-              activeTool === 'text'
-                ? 'bg-primary text-primary-foreground'
-                : 'hover:bg-accent text-muted-foreground'
-            }`}
-          >
-            <Type className="h-4 w-4" />
-            Type
-          </button>
-          <div className="relative" ref={askAiDropdownRef}>
+      <div className="flex flex-col items-center z-20 shrink-0 my-2 gap-1">
+        <div className="glass-panel flex items-center mx-auto px-3 py-1.5 overflow-x-auto overflow-y-visible w-fit max-w-full rounded-2xl border border-white/60 shadow-lg">
+          {/* Mobile: back + home + title (hidden on desktop — shown in header) */}
+          <div className="hidden pointer-touch:flex items-center gap-1 mr-2 shrink-0">
+            <button
+              onClick={() => router.back()}
+              className="flex items-center justify-center h-8 w-8 rounded-lg hover:bg-accent transition-colors text-muted-foreground"
+            >
+              <ArrowLeft className="h-4 w-4" />
+            </button>
+            <a
+              href="/dashboard"
+              className="flex items-center justify-center h-8 w-8 rounded-lg hover:bg-accent transition-colors text-muted-foreground"
+              title="Go to dashboard"
+            >
+              <Home className="h-4 w-4" />
+            </a>
+            <span className="text-sm font-medium truncate max-w-[100px]">
+              {title || 'Untitled'}
+            </span>
+          </div>
+          {/* Undo / Redo — always visible */}
+          <div className="flex items-center gap-0.5 mr-2">
             <button
               onPointerDown={(e) => {
                 e.stopPropagation();
-                if (!askAiDropdownOpen && askAiDropdownRef.current) {
-                  const rect = askAiDropdownRef.current.getBoundingClientRect();
-                  setAskAiDropdownPos({
-                    top: rect.bottom + 4,
-                    left: rect.left,
-                  });
-                }
-                setAskAiDropdownOpen((prev) => !prev);
+                handleUndo();
               }}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
-                isReadMode || activeTool === 'crop'
-                  ? 'bg-[#6355C0] text-white'
-                  : 'hover:bg-[#6355C0]/10 text-[#6355C0]'
+              disabled={!canUndo}
+              className="flex items-center justify-center h-8 w-8 min-h-[44px] min-w-[44px] rounded-lg transition-colors hover:bg-accent disabled:opacity-30 disabled:pointer-events-none text-muted-foreground"
+              title="Undo"
+            >
+              <Undo2 className="h-4 w-4" />
+            </button>
+            <button
+              onPointerDown={(e) => {
+                e.stopPropagation();
+                handleRedo();
+              }}
+              disabled={!canRedo}
+              className="flex items-center justify-center h-8 w-8 min-h-[44px] min-w-[44px] rounded-lg transition-colors hover:bg-accent disabled:opacity-30 disabled:pointer-events-none text-muted-foreground"
+              title="Redo"
+            >
+              <Redo2 className="h-4 w-4" />
+            </button>
+          </div>
+
+          <div className="h-6 w-px bg-border mr-2" />
+
+          {/* Mode toggle: Draw / Select / Type */}
+          <div className="flex items-center gap-1">
+            <button
+              onPointerDown={(e) => {
+                e.stopPropagation();
+                if (!isDrawMode) setActiveTool('pen');
+              }}
+              className={`flex items-center gap-1.5 px-3 py-1.5 min-h-[44px] min-w-[44px] rounded-md text-sm font-medium transition-colors ${
+                isDrawMode
+                  ? 'bg-primary text-primary-foreground'
+                  : 'hover:bg-accent text-muted-foreground'
               }`}
             >
-              <Sparkles className="h-4 w-4" />
-              Ask AI
+              <Pen className="h-4 w-4" />
+              Draw
             </button>
-            {askAiDropdownOpen && askAiDropdownPos && (
-              <div
-                className="fixed mt-1 w-44 rounded-lg border bg-popover p-1 shadow-lg z-[100]"
-                style={{
-                  top: askAiDropdownPos.top,
-                  left: askAiDropdownPos.left,
+            <button
+              onPointerDown={(e) => {
+                e.stopPropagation();
+                setActiveTool('text');
+              }}
+              className={`flex items-center gap-1.5 px-3 py-1.5 min-h-[44px] min-w-[44px] rounded-md text-sm font-medium transition-colors ${
+                activeTool === 'text'
+                  ? 'bg-primary text-primary-foreground'
+                  : 'hover:bg-accent text-muted-foreground'
+              }`}
+            >
+              <Type className="h-4 w-4" />
+              Type
+            </button>
+            <div className="relative" ref={askAiDropdownRef}>
+              <button
+                onPointerDown={(e) => {
+                  e.stopPropagation();
+                  if (!askAiDropdownOpen && askAiDropdownRef.current) {
+                    const rect =
+                      askAiDropdownRef.current.getBoundingClientRect();
+                    setAskAiDropdownPos({
+                      top: rect.bottom + 4,
+                      left: rect.left,
+                    });
+                  }
+                  setAskAiDropdownOpen((prev) => !prev);
                 }}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
+                  isReadMode || activeTool === 'crop'
+                    ? 'bg-[#6355C0] text-white'
+                    : 'hover:bg-[#6355C0]/10 text-[#6355C0]'
+                }`}
               >
+                <Sparkles className="h-4 w-4" />
+                Ask AI
+              </button>
+              {askAiDropdownOpen && askAiDropdownPos && (
+                <div
+                  className="fixed mt-1 w-44 rounded-lg border bg-popover p-1 shadow-lg z-[100]"
+                  style={{
+                    top: askAiDropdownPos.top,
+                    left: askAiDropdownPos.left,
+                  }}
+                >
+                  <button
+                    onPointerDown={(e) => {
+                      e.stopPropagation();
+                      setAskAiDropdownOpen(false);
+                      setActiveTool('read');
+                    }}
+                    className={`flex w-full items-center gap-2 rounded-md px-3 py-2 text-sm transition-colors ${
+                      isReadMode ? 'bg-accent' : 'hover:bg-accent'
+                    }`}
+                  >
+                    <BookOpen className="h-4 w-4 text-[#6355C0]" />
+                    Select Text
+                  </button>
+                  <button
+                    onPointerDown={(e) => {
+                      e.stopPropagation();
+                      setAskAiDropdownOpen(false);
+                      setActiveTool('crop');
+                    }}
+                    className={`flex w-full items-center gap-2 rounded-md px-3 py-2 text-sm transition-colors ${
+                      activeTool === 'crop' ? 'bg-accent' : 'hover:bg-accent'
+                    }`}
+                  >
+                    <Camera className="h-4 w-4 text-[#6355C0]" />
+                    Screenshot
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Draw mode: sub-tool icons */}
+          {isDrawMode && (
+            <>
+              <div className="h-6 w-px bg-border mx-2" />
+              <div className="flex items-center gap-1">
                 <button
                   onPointerDown={(e) => {
                     e.stopPropagation();
-                    setAskAiDropdownOpen(false);
-                    setActiveTool('read');
+                    setActiveTool('pen');
                   }}
-                  className={`flex w-full items-center gap-2 rounded-md px-3 py-2 text-sm transition-colors ${
-                    isReadMode ? 'bg-accent' : 'hover:bg-accent'
+                  className={`flex items-center justify-center h-8 w-8 min-h-[44px] min-w-[44px] rounded-lg transition-colors ${
+                    activeTool === 'pen'
+                      ? 'bg-accent text-accent-foreground'
+                      : 'hover:bg-accent/50 text-muted-foreground'
                   }`}
+                  title="Pen"
                 >
-                  <BookOpen className="h-4 w-4 text-[#6355C0]" />
-                  Select Text
+                  <Pen className="h-4 w-4" />
                 </button>
                 <button
                   onPointerDown={(e) => {
                     e.stopPropagation();
-                    setAskAiDropdownOpen(false);
-                    setActiveTool('crop');
+                    setActiveTool('highlighter');
                   }}
-                  className={`flex w-full items-center gap-2 rounded-md px-3 py-2 text-sm transition-colors ${
-                    activeTool === 'crop' ? 'bg-accent' : 'hover:bg-accent'
+                  className={`flex items-center justify-center h-8 w-8 min-h-[44px] min-w-[44px] rounded-lg transition-colors ${
+                    activeTool === 'highlighter'
+                      ? 'bg-accent text-accent-foreground'
+                      : 'hover:bg-accent/50 text-muted-foreground'
                   }`}
+                  title="Highlighter"
                 >
-                  <Camera className="h-4 w-4 text-[#6355C0]" />
-                  Screenshot
+                  <Highlighter className="h-4 w-4" />
+                </button>
+                <button
+                  onPointerDown={(e) => {
+                    e.stopPropagation();
+                    setActiveTool('eraser');
+                  }}
+                  className={`flex items-center justify-center h-8 w-8 min-h-[44px] min-w-[44px] rounded-lg transition-colors ${
+                    activeTool === 'eraser'
+                      ? 'bg-accent text-accent-foreground'
+                      : 'hover:bg-accent/50 text-muted-foreground'
+                  }`}
+                  title="Eraser"
+                >
+                  <Eraser className="h-4 w-4" />
+                </button>
+                <button
+                  onPointerDown={(e) => {
+                    e.stopPropagation();
+                    setActiveTool('select');
+                  }}
+                  className={`flex items-center justify-center h-8 w-8 min-h-[44px] min-w-[44px] rounded-lg transition-colors ${
+                    activeTool === 'select'
+                      ? 'bg-accent text-accent-foreground'
+                      : 'hover:bg-accent/50 text-muted-foreground'
+                  }`}
+                  title="Select"
+                >
+                  <MousePointer2 className="h-4 w-4" />
+                </button>
+                <button
+                  onPointerDown={(e) => {
+                    e.stopPropagation();
+                    handleAddTextBox();
+                  }}
+                  className="flex items-center justify-center h-8 w-8 min-h-[44px] min-w-[44px] rounded-lg transition-colors hover:bg-accent/50 text-muted-foreground"
+                  title="Add text box"
+                >
+                  <Type className="h-4 w-4" />
                 </button>
               </div>
-            )}
-          </div>
-        </div>
+            </>
+          )}
 
-        {/* Draw mode: sub-tool icons */}
-        {isDrawMode && (
-          <>
-            <div className="h-6 w-px bg-border mx-2" />
-            <div className="flex items-center gap-1">
+          {/* Version History — always visible */}
+          <div className="flex-1" />
+          {onToggleVersionHistory && (
+            <button
+              onPointerDown={(e) => {
+                e.stopPropagation();
+                onToggleVersionHistory();
+              }}
+              className="flex items-center justify-center h-8 w-8 min-h-[44px] min-w-[44px] rounded-lg transition-colors hover:bg-accent/50 text-muted-foreground"
+              title="Version history"
+            >
+              <Clock className="h-4 w-4" />
+            </button>
+          )}
+
+          {/* Export PDF — hidden in text mode */}
+          {activeTool !== 'text' && (
+            <>
               <button
                 onPointerDown={(e) => {
                   e.stopPropagation();
-                  setActiveTool('pen');
+                  exportPdf({ ...document, pages: { pages } });
                 }}
-                className={`flex items-center justify-center h-8 w-8 min-h-[44px] min-w-[44px] rounded-lg transition-colors ${
-                  activeTool === 'pen'
-                    ? 'bg-accent text-accent-foreground'
-                    : 'hover:bg-accent/50 text-muted-foreground'
-                }`}
-                title="Pen"
-              >
-                <Pen className="h-4 w-4" />
-              </button>
-              <button
-                onPointerDown={(e) => {
-                  e.stopPropagation();
-                  setActiveTool('highlighter');
-                }}
-                className={`flex items-center justify-center h-8 w-8 min-h-[44px] min-w-[44px] rounded-lg transition-colors ${
-                  activeTool === 'highlighter'
-                    ? 'bg-accent text-accent-foreground'
-                    : 'hover:bg-accent/50 text-muted-foreground'
-                }`}
-                title="Highlighter"
-              >
-                <Highlighter className="h-4 w-4" />
-              </button>
-              <button
-                onPointerDown={(e) => {
-                  e.stopPropagation();
-                  setActiveTool('eraser');
-                }}
-                className={`flex items-center justify-center h-8 w-8 min-h-[44px] min-w-[44px] rounded-lg transition-colors ${
-                  activeTool === 'eraser'
-                    ? 'bg-accent text-accent-foreground'
-                    : 'hover:bg-accent/50 text-muted-foreground'
-                }`}
-                title="Eraser"
-              >
-                <Eraser className="h-4 w-4" />
-              </button>
-              <button
-                onPointerDown={(e) => {
-                  e.stopPropagation();
-                  setActiveTool('select');
-                }}
-                className={`flex items-center justify-center h-8 w-8 min-h-[44px] min-w-[44px] rounded-lg transition-colors ${
-                  activeTool === 'select'
-                    ? 'bg-accent text-accent-foreground'
-                    : 'hover:bg-accent/50 text-muted-foreground'
-                }`}
-                title="Select"
-              >
-                <MousePointer2 className="h-4 w-4" />
-              </button>
-              <button
-                onPointerDown={(e) => {
-                  e.stopPropagation();
-                  handleAddTextBox();
-                }}
+                disabled={isExporting}
                 className="flex items-center justify-center h-8 w-8 min-h-[44px] min-w-[44px] rounded-lg transition-colors hover:bg-accent/50 text-muted-foreground"
-                title="Add text box"
+                title="Export as PDF"
               >
-                <Type className="h-4 w-4" />
+                {isExporting ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Download className="h-4 w-4" />
+                )}
               </button>
-            </div>
-          </>
-        )}
-
-        {/* Type mode: text formatting toolbar */}
+            </>
+          )}
+        </div>
+        {/* Type mode: text formatting toolbar (second row) */}
         {activeTool === 'text' && activeEditor && (
-          <>
-            <div className="h-6 w-px bg-border mx-2" />
+          <div className="glass-panel flex items-center mx-auto px-3 py-1 w-fit max-w-full overflow-x-auto rounded-2xl border border-white/60 shadow-md">
             <EditorToolbar
               editor={activeEditor}
               hideUndoRedo
               compact
               document={{ ...document, pages: { pages } }}
             />
-          </>
-        )}
-
-        {/* Version History — always visible */}
-        <div className="flex-1" />
-        {onToggleVersionHistory && (
-          <button
-            onPointerDown={(e) => {
-              e.stopPropagation();
-              onToggleVersionHistory();
-            }}
-            className="flex items-center justify-center h-8 w-8 min-h-[44px] min-w-[44px] rounded-lg transition-colors hover:bg-accent/50 text-muted-foreground"
-            title="Version history"
-          >
-            <Clock className="h-4 w-4" />
-          </button>
-        )}
-
-        {/* Export PDF — hidden in text mode */}
-        {activeTool !== 'text' && (
-          <>
-            <button
-              onPointerDown={(e) => {
-                e.stopPropagation();
-                exportPdf({ ...document, pages: { pages } });
-              }}
-              disabled={isExporting}
-              className="flex items-center justify-center h-8 w-8 min-h-[44px] min-w-[44px] rounded-lg transition-colors hover:bg-accent/50 text-muted-foreground"
-              title="Export as PDF"
-            >
-              {isExporting ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : (
-                <Download className="h-4 w-4" />
-              )}
-            </button>
-          </>
+          </div>
         )}
       </div>
 
