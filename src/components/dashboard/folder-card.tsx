@@ -43,7 +43,7 @@ export function FolderCard({ folder }: FolderCardProps) {
             router.push(`/dashboard/folders/${folder.id}`);
           }
         }}
-        className="group flex cursor-pointer items-center gap-3 rounded-lg border p-4 transition-colors hover:bg-muted/50"
+        className="group flex cursor-pointer items-center gap-3 rounded-xl bg-card shadow-sm p-5 border transition-shadow hover:shadow-md"
       >
         <div
           className="flex size-10 shrink-0 items-center justify-center rounded-lg"

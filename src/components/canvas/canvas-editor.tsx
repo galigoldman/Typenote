@@ -2595,7 +2595,7 @@ export function CanvasEditor({
   return (
     <div className="flex flex-col flex-1 min-h-0">
       {/* Header — hidden on mobile (merged into toolbar) */}
-      <div className="flex pointer-touch:hidden items-center justify-between border-b px-4 py-2">
+      <div className="flex pointer-touch:hidden items-center justify-between border-b border-border/50 px-4 py-2">
         <button
           onClick={() => router.back()}
           className="flex items-center justify-center h-8 w-8 min-h-[44px] min-w-[44px] rounded-lg hover:bg-accent transition-colors text-muted-foreground mr-1 shrink-0"
@@ -2631,7 +2631,7 @@ export function CanvasEditor({
               e.preventDefault();
             }
           }}
-          className="text-xl font-semibold bg-transparent border-none outline-none flex-1"
+          className="text-2xl font-bold bg-transparent border-none outline-none flex-1 text-primary"
           placeholder="Untitled"
         />
         <div className="flex items-center gap-3">
@@ -2677,7 +2677,7 @@ export function CanvasEditor({
       )}
 
       {/* Toolbar — sticky so it stays visible when zoomed */}
-      <div className="flex items-center border-b px-2 py-1 overflow-x-auto overflow-y-visible bg-background z-20 shrink-0">
+      <div className="flex items-center border-b border-border/50 px-2 py-1.5 overflow-x-auto overflow-y-visible bg-card z-20 shrink-0 shadow-sm">
         {/* Mobile: back + home + title (hidden on desktop — shown in header) */}
         <div className="hidden pointer-touch:flex items-center gap-1 mr-2 shrink-0">
           <button
@@ -2770,8 +2770,8 @@ export function CanvasEditor({
               }}
               className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
                 isReadMode || activeTool === 'crop'
-                  ? 'bg-purple-600 text-white'
-                  : 'hover:bg-purple-50 text-purple-600'
+                  ? 'bg-[#6355C0] text-white'
+                  : 'hover:bg-[#6355C0]/10 text-[#6355C0]'
               }`}
             >
               <Sparkles className="h-4 w-4" />
@@ -2795,7 +2795,7 @@ export function CanvasEditor({
                     isReadMode ? 'bg-accent' : 'hover:bg-accent'
                   }`}
                 >
-                  <BookOpen className="h-4 w-4 text-purple-500" />
+                  <BookOpen className="h-4 w-4 text-[#6355C0]" />
                   Select Text
                 </button>
                 <button
@@ -2808,7 +2808,7 @@ export function CanvasEditor({
                     activeTool === 'crop' ? 'bg-accent' : 'hover:bg-accent'
                   }`}
                 >
-                  <Camera className="h-4 w-4 text-purple-500" />
+                  <Camera className="h-4 w-4 text-[#6355C0]" />
                   Screenshot
                 </button>
               </div>
@@ -2959,7 +2959,7 @@ export function CanvasEditor({
         {/* Canvas scroll area */}
         <div
           ref={scrollContainerRef}
-          className="flex-1 bg-gray-100 pointer-touch:bg-white"
+          className="flex-1 bg-muted/40 pointer-touch:bg-white"
           data-scroll-container
           data-canvas-scroll
           style={{

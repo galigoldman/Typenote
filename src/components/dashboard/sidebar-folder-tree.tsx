@@ -34,8 +34,8 @@ function FolderNode({ folder, folders, courses, level }: FolderNodeProps) {
           if (isMobile) close();
         }}
         className={cn(
-          'flex w-full items-center gap-2 rounded-md px-2 py-2.5 text-sm transition-colors hover:bg-accent min-h-[44px]',
-          isActive && 'bg-accent text-accent-foreground',
+          'flex w-full items-center gap-2 rounded-lg px-2 py-2.5 text-sm transition-colors hover:bg-primary/10 min-h-[44px]',
+          isActive && 'bg-primary/10 text-primary font-medium',
         )}
         style={{ paddingLeft: `${level * 12 + 8}px` }}
       >
@@ -109,8 +109,8 @@ function CourseNode({ course, level }: CourseNodeProps) {
         if (isMobile) close();
       }}
       className={cn(
-        'flex w-full items-center gap-2 rounded-md px-2 py-2.5 text-sm transition-colors hover:bg-accent min-h-[44px]',
-        isActive && 'bg-accent text-accent-foreground',
+        'flex w-full items-center gap-2 rounded-lg px-2 py-2.5 text-sm transition-colors hover:bg-primary/10 min-h-[44px]',
+        isActive && 'bg-primary/10 text-primary font-medium',
       )}
       style={{ paddingLeft: `${level * 12 + 8}px` }}
     >

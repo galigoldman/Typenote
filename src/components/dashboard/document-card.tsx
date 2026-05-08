@@ -45,6 +45,17 @@ const SUBJECT_COLORS: Record<string, string> = {
   other: 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200',
 };
 
+const SUBJECT_BORDER_COLORS: Record<string, string> = {
+  calculus: 'border-t-blue-400',
+  linear_algebra: 'border-t-purple-400',
+  discrete_math: 'border-t-green-400',
+  logic: 'border-t-yellow-400',
+  data_structures: 'border-t-orange-400',
+  algorithms: 'border-t-red-400',
+  physics: 'border-t-cyan-400',
+  other: 'border-t-gray-400',
+};
+
 function getRelativeTime(dateString: string): string {
   const now = new Date();
   const date = new Date(dateString);
@@ -84,6 +95,8 @@ export function DocumentCard({
         document.subject);
 
   const subjectColor = SUBJECT_COLORS[document.subject] ?? SUBJECT_COLORS.other;
+  const subjectBorderColor =
+    SUBJECT_BORDER_COLORS[document.subject] ?? SUBJECT_BORDER_COLORS.other;
 
   async function handleDelete() {
     if (onDelete) {
@@ -96,7 +109,10 @@ export function DocumentCard({
 
   return (
     <Card
-      className="cursor-pointer transition-shadow hover:shadow-md"
+      className={cn(
+        'cursor-pointer overflow-hidden border-t-4 transition-shadow hover:shadow-md',
+        subjectBorderColor,
+      )}
       onClick={() => router.push(`/dashboard/documents/${document.id}`)}
       data-testid="document-card"
     >
