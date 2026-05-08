@@ -274,7 +274,7 @@ export function TiptapEditor({
 
       {/* Editor Canvas */}
       <div className={`flex-1 overflow-y-auto bg-background ${canvasClass}`}>
-        <div className="mx-auto max-w-4xl">
+        <div className="mx-auto max-w-4xl bg-card canvas-shadow rounded-xl my-6 p-8 min-h-[600px]">
           <EditorContent editor={editor} />
         </div>
       </div>
