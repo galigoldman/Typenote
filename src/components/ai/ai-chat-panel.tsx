@@ -461,7 +461,7 @@ export function AiChatPanel({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex h-full w-full flex-col border-l bg-background shadow-xl lg:static lg:z-auto lg:w-[480px] lg:shrink-0 xl:w-[560px] 2xl:w-[640px]">
+    <div className="fixed inset-0 z-50 flex h-full w-full flex-col border-l border-border/30 bg-background/90 backdrop-blur-xl shadow-xl lg:static lg:z-auto lg:w-[480px] lg:shrink-0 xl:w-[560px] 2xl:w-[640px]">
       {/* Header */}
       <div className="flex items-center justify-between border-b px-4 py-3">
         <div className="flex min-w-0 items-center gap-2">
@@ -598,7 +598,7 @@ export function AiChatPanel({
                         <p className="mb-1 text-right text-[10px] uppercase tracking-wider text-muted-foreground font-medium">
                           You
                         </p>
-                        <div className="rounded-2xl rounded-br-md bg-teal-600 px-4 py-2.5 text-sm text-white">
+                        <div className="rounded-2xl rounded-tr-sm bg-primary px-4 py-2.5 text-sm text-primary-foreground shadow-md">
                           {msg.content}
                         </div>
                       </div>
@@ -607,7 +607,7 @@ export function AiChatPanel({
                         <p className="mb-1 text-[10px] uppercase tracking-wider text-muted-foreground font-medium">
                           AI Assistant
                         </p>
-                        <div className="rounded-2xl rounded-bl-md bg-muted px-4 py-3 text-sm leading-relaxed">
+                        <div className="rounded-2xl rounded-tl-sm bg-card px-4 py-3 text-sm leading-relaxed shadow-sm border border-border/20">
                           <MarkdownResponse content={msg.content} />
                         </div>
 
@@ -644,7 +644,7 @@ export function AiChatPanel({
                 {streamingText && (
                   <div className="mb-4">
                     <div className="max-w-[95%]">
-                      <div className="rounded-2xl rounded-bl-md bg-muted px-4 py-3 text-sm leading-relaxed">
+                      <div className="rounded-2xl rounded-tl-sm bg-card px-4 py-3 text-sm leading-relaxed shadow-sm border border-border/20">
                         <MarkdownResponse content={streamingText} />
                       </div>
                     </div>
