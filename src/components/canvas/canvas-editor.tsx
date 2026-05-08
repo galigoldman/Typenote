@@ -2275,7 +2275,7 @@ export function CanvasEditor({
       )}
 
       {/* Toolbar — sticky so it stays visible when zoomed */}
-      <div className="flex items-center border-b border-border/50 px-2 py-1.5 overflow-x-auto overflow-y-visible bg-card z-20 shrink-0 shadow-sm">
+      <div className="flex items-center border-b border-border/50 px-2 py-1.5 overflow-x-auto overflow-y-visible bg-card z-20 shrink-0 shadow-sm min-h-[52px]">
         {/* Mobile: back + home + title (hidden on desktop — shown in header) */}
         <div className="hidden pointer-touch:flex items-center gap-1 mr-2 shrink-0">
           <button
@@ -2497,6 +2497,7 @@ export function CanvasEditor({
               <EditorToolbar
                 editor={activeEditor}
                 hideUndoRedo
+                compact
                 document={{ ...document, pages: { pages } }}
               />
             </div>
