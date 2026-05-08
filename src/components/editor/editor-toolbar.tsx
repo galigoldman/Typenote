@@ -304,7 +304,7 @@ export function EditorToolbar({
   }, [editor]);
 
   return (
-    <div className="flex items-center gap-0.5 px-5 py-2 flex-wrap mx-2 my-2 rounded-2xl border border-border/60 bg-card shadow-md">
+    <div className="flex items-center gap-0.5 px-5 py-2 mx-auto my-2 w-fit max-w-full overflow-x-auto rounded-2xl border border-border/60 bg-card shadow-md">
       {/* History */}
       {!hideUndoRedo && (
         <>
