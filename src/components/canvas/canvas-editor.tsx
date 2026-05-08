@@ -44,7 +44,6 @@ import {
   PanelLeftClose,
   MousePointer2,
   Save,
-  BrainCog,
   Download,
   Loader2,
   Clock,
@@ -60,6 +59,7 @@ import { useSelection } from '@/hooks/use-selection';
 import { usePinchZoom } from '@/hooks/use-pinch-zoom';
 import { ZoomIndicator } from './zoom-indicator';
 import { EditorToolbar } from '@/components/editor/editor-toolbar';
+import { AiHeadIcon } from '@/components/icons/ai-head-icon';
 import { useExportPdf } from '@/hooks/use-export-pdf';
 import { CanvasPage } from './canvas-page';
 import { usePdfBackground } from '@/hooks/use-pdf-background';
@@ -2778,7 +2778,7 @@ export function CanvasEditor({
                     : 'hover:bg-[#6355C0]/10 text-[#6355C0]'
                 }`}
               >
-                <BrainCog className="h-4 w-4" />
+                <AiHeadIcon className="h-4 w-4" />
                 Ask AI
               </button>
               {askAiDropdownOpen && askAiDropdownPos && (
