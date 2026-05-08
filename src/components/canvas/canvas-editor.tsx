@@ -2963,7 +2963,7 @@ export function CanvasEditor({
           data-canvas-scroll
           style={{
             overflowX: 'hidden',
-            overflowY: isDrawMode ? 'hidden' : 'auto',
+            overflowY: 'auto',
             touchAction: isDrawMode ? 'none' : 'pan-y',
             overscrollBehavior: 'none',
             userSelect: isReadMode
