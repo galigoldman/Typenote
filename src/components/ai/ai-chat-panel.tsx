@@ -8,7 +8,7 @@ import {
   Loader2,
   Plus,
   Send,
-  Sparkles,
+  BrainCircuit,
   Lock,
   Square,
   X,
@@ -465,7 +465,7 @@ export function AiChatPanel({
       {/* Header */}
       <div className="flex items-center justify-between border-b px-4 py-3">
         <div className="flex min-w-0 items-center gap-2">
-          <Sparkles className="h-5 w-5 flex-shrink-0 text-emerald-600" />
+          <BrainCircuit className="h-5 w-5 flex-shrink-0 text-emerald-600" />
           <span className="font-semibold">AI Tutor</span>
           {currentConversationId && messages.length > 0 && (
             <span
@@ -574,7 +574,7 @@ export function AiChatPanel({
               <>
                 {messages.length === 0 && !streamingText && (
                   <div className="flex flex-col items-center justify-center py-12 text-center">
-                    <Sparkles className="mb-3 h-10 w-10 text-muted-foreground/40" />
+                    <BrainCircuit className="mb-3 h-10 w-10 text-muted-foreground/40" />
                     <p className="text-sm font-medium text-muted-foreground">
                       {courseName
                         ? `Ask anything about ${courseName}`
