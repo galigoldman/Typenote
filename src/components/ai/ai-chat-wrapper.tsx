@@ -51,7 +51,7 @@ export function AiChatWrapper({
       {!isOpen && (
         <button
           onClick={handleToggle}
-          className="fixed z-40 flex items-center justify-center rounded-full bg-purple-600 text-white shadow-lg transition-transform hover:scale-105 hover:bg-purple-700 active:scale-95"
+          className="fixed z-40 flex items-center justify-center rounded-full bg-[#6355C0] text-white shadow-lg transition-transform hover:scale-105 hover:bg-[#554AAD] active:scale-95"
           style={{ bottom: 16, right: 64, width: 44, height: 44 }}
           aria-label="Open AI chat"
         >

@@ -461,11 +461,11 @@ export function AiChatPanel({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex h-full w-full flex-col border-l bg-background shadow-xl lg:static lg:z-auto lg:w-[340px] lg:shrink-0 xl:w-[420px] 2xl:w-[500px]">
+    <div className="fixed inset-0 z-50 flex h-full w-full flex-col border-l bg-background shadow-xl lg:static lg:z-auto lg:w-[480px] lg:shrink-0 xl:w-[560px] 2xl:w-[640px]">
       {/* Header */}
       <div className="flex items-center justify-between border-b px-4 py-3">
         <div className="flex min-w-0 items-center gap-2">
-          <Sparkles className="h-5 w-5 flex-shrink-0 text-purple-500" />
+          <Sparkles className="h-5 w-5 flex-shrink-0 text-emerald-600" />
           <span className="font-semibold">AI Tutor</span>
           {currentConversationId && messages.length > 0 && (
             <span
@@ -594,11 +594,19 @@ export function AiChatPanel({
                     className={`mb-4 ${msg.role === 'user' ? 'flex justify-end' : ''}`}
                   >
                     {msg.role === 'user' ? (
-                      <div className="max-w-[85%] rounded-2xl rounded-br-md bg-primary px-4 py-2.5 text-sm text-primary-foreground">
-                        {msg.content}
+                      <div className="max-w-[85%]">
+                        <p className="mb-1 text-right text-[10px] uppercase tracking-wider text-muted-foreground font-medium">
+                          You
+                        </p>
+                        <div className="rounded-2xl rounded-br-md bg-teal-600 px-4 py-2.5 text-sm text-white">
+                          {msg.content}
+                        </div>
                       </div>
                     ) : (
                       <div className="max-w-[95%]">
+                        <p className="mb-1 text-[10px] uppercase tracking-wider text-muted-foreground font-medium">
+                          AI Assistant
+                        </p>
                         <div className="rounded-2xl rounded-bl-md bg-muted px-4 py-3 text-sm leading-relaxed">
                           <MarkdownResponse content={msg.content} />
                         </div>
@@ -699,7 +707,7 @@ export function AiChatPanel({
                     className="flex items-start gap-2 rounded-lg border bg-muted/50 p-2"
                   >
                     {ctx.type === 'text' ? (
-                      <div className="flex-1 min-w-0 border-l-2 border-purple-400 pl-2">
+                      <div className="flex-1 min-w-0 border-l-2 border-[#6355C0]/60 pl-2">
                         <p className="text-xs font-medium text-muted-foreground mb-0.5">
                           Selected text
                         </p>
@@ -746,7 +754,7 @@ export function AiChatPanel({
                 placeholder={
                   quota?.chat.remaining === 0
                     ? 'Monthly limit reached'
-                    : 'Ask about your course materials...'
+                    : 'Ask anything about your course materials...'
                 }
                 disabled={loading || quota?.chat.remaining === 0}
                 className="flex-1 rounded-lg border bg-background px-3 py-2 text-sm outline-none ring-offset-background placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50"

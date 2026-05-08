@@ -141,7 +141,7 @@ export function SidebarLayout({ sidebar, children }: SidebarLayoutProps) {
       >
         {/* Navigation header — visible on mobile + iPad, hidden on document pages and xl+ desktop */}
         {!isDocumentPage && (
-          <header className="flex h-14 shrink-0 items-center gap-2 border-b bg-muted/30 px-4 xl:hidden">
+          <header className="flex h-14 shrink-0 items-center gap-2 border-b border-border/30 bg-sidebar px-4 xl:hidden">
             {isMobile && (
               <Button
                 variant="ghost"
@@ -196,7 +196,7 @@ export function SidebarLayout({ sidebar, children }: SidebarLayoutProps) {
         {/* Desktop: inline sidebar */}
         {!isMobile && (
           <aside
-            className={`flex shrink-0 flex-col border-r bg-muted/30 transition-[width] duration-200 overflow-hidden ${
+            className={`flex shrink-0 flex-col border-r border-border/30 bg-sidebar transition-[width] duration-200 overflow-hidden ${
               isOpen ? 'w-[250px]' : 'w-0 border-r-0'
             }`}
           >

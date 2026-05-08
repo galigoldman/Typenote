@@ -24,7 +24,9 @@ export default async function DashboardLayout({
   const sidebarContent = (
     <>
       <div className="flex h-14 items-center px-4">
-        <h1 className="text-lg font-bold">Typenote</h1>
+        <h1 className="text-xl font-extrabold tracking-tight text-primary">
+          <span className="text-primary/60">T</span>ypenote
+        </h1>
       </div>
       <Separator />
       <div className="flex-1 overflow-y-auto px-2 py-2">
@@ -36,7 +38,7 @@ export default async function DashboardLayout({
           <Button
             type="submit"
             variant="ghost"
-            className="w-full justify-start min-h-[44px]"
+            className="w-full justify-start min-h-[44px] hover:bg-primary/10 hover:text-primary"
           >
             <LogOut className="size-4" />
             Sign out
