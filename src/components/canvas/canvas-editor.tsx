@@ -44,7 +44,7 @@ import {
   PanelLeftClose,
   MousePointer2,
   Save,
-  Sparkles,
+  BrainCog,
   Download,
   Loader2,
   Clock,
@@ -2778,7 +2778,7 @@ export function CanvasEditor({
                     : 'hover:bg-[#6355C0]/10 text-[#6355C0]'
                 }`}
               >
-                <Sparkles className="h-4 w-4" />
+                <BrainCog className="h-4 w-4" />
                 Ask AI
               </button>
               {askAiDropdownOpen && askAiDropdownPos && (
