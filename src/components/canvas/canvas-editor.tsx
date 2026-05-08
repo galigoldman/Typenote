@@ -2895,14 +2895,12 @@ export function CanvasEditor({
         {activeTool === 'text' && activeEditor && (
           <>
             <div className="h-6 w-px bg-border mx-2" />
-            <div className="flex-1">
-              <EditorToolbar
-                editor={activeEditor}
-                hideUndoRedo
-                compact
-                document={{ ...document, pages: { pages } }}
-              />
-            </div>
+            <EditorToolbar
+              editor={activeEditor}
+              hideUndoRedo
+              compact
+              document={{ ...document, pages: { pages } }}
+            />
           </>
         )}
 
