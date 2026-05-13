@@ -9,7 +9,9 @@ on:
 
 jobs:
   ci:
-    runs-on: ubuntu-latest
+    # Pinned to ubuntu-22.04 (Jammy) so visual regression baselines stay deterministic.
+    # Playwright snapshots are pixel-sensitive to OS / font versions — see e2e/TEST_REGISTRY.md.
+    runs-on: ubuntu-22.04
 
     steps:
       - uses: actions/checkout@v4
