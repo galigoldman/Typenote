@@ -1,6 +1,7 @@
 import { test, expect, type Page, type BrowserContext } from '@playwright/test';
 import { login } from './helpers/auth';
 import { upsertFixtureDocument, type FixtureDocument } from './helpers/db';
+import { neuterPopupPrint, settlePopup } from './helpers/pdf-export';
 
 const A4_VIEWPORT = { width: 794, height: 1123 };
 
@@ -470,54 +471,6 @@ const FIXTURE_RTL: FixtureDocument = {
 // Helpers
 // ───────────────────────────────────────────────────────────────────────────
 
-/**
- * Suppress `window.print()` in any popup the page opens. The PDF export flow
- * opens a new window with the print HTML and immediately calls `print()`,
- * which would hang headless tests waiting for a dialog. Neutering print()
- * leaves the HTML rendered in the popup so we can screenshot it.
- */
-async function neuterPopupPrint(context: BrowserContext) {
-  await context.addInitScript(() => {
-    const original = window.open;
-    window.open = function (...args: Parameters<typeof window.open>) {
-      const w = original.apply(this, args);
-      if (w) {
-        const neuter = () => {
-          try {
-            w.print = () => {};
-          } catch {
-            /* cross-origin or closed */
-          }
-        };
-        neuter();
-        try {
-          w.addEventListener('load', neuter);
-        } catch {
-          /* ignore */
-        }
-      }
-      return w;
-    };
-  });
-}
-
-async function settlePopup(popup: Page) {
-  await popup.setViewportSize(A4_VIEWPORT);
-  await popup.waitForLoadState('domcontentloaded');
-  await popup.evaluate(async () => {
-    if (document.fonts) await document.fonts.ready;
-  });
-  await popup.addStyleTag({
-    content: `
-      *, *::before, *::after {
-        animation-duration: 0s !important;
-        transition-duration: 0s !important;
-      }
-    `,
-  });
-  await popup.waitForLoadState('networkidle');
-}
-
 async function exportAndScreenshot(
   page: Page,
   context: BrowserContext,
@@ -537,7 +490,7 @@ async function exportAndScreenshot(
     .first()
     .click();
   const popup = await popupPromise;
-  await settlePopup(popup);
+  await settlePopup(popup, A4_VIEWPORT);
   await expect(popup).toHaveScreenshot(snapshot, { fullPage: true });
 }
 
