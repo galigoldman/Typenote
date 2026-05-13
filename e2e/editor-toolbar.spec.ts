@@ -1,10 +1,38 @@
 import { test, expect, type Page } from '@playwright/test';
+import { login } from './helpers/auth';
+import {
+  upsertFixtureDocument,
+  deleteFixtureDocument,
+  type FixtureDocument,
+} from './helpers/db';
 
-const EDITOR_URL = '/test/editor';
+// Each test gets a fresh fixture doc with a known starting paragraph
+// ("Hello world"). This replaces the old /test/editor mock page, which
+// CLAUDE.md forbids — feature E2E coverage must go through real flows
+// (login → seeded doc → editor) so we catch real auth / load / persistence
+// bugs that mock pages bypass.
+let currentDocId = '';
+
+function buildFixture(id: string): FixtureDocument {
+  return {
+    id,
+    title: 'Toolbar Test Doc',
+    canvas_type: 'blank',
+    content: {
+      type: 'doc',
+      content: [
+        {
+          type: 'paragraph',
+          content: [{ type: 'text', text: 'Hello world' }],
+        },
+      ],
+    },
+  };
+}
 
 // Helper: get the Tiptap ProseMirror editor element
 function getEditor(page: Page) {
-  return page.locator('.ProseMirror');
+  return page.locator('.ProseMirror').first();
 }
 
 // Helper: click a toolbar button by its aria-label
@@ -19,10 +47,17 @@ async function focusAndSelectAll(page: Page) {
 }
 
 test.describe('Editor Toolbar', () => {
-  test.beforeEach(async ({ page }) => {
-    await page.goto(EDITOR_URL);
-    // Wait for the Tiptap editor to mount
+  test.beforeEach(async ({ page }, testInfo) => {
+    // Deterministic per-test fixture ID — easy to clean up, never collides.
+    currentDocId = `aa000000-0000-0000-0000-${String(testInfo.testId).padStart(12, '0').slice(-12)}`;
+    await upsertFixtureDocument(buildFixture(currentDocId));
+    await login(page);
+    await page.goto(`/dashboard/documents/${currentDocId}`);
     await expect(getEditor(page)).toBeVisible();
+  });
+
+  test.afterEach(async () => {
+    if (currentDocId) await deleteFixtureDocument(currentDocId);
   });
 
   test.describe('toolbar layout', () => {
@@ -501,7 +536,7 @@ test.describe('Editor Toolbar', () => {
   test.describe('title editing', () => {
     test('document title is editable', async ({ page }) => {
       const titleInput = page.getByPlaceholder('Untitled');
-      await expect(titleInput).toHaveValue('Test Document');
+      await expect(titleInput).toHaveValue('Toolbar Test Doc');
 
       await titleInput.clear();
       await titleInput.fill('New Title');
