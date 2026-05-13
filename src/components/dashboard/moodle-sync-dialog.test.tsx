@@ -98,7 +98,7 @@ describe('MoodleSyncDialog', () => {
     mockUseMoodleExtension.mockReturnValue({
       scrapeCourses: mockScrape,
     });
-    mockCompare.mockResolvedValue(mockComparisons);
+    mockCompare.mockResolvedValue({ success: true, data: mockComparisons });
 
     render(
       <MoodleSyncDialog
@@ -141,7 +141,7 @@ describe('MoodleSyncDialog', () => {
     mockUseMoodleExtension.mockReturnValue({
       scrapeCourses: mockScrape,
     });
-    mockCompare.mockResolvedValue(mockComparisons);
+    mockCompare.mockResolvedValue({ success: true, data: mockComparisons });
 
     render(
       <MoodleSyncDialog
@@ -167,7 +167,7 @@ describe('MoodleSyncDialog', () => {
     mockUseMoodleExtension.mockReturnValue({
       scrapeCourses: mockScrape,
     });
-    mockCompare.mockResolvedValue(mockComparisons);
+    mockCompare.mockResolvedValue({ success: true, data: mockComparisons });
 
     render(
       <MoodleSyncDialog
@@ -217,8 +217,9 @@ describe('MoodleSyncDialog', () => {
       scrapeCourseContent: mockScrapeContent,
       downloadAndUpload: vi.fn(),
     });
-    mockCompare.mockResolvedValue(mockComparisons);
+    mockCompare.mockResolvedValue({ success: true, data: mockComparisons });
     mockSync.mockResolvedValue({
+      success: true,
       syncedCount: 1,
       courses: [{ moodleCourseId: 'CS101', sections: [] }],
     });
@@ -298,15 +299,18 @@ describe('MoodleSyncDialog', () => {
       scrapeCourses: mockScrape,
     });
     // All courses synced_by_user — none pre-selected
-    mockCompare.mockResolvedValue([
-      {
-        moodleCourseId: 'CS101',
-        name: 'Intro to CS',
-        moodleUrl: 'https://moodle.test.ac.il/course/101',
-        status: 'synced_by_user',
-        registryId: 'reg-101',
-      },
-    ]);
+    mockCompare.mockResolvedValue({
+      success: true,
+      data: [
+        {
+          moodleCourseId: 'CS101',
+          name: 'Intro to CS',
+          moodleUrl: 'https://moodle.test.ac.il/course/101',
+          status: 'synced_by_user',
+          registryId: 'reg-101',
+        },
+      ],
+    });
 
     render(
       <MoodleSyncDialog
