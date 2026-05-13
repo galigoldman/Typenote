@@ -11,6 +11,16 @@ export default defineConfig({
     baseURL: 'http://localhost:3000',
     trace: 'on-first-retry',
     screenshot: 'only-on-failure',
+    locale: 'en-US',
+    timezoneId: 'UTC',
+    colorScheme: 'light',
+  },
+  expect: {
+    toHaveScreenshot: {
+      maxDiffPixelRatio: 0.01,
+      animations: 'disabled',
+      caret: 'hide',
+    },
   },
   projects: [
     {

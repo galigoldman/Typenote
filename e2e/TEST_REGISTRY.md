@@ -182,18 +182,85 @@ Follow-up to issue #118. Guards against cursor jumps when a multi-page overflow 
 
 ## Summary
 
-| Feature             | Status      | Spec File                        | Tests     |
-| ------------------- | ----------- | -------------------------------- | --------- |
-| Auth                | Implemented | `e2e/auth.spec.ts`               | 7/7       |
-| Documents           | Implemented | `e2e/documents.spec.ts`          | 6/6       |
-| Canvas Editor       | Implemented | `e2e/canvas-editor.spec.ts`      | 15/15     |
-| Text Editor Toolbar | Implemented | `e2e/editor-toolbar.spec.ts`     | 12/12     |
-| LaTeX Math          | Implemented | `e2e/latex-math.spec.ts`         | 5/5       |
-| Courses             | Implemented | `e2e/courses.spec.ts`            | 5/6       |
-| File Upload         | Implemented | `e2e/file-upload.spec.ts`        | 3/4       |
-| AI Chat             | Implemented | `e2e/ai-chat.spec.ts`            | 6/6       |
-| PDF Export          | Implemented | `e2e/export-pdf-*.spec.ts`       | 6/7       |
-| Real-time Sync      | Implemented | `e2e/realtime-sync.spec.ts`      | 3/3       |
-| Drawing Copy/Paste  | Implemented | `e2e/drawing-copy-paste.spec.ts` | 8/8       |
-| Version History     | Planned     | `e2e/version-history.spec.ts`    | 0/5       |
-| **Total**           |             |                                  | **75/81** |
+| Feature               | Status      | Spec File                           | Tests     |
+| --------------------- | ----------- | ----------------------------------- | --------- |
+| Auth                  | Implemented | `e2e/auth.spec.ts`                  | 7/7       |
+| Documents             | Implemented | `e2e/documents.spec.ts`             | 6/6       |
+| Canvas Editor         | Implemented | `e2e/canvas-editor.spec.ts`         | 15/15     |
+| Text Editor Toolbar   | Implemented | `e2e/editor-toolbar.spec.ts`        | 12/12     |
+| LaTeX Math            | Implemented | `e2e/latex-math.spec.ts`            | 5/5       |
+| Courses               | Implemented | `e2e/courses.spec.ts`               | 5/6       |
+| File Upload           | Implemented | `e2e/file-upload.spec.ts`           | 3/4       |
+| AI Chat               | Implemented | `e2e/ai-chat.spec.ts`               | 6/6       |
+| PDF Export            | Implemented | `e2e/export-pdf-*.spec.ts`          | 6/7       |
+| Real-time Sync        | Implemented | `e2e/realtime-sync.spec.ts`         | 3/3       |
+| Drawing Copy/Paste    | Implemented | `e2e/drawing-copy-paste.spec.ts`    | 8/8       |
+| Version History       | Planned     | `e2e/version-history.spec.ts`       | 0/5       |
+| PDF Visual Regression | Implemented | `e2e/pdf-visual-regression.spec.ts` | 8/8       |
+| **Total**             |             |                                     | **83/89** |
+
+---
+
+## PDF Visual Regression (`e2e/pdf-visual-regression.spec.ts`) — IMPLEMENTED
+
+Pixel-comparison tests that catch regressions in the **PDF export pipeline** — the highest-
+stakes output in the product. Each test:
+
+1. Seeds a deterministic fixture document via the Supabase admin client (bypasses autosave
+   non-determinism — see `e2e/helpers/db.ts`).
+2. Logs in, opens the doc, clicks "Export as PDF".
+3. The export opens a popup with the print HTML; we neuter `window.print()` so the dialog
+   never appears, leaving the rendered HTML to be screenshotted.
+4. Compares the full popup screenshot against the committed baseline.
+
+This catches: missing/broken text, font fallback, KaTeX math rendering, RTL/BiDi text flow,
+list/heading structure, embedded math in mixed-direction paragraphs.
+
+- [x] Text basics — headings + paragraph + bullet list with bold marks
+- [x] Inline math — KaTeX expressions in paragraphs (Pythagoras, fraction, integral)
+- [x] RTL + math — Hebrew text with embedded LaTeX (mixed BiDi, regression gate for 027-fix-latex-rtl)
+- [x] Math inside headings and list items (layout edge case)
+- [x] Invalid LaTeX — error fallback rendering (unbalanced braces, unknown command, empty)
+- [x] Long text — wrapping and page-break behaviour (12 paragraphs across A4 boundary)
+- [x] Canvas — pen strokes (X pattern in two colours on a lined page)
+- [x] Canvas — multi-page document (page 1 horizontal stroke, page 2 vertical stroke)
+
+### Follow-up fixtures to add in later PRs
+
+- [ ] Highlighter strokes (different opacity / blend mode)
+- [ ] Stroke that extends to / crosses page boundary
+- [ ] Mixed canvas + text content (both pipelines in one doc)
+- [ ] Document with text boxes positioned on canvas
+- [ ] 50+ page stress test
+
+### Updating baselines
+
+Baselines live in `e2e/pdf-visual-regression.spec.ts-snapshots/` and **must** be regenerated
+whenever the export pipeline intentionally changes its output. They are pixel-sensitive to
+the host OS, so we standardize on Ubuntu 22.04 (jammy) — the CI runner is pinned to
+`ubuntu-22.04` in `.github/workflows/ci.yml`, and Playwright's official Docker image
+(`mcr.microsoft.com/playwright:vX-jammy`) matches that.
+
+**On a local Linux machine that already matches (Ubuntu 22.04):**
+
+```bash
+pnpm test:e2e:update-snapshots
+```
+
+**On macOS / Windows / different Linux:**
+
+```bash
+docker run --rm -it \
+  -v "$(pwd):/work" \
+  -w /work \
+  --network host \
+  mcr.microsoft.com/playwright:v1.58.2-jammy \
+  bash -c "pnpm install --frozen-lockfile && pnpm exec playwright test e2e/pdf-visual-regression.spec.ts --update-snapshots"
+```
+
+Both require local Supabase running (`supabase start`), the dev server on
+`http://localhost:3000`, and `SUPABASE_SERVICE_ROLE_KEY` available (the helper falls back to
+the standard local-Supabase JWT, so CI / local default works without env tweaks).
+
+After regenerating, commit the updated PNGs in the same PR as the intentional change. CI will
+fail any PR that drifts from the committed baselines — which is the whole point.
