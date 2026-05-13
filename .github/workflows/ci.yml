@@ -72,6 +72,11 @@ jobs:
           TEST_USER_PASSWORD: Test1234
           NEXT_PUBLIC_SUPABASE_URL: ${{ steps.supabase.outputs.SUPABASE_URL }}
           NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ steps.supabase.outputs.SUPABASE_ANON_KEY }}
+          # The Next.js dev server (started by Playwright) calls
+          # createAdminClient() in server components (e.g. courses page) and
+          # in API routes. Forward the service-role key so SSR doesn't
+          # throw "Missing SUPABASE_SERVICE_ROLE_KEY" during E2E runs.
+          SUPABASE_SERVICE_ROLE_KEY: ${{ steps.supabase.outputs.SUPABASE_SERVICE_ROLE_KEY }}
 
       - name: Upload Playwright report
         if: failure()
