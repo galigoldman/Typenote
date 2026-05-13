@@ -130,15 +130,16 @@ Follow-up to issue #118. Guards against cursor jumps when a multi-page overflow 
 
 ---
 
-## PDF Export (`e2e/pdf-export.spec.ts`) — PARTIALLY IMPLEMENTED
+## PDF Export — IMPLEMENTED
 
-- [x] Export as PDF button visible in editor toolbar (`e2e/export-pdf-editor.spec.ts`)
-- [x] Clicking export triggers PDF download (`e2e/export-pdf-editor.spec.ts`) — ⚠️ SKIPPED IN CI (needs puppeteer Chromium)
 - [x] Export as PDF option in dashboard context menu (`e2e/export-pdf-dashboard.spec.ts`)
-- [x] Dashboard export triggers PDF download (`e2e/export-pdf-dashboard.spec.ts`) — ⚠️ SKIPPED IN CI (needs puppeteer Chromium)
-- [x] Exported PDF contains text content — ⚠️ SKIPPED IN CI (needs puppeteer Chromium)
-- [x] Exported PDF has correct page count — ⚠️ SKIPPED IN CI (needs puppeteer Chromium)
-- [ ] Exported PDF contains drawings/strokes — deferred (requires image comparison)
+- [x] Dashboard export opens print popup with rendered HTML (`e2e/export-pdf-dashboard.spec.ts`) — runs in CI
+- [x] Visual regression for 8 fixtures (text, math, RTL math, math-in-structure, invalid LaTeX, long-text, canvas-strokes, canvas-multipage) — see `e2e/pdf-visual-regression.spec.ts`
+- [x] Page persistence after export — see `e2e/export-pdf-page-persistence.spec.ts`
+
+PDF export uses native browser print (`window.print()`), not server-side puppeteer. The
+visual regression spec is the primary correctness gate; the dashboard spec verifies the
+context-menu entry point works end-to-end.
 
 ---
 
