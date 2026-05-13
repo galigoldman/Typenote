@@ -403,18 +403,16 @@ describe('increment_ai_usage — concurrency / atomicity', () => {
 
   it('concurrent burst at the quota boundary marks exactly the over-limit calls as not-allowed', async () => {
     // Seed the row right below the free-tier limit (50).
-    await supabase
-      .from('ai_usage')
-      .upsert(
-        {
-          user_id: TEST_USER_ID,
-          usage_month: currentMonth(),
-          query_type: 'chat',
-          query_count: 48,
-          last_model: 'flash',
-        },
-        { onConflict: 'user_id,usage_month,query_type' },
-      );
+    await supabase.from('ai_usage').upsert(
+      {
+        user_id: TEST_USER_ID,
+        usage_month: currentMonth(),
+        query_type: 'chat',
+        query_count: 48,
+        last_model: 'flash',
+      },
+      { onConflict: 'user_id,usage_month,query_type' },
+    );
 
     // Fire 5 concurrent calls. 48 → 49, 50, 51, 52, 53. Expected:
     //   counts 49 and 50 → is_allowed=true (≤ 50)
@@ -443,7 +441,13 @@ describe('increment_ai_usage — concurrency / atomicity', () => {
       .sort((a, b) => a.count - b.count);
 
     expect(rows.map((r) => r.count)).toEqual([49, 50, 51, 52, 53]);
-    expect(rows.map((r) => r.allowed)).toEqual([true, true, false, false, false]);
+    expect(rows.map((r) => r.allowed)).toEqual([
+      true,
+      true,
+      false,
+      false,
+      false,
+    ]);
 
     // Final stored count is exactly 53 — no lost updates under contention.
     const { data: row } = await supabase
