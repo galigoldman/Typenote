@@ -335,3 +335,176 @@ describe('subscription tiers', () => {
     expect(chatRow!.monthly_limit).toBe(500);
   });
 });
+
+/**
+ * The whole point of doing rate-limit accounting in a Postgres RPC (instead of
+ * read-modify-write in app code) is atomicity under concurrent requests. These
+ * tests assert that property end-to-end: fire N parallel increments, verify
+ * every increment lands, and that the counts returned are the contiguous
+ * sequence {start+1, …, start+N} with no duplicates and no gaps.
+ *
+ * Without this, a regression that loses the atomic upsert (e.g. someone
+ * rewrites the function as SELECT…UPDATE) could let two simultaneous requests
+ * both read the same starting count, both write count+1, and silently lose an
+ * increment. Every existing test that calls the RPC sequentially would still
+ * pass.
+ */
+describe('increment_ai_usage — concurrency / atomicity', () => {
+  beforeAll(async () => {
+    // Reset to a clean slate before this describe runs (other describes left state).
+    await supabase
+      .from('ai_usage')
+      .delete()
+      .eq('user_id', TEST_USER_ID)
+      .eq('usage_month', currentMonth());
+    await supabase
+      .from('profiles')
+      .update({ subscription_tier: 'free' })
+      .eq('id', TEST_USER_ID);
+  });
+
+  it('10 concurrent increments produce 10 distinct counts {1..10} (no lost updates)', async () => {
+    const N = 10;
+    const results = await Promise.all(
+      Array.from({ length: N }, () =>
+        supabase.rpc('increment_ai_usage', {
+          p_user_id: TEST_USER_ID,
+          p_model: 'flash',
+          p_query_type: 'chat',
+        }),
+      ),
+    );
+
+    // No request errored.
+    for (const { error } of results) {
+      expect(error).toBeNull();
+    }
+
+    const counts = results
+      .map(({ data }) => (Array.isArray(data) ? data[0] : data))
+      .map((row) => row!.current_count as number)
+      .sort((a, b) => a - b);
+
+    // Each concurrent call should have observed a unique, contiguous count.
+    // If two calls had collapsed, one count would be missing and another
+    // would repeat.
+    expect(counts).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 10]);
+
+    // Stored count matches.
+    const { data: row } = await supabase
+      .from('ai_usage')
+      .select('query_count')
+      .eq('user_id', TEST_USER_ID)
+      .eq('usage_month', currentMonth())
+      .eq('query_type', 'chat')
+      .single();
+    expect(row!.query_count).toBe(N);
+  });
+
+  it('concurrent burst at the quota boundary marks exactly the over-limit calls as not-allowed', async () => {
+    // Seed the row right below the free-tier limit (50).
+    await supabase
+      .from('ai_usage')
+      .upsert(
+        {
+          user_id: TEST_USER_ID,
+          usage_month: currentMonth(),
+          query_type: 'chat',
+          query_count: 48,
+          last_model: 'flash',
+        },
+        { onConflict: 'user_id,usage_month,query_type' },
+      );
+
+    // Fire 5 concurrent calls. 48 → 49, 50, 51, 52, 53. Expected:
+    //   counts 49 and 50 → is_allowed=true (≤ 50)
+    //   counts 51, 52, 53 → is_allowed=false
+    const N = 5;
+    const results = await Promise.all(
+      Array.from({ length: N }, () =>
+        supabase.rpc('increment_ai_usage', {
+          p_user_id: TEST_USER_ID,
+          p_model: 'flash',
+          p_query_type: 'chat',
+        }),
+      ),
+    );
+
+    for (const { error } of results) {
+      expect(error).toBeNull();
+    }
+
+    const rows = results
+      .map(({ data }) => (Array.isArray(data) ? data[0] : data))
+      .map((r) => ({
+        count: r!.current_count as number,
+        allowed: r!.is_allowed as boolean,
+      }))
+      .sort((a, b) => a.count - b.count);
+
+    expect(rows.map((r) => r.count)).toEqual([49, 50, 51, 52, 53]);
+    expect(rows.map((r) => r.allowed)).toEqual([true, true, false, false, false]);
+
+    // Final stored count is exactly 53 — no lost updates under contention.
+    const { data: row } = await supabase
+      .from('ai_usage')
+      .select('query_count')
+      .eq('user_id', TEST_USER_ID)
+      .eq('usage_month', currentMonth())
+      .eq('query_type', 'chat')
+      .single();
+    expect(row!.query_count).toBe(53);
+  });
+
+  it('parallel chat + latex increments do not collide (independent counters)', async () => {
+    // Reset to keep this test deterministic.
+    await supabase
+      .from('ai_usage')
+      .delete()
+      .eq('user_id', TEST_USER_ID)
+      .eq('usage_month', currentMonth());
+
+    const N_CHAT = 6;
+    const N_LATEX = 4;
+
+    const calls = [
+      ...Array.from({ length: N_CHAT }, () =>
+        supabase.rpc('increment_ai_usage', {
+          p_user_id: TEST_USER_ID,
+          p_model: 'flash',
+          p_query_type: 'chat',
+        }),
+      ),
+      ...Array.from({ length: N_LATEX }, () =>
+        supabase.rpc('increment_ai_usage', {
+          p_user_id: TEST_USER_ID,
+          p_model: 'flash',
+          p_query_type: 'latex',
+        }),
+      ),
+    ];
+
+    const results = await Promise.all(calls);
+    for (const { error } of results) {
+      expect(error).toBeNull();
+    }
+
+    const { data: chatRow } = await supabase
+      .from('ai_usage')
+      .select('query_count')
+      .eq('user_id', TEST_USER_ID)
+      .eq('usage_month', currentMonth())
+      .eq('query_type', 'chat')
+      .single();
+    const { data: latexRow } = await supabase
+      .from('ai_usage')
+      .select('query_count')
+      .eq('user_id', TEST_USER_ID)
+      .eq('usage_month', currentMonth())
+      .eq('query_type', 'latex')
+      .single();
+
+    expect(chatRow!.query_count).toBe(N_CHAT);
+    expect(latexRow!.query_count).toBe(N_LATEX);
+  });
+});
