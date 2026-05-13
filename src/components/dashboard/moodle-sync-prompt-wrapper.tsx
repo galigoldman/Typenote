@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { MoodleSyncPrompt } from './moodle-sync-prompt';
 import { MoodleSyncDialog } from './moodle-sync-dialog';
+import { ExtensionGate } from './extension-gate';
 
 interface MoodleSyncPromptWrapperProps {
   moodleConnection: { domain: string; instanceId: string } | null;
@@ -18,7 +19,7 @@ export function MoodleSyncPromptWrapper({
   }
 
   return (
-    <>
+    <ExtensionGate>
       <MoodleSyncPrompt
         moodleConnection={moodleConnection}
         onSyncClick={handleSyncClick}
@@ -30,6 +31,6 @@ export function MoodleSyncPromptWrapper({
           moodleConnection={moodleConnection}
         />
       )}
-    </>
+    </ExtensionGate>
   );
 }

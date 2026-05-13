@@ -23,6 +23,7 @@ const nextConfig: NextConfig = {
     '192.168.*.*',
     '10.*.*.*',
     '172.16-31.*.*',
+    '151.145.83.151',
   ],
   async rewrites() {
     return [
