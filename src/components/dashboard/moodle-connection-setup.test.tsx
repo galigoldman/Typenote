@@ -1,69 +1,81 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen } from '@testing-library/react';
-import { MoodleConnectionSetup } from './moodle-connection-setup';
+import { render, screen, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 
-// Mock the hook
 vi.mock('@/hooks/use-moodle-extension', () => ({
   useMoodleExtension: vi.fn(),
+  EXPECTED_EXTENSION_VERSION: '0.2.0',
 }));
 
-// Mock server actions
 vi.mock('@/lib/actions/moodle-sync', () => ({
   saveMoodleConnection: vi.fn(),
   removeMoodleConnection: vi.fn(),
 }));
 
-// Mock sonner
 vi.mock('sonner', () => ({
   toast: { success: vi.fn(), error: vi.fn() },
 }));
 
-import { useMoodleExtension } from '@/hooks/use-moodle-extension';
+import {
+  useMoodleExtension,
+  type ExtensionState,
+} from '@/hooks/use-moodle-extension';
+import { MoodleConnectionSetup } from './moodle-connection-setup';
+import { saveMoodleConnection } from '@/lib/actions/moodle-sync';
 
 const mockUseMoodleExtension = useMoodleExtension as ReturnType<typeof vi.fn>;
+
+function mockExtension(
+  state: ExtensionState,
+  overrides: {
+    requestPermission?: ReturnType<typeof vi.fn>;
+    checkPermission?: ReturnType<typeof vi.fn>;
+  } = {},
+) {
+  mockUseMoodleExtension.mockReturnValue({
+    state,
+    isInstalled: state.status === 'installed',
+    isChecking: state.status === 'checking',
+    requestPermission:
+      overrides.requestPermission ?? vi.fn().mockResolvedValue(true),
+    checkPermission:
+      overrides.checkPermission ?? vi.fn().mockResolvedValue(true),
+    ping: vi.fn(),
+    checkMoodleLogin: vi.fn(),
+    scrapeCourses: vi.fn(),
+    scrapeCourseContent: vi.fn(),
+    downloadAndUpload: vi.fn(),
+  });
+}
 
 describe('MoodleConnectionSetup', () => {
   beforeEach(() => {
     vi.resetAllMocks();
   });
 
-  it('shows loading state while checking extension', () => {
-    mockUseMoodleExtension.mockReturnValue({
-      isInstalled: false,
-      isChecking: true,
-    });
-
-    render(<MoodleConnectionSetup />);
-    expect(screen.getByText(/checking/i)).toBeInTheDocument();
+  it('renders nothing while the extension is still being checked', () => {
+    mockExtension({ status: 'checking' });
+    const { container } = render(<MoodleConnectionSetup />);
+    expect(container.firstChild).toBeNull();
   });
 
-  it('shows install prompt when extension not installed', () => {
-    mockUseMoodleExtension.mockReturnValue({
-      isInstalled: false,
-      isChecking: false,
-    });
-
-    render(<MoodleConnectionSetup />);
-    expect(screen.getByText(/extension required/i)).toBeInTheDocument();
+  it('renders nothing when the extension is not installed', () => {
+    mockExtension({ status: 'not-installed' });
+    const { container } = render(<MoodleConnectionSetup />);
+    expect(container.firstChild).toBeNull();
   });
 
-  it('shows URL input when extension is installed', () => {
-    mockUseMoodleExtension.mockReturnValue({
-      isInstalled: true,
-      isChecking: false,
-    });
-
+  it('shows URL input when extension is installed and no connection saved', () => {
+    mockExtension({ status: 'installed', version: '0.2.0' });
     render(<MoodleConnectionSetup />);
-    expect(screen.getByPlaceholderText(/moodle/i)).toBeInTheDocument();
-    expect(screen.getByText(/connect/i)).toBeInTheDocument();
+    expect(screen.getByLabelText(/moodle url/i)).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: /connect/i }),
+    ).toBeInTheDocument();
   });
 
-  it('shows current connection when provided', () => {
-    mockUseMoodleExtension.mockReturnValue({
-      isInstalled: true,
-      isChecking: false,
-    });
-
+  it('shows current connection when one is provided', () => {
+    mockExtension({ status: 'installed', version: '0.2.0' });
     render(
       <MoodleConnectionSetup
         currentConnection={{ domain: 'moodle.test.ac.il', instanceId: '123' }}
@@ -71,5 +83,70 @@ describe('MoodleConnectionSetup', () => {
     );
     expect(screen.getByText(/moodle\.test\.ac\.il/i)).toBeInTheDocument();
     expect(screen.getByText(/disconnect/i)).toBeInTheDocument();
+  });
+
+  it('calls requestPermission with the Moodle origin on Connect', async () => {
+    const requestPermission = vi.fn().mockResolvedValue(true);
+    mockExtension(
+      { status: 'installed', version: '0.2.0' },
+      { requestPermission },
+    );
+    vi.mocked(saveMoodleConnection).mockResolvedValue(undefined);
+
+    render(<MoodleConnectionSetup />);
+    await userEvent.type(
+      screen.getByLabelText(/moodle url/i),
+      'https://moodle.test.ac.il',
+    );
+    await userEvent.click(screen.getByRole('button', { name: /connect/i }));
+
+    await waitFor(() => {
+      expect(requestPermission).toHaveBeenCalledWith(
+        'https://moodle.test.ac.il',
+      );
+    });
+    expect(saveMoodleConnection).toHaveBeenCalledWith('moodle.test.ac.il');
+  });
+
+  it('shows permission-required error when the user denies the Chrome prompt', async () => {
+    const requestPermission = vi.fn().mockResolvedValue(false);
+    mockExtension(
+      { status: 'installed', version: '0.2.0' },
+      { requestPermission },
+    );
+
+    render(<MoodleConnectionSetup />);
+    await userEvent.type(
+      screen.getByLabelText(/moodle url/i),
+      'https://moodle.test.ac.il',
+    );
+    await userEvent.click(screen.getByRole('button', { name: /connect/i }));
+
+    await waitFor(() => expect(requestPermission).toHaveBeenCalled());
+    expect(saveMoodleConnection).not.toHaveBeenCalled();
+    expect(screen.getByText(/permission required/i)).toBeInTheDocument();
+  });
+
+  it('renders the Grant Access banner when an existing connection lacks permission', async () => {
+    const checkPermission = vi.fn().mockResolvedValue(false);
+    mockExtension(
+      { status: 'installed', version: '0.2.0' },
+      { checkPermission },
+    );
+
+    render(
+      <MoodleConnectionSetup
+        currentConnection={{ domain: 'moodle.test.ac.il', instanceId: '123' }}
+      />,
+    );
+
+    await waitFor(() => {
+      expect(checkPermission).toHaveBeenCalledWith('https://moodle.test.ac.il');
+    });
+    expect(
+      screen.getByRole('button', {
+        name: /grant access to moodle\.test\.ac\.il/i,
+      }),
+    ).toBeInTheDocument();
   });
 });

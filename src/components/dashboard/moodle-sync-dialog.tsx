@@ -77,6 +77,24 @@ function isAuthError(message: string): boolean {
   return AUTH_ERROR_PATTERNS.some((p) => lower.includes(p));
 }
 
+const NETWORK_ERROR_PATTERNS = ['network', 'fetch', 'timeout', 'offline'];
+
+function isNetworkError(message: string): boolean {
+  const lower = message.toLowerCase();
+  return NETWORK_ERROR_PATTERNS.some((p) => lower.includes(p));
+}
+
+const PERMISSION_ERROR_PATTERNS = [
+  'permission',
+  'host not allowed',
+  'no access',
+];
+
+function isPermissionError(message: string): boolean {
+  const lower = message.toLowerCase();
+  return PERMISSION_ERROR_PATTERNS.some((p) => lower.includes(p));
+}
+
 const STATUS_BADGE_MAP: Record<
   CourseComparisonStatus,
   { label: string; variant: 'default' | 'secondary' | 'outline' }
@@ -92,8 +110,12 @@ export function MoodleSyncDialog({
   onOpenChange,
   moodleConnection,
 }: MoodleSyncDialogProps) {
-  const { scrapeCourses, scrapeCourseContent, downloadAndUpload } =
-    useMoodleExtension();
+  const {
+    scrapeCourses,
+    scrapeCourseContent,
+    downloadAndUpload,
+    requestPermission,
+  } = useMoodleExtension();
   const supabaseRef = useRef(createClient());
 
   const [phase, setPhase] = useState<DialogPhase>('scraping');
@@ -103,6 +125,9 @@ export function MoodleSyncDialog({
   );
   const [error, setError] = useState<string | null>(null);
   const [authError, setAuthError] = useState(false);
+  const [networkError, setNetworkError] = useState(false);
+  const [permissionError, setPermissionError] = useState(false);
+  const [debugInfo, setDebugInfo] = useState<string | null>(null);
   const [progress, setProgress] = useState('');
 
   // Phase 2: content selection
@@ -130,6 +155,9 @@ export function MoodleSyncDialog({
   const [downloadedCount, setDownloadedCount] = useState(0);
   const [failedCount, setFailedCount] = useState(0);
   const [totalFileJobs, setTotalFileJobs] = useState(0);
+  const [failedJobs, setFailedJobs] = useState<
+    Array<{ moodleUrl: string; fileName: string; sectionId: string }>
+  >([]);
 
   // ---- Helpers for content selection ----
   function sectionKey(courseId: string, sectionId: string) {
@@ -268,6 +296,9 @@ export function MoodleSyncDialog({
   const loadCourses = useCallback(async () => {
     setError(null);
     setAuthError(false);
+    setNetworkError(false);
+    setPermissionError(false);
+    setDebugInfo(null);
     setCourses([]);
     setSelectedCourseIds(new Set());
 
@@ -288,15 +319,15 @@ export function MoodleSyncDialog({
       }
 
       if (scrapeResult.courses.length === 0) {
+        setError('No courses found on Moodle.');
         const debug = (scrapeResult as Record<string, unknown>)._debug as
           | { title: string; url: string; cardCount: number }
           | undefined;
-        setError(
-          `No courses found. ` +
-            (debug
-              ? `Page: "${debug.title}" at ${debug.url} (${debug.cardCount} cards)`
-              : 'No debug info available.'),
-        );
+        if (debug) {
+          setDebugInfo(
+            `Page: "${debug.title}" at ${debug.url} (${debug.cardCount} cards)`,
+          );
+        }
         setPhase('error');
         return;
       }
@@ -322,6 +353,8 @@ export function MoodleSyncDialog({
         err instanceof Error ? err.message : 'Failed to load courses';
       setError(message);
       setAuthError(isAuthError(message));
+      setNetworkError(isNetworkError(message) && !isAuthError(message));
+      setPermissionError(isPermissionError(message) && !isAuthError(message));
       setPhase('error');
     }
   }, [scrapeCourses, moodleConnection.domain]);
@@ -431,14 +464,61 @@ export function MoodleSyncDialog({
         err instanceof Error ? err.message : 'Failed to scrape content';
       setError(message);
       setAuthError(isAuthError(message));
+      setNetworkError(isNetworkError(message) && !isAuthError(message));
+      setPermissionError(isPermissionError(message) && !isAuthError(message));
       setPhase('error');
     }
   }
 
   // ---- Phase 3: Sync selected content ----
+  async function runDownloadJobs(
+    jobs: Array<{ moodleUrl: string; fileName: string; sectionId: string }>,
+    authToken: string | undefined,
+    uploadEndpoint: string,
+  ): Promise<{
+    downloaded: number;
+    failed: number;
+    failedJobs: typeof jobs;
+    errors: string[];
+  }> {
+    let downloaded = 0;
+    let failed = 0;
+    const errors: string[] = [];
+    const newFailed: typeof jobs = [];
+
+    for (const job of jobs) {
+      try {
+        await downloadAndUpload({
+          moodleFileUrl: job.moodleUrl,
+          uploadEndpoint,
+          authToken,
+          metadata: {
+            sectionId: job.sectionId,
+            moodleUrl: job.moodleUrl,
+            fileName: job.fileName,
+          },
+        });
+        downloaded++;
+      } catch (dlErr) {
+        failed++;
+        if (errors.length < 3) {
+          errors.push(
+            `${job.fileName}: ${dlErr instanceof Error ? dlErr.message : String(dlErr)}`,
+          );
+        }
+        newFailed.push(job);
+      }
+      setProgress(
+        `Downloading files... (${downloaded + failed}/${jobs.length})`,
+      );
+    }
+    return { downloaded, failed, failedJobs: newFailed, errors };
+  }
+
   async function handleSync() {
     setPhase('syncing');
     setError(null);
+    setFailedJobs([]);
     setProgress('Saving to registry...');
 
     try {
@@ -514,7 +594,6 @@ export function MoodleSyncDialog({
       let failed = 0;
       const errors: string[] = [];
       if (fileJobs.length > 0) {
-        // Get auth token for extension → API upload
         const {
           data: { session },
         } = await supabaseRef.current.auth.getSession();
@@ -522,32 +601,15 @@ export function MoodleSyncDialog({
         const uploadEndpoint = `${window.location.origin}/api/moodle/upload`;
 
         setProgress(`Downloading files... (0/${fileJobs.length})`);
-        for (const job of fileJobs) {
-          try {
-            // Extension downloads from Moodle (with cookies) and uploads directly to our API
-            await downloadAndUpload({
-              moodleFileUrl: job.moodleUrl,
-              uploadEndpoint,
-              authToken,
-              metadata: {
-                sectionId: job.sectionId,
-                moodleUrl: job.moodleUrl,
-                fileName: job.fileName,
-              },
-            });
-            downloaded++;
-          } catch (dlErr) {
-            failed++;
-            if (errors.length < 3) {
-              errors.push(
-                `${job.fileName}: ${dlErr instanceof Error ? dlErr.message : String(dlErr)}`,
-              );
-            }
-          }
-          setProgress(
-            `Downloading files... (${downloaded + failed}/${fileJobs.length})`,
-          );
-        }
+        const dlResult = await runDownloadJobs(
+          fileJobs,
+          authToken,
+          uploadEndpoint,
+        );
+        downloaded = dlResult.downloaded;
+        failed = dlResult.failed;
+        errors.push(...dlResult.errors);
+        setFailedJobs(dlResult.failedJobs);
       }
 
       setSyncedCount(result.syncedCount);
@@ -561,8 +623,50 @@ export function MoodleSyncDialog({
       const message = err instanceof Error ? err.message : 'Sync failed';
       setError(message);
       setAuthError(isAuthError(message));
+      setNetworkError(isNetworkError(message) && !isAuthError(message));
+      setPermissionError(isPermissionError(message) && !isAuthError(message));
       setPhase('error');
     }
+  }
+
+  async function handleGrantPermission() {
+    const granted = await requestPermission(
+      `https://${moodleConnection.domain}`,
+    );
+    if (granted) {
+      setPermissionError(false);
+      loadCourses();
+    } else {
+      setError(
+        `Permission still denied for ${moodleConnection.domain}. Try granting via chrome://extensions.`,
+      );
+    }
+  }
+
+  async function handleRetryFailed() {
+    if (failedJobs.length === 0) return;
+    setPhase('syncing');
+    setError(null);
+    setProgress(`Retrying ${failedJobs.length} failed file(s)...`);
+
+    const {
+      data: { session },
+    } = await supabaseRef.current.auth.getSession();
+    const authToken = session?.access_token;
+    const uploadEndpoint = `${window.location.origin}/api/moodle/upload`;
+
+    const result = await runDownloadJobs(failedJobs, authToken, uploadEndpoint);
+    setDownloadedCount((prev) => prev + result.downloaded);
+    setFailedCount(result.failed);
+    setFailedJobs(result.failedJobs);
+    if (result.errors.length > 0) {
+      setError(
+        `${result.failed} file(s) still failed:\n${result.errors.join('\n')}`,
+      );
+    } else {
+      setError(null);
+    }
+    setPhase('done');
   }
 
   // ---- Render ----
@@ -872,7 +976,9 @@ export function MoodleSyncDialog({
                 className="text-sm text-destructive whitespace-pre-wrap"
                 role="alert"
               >
-                {error}
+                {networkError && !authError
+                  ? `Couldn't reach ${moodleConnection.domain}. Check your internet and try again.`
+                  : error}
               </p>
               {authError && (
                 <p className="text-xs text-muted-foreground">
@@ -887,6 +993,23 @@ export function MoodleSyncDialog({
                   </a>{' '}
                   and try again.
                 </p>
+              )}
+              {permissionError && (
+                <div className="flex items-center gap-2">
+                  <p className="text-xs text-muted-foreground flex-1">
+                    The extension lost access to {moodleConnection.domain}.
+                    Grant permission again to continue.
+                  </p>
+                  <Button size="sm" onClick={handleGrantPermission}>
+                    Grant Permission
+                  </Button>
+                </div>
+              )}
+              {debugInfo && (
+                <details className="text-xs text-muted-foreground">
+                  <summary className="cursor-pointer">Debug info</summary>
+                  <pre className="mt-1 whitespace-pre-wrap">{debugInfo}</pre>
+                </details>
               )}
             </div>
           )}
@@ -915,7 +1038,14 @@ export function MoodleSyncDialog({
             </div>
           )}
           {phase === 'done' && (
-            <Button onClick={() => onOpenChange(false)}>Close</Button>
+            <div className="flex gap-2">
+              {failedJobs.length > 0 && (
+                <Button variant="outline" onClick={handleRetryFailed}>
+                  Retry failed ({failedJobs.length})
+                </Button>
+              )}
+              <Button onClick={() => onOpenChange(false)}>Close</Button>
+            </div>
           )}
           {phase === 'error' && (
             <Button variant="outline" onClick={loadCourses}>

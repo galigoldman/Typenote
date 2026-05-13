@@ -3,19 +3,17 @@
 import { useState, useEffect, useCallback } from 'react';
 
 const EXTENSION_ID = process.env.NEXT_PUBLIC_EXTENSION_ID ?? '';
+export const EXPECTED_EXTENSION_VERSION = '0.2.0';
+const PING_TIMEOUT_MS = 2_000;
 
-interface ExtensionState {
-  isInstalled: boolean;
-  isChecking: boolean;
-}
+export type ExtensionState =
+  | { status: 'checking' }
+  | { status: 'installed'; version: string }
+  | { status: 'not-installed' }
+  | { status: 'version-mismatch'; installedVersion: string };
 
-/**
- * Send a message to the Typenote Moodle extension.
- * Returns null if extension is not installed.
- */
 async function sendExtensionMessage<T>(message: unknown): Promise<T | null> {
   if (!EXTENSION_ID) return null;
-
   return new Promise((resolve) => {
     try {
       chrome.runtime.sendMessage(EXTENSION_ID, message, (response: unknown) => {
@@ -31,33 +29,73 @@ async function sendExtensionMessage<T>(message: unknown): Promise<T | null> {
   });
 }
 
-export function useMoodleExtension() {
-  const [state, setState] = useState<ExtensionState>({
-    isInstalled: false,
-    isChecking: true,
+function withTimeout<T>(
+  promise: Promise<T | null>,
+  ms: number,
+): Promise<T | null> {
+  return new Promise((resolve) => {
+    const timer = setTimeout(() => resolve(null), ms);
+    promise
+      .then((value) => {
+        clearTimeout(timer);
+        resolve(value);
+      })
+      .catch(() => {
+        clearTimeout(timer);
+        resolve(null);
+      });
   });
+}
 
-  // Ping extension on mount to check if installed
+export function useMoodleExtension() {
+  const [state, setState] = useState<ExtensionState>({ status: 'checking' });
+
   useEffect(() => {
+    let cancelled = false;
+
     async function checkExtension() {
-      const response = await sendExtensionMessage<{ success: boolean }>({
-        type: 'PING',
-      });
-      setState({
-        isInstalled: response?.success === true,
-        isChecking: false,
-      });
+      if (!EXTENSION_ID) {
+        if (process.env.NODE_ENV !== 'production') {
+          console.warn(
+            '[Typenote] NEXT_PUBLIC_EXTENSION_ID is not set. The Moodle extension will appear as not-installed. See .env.local.example.',
+          );
+        }
+        if (!cancelled) setState({ status: 'not-installed' });
+        return;
+      }
+
+      const response = await withTimeout(
+        sendExtensionMessage<{ success: boolean; data?: { version?: string } }>(
+          { type: 'PING' },
+        ),
+        PING_TIMEOUT_MS,
+      );
+
+      if (cancelled) return;
+
+      const version = response?.data?.version;
+      if (!response?.success || !version) {
+        setState({ status: 'not-installed' });
+        return;
+      }
+      if (version !== EXPECTED_EXTENSION_VERSION) {
+        setState({ status: 'version-mismatch', installedVersion: version });
+        return;
+      }
+      setState({ status: 'installed', version });
     }
-    checkExtension();
+
+    void checkExtension();
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   const ping = useCallback(async () => {
     const response = await sendExtensionMessage<{
       success: boolean;
       data: { version: string };
-    }>({
-      type: 'PING',
-    });
+    }>({ type: 'PING' });
     return response?.success ? response.data : null;
   }, []);
 
@@ -178,7 +216,9 @@ export function useMoodleExtension() {
   );
 
   return {
-    ...state,
+    state,
+    isInstalled: state.status === 'installed',
+    isChecking: state.status === 'checking',
     ping,
     checkPermission,
     requestPermission,
