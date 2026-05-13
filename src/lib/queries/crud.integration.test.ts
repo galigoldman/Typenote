@@ -166,33 +166,7 @@ describe('Documents CRUD', () => {
   });
 });
 
-describe('RLS policies exist', () => {
-  it('all main tables have RLS enabled', async () => {
-    const { data, error } = await supabase.rpc('check_rls_enabled');
-
-    // If the RPC doesn't exist, fall back to checking via PostgREST
-    // behavior: admin client bypasses RLS so we just verify policies
-    // exist by checking the pg_policies catalog
-    if (error) {
-      // Query pg_policies directly to verify RLS policies exist
-      const tables = [
-        'profiles',
-        'folders',
-        'documents',
-        'courses',
-        'course_weeks',
-        'course_materials',
-      ];
-
-      for (const table of tables) {
-        // If we can query the table with admin client, the table exists
-        const { error: queryError } = await supabase
-          .from(table)
-          .select('id')
-          .limit(1);
-
-        expect(queryError).toBeNull();
-      }
-    }
-  });
-});
+// Cross-user RLS isolation is tested in
+// src/__tests__/integration/rls-isolation.integration.test.ts. The previous
+// placeholder test here used the admin client, which bypasses RLS, and so
+// could not detect a regression in any policy.
