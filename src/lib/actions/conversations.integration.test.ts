@@ -485,66 +485,8 @@ describe('Course deletion cascades to conversations', () => {
   });
 });
 
-describe('RLS blocks cross-user access', () => {
-  // RLS is enforced by Supabase when using the anon key with a user JWT.
-  // The admin (service_role) client bypasses RLS by design.
-  // To test RLS properly we switch the Postgres role via raw SQL,
-  // matching the pattern described in supabase-client.ts.
-
-  let conversationId: string;
-
-  beforeAll(async () => {
-    // Create a conversation owned by the test user
-    const { data } = await supabase
-      .from('ai_conversations')
-      .insert({
-        user_id: TEST_USER_ID,
-        course_id: COURSE_ID,
-        title: 'RLS test conversation',
-      })
-      .select()
-      .single();
-
-    conversationId = data!.id;
-    createdConversationIds.push(conversationId);
-  });
-
-  it('service_role client can see the conversation (bypasses RLS)', async () => {
-    const { data, error } = await supabase
-      .from('ai_conversations')
-      .select()
-      .eq('id', conversationId)
-      .single();
-
-    expect(error).toBeNull();
-    expect(data).toBeDefined();
-    expect(data!.id).toBe(conversationId);
-  });
-
-  it('RLS policies exist on ai_conversations', async () => {
-    // Verify the table has RLS enabled by querying pg_tables
-    const { error } = await supabase.rpc('check_rls_enabled').select();
-
-    if (error) {
-      // If the RPC doesn't exist, check that we can at least query the table
-      // (service_role bypasses RLS, so this proves the table exists and is queryable)
-      const { error: queryError } = await supabase
-        .from('ai_conversations')
-        .select('id')
-        .limit(1);
-      expect(queryError).toBeNull();
-    }
-  });
-
-  it('RLS policies exist on ai_messages', async () => {
-    const { error } = await supabase.rpc('check_rls_enabled').select();
-
-    if (error) {
-      const { error: queryError } = await supabase
-        .from('ai_messages')
-        .select('id')
-        .limit(1);
-      expect(queryError).toBeNull();
-    }
-  });
-});
+// Real cross-user RLS isolation is tested in
+// src/__tests__/integration/rls-isolation.integration.test.ts using two
+// anon-key clients with different user JWTs. Placeholder tests previously
+// here only verified the table was queryable by the admin client (which
+// bypasses RLS), so they could not detect a missing or broken policy.
