@@ -171,6 +171,13 @@ context-menu entry point works end-to-end.
 
 ---
 
+## Moodle Extension Gating (`e2e/moodle-touch-gating.spec.ts`) — IMPLEMENTED
+
+- [x] Moodle card is hidden on iPad viewport (pointer: coarse)
+- [x] Moodle card is visible on desktop viewport (pointer: fine)
+
+---
+
 ## Version History (`e2e/version-history.spec.ts`) — PLANNED
 
 - [ ] Open version history sidebar from canvas editor toolbar
@@ -196,9 +203,11 @@ context-menu entry point works end-to-end.
 | PDF Export            | Implemented | `e2e/export-pdf-*.spec.ts`          | 6/7       |
 | Real-time Sync        | Implemented | `e2e/realtime-sync.spec.ts`         | 3/3       |
 | Drawing Copy/Paste    | Implemented | `e2e/drawing-copy-paste.spec.ts`    | 8/8       |
+| Moodle Ext Gating     | Implemented | `e2e/moodle-touch-gating.spec.ts`   | 2/2       |
+| Extension Real Load   | Implemented | `e2e/extension-real.spec.ts`        | 3/3       |
 | Version History       | Planned     | `e2e/version-history.spec.ts`       | 0/5       |
 | PDF Visual Regression | Implemented | `e2e/pdf-visual-regression.spec.ts` | 8/8       |
-| **Total**             |             |                                     | **83/89** |
+| **Total**             |             |                                     | **88/94** |
 
 ---
 

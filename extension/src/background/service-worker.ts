@@ -19,7 +19,7 @@ import type {
   ScrapedCourseContentData,
 } from '../types/messages';
 
-const EXTENSION_VERSION = '0.1.0';
+const EXTENSION_VERSION = '0.2.0';
 
 // Listen for messages from the Typenote web app
 chrome.runtime.onMessageExternal.addListener(
