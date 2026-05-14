@@ -188,6 +188,28 @@ context-menu entry point works end-to-end.
 
 ---
 
+## Security — XSS (`e2e/security-xss.spec.ts`) — IMPLEMENTED
+
+- [x] XSS payload in document title renders as text on the dashboard and does not execute
+- [x] XSS payload in document title renders as text in the editor header and does not execute
+
+---
+
+## Security — Prompt Injection (`e2e/security-prompt-injection.spec.ts`) — IMPLEMENTED
+
+- [x] AI response containing `<script>` / `<img onerror>` / `<svg onload>` renders as text and does NOT execute
+- [x] Markdown link with `javascript:` URL in AI response is sanitized — no click execution
+
+---
+
+## Security — File Upload Validation (`e2e/security-file-upload.spec.ts`) — IMPLEMENTED
+
+- [x] Non-PDF file rejected by MIME type — inline error visible, no success toast
+- [x] File >50MB rejected — inline error visible, no success toast
+- [x] Double-extension file (`report.pdf.exe`) rejected by MIME type, not just extension
+
+---
+
 ## Summary
 
 | Feature               | Status      | Spec File                           | Tests     |
