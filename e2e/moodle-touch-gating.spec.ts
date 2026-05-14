@@ -29,15 +29,17 @@ test.describe('Moodle UI — touch / non-Chromium gating', () => {
       viewport: { width: 1440, height: 900 },
       baseURL: BASE_URL,
     });
-    // Stub window.chrome.runtime.sendMessage so useExtensionPlatform() sees a
-    // Chromium-family desktop environment. Without an actual Chrome extension
-    // loaded, Playwright's Chromium does not expose window.chrome at all.
+    // Stub window.chrome with the Chrome-family globals (loadTimes/csi/app)
+    // that useExtensionPlatform() uses for Chromium detection. We deliberately
+    // omit `runtime` here — that field is only injected once the extension is
+    // installed and lists the page in externally_connectable, so the gate must
+    // work without it (otherwise the install card itself is unreachable).
     await context.addInitScript(() => {
       Object.defineProperty(window, 'chrome', {
         value: {
-          runtime: {
-            sendMessage: () => {},
-          },
+          loadTimes: () => ({}),
+          csi: () => ({}),
+          app: {},
         },
         writable: true,
       });
