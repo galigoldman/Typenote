@@ -210,6 +210,14 @@ context-menu entry point works end-to-end.
 
 ---
 
+## Security — API Auth Boundary (`e2e/security-api-auth.spec.ts`) — IMPLEMENTED
+
+- [x] Unauthenticated POST to protected routes (`/api/ai/ask`, `/api/ai/latex`, `/api/ai/search`, `/api/ai/reindex`) returns 401/400/405 (never reaches DB/AI)
+- [x] Unauthenticated GET to protected routes (`/api/ai/quota`, `/api/ai/conversations`) returns 401/400/405
+- [x] Unauthenticated POST with malformed/empty body returns <500 (no crash path reachable without auth)
+
+---
+
 ## Summary
 
 | Feature               | Status      | Spec File                           | Tests     |
