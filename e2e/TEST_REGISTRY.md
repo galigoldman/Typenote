@@ -218,6 +218,12 @@ context-menu entry point works end-to-end.
 
 ---
 
+## Security — Storage RLS (integration test, not E2E)
+
+Test lives in `src/__tests__/integration/storage-rls.integration.test.ts`. Verifies path-prefix RLS on the `personal-files` Storage bucket: list/download/upload/delete attempts on a path NOT owned by the calling user are rejected.
+
+---
+
 ## Summary
 
 | Feature               | Status      | Spec File                           | Tests     |

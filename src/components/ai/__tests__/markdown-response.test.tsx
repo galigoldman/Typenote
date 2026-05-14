@@ -94,3 +94,56 @@ describe('MarkdownResponse', () => {
     expect(container.innerHTML).toBe('');
   });
 });
+
+/**
+ * XSS-safety: unit-level guard for the same property the E2E
+ * `e2e/security-prompt-injection.spec.ts` covers.
+ *
+ * react-markdown by default does NOT render raw HTML. The moment
+ * someone adds `rehype-raw` (or any plugin that emits raw HTML), the
+ * `<script>` count below jumps from 0 and this test fails — much
+ * cheaper than catching the regression 30s into an E2E run.
+ */
+describe('MarkdownResponse — XSS safety', () => {
+  it('does not emit a live <script> for inline <script> in markdown', () => {
+    const { container } = render(
+      <MarkdownResponse content="hello <script>window.__md_xss=true</script> world" />,
+    );
+    expect(container.querySelectorAll('script')).toHaveLength(0);
+    // The literal characters appear as text (escaped) so a reader sees
+    // what the model said.
+    expect(container.textContent).toContain('<script>');
+  });
+
+  it('does not emit an <img> with an onerror sink', () => {
+    const { container } = render(
+      <MarkdownResponse content='<img src=x onerror="window.__md_xss=true">' />,
+    );
+    for (const img of Array.from(container.querySelectorAll('img'))) {
+      expect(img.getAttribute('onerror')).toBeNull();
+    }
+    expect(container.textContent).toContain('onerror');
+  });
+
+  it('sanitizes javascript: URLs in markdown links', () => {
+    const { container } = render(
+      <MarkdownResponse content="[click](javascript:window.__md_xss=true)" />,
+    );
+    const link = container.querySelector('a');
+    expect(link).not.toBeNull();
+    // react-markdown's URL allowlist replaces unsafe protocols. Either
+    // the protocol is stripped (href becomes empty/about:blank) or
+    // replaced — what matters is that no live javascript: remains.
+    expect(link!.getAttribute('href') ?? '').not.toMatch(/^javascript:/i);
+    expect(link!.textContent).toBe('click');
+  });
+
+  it('preserves safe https:// URLs (regression guard against over-sanitization)', () => {
+    const { container } = render(
+      <MarkdownResponse content="[docs](https://example.com)" />,
+    );
+    const link = container.querySelector('a');
+    expect(link).not.toBeNull();
+    expect(link!.getAttribute('href')).toBe('https://example.com');
+  });
+});
