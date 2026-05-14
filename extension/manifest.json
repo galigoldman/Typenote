@@ -14,7 +14,8 @@
       "http://localhost:3000/*",
       "http://localhost:3001/*",
       "http://151.145.83.151:3001/*",
-      "https://*.typenote.app/*"
+      "https://*.typenote.app/*",
+      "https://typenote-two.vercel.app/*"
     ]
   },
   "web_accessible_resources": [
