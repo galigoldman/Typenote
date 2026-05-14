@@ -81,8 +81,8 @@ export function MoodleInstallDialog({ trigger }: MoodleInstallDialogProps) {
             lowercase string).
           </li>
           <li>
-            <strong>Refresh this page.</strong> The card will switch to "Enter
-            your Moodle URL".
+            <strong>Refresh this page.</strong> The card will switch to{' '}
+            <em>Enter your Moodle URL</em>.
           </li>
         </ol>
 
