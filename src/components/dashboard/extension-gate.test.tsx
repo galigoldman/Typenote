@@ -16,8 +16,11 @@ function setSupported(supported: boolean) {
     onchange: null,
   }));
   if (supported) {
+    // Mimic a clean Chromium browser without the extension installed.
     (globalThis as Record<string, unknown>).chrome = {
-      runtime: { sendMessage: vi.fn() },
+      loadTimes: () => ({}),
+      csi: () => ({}),
+      app: {},
     };
   } else {
     delete (globalThis as Record<string, unknown>).chrome;

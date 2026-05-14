@@ -9,10 +9,17 @@ interface ExtensionPlatform {
 function getSnapshot(): boolean {
   if (typeof window === 'undefined') return false;
   const pointerFine = window.matchMedia?.('(pointer: fine)').matches ?? false;
-  const chromeRuntime = (window as unknown as { chrome?: typeof chrome }).chrome
-    ?.runtime;
-  const hasChromeRuntime = typeof chromeRuntime?.sendMessage === 'function';
-  return pointerFine && hasChromeRuntime;
+  const chromeObj = (window as unknown as { chrome?: Record<string, unknown> })
+    .chrome;
+  // `chrome.runtime` only appears once the extension is installed AND the page
+  // is in its `externally_connectable.matches`, so we can't gate on it — that
+  // would make the install card itself unreachable. Instead detect the Chromium
+  // family via the stable Chrome-only globals (`loadTimes`/`csi`/`app`) that
+  // exist on every Chromium-based browser without any extension installed.
+  const isChromiumFamily =
+    !!chromeObj &&
+    ('loadTimes' in chromeObj || 'csi' in chromeObj || 'app' in chromeObj);
+  return pointerFine && isChromiumFamily;
 }
 
 function subscribe(callback: () => void): () => void {
