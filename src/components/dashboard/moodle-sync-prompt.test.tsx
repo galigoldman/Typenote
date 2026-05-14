@@ -37,7 +37,7 @@ describe('MoodleSyncPrompt', () => {
     expect(container.querySelector('[aria-busy="true"]')).toBeInTheDocument();
   });
 
-  it('renders the Install card when extension is not installed', () => {
+  it('renders the Install card with an enabled trigger when extension is not installed', () => {
     setState({ status: 'not-installed' });
     render(<MoodleSyncPrompt moodleConnection={null} onSyncClick={() => {}} />);
     expect(
@@ -45,7 +45,7 @@ describe('MoodleSyncPrompt', () => {
     ).toBeInTheDocument();
     expect(
       screen.getByRole('button', { name: /install extension/i }),
-    ).toBeDisabled();
+    ).toBeEnabled();
   });
 
   it('renders the Update card with both versions when version mismatches', () => {

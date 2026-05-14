@@ -14,6 +14,7 @@ import {
 } from '@/hooks/use-moodle-extension';
 import { MoodleCardSkeleton } from './moodle-card-skeleton';
 import { MoodleConnectionSetup } from './moodle-connection-setup';
+import { MoodleInstallDialog } from './moodle-install-dialog';
 
 interface MoodleSyncPromptProps {
   moodleConnection: { domain: string; instanceId: string } | null;
@@ -41,12 +42,16 @@ export function MoodleSyncPrompt({
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <Button variant="outline" size="sm" disabled>
-            Install Extension
-          </Button>
+          <MoodleInstallDialog
+            trigger={
+              <Button variant="outline" size="sm">
+                Install Extension
+              </Button>
+            }
+          />
           <p className="mt-2 text-xs text-muted-foreground">
-            Coming soon to the Chrome Web Store. Refresh this page after
-            installing.
+            Beta — load the unpacked extension from GitHub. Refresh this page
+            after installing.
           </p>
         </CardContent>
       </Card>
