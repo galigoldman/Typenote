@@ -161,20 +161,23 @@ async function executeScraperFunction<T>(
   const tab = await chrome.tabs.get(tabId);
   const tabUrl = tab.url ?? '';
 
-  // Inject the scraper content script
+  // Inject the scraper content script. Path must match the build output
+  // (esbuild outdir=dist, source at src/content/moodle-scraper.ts → dist/content/moodle-scraper.js).
   let results;
   try {
     results = await chrome.scripting.executeScript({
       target: { tabId },
-      files: ['dist/moodle-scraper.js'],
+      files: ['dist/content/moodle-scraper.js'],
     });
   } catch (err) {
-    // If injection failed, it's likely a redirect to SSO or permission issue
     const msg = String(err);
+    // Distinguish "page is not Moodle (likely SSO redirect)" from "anything else"
+    // — the previous code claimed login failure even when the real cause was a
+    // bad file path or scripting permission, which made debugging painful.
     if (tabUrl && !tabUrl.startsWith('chrome')) {
       throw new Error(
-        `Cannot access page at: ${tabUrl.substring(0, 100)}. ` +
-          'You may need to log into Moodle in this browser first.',
+        `Failed to inject scraper into ${tabUrl.substring(0, 100)}: ${msg}. ` +
+          'If this URL is a login page, log into Moodle and retry.',
       );
     }
     throw new Error(msg);
