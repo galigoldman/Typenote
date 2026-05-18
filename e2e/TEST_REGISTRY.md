@@ -188,6 +188,42 @@ context-menu entry point works end-to-end.
 
 ---
 
+## Security — XSS (`e2e/security-xss.spec.ts`) — IMPLEMENTED
+
+- [x] XSS payload in document title renders as text on the dashboard and does not execute
+- [x] XSS payload in document title renders as text in the editor header and does not execute
+
+---
+
+## Security — Prompt Injection (`e2e/security-prompt-injection.spec.ts`) — IMPLEMENTED
+
+- [x] AI response containing `<script>` / `<img onerror>` / `<svg onload>` renders as text and does NOT execute
+- [x] Markdown link with `javascript:` URL in AI response is sanitized — no click execution
+
+---
+
+## Security — File Upload Validation (`e2e/security-file-upload.spec.ts`) — IMPLEMENTED
+
+- [x] Non-PDF file rejected by MIME type — inline error visible, no success toast
+- [x] File >50MB rejected — inline error visible, no success toast
+- [x] Double-extension file (`report.pdf.exe`) rejected by MIME type, not just extension
+
+---
+
+## Security — API Auth Boundary (`e2e/security-api-auth.spec.ts`) — IMPLEMENTED
+
+- [x] Unauthenticated POST to protected routes (`/api/ai/ask`, `/api/ai/latex`, `/api/ai/search`, `/api/ai/reindex`) returns 401/400/405 (never reaches DB/AI)
+- [x] Unauthenticated GET to protected routes (`/api/ai/quota`, `/api/ai/conversations`) returns 401/400/405
+- [x] Unauthenticated POST with malformed/empty body returns <500 (no crash path reachable without auth)
+
+---
+
+## Security — Storage RLS (integration test, not E2E)
+
+Test lives in `src/__tests__/integration/storage-rls.integration.test.ts`. Verifies path-prefix RLS on the `personal-files` Storage bucket: list/download/upload/delete attempts on a path NOT owned by the calling user are rejected.
+
+---
+
 ## Summary
 
 | Feature               | Status      | Spec File                           | Tests     |
