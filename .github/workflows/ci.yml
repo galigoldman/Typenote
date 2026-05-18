@@ -35,10 +35,22 @@ jobs:
       - name: Test
         run: pnpm test
 
-      - name: Start Supabase
-        uses: supabase/setup-cli@v1
-        with:
-          version: latest
+      # Install the Supabase CLI directly. We don't use supabase/setup-cli@v1
+      # because it builds download URLs without the version in the filename
+      # (e.g. `supabase_linux_amd64.tar.gz`) which 404s — Supabase publishes
+      # asset names *with* the version embedded (`supabase_2.99.0_linux_amd64.tar.gz`).
+      # The action's broken URL pattern affects both @v1 and @v2 tags.
+      - name: Install Supabase CLI
+        env:
+          SUPABASE_VERSION: 2.99.0
+        run: |
+          curl -fsSL "https://github.com/supabase/cli/releases/download/v${SUPABASE_VERSION}/supabase_${SUPABASE_VERSION}_linux_amd64.tar.gz" -o /tmp/supabase.tar.gz
+          tar -xzf /tmp/supabase.tar.gz -C /tmp
+          sudo mv /tmp/supabase /usr/local/bin/
+          supabase --version
+          # setup-cli sets this so `supabase start` pulls Docker images
+          # from ghcr.io instead of Docker Hub. Preserve that behavior.
+          echo "SUPABASE_INTERNAL_IMAGE_REGISTRY=ghcr.io" >> "$GITHUB_ENV"
 
       - name: Start Supabase local
         run: supabase start
