@@ -62,12 +62,25 @@ export function scrapeLoginStatus(): LoginStatusData {
  *       span[aria-hidden="true"]  ->  visible course name
  *       span.sr-only              ->  accessible course name (fallback)
  */
-export function scrapeCourses(): ScrapedCoursesData & {
-  _debug?: { title: string; url: string; cardCount: number };
-} {
-  const cards = document.querySelectorAll<HTMLElement>(
-    '.card.dashboard-card[data-course-id]',
-  );
+export async function scrapeCourses(): Promise<
+  ScrapedCoursesData & {
+    _debug?: { title: string; url: string; cardCount: number };
+  }
+> {
+  // Moodle's /my/courses.php hydrates the dashboard cards via XHR after
+  // DOMContentLoaded — the SW's waitForTabLoad only waits for tab
+  // status:'complete' (network idle for the document itself, not for the
+  // follow-up AJAX). If the user navigates quickly we'd query the DOM
+  // before the cards mount and falsely report "no courses". Poll instead.
+  const CARD_SELECTOR = '.card.dashboard-card[data-course-id]';
+  const POLL_INTERVAL_MS = 250;
+  const POLL_TIMEOUT_MS = 8000;
+  const start = Date.now();
+  let cards = document.querySelectorAll<HTMLElement>(CARD_SELECTOR);
+  while (cards.length === 0 && Date.now() - start < POLL_TIMEOUT_MS) {
+    await new Promise((r) => setTimeout(r, POLL_INTERVAL_MS));
+    cards = document.querySelectorAll<HTMLElement>(CARD_SELECTOR);
+  }
   const courses: ScrapedCourse[] = [];
 
   cards.forEach((card) => {
