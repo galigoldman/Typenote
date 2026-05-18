@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
+import { createServerClient } from '@supabase/ssr';
+import { cookies } from 'next/headers';
 
 export async function GET(request: Request) {
   const { searchParams, origin } = new URL(request.url);
@@ -14,10 +15,42 @@ export async function GET(request: Request) {
       : '/dashboard';
 
   if (code) {
-    const supabase = await createClient();
+    const cookieStore = await cookies();
+
+    // Track cookies that need to be set on the redirect response
+    const cookiesToForward: {
+      name: string;
+      value: string;
+      options: Record<string, unknown>;
+    }[] = [];
+
+    const supabase = createServerClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+      {
+        cookies: {
+          getAll() {
+            return cookieStore.getAll();
+          },
+          setAll(cookiesToSet) {
+            cookiesToSet.forEach(({ name, value, options }) => {
+              cookiesToForward.push({ name, value, options });
+            });
+          },
+        },
+      },
+    );
+
     const { error } = await supabase.auth.exchangeCodeForSession(code);
+    console.log('[auth/callback] exchangeCodeForSession result:', { error: error?.message ?? null, cookieCount: cookiesToForward.length });
+
     if (!error) {
-      return NextResponse.redirect(`${origin}${redirectTo}`);
+      const response = NextResponse.redirect(`${origin}${redirectTo}`);
+      // Forward auth cookies onto the redirect response
+      cookiesToForward.forEach(({ name, value, options }) => {
+        response.cookies.set(name, value, options);
+      });
+      return response;
     }
   }
 

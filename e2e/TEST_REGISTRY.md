@@ -13,13 +13,13 @@ When adding or modifying a feature, update this registry and write the correspon
 
 ## Auth (`e2e/auth.spec.ts`) — IMPLEMENTED
 
-- [x] Sign up with email and password
-- [x] Sign up with invalid email shows error
+- [x] Signup page shows only Google button (no email/password form)
 - [x] Log in with valid credentials redirects to dashboard
 - [x] Log in with wrong password shows error
 - [x] Log out returns to login page
 - [x] Password reset sends email (forgot password flow)
 - [x] Unauthenticated user is redirected to login
+- [x] Login page still shows both email/password and Google options
 
 ---
 
@@ -170,6 +170,25 @@ Follow-up to issue #118. Guards against cursor jumps when a multi-page overflow 
 
 ---
 
+## Save on Navigate (`e2e/save-on-navigate.spec.ts`) — IMPLEMENTED
+
+Fixes bug where canvas changes (image resize, strokes, etc.) were lost when navigating away before the 800ms debounce fired.
+
+- [x] Canvas changes persist when navigating away immediately after drawing
+
+---
+
+## Page Overflow Split (`e2e/page-overflow.spec.ts`) — PLANNED
+
+Fixes bug where paragraph overflow moved the entire paragraph to the next page instead of only the overflowing lines (line-level splitting).
+
+- [ ] Paragraph overflow splits at line level — only overflowing lines move to next page
+- [ ] List overflow splits at item level — overflowing list items move to next page
+- [ ] Cursor position is correct after overflow split
+- [ ] Content persists correctly after split and page reload
+
+---
+
 ## Version History (`e2e/version-history.spec.ts`) — PLANNED
 
 - [ ] Open version history sidebar from canvas editor toolbar
@@ -185,6 +204,7 @@ Follow-up to issue #118. Guards against cursor jumps when a multi-page overflow 
 | Feature             | Status      | Spec File                        | Tests     |
 | ------------------- | ----------- | -------------------------------- | --------- |
 | Auth                | Implemented | `e2e/auth.spec.ts`               | 7/7       |
+| Google Signup       | Implemented | `e2e/auth.spec.ts`               | 2/2       |
 | Documents           | Implemented | `e2e/documents.spec.ts`          | 6/6       |
 | Canvas Editor       | Implemented | `e2e/canvas-editor.spec.ts`      | 15/15     |
 | Text Editor Toolbar | Implemented | `e2e/editor-toolbar.spec.ts`     | 12/12     |
@@ -195,5 +215,7 @@ Follow-up to issue #118. Guards against cursor jumps when a multi-page overflow 
 | PDF Export          | Implemented | `e2e/export-pdf-*.spec.ts`       | 6/7       |
 | Real-time Sync      | Implemented | `e2e/realtime-sync.spec.ts`      | 3/3       |
 | Drawing Copy/Paste  | Implemented | `e2e/drawing-copy-paste.spec.ts` | 8/8       |
+| Save on Navigate    | Implemented | `e2e/save-on-navigate.spec.ts`   | 1/1       |
+| Page Overflow Split | Planned     | `e2e/page-overflow.spec.ts`      | 0/4       |
 | Version History     | Planned     | `e2e/version-history.spec.ts`    | 0/5       |
-| **Total**           |             |                                  | **75/81** |
+| **Total**           |             |                                  | **76/86** |

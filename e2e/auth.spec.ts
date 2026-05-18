@@ -24,31 +24,38 @@ test.describe('Auth', () => {
     await expect(page).not.toHaveURL(/\/dashboard/);
   });
 
-  test('sign up with valid details redirects to dashboard', async ({
+  test('signup page shows only Google button (no email/password form)', async ({
     page,
   }) => {
-    const uniqueEmail = `test-signup-${Date.now()}@typenote.dev`;
-
     await page.goto('/signup');
-    await page.getByLabel('Display Name').fill('E2E Test User');
-    await page.getByLabel('Email').fill(uniqueEmail);
-    await page.getByLabel('Password').fill('TestPassword123');
-    await page.getByRole('button', { name: 'Sign up' }).click();
 
-    await expect(page).toHaveURL(/\/dashboard/, { timeout: 10_000 });
+    // Google signup button should be visible
+    await expect(
+      page.getByRole('button', { name: /sign up with google/i }),
+    ).toBeVisible();
+
+    // Email/password form fields should NOT exist
+    await expect(page.getByLabel('Email')).not.toBeVisible();
+    await expect(page.getByLabel('Password')).not.toBeVisible();
+    await expect(page.getByLabel('Display Name')).not.toBeVisible();
   });
 
-  test('sign up with invalid email shows error', async ({ page }) => {
-    await page.goto('/signup');
-    await page.getByLabel('Display Name').fill('Bad Email User');
-    await page.getByLabel('Email').fill('not-an-email');
-    await page.getByLabel('Password').fill('TestPassword123');
-    await page.getByRole('button', { name: 'Sign up' }).click();
+  test('login page still shows both email/password and Google options', async ({
+    page,
+  }) => {
+    await page.goto('/login');
 
-    // The browser's built-in validation should prevent submission,
-    // or Supabase returns an error. Either way, we should NOT reach dashboard.
-    await page.waitForTimeout(1000);
-    await expect(page).toHaveURL(/\/signup/);
+    // Email/password form should be present
+    await expect(page.getByLabel('Email')).toBeVisible();
+    await expect(page.getByLabel('Password')).toBeVisible();
+    await expect(
+      page.getByRole('button', { name: /sign in/i }),
+    ).toBeVisible();
+
+    // Google button should also be present
+    await expect(
+      page.getByRole('button', { name: /google/i }),
+    ).toBeVisible();
   });
 
   test('logout returns to login page', async ({ page }) => {
