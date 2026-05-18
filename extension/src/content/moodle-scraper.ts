@@ -564,8 +564,59 @@ function scrapeStandardFormat(): ScrapedSection[] {
 }
 
 /**
+ * Sweeps a scope element for every pluginfile.php link whose filename
+ * extension is in ALLOWED_FILE_EXTENSIONS, dedups by href, returns
+ * ScrapedItems. Used as a backstop so we never miss a file just because
+ * its surrounding DOM didn't match an activity-wrapper selector.
+ */
+function linkSweep(scope: HTMLElement): ScrapedItem[] {
+  const items: ScrapedItem[] = [];
+  const seen = new Set<string>();
+  let links: NodeListOf<HTMLAnchorElement> | HTMLAnchorElement[] = [];
+  try {
+    links = scope.querySelectorAll<HTMLAnchorElement>(
+      'a[href*="/pluginfile.php/"]',
+    );
+  } catch {
+    links = [];
+  }
+  for (const link of Array.from(links)) {
+    if (seen.has(link.href)) continue;
+    const item = fileItemFromPluginfileLink(link);
+    if (!item) continue;
+    seen.add(link.href);
+    items.push(item);
+  }
+  return items;
+}
+
+function getMainContentArea(): HTMLElement {
+  return (
+    document.querySelector<HTMLElement>('#region-main .course-content') ??
+    document.querySelector<HTMLElement>('#region-main') ??
+    document.querySelector<HTMLElement>('main') ??
+    document.body
+  );
+}
+
+function mergeUnique(into: ScrapedItem[], extras: ScrapedItem[]): void {
+  const seen = new Set(into.map((i) => i.moodleUrl));
+  for (const e of extras) {
+    if (seen.has(e.moodleUrl)) continue;
+    seen.add(e.moodleUrl);
+    into.push(e);
+  }
+}
+
+/**
  * Scrapes the full course content (sections + items) from a course page.
  * Handles both "tiles" and standard (topics/weeks) formats.
+ *
+ * Backstop: if structured detection found no sections, OR every section
+ * is empty, we add a synthetic "Course Materials" section populated from
+ * a full link sweep of the main content area. This protects against
+ * Moodle themes that completely restructure the section DOM beyond
+ * recognition — we'd rather show a flat list than nothing.
  */
 export function scrapeCourseContent(): ScrapedCourseContentData {
   const format = getCourseFormat();
@@ -575,6 +626,19 @@ export function scrapeCourseContent(): ScrapedCourseContentData {
     sections = scrapeTilesFormat();
   } else {
     sections = scrapeStandardFormat();
+  }
+
+  const totalItems = sections.reduce((n, s) => n + s.items.length, 0);
+  if (totalItems === 0) {
+    const sweep = linkSweep(getMainContentArea());
+    if (sweep.length > 0) {
+      sections.push({
+        moodleSectionId: 'sweep',
+        title: 'Course Materials',
+        position: sections.length,
+        items: sweep,
+      });
+    }
   }
 
   return { sections };
@@ -590,9 +654,10 @@ export function scrapeCourseContent(): ScrapedCourseContentData {
  * we skip those — only scrape the target section's activities.
  */
 export function scrapeSectionPage(): ScrapedItem[] {
-  // Find the visible loaded section (not section-0). Theme variants:
-  // some emit .state-visible on li.section.course-section, some on
-  // li.section.moveablesection, some on a non-li wrapper with [data-region="section"].
+  const items: ScrapedItem[] = [];
+
+  // Pass 1: structured detection. Theme variants emit .state-visible on
+  // different wrappers, so try several.
   const visibleSelectors = [
     'li.section.course-section.state-visible',
     'li.section.moveablesection.state-visible',
@@ -602,42 +667,43 @@ export function scrapeSectionPage(): ScrapedItem[] {
   for (const sel of visibleSelectors) {
     const el = document.querySelector<HTMLElement>(sel);
     if (el) {
-      const items = scrapeActivitiesFromSection(el);
-      if (items.length > 0) return items;
+      mergeUnique(items, scrapeActivitiesFromSection(el));
+      if (items.length > 0) break;
     }
   }
 
-  // Fallback: enumerate sections with activities and skip section-0.
-  let allSections: NodeListOf<HTMLElement> | HTMLElement[] = [];
-  try {
-    allSections = document.querySelectorAll<HTMLElement>(
-      'li.section.course-section, li.section.moveablesection, [data-region="section"], .section.course-section',
-    );
-  } catch {
-    allSections = [];
-  }
-  for (const section of Array.from(allSections)) {
-    const sectionNum =
-      section.dataset.section ?? section.id.replace('section-', '');
-    if (sectionNum === '0') continue;
-    const activities = section.querySelectorAll(
-      '.activity.activity-wrapper[data-for="cmitem"], .activity[data-for="cmitem"]',
-    );
-    if (activities.length > 0) {
-      const items = scrapeActivitiesFromSection(section);
-      if (items.length > 0) return items;
+  // Pass 2: if pass 1 found nothing, walk any section wrapper that has
+  // activity children, skipping section-0.
+  if (items.length === 0) {
+    let allSections: NodeListOf<HTMLElement> | HTMLElement[] = [];
+    try {
+      allSections = document.querySelectorAll<HTMLElement>(
+        'li.section.course-section, li.section.moveablesection, [data-region="section"], .section.course-section',
+      );
+    } catch {
+      allSections = [];
+    }
+    for (const section of Array.from(allSections)) {
+      const sectionNum =
+        section.dataset.section ?? section.id.replace('section-', '');
+      if (sectionNum === '0') continue;
+      const activities = section.querySelectorAll(
+        '.activity.activity-wrapper[data-for="cmitem"], .activity[data-for="cmitem"]',
+      );
+      if (activities.length > 0) {
+        mergeUnique(items, scrapeActivitiesFromSection(section));
+        if (items.length > 0) break;
+      }
     }
   }
 
-  // Final fallback: scrape the whole main content area. The section's
-  // activities live somewhere inside #region-main even if the theme has
-  // restructured the section wrapper beyond recognition.
-  const contentArea =
-    document.querySelector<HTMLElement>('#region-main .course-content') ??
-    document.querySelector<HTMLElement>('#region-main') ??
-    document.querySelector<HTMLElement>('main') ??
-    document.body;
-  return scrapeActivitiesFromSection(contentArea);
+  // Pass 3: ALWAYS run a link sweep across the main content area as a
+  // backstop. Merges in any pluginfile.php links of allowed extensions
+  // that the structured passes missed. Deduped by href so we don't
+  // double-count items already captured by passes 1/2.
+  mergeUnique(items, linkSweep(getMainContentArea()));
+
+  return items;
 }
 
 // ============================================
