@@ -119,6 +119,7 @@ export function MoodleSyncDialog({
     downloadAndUpload,
     requestPermission,
     checkPermission,
+    checkMoodleLogin,
   } = useMoodleExtension();
   const supabaseRef = useRef(createClient());
 
@@ -423,13 +424,23 @@ export function MoodleSyncDialog({
         return;
       }
       if (code === 'PERMISSION_DENIED') {
-        // Stale permission — was granted at the gate, then revoked mid-flow.
-        // Re-stash so the popup is primed, surface the permission-error UI
-        // with a Retry button. We don't auto-loop loadCourses from inside its
-        // own useCallback (self-reference cycle).
+        // PERMISSION_DENIED is ambiguous from the dashboard side: it can be
+        // a genuine permission revocation OR a session expiry whose redirect
+        // landed on a cross-host SSO page the extension cannot read. Probe
+        // login state first so we route to the right UI instead of always
+        // blaming permissions. checkMoodleLogin's fast path checks for the
+        // MoodleSession cookie and returns loggedIn:false without needing
+        // tab access, so it works even when permissions are the issue.
+        const loginStatus = await checkMoodleLogin(moodleUrl);
+        if (loginStatus?.loggedIn === false) {
+          setPhase('awaiting-login');
+          return;
+        }
         await requestPermission(moodleUrl);
         setPermissionError(true);
-        setError('Permission was revoked. Click Retry to re-grant access.');
+        setError(
+          'Could not access Moodle. Your session may have expired, or the extension may have lost permission for this host.',
+        );
         setPhase('error');
         return;
       }
@@ -1130,10 +1141,18 @@ export function MoodleSyncDialog({
               )}
               {permissionError && (
                 <p className="text-xs text-muted-foreground">
-                  Click <strong>Retry</strong> below — Typenote will ask the
-                  extension for access, then guide you to click{' '}
-                  <strong>Allow</strong>
-                  on the toolbar icon.
+                  Two things to check: (1) you&rsquo;re signed in to{' '}
+                  <a
+                    href={`https://${moodleConnection.domain}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="underline"
+                  >
+                    {moodleConnection.domain}
+                  </a>{' '}
+                  (open it in a new tab and confirm), and (2) the extension has
+                  permission for that host. Then click <strong>Retry</strong>{' '}
+                  below.
                 </p>
               )}
               {debugInfo && (
