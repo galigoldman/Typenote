@@ -42,9 +42,16 @@ jobs:
       # The action's broken URL pattern affects both @v1 and @v2 tags.
       - name: Install Supabase CLI
         env:
-          SUPABASE_VERSION: 2.99.0
+          # Pinned to v2.98.2 — the last known-good version per the last
+          # green CI run on main (2026-05-15). v2.99.0 (released 2026-05-18)
+          # both changed the asset naming convention AND causes
+          # `supabase start` to hang indefinitely on CI runners.
+          SUPABASE_VERSION: 2.98.2
         run: |
-          curl -fsSL "https://github.com/supabase/cli/releases/download/v${SUPABASE_VERSION}/supabase_${SUPABASE_VERSION}_linux_amd64.tar.gz" -o /tmp/supabase.tar.gz
+          # v2.98.2 publishes the versionless filename `supabase_<platform>_<arch>.tar.gz`.
+          # (v2.99.0 switched to the versioned form `supabase_<version>_<platform>_<arch>.tar.gz`
+          # — and broke the official setup-cli action in the process.)
+          curl -fsSL "https://github.com/supabase/cli/releases/download/v${SUPABASE_VERSION}/supabase_linux_amd64.tar.gz" -o /tmp/supabase.tar.gz
           tar -xzf /tmp/supabase.tar.gz -C /tmp
           sudo mv /tmp/supabase /usr/local/bin/
           supabase --version
