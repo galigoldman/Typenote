@@ -37,6 +37,24 @@ const mockSync = syncMoodleCourses as ReturnType<typeof vi.fn>;
 
 const mockConnection = { domain: 'moodle.test.ac.il', instanceId: 'inst-123' };
 
+/**
+ * Default hook mock: permission already granted so loadCourses falls through
+ * straight to scraping. Tests that want to exercise the permission handshake
+ * override `checkPermission`/`requestPermission` explicitly.
+ */
+function makeExtensionMock(
+  overrides: Record<string, unknown> = {},
+): Record<string, unknown> {
+  return {
+    scrapeCourses: vi.fn(),
+    scrapeCourseContent: vi.fn(),
+    downloadAndUpload: vi.fn(),
+    requestPermission: vi.fn().mockResolvedValue({ granted: true }),
+    checkPermission: vi.fn().mockResolvedValue(true),
+    ...overrides,
+  };
+}
+
 const mockScrapedCourses = {
   courses: [
     {
@@ -76,9 +94,9 @@ describe('MoodleSyncDialog', () => {
 
   it('shows scraping message when dialog opens', () => {
     const mockScrape = vi.fn().mockReturnValue(new Promise(() => {})); // never resolves
-    mockUseMoodleExtension.mockReturnValue({
-      scrapeCourses: mockScrape,
-    });
+    mockUseMoodleExtension.mockReturnValue(
+      makeExtensionMock({ scrapeCourses: mockScrape }),
+    );
 
     render(
       <MoodleSyncDialog
@@ -95,9 +113,9 @@ describe('MoodleSyncDialog', () => {
 
   it('shows course list after scraping and comparing', async () => {
     const mockScrape = vi.fn().mockResolvedValue(mockScrapedCourses);
-    mockUseMoodleExtension.mockReturnValue({
-      scrapeCourses: mockScrape,
-    });
+    mockUseMoodleExtension.mockReturnValue(
+      makeExtensionMock({ scrapeCourses: mockScrape }),
+    );
     mockCompare.mockResolvedValue(mockComparisons);
 
     render(
@@ -119,9 +137,9 @@ describe('MoodleSyncDialog', () => {
 
   it('shows no courses message when scrape returns empty array', async () => {
     const mockScrape = vi.fn().mockResolvedValue({ courses: [] });
-    mockUseMoodleExtension.mockReturnValue({
-      scrapeCourses: mockScrape,
-    });
+    mockUseMoodleExtension.mockReturnValue(
+      makeExtensionMock({ scrapeCourses: mockScrape }),
+    );
 
     render(
       <MoodleSyncDialog
@@ -138,9 +156,9 @@ describe('MoodleSyncDialog', () => {
 
   it('pre-selects new_to_system courses and shows sync button', async () => {
     const mockScrape = vi.fn().mockResolvedValue(mockScrapedCourses);
-    mockUseMoodleExtension.mockReturnValue({
-      scrapeCourses: mockScrape,
-    });
+    mockUseMoodleExtension.mockReturnValue(
+      makeExtensionMock({ scrapeCourses: mockScrape }),
+    );
     mockCompare.mockResolvedValue(mockComparisons);
 
     render(
@@ -164,9 +182,9 @@ describe('MoodleSyncDialog', () => {
   it('toggles course selection when checkbox is clicked', async () => {
     const user = userEvent.setup();
     const mockScrape = vi.fn().mockResolvedValue(mockScrapedCourses);
-    mockUseMoodleExtension.mockReturnValue({
-      scrapeCourses: mockScrape,
-    });
+    mockUseMoodleExtension.mockReturnValue(
+      makeExtensionMock({ scrapeCourses: mockScrape }),
+    );
     mockCompare.mockResolvedValue(mockComparisons);
 
     render(
@@ -212,11 +230,13 @@ describe('MoodleSyncDialog', () => {
         },
       ],
     });
-    mockUseMoodleExtension.mockReturnValue({
-      scrapeCourses: mockScrape,
-      scrapeCourseContent: mockScrapeContent,
-      downloadAndUpload: vi.fn(),
-    });
+    mockUseMoodleExtension.mockReturnValue(
+      makeExtensionMock({
+        scrapeCourses: mockScrape,
+        scrapeCourseContent: mockScrapeContent,
+        downloadAndUpload: vi.fn(),
+      }),
+    );
     mockCompare.mockResolvedValue(mockComparisons);
     mockSync.mockResolvedValue({
       syncedCount: 1,
@@ -272,9 +292,9 @@ describe('MoodleSyncDialog', () => {
     const mockScrape = vi
       .fn()
       .mockRejectedValue(new Error('Extension crashed'));
-    mockUseMoodleExtension.mockReturnValue({
-      scrapeCourses: mockScrape,
-    });
+    mockUseMoodleExtension.mockReturnValue(
+      makeExtensionMock({ scrapeCourses: mockScrape }),
+    );
 
     render(
       <MoodleSyncDialog
@@ -293,9 +313,9 @@ describe('MoodleSyncDialog', () => {
 
   it('shows friendly network message when error matches network patterns', async () => {
     const mockScrape = vi.fn().mockRejectedValue(new Error('fetch failed'));
-    mockUseMoodleExtension.mockReturnValue({
-      scrapeCourses: mockScrape,
-    });
+    mockUseMoodleExtension.mockReturnValue(
+      makeExtensionMock({ scrapeCourses: mockScrape }),
+    );
 
     render(
       <MoodleSyncDialog
@@ -342,11 +362,13 @@ describe('MoodleSyncDialog', () => {
       .mockResolvedValueOnce(undefined) // good.pdf
       .mockRejectedValueOnce(new Error('network exploded')) // bad.pdf
       .mockResolvedValueOnce(undefined); // bad.pdf retry
-    mockUseMoodleExtension.mockReturnValue({
-      scrapeCourses: mockScrape,
-      scrapeCourseContent: mockScrapeContent,
-      downloadAndUpload: mockDownloadAndUpload,
-    });
+    mockUseMoodleExtension.mockReturnValue(
+      makeExtensionMock({
+        scrapeCourses: mockScrape,
+        scrapeCourseContent: mockScrapeContent,
+        downloadAndUpload: mockDownloadAndUpload,
+      }),
+    );
     mockCompare.mockResolvedValue(mockComparisons);
     mockSync.mockResolvedValue({
       syncedCount: 1,
@@ -421,16 +443,27 @@ describe('MoodleSyncDialog', () => {
     ).toBeGreaterThan(0);
   });
 
-  it('shows Grant Permission button when scrape fails with permission error', async () => {
-    const user = userEvent.setup();
-    const mockScrape = vi
+  it('shows awaiting-permission UI when permission needs popup grant', async () => {
+    // First call: needs popup. After the polling loop sees the grant, scrape runs.
+    const mockCheckPermission = vi
       .fn()
-      .mockRejectedValue(new Error('permission denied for host'));
-    const mockRequestPermission = vi.fn().mockResolvedValue(true);
-    mockUseMoodleExtension.mockReturnValue({
-      scrapeCourses: mockScrape,
-      requestPermission: mockRequestPermission,
+      .mockResolvedValueOnce(false) // initial gate
+      .mockResolvedValueOnce(false) // first poll
+      .mockResolvedValue(true); // subsequent polls — granted
+    const mockRequestPermission = vi.fn().mockResolvedValue({
+      granted: false,
+      needsPopup: true,
+      host: 'moodle.test.ac.il',
     });
+    const mockScrape = vi.fn().mockResolvedValue(mockScrapedCourses);
+    mockUseMoodleExtension.mockReturnValue(
+      makeExtensionMock({
+        scrapeCourses: mockScrape,
+        checkPermission: mockCheckPermission,
+        requestPermission: mockRequestPermission,
+      }),
+    );
+    mockCompare.mockResolvedValue(mockComparisons);
 
     render(
       <MoodleSyncDialog
@@ -440,25 +473,30 @@ describe('MoodleSyncDialog', () => {
       />,
     );
 
-    // Grant Permission button shows on the permission-error path
-    const grantButton = await screen.findByRole('button', {
-      name: /grant permission/i,
-    });
-    expect(grantButton).toBeInTheDocument();
+    // The dialog should land in awaiting-permission with the per-host copy.
+    expect(await screen.findByText(/approve access to/i)).toBeInTheDocument();
 
-    // Clicking it calls requestPermission with the correct origin
-    await user.click(grantButton);
+    // requestPermission was called with the host URL.
     expect(mockRequestPermission).toHaveBeenCalledWith(
       'https://moodle.test.ac.il',
+    );
+
+    // After polling sees a grant, the dialog auto-resumes and reaches the
+    // course list.
+    await waitFor(
+      () => {
+        expect(screen.getByText('Intro to CS')).toBeInTheDocument();
+      },
+      { timeout: 5000 },
     );
   });
 
   it('disables sync button when no courses are selected', async () => {
     userEvent.setup();
     const mockScrape = vi.fn().mockResolvedValue(mockScrapedCourses);
-    mockUseMoodleExtension.mockReturnValue({
-      scrapeCourses: mockScrape,
-    });
+    mockUseMoodleExtension.mockReturnValue(
+      makeExtensionMock({ scrapeCourses: mockScrape }),
+    );
     // All courses synced_by_user — none pre-selected
     mockCompare.mockResolvedValue([
       {

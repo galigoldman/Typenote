@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Typenote Moodle Sync</title>
+    <link rel="stylesheet" href="popup.css" />
+  </head>
+  <body>
+    <header>
+      <h1>Typenote Moodle Sync</h1>
+    </header>
+
+    <!-- Mode 1: a permission is pending (web app requested it). Hidden by default. -->
+    <section id="pending-section" class="pending" hidden>
+      <p class="pending-lead">
+        Typenote wants to read your Moodle courses on
+        <strong id="pending-host" class="host-name"></strong>.
+      </p>
+      <p class="pending-detail">
+        Files are only fetched while you're logged in. Click Allow on the next
+        Chrome prompt to continue.
+      </p>
+      <div class="actions">
+        <button id="pending-allow" type="button" class="primary">Allow</button>
+        <button id="pending-cancel" type="button" class="secondary">
+          Cancel
+        </button>
+      </div>
+      <p
+        id="pending-status"
+        class="status"
+        role="status"
+        aria-live="polite"
+      ></p>
+    </section>
+
+    <!-- Mode 2: default — list of connected Moodle sites. Hidden until ready. -->
+    <section id="default-section" class="connected" hidden>
+      <h2>Connected Moodle sites</h2>
+      <ul id="host-list" class="host-list" aria-live="polite"></ul>
+      <p id="empty-state" class="empty-state" hidden>
+        No Moodle sites connected yet. Open Typenote to add one.
+      </p>
+      <p class="hint">Typenote only reads pages on the sites listed here.</p>
+    </section>
+
+    <script src="dist/popup/popup.js"></script>
+  </body>
+</html>
