@@ -184,6 +184,18 @@ function mimeFromExtension(ext: string): string | undefined {
   return map[ext.toLowerCase()];
 }
 
+// Only these file types are imported. Everything else (URLs, assignments,
+// zips, images, video/audio, unknown extensions, etc.) is dropped at scrape
+// time so it never reaches the picker or the downloader. Matches the set
+// processable by the AI-context pipeline in src/lib/actions/ai-context.ts.
+const ALLOWED_FILE_EXTENSIONS = new Set([
+  'pdf',
+  'docx',
+  'doc',
+  'pptx',
+  'ppt',
+]);
+
 /**
  * Parses a single activity element into a ScrapedItem.
  *
@@ -211,11 +223,9 @@ function parseActivity(activity: HTMLElement): ScrapedItem | null {
     activity.querySelector<HTMLImageElement>('img.activityicon')?.alt ?? '';
   const classes = activity.className;
 
-  // Determine if this is a file or a link
-  const isFile =
-    modType.startsWith('resource') ||
-    classes.includes('modtype_resource') ||
-    iconAlt === 'File icon';
+  // Determine if this is an external URL resource (filtered out below).
+  // Files are identified by file-extension detection rather than a heuristic
+  // flag — see ALLOWED_FILE_EXTENSIONS guard further down.
   const isUrl =
     modType === 'url' ||
     classes.includes('modtype_url') ||
@@ -243,31 +253,36 @@ function parseActivity(activity: HTMLElement): ScrapedItem | null {
     return null;
   }
 
-  // Assignments are not downloadable files — treat them as links
-  if (baseModType === 'assign' || moodleUrl.includes('/mod/assign/')) {
-    return {
-      type: 'link',
-      name,
-      moodleUrl,
-      externalUrl: moodleUrl,
-    };
+  // Assignments and URL resources are not downloadable files we can embed
+  // — drop them. (Previously surfaced as type:'link' but the dashboard /
+  // AI-context pipeline can't do anything with them.)
+  if (
+    isUrl ||
+    baseModType === 'assign' ||
+    baseModType === 'url' ||
+    moodleUrl.includes('/mod/assign/')
+  ) {
+    return null;
   }
 
-  // For files: extract file extension from modtype or icon
+  // For files: extract file extension from modtype or icon.
+  // Filter to ALLOWED_FILE_EXTENSIONS so zips / images / video / unknown
+  // types never reach the picker. Items without a detectable extension are
+  // dropped too — we can't import what we can't classify. (This also
+  // implicitly drops modtype_page, modtype_folder, modtype_book, etc.
+  // since extractFileType returns their bare modtype name, which isn't
+  // in the allow-list.)
   const fileExt = extractFileType(classes);
-  const mimeType = fileExt ? mimeFromExtension(fileExt) : undefined;
+  if (!fileExt || !ALLOWED_FILE_EXTENSIONS.has(fileExt.toLowerCase())) {
+    return null;
+  }
+  const mimeType = mimeFromExtension(fileExt);
 
   const item: ScrapedItem = {
-    type: isUrl ? 'link' : 'file',
+    type: 'file',
     name,
     moodleUrl,
   };
-
-  if (isUrl) {
-    // For URL resources, the actual external URL is behind the Moodle redirect
-    // The extension will resolve it when downloading
-    item.externalUrl = moodleUrl;
-  }
 
   if (mimeType) {
     item.mimeType = mimeType;
