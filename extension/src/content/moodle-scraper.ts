@@ -344,69 +344,130 @@ function parseActivity(activity: HTMLElement): ScrapedItem | null {
 }
 
 /**
- * Scrapes the allowed file links (pdf/docx/pptx) inline inside a Moodle
- * folder activity. Folders rendered with "display inline" expose their
- * children as pluginfile.php links in `.foldertree` or `.contentafterlink`.
- * Each child becomes its own ScrapedItem so it appears flat in the picker
- * alongside non-foldered files.
+ * Extracts an allowed-extension file item from a pluginfile.php anchor.
+ * Returns null if the link is missing a recognizable allowed extension.
+ * Wrapped in its own helper because malformed URLs would otherwise throw
+ * out of decodeURIComponent and abort the parent loop.
+ */
+function fileItemFromPluginfileLink(
+  link: HTMLAnchorElement,
+): ScrapedItem | null {
+  try {
+    const url = link.href;
+    if (!url) return null;
+    let filename = '';
+    try {
+      filename = decodeURIComponent(
+        url.split('/').pop()?.split('?')[0] ?? '',
+      );
+    } catch {
+      filename = url.split('/').pop()?.split('?')[0] ?? '';
+    }
+    if (!filename) return null;
+    const extMatch = filename.match(/\.([^.]+)$/);
+    const ext = extMatch?.[1]?.toLowerCase();
+    if (!ext || !ALLOWED_FILE_EXTENSIONS.has(ext)) return null;
+    const name =
+      (link.textContent ?? '').replace(/\s+/g, ' ').trim() || filename;
+    const item: ScrapedItem = { type: 'file', name, moodleUrl: url };
+    const mime = mimeFromExtension(ext);
+    if (mime) item.mimeType = mime;
+    return item;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Scrapes allowed-extension file links inline inside a Moodle folder
+ * activity. Folders rendered with "display inline" expose children as
+ * pluginfile.php links in .foldertree / .contentafterlink. Each child
+ * becomes its own ScrapedItem so it appears flat in the picker.
  *
- * Skips the "Download folder" zip button: those are filtered implicitly
- * because .zip isn't in ALLOWED_FILE_EXTENSIONS.
+ * "Download folder" zip button is naturally skipped — .zip isn't in
+ * ALLOWED_FILE_EXTENSIONS.
  */
 function scrapeFolderActivity(folderEl: HTMLElement): ScrapedItem[] {
   const items: ScrapedItem[] = [];
   const seen = new Set<string>();
-  const links = folderEl.querySelectorAll<HTMLAnchorElement>(
-    'a[href*="/pluginfile.php/"]',
-  );
-  for (const link of Array.from(links)) {
-    const url = link.href;
-    if (seen.has(url)) continue;
-    const filename = decodeURIComponent(
-      url.split('/').pop()?.split('?')[0] ?? '',
+  try {
+    const links = folderEl.querySelectorAll<HTMLAnchorElement>(
+      'a[href*="/pluginfile.php/"]',
     );
-    if (!filename) continue;
-    const extMatch = filename.match(/\.([^.]+)$/);
-    const ext = extMatch?.[1]?.toLowerCase();
-    if (!ext || !ALLOWED_FILE_EXTENSIONS.has(ext)) continue;
-    seen.add(url);
-    const name = (link.textContent ?? '').replace(/\s+/g, ' ').trim() ||
-      filename;
-    const item: ScrapedItem = { type: 'file', name, moodleUrl: url };
-    const mime = mimeFromExtension(ext);
-    if (mime) item.mimeType = mime;
-    items.push(item);
+    for (const link of Array.from(links)) {
+      if (seen.has(link.href)) continue;
+      const item = fileItemFromPluginfileLink(link);
+      if (!item) continue;
+      seen.add(link.href);
+      items.push(item);
+    }
+  } catch {
+    // Defensive: any DOM surprise on a single folder shouldn't blank
+    // out the whole section.
   }
   return items;
 }
 
 /**
- * Scrapes activities from a section element.
+ * Scrapes activities from a section element. Per-activity errors are
+ * swallowed so one malformed activity DOM can't blank the section.
+ * If the structured pass finds zero items, a link-sweep fallback
+ * harvests pluginfile.php links of allowed extensions directly from
+ * the section's DOM — this catches custom themes, raw HTML blocks
+ * with file links, and folder activities that render outside the
+ * expected modtype_folder shell.
  */
 function scrapeActivitiesFromSection(sectionEl: HTMLElement): ScrapedItem[] {
-  // Select only the wrapper activities (not the nested .activity-item duplicates)
-  const activities = sectionEl.querySelectorAll<HTMLElement>(
-    '.activity.activity-wrapper[data-for="cmitem"]',
-  );
   const items: ScrapedItem[] = [];
 
+  let activities: NodeListOf<HTMLElement> | HTMLElement[] = [];
+  try {
+    activities = sectionEl.querySelectorAll<HTMLElement>(
+      '.activity.activity-wrapper[data-for="cmitem"]',
+    );
+  } catch {
+    activities = [];
+  }
+
   activities.forEach((act) => {
-    const modType = act.dataset.modtype ?? '';
-    const baseModType = modType.split('_')[0];
-    const isFolder =
-      baseModType === 'folder' || act.className.includes('modtype_folder');
+    try {
+      const modType = act.dataset.modtype ?? '';
+      const baseModType = modType.split('_')[0];
+      const isFolder =
+        baseModType === 'folder' || act.className.includes('modtype_folder');
 
-    if (isFolder) {
-      // Folders never appear as files themselves — but their contained
-      // pdf/docx/pptx links should each be lifted into the section as
-      // individual items. Drop the folder shell.
-      items.push(...scrapeFolderActivity(act));
-      return;
+      if (isFolder) {
+        items.push(...scrapeFolderActivity(act));
+        return;
+      }
+
+      const item = parseActivity(act);
+      if (item) items.push(item);
+    } catch {
+      // Swallow per-activity failures — keep scraping the rest.
     }
-
-    const item = parseActivity(act);
-    if (item) items.push(item);
   });
+
+  // Link-sweep fallback. Only kicks in if the structured pass found
+  // nothing — we don't want to dedupe-merge with a working pass.
+  if (items.length === 0) {
+    const seen = new Set<string>();
+    let links: NodeListOf<HTMLAnchorElement> | HTMLAnchorElement[] = [];
+    try {
+      links = sectionEl.querySelectorAll<HTMLAnchorElement>(
+        'a[href*="/pluginfile.php/"]',
+      );
+    } catch {
+      links = [];
+    }
+    for (const link of Array.from(links)) {
+      if (seen.has(link.href)) continue;
+      const item = fileItemFromPluginfileLink(link);
+      if (!item) continue;
+      seen.add(link.href);
+      items.push(item);
+    }
+  }
 
   return items;
 }
@@ -529,36 +590,53 @@ export function scrapeCourseContent(): ScrapedCourseContentData {
  * we skip those — only scrape the target section's activities.
  */
 export function scrapeSectionPage(): ScrapedItem[] {
-  // Find the visible loaded section (not section-0)
-  // The target section has class "state-visible" or is the only non-zero section with activities
-  const loadedSection = document.querySelector<HTMLElement>(
-    'li.section.course-section.state-visible, li.section.moveablesection.state-visible',
-  );
-  if (loadedSection) {
-    return scrapeActivitiesFromSection(loadedSection);
+  // Find the visible loaded section (not section-0). Theme variants:
+  // some emit .state-visible on li.section.course-section, some on
+  // li.section.moveablesection, some on a non-li wrapper with [data-region="section"].
+  const visibleSelectors = [
+    'li.section.course-section.state-visible',
+    'li.section.moveablesection.state-visible',
+    '[data-region="section"].state-visible',
+    '.section.course-section.state-visible',
+  ];
+  for (const sel of visibleSelectors) {
+    const el = document.querySelector<HTMLElement>(sel);
+    if (el) {
+      const items = scrapeActivitiesFromSection(el);
+      if (items.length > 0) return items;
+    }
   }
 
-  // Fallback: find sections with activities, skip section-0
-  const allSections = document.querySelectorAll<HTMLElement>(
-    'li.section.course-section, li.section.moveablesection',
-  );
-  for (const section of allSections) {
+  // Fallback: enumerate sections with activities and skip section-0.
+  let allSections: NodeListOf<HTMLElement> | HTMLElement[] = [];
+  try {
+    allSections = document.querySelectorAll<HTMLElement>(
+      'li.section.course-section, li.section.moveablesection, [data-region="section"], .section.course-section',
+    );
+  } catch {
+    allSections = [];
+  }
+  for (const section of Array.from(allSections)) {
     const sectionNum =
       section.dataset.section ?? section.id.replace('section-', '');
     if (sectionNum === '0') continue;
     const activities = section.querySelectorAll(
-      '.activity.activity-wrapper[data-for="cmitem"]',
+      '.activity.activity-wrapper[data-for="cmitem"], .activity[data-for="cmitem"]',
     );
     if (activities.length > 0) {
-      return scrapeActivitiesFromSection(section);
+      const items = scrapeActivitiesFromSection(section);
+      if (items.length > 0) return items;
     }
   }
 
-  // Final fallback: use the whole content area
-  const contentArea = document.querySelector<HTMLElement>(
-    '#region-main .course-content',
-  );
-  if (!contentArea) return [];
+  // Final fallback: scrape the whole main content area. The section's
+  // activities live somewhere inside #region-main even if the theme has
+  // restructured the section wrapper beyond recognition.
+  const contentArea =
+    document.querySelector<HTMLElement>('#region-main .course-content') ??
+    document.querySelector<HTMLElement>('#region-main') ??
+    document.querySelector<HTMLElement>('main') ??
+    document.body;
   return scrapeActivitiesFromSection(contentArea);
 }
 
