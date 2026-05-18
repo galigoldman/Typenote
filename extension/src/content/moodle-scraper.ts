@@ -344,6 +344,43 @@ function parseActivity(activity: HTMLElement): ScrapedItem | null {
 }
 
 /**
+ * Scrapes the allowed file links (pdf/docx/pptx) inline inside a Moodle
+ * folder activity. Folders rendered with "display inline" expose their
+ * children as pluginfile.php links in `.foldertree` or `.contentafterlink`.
+ * Each child becomes its own ScrapedItem so it appears flat in the picker
+ * alongside non-foldered files.
+ *
+ * Skips the "Download folder" zip button: those are filtered implicitly
+ * because .zip isn't in ALLOWED_FILE_EXTENSIONS.
+ */
+function scrapeFolderActivity(folderEl: HTMLElement): ScrapedItem[] {
+  const items: ScrapedItem[] = [];
+  const seen = new Set<string>();
+  const links = folderEl.querySelectorAll<HTMLAnchorElement>(
+    'a[href*="/pluginfile.php/"]',
+  );
+  for (const link of Array.from(links)) {
+    const url = link.href;
+    if (seen.has(url)) continue;
+    const filename = decodeURIComponent(
+      url.split('/').pop()?.split('?')[0] ?? '',
+    );
+    if (!filename) continue;
+    const extMatch = filename.match(/\.([^.]+)$/);
+    const ext = extMatch?.[1]?.toLowerCase();
+    if (!ext || !ALLOWED_FILE_EXTENSIONS.has(ext)) continue;
+    seen.add(url);
+    const name = (link.textContent ?? '').replace(/\s+/g, ' ').trim() ||
+      filename;
+    const item: ScrapedItem = { type: 'file', name, moodleUrl: url };
+    const mime = mimeFromExtension(ext);
+    if (mime) item.mimeType = mime;
+    items.push(item);
+  }
+  return items;
+}
+
+/**
  * Scrapes activities from a section element.
  */
 function scrapeActivitiesFromSection(sectionEl: HTMLElement): ScrapedItem[] {
@@ -354,6 +391,19 @@ function scrapeActivitiesFromSection(sectionEl: HTMLElement): ScrapedItem[] {
   const items: ScrapedItem[] = [];
 
   activities.forEach((act) => {
+    const modType = act.dataset.modtype ?? '';
+    const baseModType = modType.split('_')[0];
+    const isFolder =
+      baseModType === 'folder' || act.className.includes('modtype_folder');
+
+    if (isFolder) {
+      // Folders never appear as files themselves — but their contained
+      // pdf/docx/pptx links should each be lifted into the section as
+      // individual items. Drop the folder shell.
+      items.push(...scrapeFolderActivity(act));
+      return;
+    }
+
     const item = parseActivity(act);
     if (item) items.push(item);
   });
