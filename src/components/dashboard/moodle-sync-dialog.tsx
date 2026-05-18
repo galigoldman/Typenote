@@ -136,6 +136,7 @@ export function MoodleSyncDialog({
   const [authError, setAuthError] = useState(false);
   const [networkError, setNetworkError] = useState(false);
   const [permissionError, setPermissionError] = useState(false);
+  const [noCoursesError, setNoCoursesError] = useState(false);
   const [debugInfo, setDebugInfo] = useState<string | null>(null);
   const [progress, setProgress] = useState('');
 
@@ -327,6 +328,7 @@ export function MoodleSyncDialog({
     setAuthError(false);
     setNetworkError(false);
     setPermissionError(false);
+    setNoCoursesError(false);
     setDebugInfo(null);
     setCourses([]);
     setSelectedCourseIds(new Set());
@@ -392,7 +394,10 @@ export function MoodleSyncDialog({
           setPhase('awaiting-login');
           return;
         }
-        setError('No courses found on Moodle.');
+        setError(
+          `Couldn't find any courses on ${moodleConnection.domain}.`,
+        );
+        setNoCoursesError(true);
         if (debug) {
           setDebugInfo(
             `Page: "${debug.title}" at ${debug.url} (${debug.cardCount} cards)`,
@@ -1153,6 +1158,22 @@ export function MoodleSyncDialog({
                   (open it in a new tab and confirm), and (2) the extension has
                   permission for that host. Then click <strong>Retry</strong>{' '}
                   below.
+                </p>
+              )}
+              {noCoursesError && (
+                <p className="text-xs text-muted-foreground">
+                  Open{' '}
+                  <a
+                    href={`https://${moodleConnection.domain}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="underline"
+                  >
+                    {moodleConnection.domain}
+                  </a>{' '}
+                  in a tab, make sure you&rsquo;re signed in and your courses
+                  show on the <strong>My Courses</strong> page, then click{' '}
+                  <strong>Retry</strong>.
                 </p>
               )}
               {debugInfo && (
