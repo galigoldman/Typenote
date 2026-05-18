@@ -21,6 +21,30 @@ import type {
 
 const EXTENSION_VERSION = '0.2.0';
 
+// ============================================
+// Pending permission stash
+// ============================================
+// When the web app requests permission for a Moodle host, we can't call
+// chrome.permissions.request() here (no user gesture). Instead we stash
+// the request and let the popup pick it up next time the user opens it.
+
+interface PendingPermission {
+  host: string;
+  origin: string;
+  createdAt: number;
+}
+
+const PENDING_KEY = 'pendingPermission';
+
+async function stashPendingPermission(host: string): Promise<void> {
+  const pending: PendingPermission = {
+    host,
+    origin: `https://${host}/*`,
+    createdAt: Date.now(),
+  };
+  await chrome.storage.session.set({ [PENDING_KEY]: pending });
+}
+
 // Listen for messages from the Typenote web app
 chrome.runtime.onMessageExternal.addListener(
   (
@@ -71,17 +95,32 @@ async function handleMessage(
     }
 
     case 'REQUEST_PERMISSION': {
+      // chrome.permissions.request requires a user gesture. onMessageExternal
+      // is NOT a gesture context (even though a user clicked something on the
+      // web app), so calling it here would always silently fail. Workaround:
+      //   1. Stash the requested host in session storage.
+      //   2. Auto-open the toolbar popup via chrome.action.openPopup
+      //      (Chrome 127+, no user gesture required from the service worker).
+      //   3. The popup reads the stash and lets the user click Allow — that
+      //      click IS a gesture, so chrome.permissions.request inside the
+      //      popup will display Chrome's native per-host prompt.
+      // If openPopup fails (older Chrome, no focused window, blocked by
+      // policy, etc.) the dialog falls back to "click the toolbar icon"
+      // instructional copy — the NEEDS_POPUP response below tells it so.
       const url = new URL(message.payload.moodleUrl);
-      const origin = `${url.protocol}//${url.host}/*`;
+      const host = url.host;
+      await stashPendingPermission(host);
       try {
-        const granted = await chrome.permissions.request({ origins: [origin] });
-        if (granted) {
-          return { success: true, data: {} };
-        }
-        return { success: false, error: 'User denied permission' };
-      } catch (err) {
-        return { success: false, error: String(err) };
+        await chrome.action.openPopup();
+      } catch {
+        // Fallback path is fine — the web app shows instructions and polls.
       }
+      return {
+        success: false,
+        error: `Permission for ${host} must be granted from the extension popup`,
+        code: 'NEEDS_POPUP',
+        data: { host },
+      };
     }
 
     default:
@@ -153,6 +192,19 @@ function waitForTabLoad(tabId: number): Promise<void> {
  * Injects the moodle-scraper content script into a tab and executes
  * one of its exported functions, returning the result.
  */
+/**
+ * Custom error class so handlers can attach a structured error code that
+ * the web app branches on (PERMISSION_DENIED vs NOT_LOGGED_IN vs raw).
+ */
+class ScraperError extends Error {
+  constructor(
+    message: string,
+    public code?: 'PERMISSION_DENIED' | 'NOT_LOGGED_IN',
+  ) {
+    super(message);
+  }
+}
+
 async function executeScraperFunction<T>(
   tabId: number,
   functionName: string,
@@ -171,16 +223,24 @@ async function executeScraperFunction<T>(
     });
   } catch (err) {
     const msg = String(err);
-    // Distinguish "page is not Moodle (likely SSO redirect)" from "anything else"
-    // — the previous code claimed login failure even when the real cause was a
-    // bad file path or scripting permission, which made debugging painful.
-    if (tabUrl && !tabUrl.startsWith('chrome')) {
-      throw new Error(
-        `Failed to inject scraper into ${tabUrl.substring(0, 100)}: ${msg}. ` +
-          'If this URL is a login page, log into Moodle and retry.',
+    // Chrome's "no host_permissions for this URL" comes in several variants:
+    //   "Cannot access contents of the page."
+    //   "Cannot access contents of url \"<URL>\"."
+    //   "...must request permission to access [this|the respective] host."
+    // Match the stable substrings so any of them route to the
+    // permission-grant flow instead of looking like a login failure.
+    if (/Cannot access contents|must request permission to access/i.test(msg)) {
+      throw new ScraperError(
+        `Extension does not have permission to access ${tabUrl.substring(0, 100)}.`,
+        'PERMISSION_DENIED',
       );
     }
-    throw new Error(msg);
+    if (tabUrl && !tabUrl.startsWith('chrome')) {
+      throw new ScraperError(
+        `Failed to inject scraper into ${tabUrl.substring(0, 100)}: ${msg}.`,
+      );
+    }
+    throw new ScraperError(msg);
   }
 
   if (!results || results.length === 0) {
@@ -257,12 +317,27 @@ async function handleScrapeCourses(
     const coursesPageUrl = `${base}/my/courses.php`;
 
     const tabId = await getOrCreateMoodleTab(coursesPageUrl);
-
-    // Navigate if tab is not already on the courses page
     const tab = await chrome.tabs.get(tabId);
     if (tab.url !== coursesPageUrl) {
       await chrome.tabs.update(tabId, { url: coursesPageUrl });
       await waitForTabLoad(tabId);
+    }
+
+    // If Moodle bounced an unauthenticated user, the tab URL is now a login
+    // page rather than the courses page. This is a more reliable signal
+    // than a cookie-name precheck, which couldn't fire if host_permissions
+    // weren't yet granted for the Moodle domain.
+    const tabAfter = await chrome.tabs.get(tabId);
+    const tabUrl = tabAfter.url ?? '';
+    if (
+      /\/login\/|\/auth\/|sso|saml/i.test(tabUrl) &&
+      !tabUrl.endsWith('/my/courses.php')
+    ) {
+      return {
+        success: false,
+        error: `Moodle redirected to a login page (${tabUrl.substring(0, 120)}).`,
+        code: 'NOT_LOGGED_IN',
+      };
     }
 
     const data = await executeScraperFunction<ScrapedCoursesData>(
@@ -271,6 +346,9 @@ async function handleScrapeCourses(
     );
     return { success: true, data };
   } catch (err) {
+    if (err instanceof ScraperError && err.code) {
+      return { success: false, error: err.message, code: err.code };
+    }
     return { success: false, error: `Course scraping failed: ${String(err)}` };
   }
 }
@@ -323,6 +401,9 @@ async function handleScrapeCourseContent(
 
     return { success: true, data };
   } catch (err) {
+    if (err instanceof ScraperError && err.code) {
+      return { success: false, error: err.message, code: err.code };
+    }
     return {
       success: false,
       error: `Course content scraping failed: ${String(err)}`,
@@ -385,23 +466,22 @@ async function handleDownloadAndUpload(
 ): Promise<ExtensionResponse> {
   try {
     const { moodleFileUrl, uploadEndpoint, metadata } = payload;
+    const authToken = (payload as Record<string, unknown>).authToken as
+      | string
+      | undefined;
 
-    // Resolve view.php URLs to actual pluginfile.php download URLs
     const downloadUrl = await resolveFileUrl(moodleFileUrl);
 
-    // Download the file using the student's Moodle session cookies
     const response = await fetch(downloadUrl, {
       credentials: 'include',
       redirect: 'follow',
     });
-
     if (!response.ok) {
       throw new Error(
         `Download failed: ${response.status} ${response.statusText}`,
       );
     }
 
-    // Verify we got a real file, not an HTML page
     const contentType = response.headers.get('content-type') ?? '';
     if (contentType.includes('text/html')) {
       throw new Error(
@@ -413,46 +493,87 @@ async function handleDownloadAndUpload(
     const blob = await response.blob();
     const arrayBuffer = await blob.arrayBuffer();
 
-    // Compute SHA-256 content hash for deduplication
     const hashBuffer = await crypto.subtle.digest('SHA-256', arrayBuffer);
-    const hashArray = Array.from(new Uint8Array(hashBuffer));
-    const contentHash = hashArray
+    const contentHash = Array.from(new Uint8Array(hashBuffer))
       .map((b) => b.toString(16).padStart(2, '0'))
       .join('');
 
-    // Upload to Typenote backend
-    const formData = new FormData();
-    formData.append(
-      'file',
-      new Blob([arrayBuffer], { type: blob.type }),
-      metadata.fileName,
-    );
-    formData.append('contentHash', contentHash);
-    formData.append('sectionId', metadata.sectionId);
-    formData.append('moodleUrl', metadata.moodleUrl);
-    formData.append('fileName', metadata.fileName);
-    formData.append('fileSize', String(blob.size));
-    formData.append('mimeType', blob.type);
+    // Two-phase upload. Streaming the file body through the Next.js API
+    // route on Vercel is bounded by the Serverless body limit (4.5 MB on
+    // Hobby), so we go direct-to-Storage via a one-time signed URL.
+    //
+    //   POST /api/moodle/upload-prepare → { uploadUrl, storagePath }
+    //   PUT  uploadUrl                  → file bytes (any size)
+    //   POST /api/moodle/upload-finalize → { fileId, deduplicated }
+    //
+    // The caller still passes `${origin}/api/moodle/upload` as
+    // `uploadEndpoint` (legacy contract); we just take the origin off it.
+    const baseOrigin = new URL(uploadEndpoint).origin;
+    const prepareUrl = `${baseOrigin}/api/moodle/upload-prepare`;
+    const finalizeUrl = `${baseOrigin}/api/moodle/upload-finalize`;
 
-    const uploadHeaders: Record<string, string> = {};
-    if ((payload as Record<string, unknown>).authToken) {
-      uploadHeaders['Authorization'] =
-        `Bearer ${(payload as Record<string, unknown>).authToken}`;
-    }
+    const jsonHeaders: Record<string, string> = {
+      'Content-Type': 'application/json',
+    };
+    if (authToken) jsonHeaders['Authorization'] = `Bearer ${authToken}`;
 
-    const uploadResponse = await fetch(uploadEndpoint, {
+    const prepareResp = await fetch(prepareUrl, {
       method: 'POST',
-      body: formData,
-      headers: uploadHeaders,
+      headers: jsonHeaders,
+      body: JSON.stringify({
+        sectionId: metadata.sectionId,
+        fileName: metadata.fileName,
+        contentHash,
+      }),
     });
-
-    if (!uploadResponse.ok) {
+    if (!prepareResp.ok) {
+      const body = await prepareResp.text().catch(() => '');
       throw new Error(
-        `Upload failed: ${uploadResponse.status} ${uploadResponse.statusText}`,
+        `Upload prepare failed: ${prepareResp.status} ${prepareResp.statusText} ${body.slice(0, 200)}`,
+      );
+    }
+    const { uploadUrl, storagePath } = (await prepareResp.json()) as {
+      uploadUrl: string;
+      storagePath: string;
+    };
+
+    const putResp = await fetch(uploadUrl, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': blob.type || 'application/octet-stream',
+      },
+      body: arrayBuffer,
+    });
+    if (!putResp.ok) {
+      const body = await putResp.text().catch(() => '');
+      throw new Error(
+        `Storage PUT failed: ${putResp.status} ${putResp.statusText} ${body.slice(0, 200)}`,
       );
     }
 
-    const uploadResult = await uploadResponse.json();
+    const finalizeResp = await fetch(finalizeUrl, {
+      method: 'POST',
+      headers: jsonHeaders,
+      body: JSON.stringify({
+        sectionId: metadata.sectionId,
+        moodleUrl: metadata.moodleUrl,
+        fileName: metadata.fileName,
+        contentHash,
+        storagePath,
+        fileSize: blob.size,
+        mimeType: blob.type,
+      }),
+    });
+    if (!finalizeResp.ok) {
+      const body = await finalizeResp.text().catch(() => '');
+      throw new Error(
+        `Upload finalize failed: ${finalizeResp.status} ${finalizeResp.statusText} ${body.slice(0, 200)}`,
+      );
+    }
+
+    const finalizeResult = (await finalizeResp.json()) as {
+      deduplicated?: boolean;
+    };
 
     return {
       success: true,
@@ -460,7 +581,7 @@ async function handleDownloadAndUpload(
         contentHash,
         fileSize: blob.size,
         mimeType: blob.type,
-        deduplicated: uploadResult.deduplicated ?? false,
+        deduplicated: finalizeResult.deduplicated ?? false,
       },
     };
   } catch (err) {

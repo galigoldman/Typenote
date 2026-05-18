@@ -110,15 +110,34 @@ export function useMoodleExtension() {
     return response?.success === true && response.data.granted === true;
   }, []);
 
+  /**
+   * Asks the extension for permission to access a Moodle host. Because
+   * `chrome.permissions.request` requires a user gesture (which we don't
+   * have from a web-page message), the service worker stashes the host and
+   * returns `code: 'NEEDS_POPUP'`. The caller must then instruct the user
+   * to click the toolbar icon, and poll `checkPermission` until granted.
+   */
   const requestPermission = useCallback(async (moodleUrl: string) => {
     const response = await sendExtensionMessage<{
       success: boolean;
       error?: string;
+      code?: string;
+      data?: { host?: string };
     }>({
       type: 'REQUEST_PERMISSION',
       payload: { moodleUrl },
     });
-    return response?.success === true;
+    if (response?.success === true) {
+      return { granted: true as const };
+    }
+    if (response?.code === 'NEEDS_POPUP' && response.data?.host) {
+      return {
+        granted: false as const,
+        needsPopup: true as const,
+        host: response.data.host,
+      };
+    }
+    return { granted: false as const, error: response?.error };
   }, []);
 
   const checkMoodleLogin = useCallback(async (moodleUrl: string) => {
@@ -140,15 +159,18 @@ export function useMoodleExtension() {
         courses: Array<{ moodleCourseId: string; name: string; url: string }>;
       };
       error?: string;
+      code?: string;
     }>({
       type: 'SCRAPE_COURSES',
       payload: { moodleUrl },
     });
     if (!response) return null;
     if (!response.success) {
-      throw new Error(
-        (response as { error?: string }).error ?? 'Scraping failed',
-      );
+      const err = new Error(response.error ?? 'Scraping failed') as Error & {
+        code?: string;
+      };
+      err.code = response.code;
+      throw err;
     }
     return response.data;
   }, []);
@@ -172,15 +194,18 @@ export function useMoodleExtension() {
         }>;
       };
       error?: string;
+      code?: string;
     }>({
       type: 'SCRAPE_COURSE_CONTENT',
       payload: { courseUrl },
     });
     if (!response) return null;
     if (!response.success) {
-      throw new Error(
-        (response as { error?: string }).error ?? 'Content scraping failed',
-      );
+      const err = new Error(
+        response.error ?? 'Content scraping failed',
+      ) as Error & { code?: string };
+      err.code = response.code;
+      throw err;
     }
     return response.data;
   }, []);
