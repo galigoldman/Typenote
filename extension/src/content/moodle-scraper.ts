@@ -72,19 +72,38 @@ export async function scrapeCourses(): Promise<
   // status:'complete' (network idle for the document itself, not for the
   // follow-up AJAX). If the user navigates quickly we'd query the DOM
   // before the cards mount and falsely report "no courses". Poll instead.
-  const CARD_SELECTOR = '.card.dashboard-card[data-course-id]';
+  //
+  // We also try several selectors: institutions and Moodle themes vary —
+  // some render `.card.dashboard-card[data-course-id]`, some only set
+  // `[data-courseid]`, some wrap differently. Any one matching is enough.
+  const CARD_SELECTORS = [
+    '.card.dashboard-card[data-course-id]',
+    '.dashboard-card[data-course-id]',
+    '[data-region="paged-content-page"] [data-course-id]',
+    '[data-region="paged-content-page"] [data-courseid]',
+    '[data-courseid]',
+  ];
+  const findCards = (): HTMLElement[] => {
+    for (const sel of CARD_SELECTORS) {
+      const els = Array.from(document.querySelectorAll<HTMLElement>(sel));
+      if (els.length > 0) return els;
+    }
+    return [];
+  };
   const POLL_INTERVAL_MS = 250;
   const POLL_TIMEOUT_MS = 8000;
   const start = Date.now();
-  let cards = document.querySelectorAll<HTMLElement>(CARD_SELECTOR);
+  let cards = findCards();
   while (cards.length === 0 && Date.now() - start < POLL_TIMEOUT_MS) {
     await new Promise((r) => setTimeout(r, POLL_INTERVAL_MS));
-    cards = document.querySelectorAll<HTMLElement>(CARD_SELECTOR);
+    cards = findCards();
   }
+
   const courses: ScrapedCourse[] = [];
 
   cards.forEach((card) => {
-    const moodleCourseId = card.dataset.courseId;
+    const moodleCourseId =
+      card.dataset.courseId ?? card.dataset.courseid ?? '';
     if (!moodleCourseId) return;
 
     // Extract course name from .multiline area
@@ -118,6 +137,39 @@ export async function scrapeCourses(): Promise<
       courses.push({ moodleCourseId, name, url });
     }
   });
+
+  // Theme-agnostic fallback: if the card selectors still found nothing
+  // (or the cards lacked the expected name/link structure), harvest course
+  // links from the page's main content. This catches list/summary views
+  // and themes that completely restructure the dashboard. We dedupe by
+  // course id and skip the nav/sidebar so we don't pick up "recent courses"
+  // widgets duplicating the real list.
+  if (courses.length === 0) {
+    const container =
+      document.querySelector('#region-main, #page-content, main') ??
+      document.body;
+    const seen = new Set<string>();
+    const links = container.querySelectorAll<HTMLAnchorElement>(
+      'a[href*="/course/view.php?id="]',
+    );
+    for (const link of Array.from(links)) {
+      const m = link.href.match(/[?&]id=(\d+)/);
+      if (!m) continue;
+      const moodleCourseId = m[1];
+      if (seen.has(moodleCourseId)) continue;
+      const aria = link.getAttribute('aria-label') ?? '';
+      const clone = link.cloneNode(true) as HTMLElement;
+      clone
+        .querySelectorAll('.sr-only, .accesshide')
+        .forEach((el) => el.remove());
+      const name = (aria || clone.textContent || '')
+        .replace(/\s+/g, ' ')
+        .trim();
+      if (!name || name.length < 2) continue;
+      seen.add(moodleCourseId);
+      courses.push({ moodleCourseId, name, url: link.href });
+    }
+  }
 
   return {
     courses,
