@@ -8,8 +8,13 @@ import {
   CardHeader,
   CardTitle,
 } from '@/components/ui/card';
-import { useMoodleExtension } from '@/hooks/use-moodle-extension';
+import {
+  useMoodleExtension,
+  EXPECTED_EXTENSION_VERSION,
+} from '@/hooks/use-moodle-extension';
+import { MoodleCardSkeleton } from './moodle-card-skeleton';
 import { MoodleConnectionSetup } from './moodle-connection-setup';
+import { MoodleInstallDialog } from './moodle-install-dialog';
 
 interface MoodleSyncPromptProps {
   moodleConnection: { domain: string; instanceId: string } | null;
@@ -20,31 +25,63 @@ export function MoodleSyncPrompt({
   moodleConnection,
   onSyncClick,
 }: MoodleSyncPromptProps) {
-  const { isInstalled, isChecking } = useMoodleExtension();
+  const { state } = useMoodleExtension();
 
-  if (isChecking) {
-    return null;
+  if (state.status === 'checking') {
+    return <MoodleCardSkeleton />;
   }
 
-  if (!isInstalled) {
+  if (state.status === 'not-installed') {
     return (
       <Card className="p-6">
         <CardHeader>
           <CardTitle className="text-base">Moodle Integration</CardTitle>
           <CardDescription>
-            Install the Typenote browser extension to sync your Moodle courses
-            and materials automatically.
+            Install the Typenote extension to sync your Moodle courses and
+            materials automatically.
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <Button variant="outline" size="sm" disabled>
-            Install Extension
-          </Button>
+          <MoodleInstallDialog
+            trigger={
+              <Button variant="outline" size="sm">
+                Install Extension
+              </Button>
+            }
+          />
+          <p className="mt-2 text-xs text-muted-foreground">
+            Beta — load the unpacked extension from GitHub. Refresh this page
+            after installing.
+          </p>
         </CardContent>
       </Card>
     );
   }
 
+  if (state.status === 'version-mismatch') {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Moodle Integration</CardTitle>
+          <CardDescription>
+            Update the Typenote extension to continue syncing. Installed
+            version: <strong>{state.installedVersion}</strong>. Required:{' '}
+            <strong>{EXPECTED_EXTENSION_VERSION}</strong>.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <Button variant="outline" size="sm" disabled>
+            Update Extension
+          </Button>
+          <p className="mt-2 text-xs text-muted-foreground">
+            Refresh this page after updating.
+          </p>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  // state.status === 'installed'
   if (!moodleConnection) {
     return (
       <Card className="p-6">

@@ -78,9 +78,28 @@ export interface ExtensionSuccessResponse<T = unknown> {
   data: T;
 }
 
+/**
+ * Stable error codes. The web app branches its UI on these — keep them
+ * machine-readable and stable. The `error` field is the human-readable
+ * fallback for unknown codes or developer logs.
+ */
+export type ExtensionErrorCode =
+  // Permission was requested by the web app but Chrome won't grant it without
+  // a user gesture. The host has been stashed; the popup will pick it up the
+  // next time the user clicks the toolbar icon.
+  | 'NEEDS_POPUP'
+  // The user is not authenticated to Moodle (no session cookie, or the
+  // courses page redirected to a login URL).
+  | 'NOT_LOGGED_IN'
+  // The extension has no host permission for the target Moodle host.
+  | 'PERMISSION_DENIED';
+
 export interface ExtensionErrorResponse {
   success: false;
   error: string;
+  code?: ExtensionErrorCode;
+  // For NEEDS_POPUP: which host the popup will grant.
+  data?: { host?: string };
 }
 
 export type ExtensionResponse<T = unknown> =

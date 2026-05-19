@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -21,45 +21,42 @@ interface MoodleConnectionSetupProps {
 export function MoodleConnectionSetup({
   currentConnection,
 }: MoodleConnectionSetupProps) {
-  const { isInstalled, isChecking } = useMoodleExtension();
+  const { state, checkPermission, requestPermission } = useMoodleExtension();
   const [url, setUrl] = useState(
     currentConnection?.domain ? `https://${currentConnection.domain}` : '',
   );
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [permissionMissing, setPermissionMissing] = useState(false);
 
-  if (isChecking) {
-    return (
-      <p className="text-sm text-muted-foreground">
-        Checking for Typenote extension...
-      </p>
-    );
+  // On mount with an existing connection, verify the extension still has host permission.
+  useEffect(() => {
+    if (!currentConnection || state.status !== 'installed') return;
+    let cancelled = false;
+    checkPermission(`https://${currentConnection.domain}`).then((granted) => {
+      if (!cancelled) setPermissionMissing(!granted);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [currentConnection, state.status, checkPermission]);
+
+  if (state.status === 'checking') {
+    return null;
   }
 
-  if (!isInstalled) {
-    return (
-      <div className="rounded-lg border border-dashed p-4 text-center">
-        <p className="text-sm font-medium">
-          Typenote Moodle Extension Required
-        </p>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Install the browser extension to sync your Moodle courses.
-        </p>
-        {/* TODO: Add Chrome Web Store link when published */}
-      </div>
-    );
+  // Parent (MoodleSyncPrompt) only renders us when state === 'installed', but be safe.
+  if (state.status !== 'installed') {
+    return null;
   }
 
   async function handleSave() {
     setError(null);
     setSaving(true);
-
     try {
-      // Parse and validate URL — keep host + base path (e.g. moodle.runi.ac.il/2026)
       let domain: string;
       try {
         const parsed = new URL(url.startsWith('http') ? url : `https://${url}`);
-        // Strip known Moodle paths to extract just the base prefix
         const basePath = parsed.pathname
           .replace(
             /\/(my|course|login|mod|lib|theme|admin|message|calendar|user|badges|grade|report|backup|blocks|question|tag|cohort|enrol|webservice|auth|completion|files|search)\b.*/,
@@ -79,7 +76,17 @@ export function MoodleConnectionSetup({
         return;
       }
 
+      const granted = await requestPermission(`https://${domain}`);
+      if (!granted) {
+        setError(
+          'Permission required. Allow access to this Moodle domain in the popup, or click Connect again.',
+        );
+        setSaving(false);
+        return;
+      }
+
       await saveMoodleConnection(domain);
+      setPermissionMissing(false);
       toast.success('Moodle connection saved');
     } catch (err) {
       setError(
@@ -90,10 +97,24 @@ export function MoodleConnectionSetup({
     }
   }
 
+  async function handleGrantExisting() {
+    if (!currentConnection) return;
+    const granted = await requestPermission(
+      `https://${currentConnection.domain}`,
+    );
+    if (granted) {
+      setPermissionMissing(false);
+      toast.success(`Access granted to ${currentConnection.domain}`);
+    } else {
+      toast.error('Permission required. Try again from chrome://extensions.');
+    }
+  }
+
   async function handleRemove() {
     try {
       await removeMoodleConnection();
       setUrl('');
+      setPermissionMissing(false);
       toast.success('Moodle connection removed');
     } catch (err) {
       toast.error(
@@ -128,6 +149,18 @@ export function MoodleConnectionSetup({
           </span>
           <Button variant="ghost" size="sm" onClick={handleRemove}>
             Disconnect
+          </Button>
+        </div>
+      )}
+
+      {currentConnection && permissionMissing && (
+        <div className="flex items-center justify-between rounded-md border border-amber-400/40 bg-amber-50 dark:bg-amber-950/30 px-3 py-2">
+          <p className="text-sm">
+            The extension needs access to{' '}
+            <strong>{currentConnection.domain}</strong> to sync.
+          </p>
+          <Button size="sm" onClick={handleGrantExisting}>
+            Grant access to {currentConnection.domain}
           </Button>
         </div>
       )}

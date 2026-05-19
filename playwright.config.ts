@@ -1,5 +1,8 @@
 import { defineConfig, devices } from '@playwright/test';
 
+const BASE_URL = process.env.PLAYWRIGHT_BASE_URL ?? 'http://localhost:3000';
+const isLocalBase = /^https?:\/\/(localhost|127\.0\.0\.1)/i.test(BASE_URL);
+
 export default defineConfig({
   testDir: './e2e',
   fullyParallel: true,
@@ -8,9 +11,19 @@ export default defineConfig({
   workers: process.env.CI ? 1 : undefined,
   reporter: 'html',
   use: {
-    baseURL: 'http://localhost:3000',
+    baseURL: BASE_URL,
     trace: 'on-first-retry',
     screenshot: 'only-on-failure',
+    locale: 'en-US',
+    timezoneId: 'UTC',
+    colorScheme: 'light',
+  },
+  expect: {
+    toHaveScreenshot: {
+      maxDiffPixelRatio: 0.01,
+      animations: 'disabled',
+      caret: 'hide',
+    },
   },
   projects: [
     {
@@ -18,9 +31,11 @@ export default defineConfig({
       use: { ...devices['Desktop Chrome'] },
     },
   ],
-  webServer: {
-    command: 'pnpm dev',
-    url: 'http://localhost:3000',
-    reuseExistingServer: !process.env.CI,
-  },
+  webServer: isLocalBase
+    ? {
+        command: 'pnpm dev',
+        url: BASE_URL,
+        reuseExistingServer: !process.env.CI,
+      }
+    : undefined,
 });

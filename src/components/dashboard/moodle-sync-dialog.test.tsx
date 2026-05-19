@@ -37,6 +37,24 @@ const mockSync = syncMoodleCourses as ReturnType<typeof vi.fn>;
 
 const mockConnection = { domain: 'moodle.test.ac.il', instanceId: 'inst-123' };
 
+/**
+ * Default hook mock: permission already granted so loadCourses falls through
+ * straight to scraping. Tests that want to exercise the permission handshake
+ * override `checkPermission`/`requestPermission` explicitly.
+ */
+function makeExtensionMock(
+  overrides: Record<string, unknown> = {},
+): Record<string, unknown> {
+  return {
+    scrapeCourses: vi.fn(),
+    scrapeCourseContent: vi.fn(),
+    downloadAndUpload: vi.fn(),
+    requestPermission: vi.fn().mockResolvedValue({ granted: true }),
+    checkPermission: vi.fn().mockResolvedValue(true),
+    ...overrides,
+  };
+}
+
 const mockScrapedCourses = {
   courses: [
     {
@@ -76,9 +94,9 @@ describe('MoodleSyncDialog', () => {
 
   it('shows scraping message when dialog opens', () => {
     const mockScrape = vi.fn().mockReturnValue(new Promise(() => {})); // never resolves
-    mockUseMoodleExtension.mockReturnValue({
-      scrapeCourses: mockScrape,
-    });
+    mockUseMoodleExtension.mockReturnValue(
+      makeExtensionMock({ scrapeCourses: mockScrape }),
+    );
 
     render(
       <MoodleSyncDialog
@@ -95,9 +113,9 @@ describe('MoodleSyncDialog', () => {
 
   it('shows course list after scraping and comparing', async () => {
     const mockScrape = vi.fn().mockResolvedValue(mockScrapedCourses);
-    mockUseMoodleExtension.mockReturnValue({
-      scrapeCourses: mockScrape,
-    });
+    mockUseMoodleExtension.mockReturnValue(
+      makeExtensionMock({ scrapeCourses: mockScrape }),
+    );
     mockCompare.mockResolvedValue(mockComparisons);
 
     render(
@@ -119,9 +137,9 @@ describe('MoodleSyncDialog', () => {
 
   it('shows no courses message when scrape returns empty array', async () => {
     const mockScrape = vi.fn().mockResolvedValue({ courses: [] });
-    mockUseMoodleExtension.mockReturnValue({
-      scrapeCourses: mockScrape,
-    });
+    mockUseMoodleExtension.mockReturnValue(
+      makeExtensionMock({ scrapeCourses: mockScrape }),
+    );
 
     render(
       <MoodleSyncDialog
@@ -138,9 +156,9 @@ describe('MoodleSyncDialog', () => {
 
   it('pre-selects new_to_system courses and shows sync button', async () => {
     const mockScrape = vi.fn().mockResolvedValue(mockScrapedCourses);
-    mockUseMoodleExtension.mockReturnValue({
-      scrapeCourses: mockScrape,
-    });
+    mockUseMoodleExtension.mockReturnValue(
+      makeExtensionMock({ scrapeCourses: mockScrape }),
+    );
     mockCompare.mockResolvedValue(mockComparisons);
 
     render(
@@ -164,9 +182,9 @@ describe('MoodleSyncDialog', () => {
   it('toggles course selection when checkbox is clicked', async () => {
     const user = userEvent.setup();
     const mockScrape = vi.fn().mockResolvedValue(mockScrapedCourses);
-    mockUseMoodleExtension.mockReturnValue({
-      scrapeCourses: mockScrape,
-    });
+    mockUseMoodleExtension.mockReturnValue(
+      makeExtensionMock({ scrapeCourses: mockScrape }),
+    );
     mockCompare.mockResolvedValue(mockComparisons);
 
     render(
@@ -212,11 +230,13 @@ describe('MoodleSyncDialog', () => {
         },
       ],
     });
-    mockUseMoodleExtension.mockReturnValue({
-      scrapeCourses: mockScrape,
-      scrapeCourseContent: mockScrapeContent,
-      downloadAndUpload: vi.fn(),
-    });
+    mockUseMoodleExtension.mockReturnValue(
+      makeExtensionMock({
+        scrapeCourses: mockScrape,
+        scrapeCourseContent: mockScrapeContent,
+        downloadAndUpload: vi.fn(),
+      }),
+    );
     mockCompare.mockResolvedValue(mockComparisons);
     mockSync.mockResolvedValue({
       syncedCount: 1,
@@ -271,10 +291,10 @@ describe('MoodleSyncDialog', () => {
   it('shows error and retry button on scrape failure', async () => {
     const mockScrape = vi
       .fn()
-      .mockRejectedValue(new Error('Extension timeout'));
-    mockUseMoodleExtension.mockReturnValue({
-      scrapeCourses: mockScrape,
-    });
+      .mockRejectedValue(new Error('Extension crashed'));
+    mockUseMoodleExtension.mockReturnValue(
+      makeExtensionMock({ scrapeCourses: mockScrape }),
+    );
 
     render(
       <MoodleSyncDialog
@@ -285,18 +305,198 @@ describe('MoodleSyncDialog', () => {
     );
 
     await waitFor(() => {
-      expect(screen.getByRole('alert')).toHaveTextContent('Extension timeout');
+      expect(screen.getByRole('alert')).toHaveTextContent('Extension crashed');
     });
 
     expect(screen.getByRole('button', { name: /retry/i })).toBeInTheDocument();
   });
 
+  it('shows friendly network message when error matches network patterns', async () => {
+    const mockScrape = vi.fn().mockRejectedValue(new Error('fetch failed'));
+    mockUseMoodleExtension.mockReturnValue(
+      makeExtensionMock({ scrapeCourses: mockScrape }),
+    );
+
+    render(
+      <MoodleSyncDialog
+        open={true}
+        onOpenChange={vi.fn()}
+        moodleConnection={mockConnection}
+      />,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByRole('alert')).toHaveTextContent(
+        /Couldn't reach moodle\.test\.ac\.il/i,
+      );
+    });
+  });
+
+  it('shows Retry failed button after partial sync and re-runs only failed jobs', async () => {
+    const user = userEvent.setup();
+    const mockScrape = vi.fn().mockResolvedValue(mockScrapedCourses);
+    const mockScrapeContent = vi.fn().mockResolvedValue({
+      sections: [
+        {
+          moodleSectionId: 'sec-1',
+          title: 'Week 1',
+          position: 0,
+          items: [
+            {
+              type: 'file' as const,
+              name: 'good.pdf',
+              moodleUrl: 'https://moodle.test.ac.il/file/good',
+            },
+            {
+              type: 'file' as const,
+              name: 'bad.pdf',
+              moodleUrl: 'https://moodle.test.ac.il/file/bad',
+            },
+          ],
+        },
+      ],
+    });
+    // First call: good succeeds, bad fails. Second call (retry): bad succeeds.
+    const mockDownloadAndUpload = vi
+      .fn()
+      .mockResolvedValueOnce(undefined) // good.pdf
+      .mockRejectedValueOnce(new Error('network exploded')) // bad.pdf
+      .mockResolvedValueOnce(undefined); // bad.pdf retry
+    mockUseMoodleExtension.mockReturnValue(
+      makeExtensionMock({
+        scrapeCourses: mockScrape,
+        scrapeCourseContent: mockScrapeContent,
+        downloadAndUpload: mockDownloadAndUpload,
+      }),
+    );
+    mockCompare.mockResolvedValue(mockComparisons);
+    mockSync.mockResolvedValue({
+      syncedCount: 1,
+      courses: [
+        {
+          moodleCourseId: 'CS101',
+          sections: [
+            {
+              id: 'section-db-1',
+              moodleSectionId: 'sec-1',
+              items: [
+                { moodleUrl: 'https://moodle.test.ac.il/file/good' },
+                { moodleUrl: 'https://moodle.test.ac.il/file/bad' },
+              ],
+            },
+          ],
+        },
+      ],
+    });
+
+    render(
+      <MoodleSyncDialog
+        open={true}
+        onOpenChange={vi.fn()}
+        moodleConnection={mockConnection}
+      />,
+    );
+
+    // Wait for course list, then preview content
+    await waitFor(() => {
+      expect(screen.getByText('Intro to CS')).toBeInTheDocument();
+    });
+    await user.click(screen.getByRole('button', { name: /preview content/i }));
+
+    await waitFor(() => {
+      expect(screen.getByText('good.pdf')).toBeInTheDocument();
+      expect(screen.getByText('bad.pdf')).toBeInTheDocument();
+    });
+
+    // Trigger sync
+    await user.click(screen.getByRole('button', { name: /sync selected/i }));
+
+    // Wait for done phase with retry button
+    await waitFor(() => {
+      expect(
+        screen.getByRole('button', { name: /retry failed \(1\)/i }),
+      ).toBeInTheDocument();
+    });
+
+    // downloadAndUpload was called twice (one per file)
+    expect(mockDownloadAndUpload).toHaveBeenCalledTimes(2);
+
+    // Click retry — should re-run only the failed job (bad.pdf)
+    await user.click(screen.getByRole('button', { name: /retry failed/i }));
+
+    await waitFor(() => {
+      expect(
+        screen.queryByRole('button', { name: /retry failed/i }),
+      ).not.toBeInTheDocument();
+    });
+
+    // 3rd call should be only for bad.pdf
+    expect(mockDownloadAndUpload).toHaveBeenCalledTimes(3);
+    const thirdCallArg = mockDownloadAndUpload.mock.calls[2][0];
+    expect(thirdCallArg.moodleFileUrl).toBe(
+      'https://moodle.test.ac.il/file/bad',
+    );
+
+    // Close button should still be present (footer Close, not the dialog X)
+    expect(
+      screen.getAllByRole('button', { name: /close/i }).length,
+    ).toBeGreaterThan(0);
+  });
+
+  it('shows awaiting-permission UI when permission needs popup grant', async () => {
+    // First call: needs popup. After the polling loop sees the grant, scrape runs.
+    const mockCheckPermission = vi
+      .fn()
+      .mockResolvedValueOnce(false) // initial gate
+      .mockResolvedValueOnce(false) // first poll
+      .mockResolvedValue(true); // subsequent polls — granted
+    const mockRequestPermission = vi.fn().mockResolvedValue({
+      granted: false,
+      needsPopup: true,
+      host: 'moodle.test.ac.il',
+    });
+    const mockScrape = vi.fn().mockResolvedValue(mockScrapedCourses);
+    mockUseMoodleExtension.mockReturnValue(
+      makeExtensionMock({
+        scrapeCourses: mockScrape,
+        checkPermission: mockCheckPermission,
+        requestPermission: mockRequestPermission,
+      }),
+    );
+    mockCompare.mockResolvedValue(mockComparisons);
+
+    render(
+      <MoodleSyncDialog
+        open={true}
+        onOpenChange={vi.fn()}
+        moodleConnection={mockConnection}
+      />,
+    );
+
+    // The dialog should land in awaiting-permission with the per-host copy.
+    expect(await screen.findByText(/approve access to/i)).toBeInTheDocument();
+
+    // requestPermission was called with the host URL.
+    expect(mockRequestPermission).toHaveBeenCalledWith(
+      'https://moodle.test.ac.il',
+    );
+
+    // After polling sees a grant, the dialog auto-resumes and reaches the
+    // course list.
+    await waitFor(
+      () => {
+        expect(screen.getByText('Intro to CS')).toBeInTheDocument();
+      },
+      { timeout: 5000 },
+    );
+  });
+
   it('disables sync button when no courses are selected', async () => {
     userEvent.setup();
     const mockScrape = vi.fn().mockResolvedValue(mockScrapedCourses);
-    mockUseMoodleExtension.mockReturnValue({
-      scrapeCourses: mockScrape,
-    });
+    mockUseMoodleExtension.mockReturnValue(
+      makeExtensionMock({ scrapeCourses: mockScrape }),
+    );
     // All courses synced_by_user — none pre-selected
     mockCompare.mockResolvedValue([
       {

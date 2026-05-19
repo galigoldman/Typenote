@@ -9,7 +9,9 @@ on:
 
 jobs:
   ci:
-    runs-on: ubuntu-latest
+    # Pinned to ubuntu-22.04 (Jammy) so visual regression baselines stay deterministic.
+    # Playwright snapshots are pixel-sensitive to OS / font versions — see e2e/TEST_REGISTRY.md.
+    runs-on: ubuntu-22.04
 
     steps:
       - uses: actions/checkout@v4
@@ -33,10 +35,29 @@ jobs:
       - name: Test
         run: pnpm test
 
-      - name: Start Supabase
-        uses: supabase/setup-cli@v1
-        with:
-          version: latest
+      # Install the Supabase CLI directly. We don't use supabase/setup-cli@v1
+      # because it builds download URLs without the version in the filename
+      # (e.g. `supabase_linux_amd64.tar.gz`) which 404s — Supabase publishes
+      # asset names *with* the version embedded (`supabase_2.99.0_linux_amd64.tar.gz`).
+      # The action's broken URL pattern affects both @v1 and @v2 tags.
+      - name: Install Supabase CLI
+        env:
+          # Pinned to v2.98.2 — the last known-good version per the last
+          # green CI run on main (2026-05-15). v2.99.0 (released 2026-05-18)
+          # both changed the asset naming convention AND causes
+          # `supabase start` to hang indefinitely on CI runners.
+          SUPABASE_VERSION: 2.98.2
+        run: |
+          # v2.98.2 publishes the versionless filename `supabase_<platform>_<arch>.tar.gz`.
+          # (v2.99.0 switched to the versioned form `supabase_<version>_<platform>_<arch>.tar.gz`
+          # — and broke the official setup-cli action in the process.)
+          curl -fsSL "https://github.com/supabase/cli/releases/download/v${SUPABASE_VERSION}/supabase_linux_amd64.tar.gz" -o /tmp/supabase.tar.gz
+          tar -xzf /tmp/supabase.tar.gz -C /tmp
+          sudo mv /tmp/supabase /usr/local/bin/
+          supabase --version
+          # setup-cli sets this so `supabase start` pulls Docker images
+          # from ghcr.io instead of Docker Hub. Preserve that behavior.
+          echo "SUPABASE_INTERNAL_IMAGE_REGISTRY=ghcr.io" >> "$GITHUB_ENV"
 
       - name: Start Supabase local
         run: supabase start
@@ -63,6 +84,9 @@ jobs:
       - name: Install Playwright browsers
         run: pnpm exec playwright install --with-deps chromium
 
+      - name: Build extension
+        run: cd extension && npm install && npm run build
+
       - name: E2E tests
         run: pnpm test:e2e
         env:
@@ -70,6 +94,14 @@ jobs:
           TEST_USER_PASSWORD: Test1234
           NEXT_PUBLIC_SUPABASE_URL: ${{ steps.supabase.outputs.SUPABASE_URL }}
           NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ steps.supabase.outputs.SUPABASE_ANON_KEY }}
+          # The Next.js dev server (started by Playwright) calls
+          # createAdminClient() in server components (e.g. courses page) and
+          # in API routes. Forward the service-role key so SSR doesn't
+          # throw "Missing SUPABASE_SERVICE_ROLE_KEY" during E2E runs.
+          SUPABASE_SERVICE_ROLE_KEY: ${{ steps.supabase.outputs.SUPABASE_SERVICE_ROLE_KEY }}
+          # Pinned ID matches the "key" in extension/manifest.json — lets the
+          # dashboard recognize the unpacked extension loaded by extension-real.spec.ts.
+          NEXT_PUBLIC_EXTENSION_ID: beajdnpmcbgjfkhojoangknkeimimmfm
 
       - name: Upload Playwright report
         if: failure()

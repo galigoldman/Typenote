@@ -1,134 +1,79 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
-import userEvent from '@testing-library/user-event';
-import { MoodleSyncPrompt } from './moodle-sync-prompt';
+import { render, screen } from '@testing-library/react';
+import type { ExtensionState } from '@/hooks/use-moodle-extension';
 
-// Mock the hook
 vi.mock('@/hooks/use-moodle-extension', () => ({
   useMoodleExtension: vi.fn(),
-}));
-
-// Mock the MoodleConnectionSetup component (avoids needing to mock its server action imports)
-vi.mock('./moodle-connection-setup', () => ({
-  MoodleConnectionSetup: () => (
-    <div data-testid="moodle-connection-setup">Moodle Connection Setup</div>
-  ),
+  EXPECTED_EXTENSION_VERSION: '0.2.0',
 }));
 
 import { useMoodleExtension } from '@/hooks/use-moodle-extension';
+import { MoodleSyncPrompt } from './moodle-sync-prompt';
 
-const mockUseMoodleExtension = useMoodleExtension as ReturnType<typeof vi.fn>;
+function setState(state: ExtensionState) {
+  vi.mocked(useMoodleExtension).mockReturnValue({
+    state,
+    isInstalled: state.status === 'installed',
+    isChecking: state.status === 'checking',
+    ping: vi.fn(),
+    checkPermission: vi.fn(),
+    requestPermission: vi.fn(),
+    checkMoodleLogin: vi.fn(),
+    scrapeCourses: vi.fn(),
+    scrapeCourseContent: vi.fn(),
+    downloadAndUpload: vi.fn(),
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  } as any);
+}
 
-const mockConnection = { domain: 'moodle.test.ac.il', instanceId: 'inst-123' };
+beforeEach(() => vi.clearAllMocks());
 
 describe('MoodleSyncPrompt', () => {
-  beforeEach(() => {
-    vi.resetAllMocks();
-  });
-
-  it('renders nothing while checking extension', () => {
-    mockUseMoodleExtension.mockReturnValue({
-      isInstalled: false,
-      isChecking: true,
-      checkMoodleLogin: vi.fn(),
-    });
-
+  it('renders the skeleton while extension is checking', () => {
+    setState({ status: 'checking' });
     const { container } = render(
-      <MoodleSyncPrompt moodleConnection={null} onSyncClick={vi.fn()} />,
+      <MoodleSyncPrompt moodleConnection={null} onSyncClick={() => {}} />,
     );
-    expect(container.innerHTML).toBe('');
+    expect(container.querySelector('[aria-busy="true"]')).toBeInTheDocument();
   });
 
-  it('shows install message when extension is not installed', () => {
-    mockUseMoodleExtension.mockReturnValue({
-      isInstalled: false,
-      isChecking: false,
-      checkMoodleLogin: vi.fn(),
-    });
-
-    render(<MoodleSyncPrompt moodleConnection={null} onSyncClick={vi.fn()} />);
+  it('renders the Install card with an enabled trigger when extension is not installed', () => {
+    setState({ status: 'not-installed' });
+    render(<MoodleSyncPrompt moodleConnection={null} onSyncClick={() => {}} />);
     expect(
-      screen.getByText(/install the typenote browser extension/i),
+      screen.getByText(/install the typenote extension/i),
     ).toBeInTheDocument();
-    expect(screen.getByText(/install extension/i)).toBeInTheDocument();
-  });
-
-  it('shows setup message when extension is installed but no connection', () => {
-    mockUseMoodleExtension.mockReturnValue({
-      isInstalled: true,
-      isChecking: false,
-    });
-
-    render(<MoodleSyncPrompt moodleConnection={null} onSyncClick={vi.fn()} />);
     expect(
-      screen.getByText(/enter your moodle url to start syncing courses/i),
+      screen.getByRole('button', { name: /install extension/i }),
+    ).toBeEnabled();
+  });
+
+  it('renders the Update card with both versions when version mismatches', () => {
+    setState({ status: 'version-mismatch', installedVersion: '0.1.0' });
+    render(<MoodleSyncPrompt moodleConnection={null} onSyncClick={() => {}} />);
+    expect(
+      screen.getByText(/update the typenote extension/i),
     ).toBeInTheDocument();
-    expect(screen.getByTestId('moodle-connection-setup')).toBeInTheDocument();
+    expect(screen.getByText(/0\.1\.0/)).toBeInTheDocument();
+    expect(screen.getByText(/0\.2\.0/)).toBeInTheDocument();
   });
 
-  it('shows sync button immediately when extension is installed and connection exists', () => {
-    mockUseMoodleExtension.mockReturnValue({
-      isInstalled: true,
-      isChecking: false,
-    });
-
-    render(
-      <MoodleSyncPrompt
-        moodleConnection={mockConnection}
-        onSyncClick={vi.fn()}
-      />,
-    );
-
-    expect(screen.getByText(/connected to/i)).toBeInTheDocument();
-    expect(screen.getByText('moodle.test.ac.il')).toBeInTheDocument();
-    expect(screen.getByText(/sync with moodle/i)).toBeInTheDocument();
+  it('renders the connection-setup card when extension is installed but not connected', () => {
+    setState({ status: 'installed', version: '0.2.0' });
+    render(<MoodleSyncPrompt moodleConnection={null} onSyncClick={() => {}} />);
+    expect(screen.getByLabelText(/moodle url/i)).toBeInTheDocument();
   });
 
-  it('shows sync button when extension is installed, connection exists, and logged in', async () => {
-    const mockCheckLogin = vi.fn().mockResolvedValue({ loggedIn: true });
-    mockUseMoodleExtension.mockReturnValue({
-      isInstalled: true,
-      isChecking: false,
-      checkMoodleLogin: mockCheckLogin,
-    });
-
+  it('renders the Sync button when extension is installed AND connected', () => {
+    setState({ status: 'installed', version: '0.2.0' });
     render(
       <MoodleSyncPrompt
-        moodleConnection={mockConnection}
-        onSyncClick={vi.fn()}
+        moodleConnection={{ domain: 'moodle.test.ac.il', instanceId: 'abc' }}
+        onSyncClick={() => {}}
       />,
     );
-
-    await waitFor(() => {
-      expect(screen.getByText(/sync with moodle/i)).toBeInTheDocument();
-    });
-
-    expect(screen.getByText(/connected to/i)).toBeInTheDocument();
-    expect(screen.getByText('moodle.test.ac.il')).toBeInTheDocument();
-  });
-
-  it('calls onSyncClick when sync button is clicked', async () => {
-    const mockCheckLogin = vi.fn().mockResolvedValue({ loggedIn: true });
-    const onSyncClick = vi.fn();
-    mockUseMoodleExtension.mockReturnValue({
-      isInstalled: true,
-      isChecking: false,
-      checkMoodleLogin: mockCheckLogin,
-    });
-
-    render(
-      <MoodleSyncPrompt
-        moodleConnection={mockConnection}
-        onSyncClick={onSyncClick}
-      />,
-    );
-
-    await waitFor(() => {
-      expect(screen.getByText(/sync with moodle/i)).toBeInTheDocument();
-    });
-
-    const user = userEvent.setup();
-    await user.click(screen.getByRole('button', { name: /sync with moodle/i }));
-    expect(onSyncClick).toHaveBeenCalledOnce();
+    expect(
+      screen.getByRole('button', { name: /sync with moodle/i }),
+    ).toBeInTheDocument();
   });
 });

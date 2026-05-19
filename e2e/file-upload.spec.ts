@@ -2,17 +2,14 @@ import { test, expect } from '@playwright/test';
 import { login } from './helpers/auth';
 import { goToSeededCourse } from './helpers/navigate';
 
-const COURSE_URL = '/dashboard/courses/30000000-0000-0000-0000-000000000001';
-
 test.describe('File Upload', () => {
   test.beforeEach(async ({ page }) => {
     await login(page);
   });
 
   test('import file into course', async ({ page }) => {
-    test.skip(!!process.env.CI, 'Course page rendering flaky in CI');
     test.setTimeout(30_000);
-    await page.goto(COURSE_URL);
+    await goToSeededCourse(page);
     await expect(page.getByRole('button', { name: 'Import File' })).toBeVisible(
       { timeout: 15_000 },
     );
@@ -38,7 +35,7 @@ test.describe('File Upload', () => {
     // that's unreliable in CI's local Supabase environment.
     test.skip(!!process.env.CI, 'File conversion unreliable in local CI');
     test.setTimeout(45_000);
-    await page.goto(COURSE_URL);
+    await goToSeededCourse(page);
     await expect(page.getByRole('button', { name: 'Import File' })).toBeVisible(
       { timeout: 15_000 },
     );
@@ -70,9 +67,8 @@ test.describe('File Upload', () => {
   });
 
   test('delete imported file', async ({ page }) => {
-    test.skip(!!process.env.CI, 'Course page rendering flaky in CI');
     test.setTimeout(45_000);
-    await page.goto(COURSE_URL);
+    await goToSeededCourse(page);
     await expect(page.getByRole('button', { name: 'Import File' })).toBeVisible(
       { timeout: 15_000 },
     );
