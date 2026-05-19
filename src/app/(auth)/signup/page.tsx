@@ -43,11 +43,7 @@ function SignupForm() {
             Sign-up failed. Please try again.
           </p>
         )}
-        <Button
-          className="w-full"
-          onClick={handleGoogleSignup}
-          type="button"
-        >
+        <Button className="w-full" onClick={handleGoogleSignup} type="button">
           Sign up with Google
         </Button>
       </CardContent>

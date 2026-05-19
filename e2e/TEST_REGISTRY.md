@@ -284,4 +284,3 @@ the standard local-Supabase JWT, so CI / local default works without env tweaks)
 
 After regenerating, commit the updated PNGs in the same PR as the intentional change. CI will
 fail any PR that drifts from the committed baselines — which is the whole point.
->>>>>>> origin/main

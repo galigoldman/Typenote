@@ -54,7 +54,6 @@ The project uses a two-branch model: `dev` (integration) and `main` (production)
 - TypeScript 5 / Node.js 22+ + Next.js 16 (App Router), React 19, Tailwind 4 (`pointer-fine:` variant), Chrome Manifest V3, Vitest, Playwright (2026-05-13-extension-readiness)
 - N/A — manifest tightening + client-side gating; no schema changes (2026-05-13-extension-readiness)
 
-
 - TypeScript 5 / Node.js 22+ + Next.js 16 (App Router), React 19, Tailwind CSS 4, shadcn/ui (New York), Lucide icons (041-ui-redesign)
 
 - TypeScript 5 / Node.js 22+ + React 19, Next.js 16 (App Router), Canvas 2D API (image processing), Pointer Events API (interaction) (040-image-paste-select)

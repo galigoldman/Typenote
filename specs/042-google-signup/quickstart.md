@@ -47,8 +47,8 @@ pnpm test:e2e
 
 ## Key Files
 
-| File                                    | Change   | Purpose                              |
-| --------------------------------------- | -------- | ------------------------------------ |
-| `src/app/(auth)/signup/page.tsx`        | MODIFY   | Google-only signup UI                |
-| `src/app/(auth)/signup/page.test.tsx`   | MODIFY   | Updated unit tests                   |
-| `e2e/google-signup.spec.ts`            | NEW      | E2E test for Google signup flow      |
+| File                                  | Change | Purpose                         |
+| ------------------------------------- | ------ | ------------------------------- |
+| `src/app/(auth)/signup/page.tsx`      | MODIFY | Google-only signup UI           |
+| `src/app/(auth)/signup/page.test.tsx` | MODIFY | Updated unit tests              |
+| `e2e/google-signup.spec.ts`           | NEW    | E2E test for Google signup flow |

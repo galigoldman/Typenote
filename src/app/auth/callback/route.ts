@@ -42,7 +42,10 @@ export async function GET(request: Request) {
     );
 
     const { error } = await supabase.auth.exchangeCodeForSession(code);
-    console.log('[auth/callback] exchangeCodeForSession result:', { error: error?.message ?? null, cookieCount: cookiesToForward.length });
+    console.log('[auth/callback] exchangeCodeForSession result:', {
+      error: error?.message ?? null,
+      cookieCount: cookiesToForward.length,
+    });
 
     if (!error) {
       const response = NextResponse.redirect(`${origin}${redirectTo}`);

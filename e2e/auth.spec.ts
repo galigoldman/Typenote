@@ -48,14 +48,10 @@ test.describe('Auth', () => {
     // Email/password form should be present
     await expect(page.getByLabel('Email')).toBeVisible();
     await expect(page.getByLabel('Password')).toBeVisible();
-    await expect(
-      page.getByRole('button', { name: /sign in/i }),
-    ).toBeVisible();
+    await expect(page.getByRole('button', { name: /sign in/i })).toBeVisible();
 
     // Google button should also be present
-    await expect(
-      page.getByRole('button', { name: /google/i }),
-    ).toBeVisible();
+    await expect(page.getByRole('button', { name: /google/i })).toBeVisible();
   });
 
   test('logout returns to login page', async ({ page }) => {
