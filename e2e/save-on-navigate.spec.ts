@@ -71,26 +71,6 @@ test.describe('Save on navigate (flush-on-unmount)', () => {
     // Draw a unique stroke (use a distinctive position so we can verify it)
     await drawStroke(page, 100, 800, 300, 800);
 
-    // Count strokes rendered on canvas before navigating
-    const strokeCountBefore = await page
-      .locator('[data-page-id]')
-      .first()
-      .locator('canvas')
-      .evaluate((canvas: HTMLCanvasElement) => {
-        // We can't easily count strokes from the canvas pixels, but we can
-        // check that the canvas has been drawn on by examining non-white pixels
-        const ctx = canvas.getContext('2d');
-        if (!ctx) return -1;
-        const data = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
-        let nonWhite = 0;
-        for (let i = 0; i < data.length; i += 4) {
-          if (data[i] < 250 || data[i + 1] < 250 || data[i + 2] < 250) {
-            nonWhite++;
-          }
-        }
-        return nonWhite;
-      });
-
     // Navigate to dashboard IMMEDIATELY — no waiting for save
     await page.goto('/dashboard');
     await page.waitForURL('**/dashboard**');

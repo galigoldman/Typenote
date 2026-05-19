@@ -4,13 +4,13 @@
 
 ### Trigger-Save-Flush Lifecycle
 
-| Event | Current Behavior | Fixed Behavior |
-| ----- | --------------- | -------------- |
-| `trigger()` called | Sets 800ms debounce timer | No change |
-| Debounce timer fires | Calls `performSave()` | No change |
-| Component unmounts with pending timer | **Clears timer, save lost** | **Fires `saveFnRef.current()` immediately, then clears timer** |
-| `beforeunload` event | Calls `flush()` (async) | No change |
-| `flush()` called | Clears timer, calls `performSave()` immediately | No change |
+| Event                                 | Current Behavior                                | Fixed Behavior                                                 |
+| ------------------------------------- | ----------------------------------------------- | -------------------------------------------------------------- |
+| `trigger()` called                    | Sets 800ms debounce timer                       | No change                                                      |
+| Debounce timer fires                  | Calls `performSave()`                           | No change                                                      |
+| Component unmounts with pending timer | **Clears timer, save lost**                     | **Fires `saveFnRef.current()` immediately, then clears timer** |
+| `beforeunload` event                  | Calls `flush()` (async)                         | No change                                                      |
+| `flush()` called                      | Clears timer, calls `performSave()` immediately | No change                                                      |
 
 ### Guarantees (after fix)
 

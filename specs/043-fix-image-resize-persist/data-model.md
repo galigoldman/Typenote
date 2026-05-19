@@ -7,6 +7,7 @@ This bug fix does not modify the data model. The existing schema correctly suppo
 ### Existing Entities (unchanged)
 
 **ImageObject** (stored in `CanvasPage.images[]` within the `pages` JSONB column):
+
 - `id`: string (unique identifier)
 - `x`: number (horizontal position on page)
 - `y`: number (vertical position on page)
@@ -17,6 +18,7 @@ This bug fix does not modify the data model. The existing schema correctly suppo
 - `createdAt`: number (timestamp)
 
 **CanvasPage** (stored as array in `documents.pages` JSONB column):
+
 - `id`: string
 - `order`: number
 - `strokes`: Stroke[]

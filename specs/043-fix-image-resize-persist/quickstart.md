@@ -13,6 +13,7 @@
 **What to change**: The unmount cleanup effect (around line 168-173) currently clears pending save timers. Change it to fire the save function before clearing.
 
 **Current code** (buggy):
+
 ```typescript
 useEffect(() => {
   return () => {
@@ -23,6 +24,7 @@ useEffect(() => {
 ```
 
 **Fixed code**:
+
 ```typescript
 useEffect(() => {
   return () => {
@@ -45,6 +47,7 @@ useEffect(() => {
 ### 1. Unit test (write first -- TDD)
 
 Add a test in `src/hooks/use-auto-save.test.ts`:
+
 - Trigger a save, then unmount before debounce fires
 - Assert that `saveFn` was called (not just scheduled)
 
@@ -60,6 +63,7 @@ Add a test in `src/hooks/use-auto-save.test.ts`:
 ### 3. E2E test (Playwright)
 
 Add a test that automates the manual verification above:
+
 - Log in, open document, paste image, resize, navigate away, return, check dimensions
 
 ### 4. Run full suite
