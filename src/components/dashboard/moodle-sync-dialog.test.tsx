@@ -150,7 +150,9 @@ describe('MoodleSyncDialog', () => {
     );
 
     await waitFor(() => {
-      expect(screen.getByText(/no courses found/i)).toBeInTheDocument();
+      expect(
+        screen.getByText(/couldn't find any courses/i),
+      ).toBeInTheDocument();
     });
   });
 
