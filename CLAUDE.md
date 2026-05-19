@@ -50,6 +50,7 @@ The project uses a two-branch model: `dev` (integration) and `main` (production)
 - PRs cannot be merged unless CI passes. This is enforced via GitHub branch protection rules on both `main` and `dev`.
 
 ## Active Technologies
+- N/A — no database changes, purely client-side (045-fix-page-overflow-undo)
 
 - TypeScript 5 / Node.js 22+ + Next.js 16 (App Router), React 19, Tailwind 4 (`pointer-fine:` variant), Chrome Manifest V3, Vitest, Playwright (2026-05-13-extension-readiness)
 - N/A — manifest tightening + client-side gating; no schema changes (2026-05-13-extension-readiness)
