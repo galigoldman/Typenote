@@ -102,8 +102,7 @@ export async function scrapeCourses(): Promise<
   const courses: ScrapedCourse[] = [];
 
   cards.forEach((card) => {
-    const moodleCourseId =
-      card.dataset.courseId ?? card.dataset.courseid ?? '';
+    const moodleCourseId = card.dataset.courseId ?? card.dataset.courseid ?? '';
     if (!moodleCourseId) return;
 
     // Extract course name from .multiline area
@@ -240,13 +239,7 @@ function mimeFromExtension(ext: string): string | undefined {
 // zips, images, video/audio, unknown extensions, etc.) is dropped at scrape
 // time so it never reaches the picker or the downloader. Matches the set
 // processable by the AI-context pipeline in src/lib/actions/ai-context.ts.
-const ALLOWED_FILE_EXTENSIONS = new Set([
-  'pdf',
-  'docx',
-  'doc',
-  'pptx',
-  'ppt',
-]);
+const ALLOWED_FILE_EXTENSIONS = new Set(['pdf', 'docx', 'doc', 'pptx', 'ppt']);
 
 /**
  * Parses a single activity element into a ScrapedItem.
@@ -357,9 +350,7 @@ function fileItemFromPluginfileLink(
     if (!url) return null;
     let filename = '';
     try {
-      filename = decodeURIComponent(
-        url.split('/').pop()?.split('?')[0] ?? '',
-      );
+      filename = decodeURIComponent(url.split('/').pop()?.split('?')[0] ?? '');
     } catch {
       filename = url.split('/').pop()?.split('?')[0] ?? '';
     }

@@ -2,3 +2,6 @@ node_modules
 .next
 pnpm-lock.yaml
 public/pdf.worker.min.mjs
+.chrome-debug
+.chrome-debug-moodle
+.claude/worktrees

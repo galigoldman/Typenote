@@ -114,12 +114,12 @@ const STATUS_BADGE_MAP: Record<
 function friendlyFileLabel(mimeType: string | undefined): string {
   if (!mimeType) return 'file';
   if (mimeType === 'application/pdf') return 'PDF';
-  if (mimeType.includes('wordprocessingml') || mimeType === 'application/msword')
-    return 'DOCX';
   if (
-    mimeType.includes('presentationml') ||
-    mimeType.includes('ms-powerpoint')
+    mimeType.includes('wordprocessingml') ||
+    mimeType === 'application/msword'
   )
+    return 'DOCX';
+  if (mimeType.includes('presentationml') || mimeType.includes('ms-powerpoint'))
     return 'PPTX';
   return 'file';
 }
@@ -410,9 +410,7 @@ export function MoodleSyncDialog({
           setPhase('awaiting-login');
           return;
         }
-        setError(
-          `Couldn't find any courses on ${moodleConnection.domain}.`,
-        );
+        setError(`Couldn't find any courses on ${moodleConnection.domain}.`);
         setNoCoursesError(true);
         if (debug) {
           setDebugInfo(
