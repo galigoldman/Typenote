@@ -52,10 +52,24 @@ export function decideCursorTarget(
   cursorBlockIndex: number,
   cursorOffset: number,
   splitIndex: number,
+  withinBlockSplitOffset?: number,
 ): CursorTarget {
   if (cursorBlockIndex < splitIndex) {
     return { kind: 'stay' };
   }
+
+  // Cursor is in the straddling block and we have a mid-block split.
+  if (cursorBlockIndex === splitIndex && withinBlockSplitOffset !== undefined) {
+    if (cursorOffset < withinBlockSplitOffset) {
+      return { kind: 'stay' };
+    }
+    return {
+      kind: 'move',
+      newBlockIndex: 0,
+      offset: cursorOffset - withinBlockSplitOffset,
+    };
+  }
+
   return {
     kind: 'move',
     newBlockIndex: cursorBlockIndex - splitIndex,

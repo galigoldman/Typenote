@@ -20,7 +20,10 @@ import type {
 } from '@/types/canvas';
 import { PAGE_WIDTH, PAGE_HEIGHT } from '@/types/canvas';
 import { processClipboardImage } from '@/lib/canvas/image-utils';
-import { findOverflowSplitIndex } from '@/lib/canvas/text-split';
+import {
+  findOverflowSplitIndex,
+  findStraddlingSplitPos,
+} from '@/lib/canvas/text-split';
 import { decideCursorTarget } from '@/lib/canvas/cursor-target';
 import type { Document } from '@/types/database';
 import type { SaveStatus } from '@/hooks/use-auto-save';
@@ -1263,13 +1266,16 @@ export function CanvasEditor({
       const containerRect = containerEl.getBoundingClientRect();
       const editorDom = editor.view.dom as HTMLElement;
       const domChildren = editorDom.children;
+      const blockTops: number[] = [];
       const blockBottoms: number[] = [];
       for (let i = 0; i < doc.childCount; i++) {
         const el = domChildren[i] as HTMLElement | undefined;
         if (el) {
           const rect = el.getBoundingClientRect();
+          blockTops.push(rect.top - containerRect.top);
           blockBottoms.push(rect.bottom - containerRect.top);
         } else {
+          blockTops.push(Infinity);
           blockBottoms.push(Infinity);
         }
       }
@@ -1282,31 +1288,109 @@ export function CanvasEditor({
         );
         if (splitIdx === null || splitIdx >= doc.childCount) return;
 
-        // Collect overflow blocks as JSON.
-        const overflowNodes: unknown[] = [];
-        for (let i = splitIdx; i < doc.childCount; i++) {
-          overflowNodes.push(doc.child(i).toJSON());
-        }
+        // Check if the block at splitIdx straddles the boundary
+        // (top within container, bottom past it). If so, split within
+        // the block at the line level (hybrid split).
+        const blockStraddles =
+          blockTops[splitIdx] < availableContainerHeight &&
+          blockBottoms[splitIdx] > availableContainerHeight;
 
-        // Compute the ProseMirror position where overflow starts.
-        let deleteFrom = 0;
-        for (let i = 0; i < splitIdx; i++) {
-          deleteFrom += doc.child(i).nodeSize;
-        }
+        let overflowNodes: unknown[];
+        let withinBlockOffset: number | undefined;
 
-        // Remove overflow from the current text box editor. In the
-        // "stay" case, the cursor is before `deleteFrom` and survives
-        // this deletion unchanged via ProseMirror's selection mapping.
-        editor
-          .chain()
-          .deleteRange({ from: deleteFrom, to: doc.content.size })
-          .run();
+        if (blockStraddles) {
+          const editorRect = editorDom.getBoundingClientRect();
+          const bottomY =
+            containerRect.top + availableContainerHeight - 10;
+          const leftX = editorRect.left + editorRect.width / 2;
+          const straddleResult = findStraddlingSplitPos(
+            (coords) => editor.view.posAtCoords(coords),
+            doc,
+            splitIdx,
+            bottomY,
+            leftX,
+          );
+
+          if (straddleResult) {
+            // Hybrid split: split the straddling block, keep first half
+            // + all preceding blocks, move second half + trailing blocks.
+            // addToHistory:false so overflow is invisible to undo.
+            editor
+              .chain()
+              .command(({ tr }) => {
+                tr.setMeta('addToHistory', false);
+                return true;
+              })
+              .setTextSelection(straddleResult.splitPos)
+              .splitBlock()
+              .run();
+
+            const newDoc = editor.state.doc;
+            overflowNodes = [];
+            for (let i = splitIdx + 1; i < newDoc.childCount; i++) {
+              overflowNodes.push(newDoc.child(i).toJSON());
+            }
+
+            let deleteFrom = 0;
+            for (let i = 0; i <= splitIdx; i++) {
+              deleteFrom += newDoc.child(i).nodeSize;
+            }
+            editor
+              .chain()
+              .command(({ tr }) => {
+                tr.setMeta('addToHistory', false);
+                return true;
+              })
+              .deleteRange({ from: deleteFrom, to: newDoc.content.size })
+              .run();
+
+            withinBlockOffset = straddleResult.withinBlockSplitOffset;
+          } else {
+            // straddleResult null — fall through to wholesale move
+            overflowNodes = [];
+            for (let i = splitIdx; i < doc.childCount; i++) {
+              overflowNodes.push(doc.child(i).toJSON());
+            }
+
+            let deleteFrom = 0;
+            for (let i = 0; i < splitIdx; i++) {
+              deleteFrom += doc.child(i).nodeSize;
+            }
+            editor
+              .chain()
+              .command(({ tr }) => {
+                tr.setMeta('addToHistory', false);
+                return true;
+              })
+              .deleteRange({ from: deleteFrom, to: doc.content.size })
+              .run();
+          }
+        } else {
+          // Wholesale move — block is entirely past the boundary.
+          // addToHistory:false so overflow is invisible to undo.
+          overflowNodes = [];
+          for (let i = splitIdx; i < doc.childCount; i++) {
+            overflowNodes.push(doc.child(i).toJSON());
+          }
+
+          let deleteFrom = 0;
+          for (let i = 0; i < splitIdx; i++) {
+            deleteFrom += doc.child(i).nodeSize;
+          }
+          editor
+            .chain()
+            .command(({ tr }) => {
+              tr.setMeta('addToHistory', false);
+              return true;
+            })
+            .deleteRange({ from: deleteFrom, to: doc.content.size })
+            .run();
+        }
 
         // Propagate the cascade: register the next page's text box as
         // a downstream cascade target so its own handleTextBoxOverflow
         // (fired later by its ResizeObserver) will classify itself as
-        // an inner hop. We do this unconditionally — the set drains
-        // naturally as each inner hop consumes its own entry.
+        // an inner hop.
         const pageIdx = currentPages.findIndex((p) => p.id === pageId);
         const nextPage =
           pageIdx >= 0 && pageIdx + 1 < currentPages.length
@@ -1316,13 +1400,15 @@ export function CanvasEditor({
           cascadeTargetTextBoxIds.current.add(`${nextPage.id}-ftb`);
         }
 
-        // Decide cursor target: if the user's block is in the overflow
-        // (e.g. Enter at end of page), the cursor follows the text.
-        // If the user's block stays (e.g. Enter in the middle), the
-        // cursor stays via ProseMirror's selection mapping.
+        // Decide cursor target with withinBlockOffset for hybrid split.
         const target = isInnerHop
           ? null
-          : decideCursorTarget(cursorBlockIndex, cursorOffsetInBlock, splitIdx);
+          : decideCursorTarget(
+              cursorBlockIndex,
+              cursorOffsetInBlock,
+              splitIdx,
+              withinBlockOffset,
+            );
 
         const cursorTargetForFocus =
           target?.kind === 'move'
@@ -1338,14 +1424,7 @@ export function CanvasEditor({
       }
 
       // Single-block path: the whole overflow is inside one paragraph/heading.
-      // Split the block at a word boundary near the bottom of the page.
-      // Cursor handling for this path is simpler — ProseMirror's
-      // setTextSelection + splitBlock + deleteRange sequence naturally
-      // leaves the cursor at the end of the first (remaining) block on
-      // the current page, which is where the user expects it to be.
-      // We do not pass a cursor target to handleTextOverflow in this
-      // case, so the overflow half moves to the next page without
-      // dragging focus with it.
+      // addToHistory:false so overflow is invisible to undo.
       const rect = editorDom.getBoundingClientRect();
       const bottomY = rect.top + availableContainerHeight - 10;
       const posInfo = editor.view.posAtCoords({
@@ -1365,7 +1444,15 @@ export function CanvasEditor({
       const splitPos = wordBreak > 0 ? $pos.start() + wordBreak : posInfo.pos;
 
       // Split, extract the overflow half, delete it from the current editor.
-      editor.chain().setTextSelection(splitPos).splitBlock().run();
+      editor
+        .chain()
+        .command(({ tr }) => {
+          tr.setMeta('addToHistory', false);
+          return true;
+        })
+        .setTextSelection(splitPos)
+        .splitBlock()
+        .run();
       const newDoc = editor.state.doc;
       const overflowNodes: unknown[] = [];
       for (let i = 1; i < newDoc.childCount; i++) {
@@ -1374,11 +1461,14 @@ export function CanvasEditor({
       const firstBlockEnd = newDoc.child(0).nodeSize;
       editor
         .chain()
+        .command(({ tr }) => {
+          tr.setMeta('addToHistory', false);
+          return true;
+        })
         .deleteRange({ from: firstBlockEnd, to: newDoc.content.size })
         .run();
 
-      // Propagate the cascade target for the single-block path too,
-      // so downstream ResizeObserver hops are classified as inner.
+      // Propagate the cascade target for the single-block path too.
       const singleBlockPageIdx = currentPages.findIndex((p) => p.id === pageId);
       const singleBlockNextPage =
         singleBlockPageIdx >= 0 && singleBlockPageIdx + 1 < currentPages.length
