@@ -1,58 +1,66 @@
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import SignupPage from './page';
 
-const mockPush = vi.fn();
-const mockRefresh = vi.fn();
-const mockSignUp = vi.fn();
 const mockSignInWithOAuth = vi.fn();
 
 vi.mock('@/lib/supabase/client', () => ({
   createClient: () => ({
     auth: {
-      signInWithPassword: vi.fn(),
       signInWithOAuth: mockSignInWithOAuth,
-      signUp: mockSignUp,
     },
   }),
 }));
 
+let mockSearchParams = new URLSearchParams();
+
 vi.mock('next/navigation', () => ({
-  useRouter: () => ({ push: mockPush, refresh: mockRefresh }),
+  useRouter: () => ({ push: vi.fn(), refresh: vi.fn() }),
+  useSearchParams: () => mockSearchParams,
 }));
 
 describe('SignupPage', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockSearchParams = new URLSearchParams();
   });
 
-  it('renders display name input', () => {
-    render(<SignupPage />);
-    expect(screen.getByLabelText(/display name/i)).toBeInTheDocument();
-  });
-
-  it('renders email input', () => {
-    render(<SignupPage />);
-    expect(screen.getByLabelText(/email/i)).toBeInTheDocument();
-  });
-
-  it('renders password input', () => {
-    render(<SignupPage />);
-    expect(screen.getByLabelText(/password/i)).toBeInTheDocument();
-  });
-
-  it('renders submit button', () => {
+  // T001: Renders only Google button, no email/password form
+  it('renders Google sign-up button', () => {
     render(<SignupPage />);
     expect(
-      screen.getByRole('button', { name: /sign up/i }),
+      screen.getByRole('button', { name: /sign up with google/i }),
     ).toBeInTheDocument();
   });
 
-  it('renders Google button', () => {
+  it('does NOT render email input', () => {
     render(<SignupPage />);
-    expect(screen.getByRole('button', { name: /google/i })).toBeInTheDocument();
+    expect(screen.queryByLabelText(/email/i)).not.toBeInTheDocument();
   });
 
+  it('does NOT render password input', () => {
+    render(<SignupPage />);
+    expect(screen.queryByLabelText(/password/i)).not.toBeInTheDocument();
+  });
+
+  it('does NOT render display name input', () => {
+    render(<SignupPage />);
+    expect(screen.queryByLabelText(/display name/i)).not.toBeInTheDocument();
+  });
+
+  // T002: Shows error message when error query param is present
+  it('shows error message when error query param is present', () => {
+    mockSearchParams = new URLSearchParams('error=auth_failed');
+    render(<SignupPage />);
+    expect(screen.getByRole('alert')).toBeInTheDocument();
+  });
+
+  it('does NOT show error message when no error param', () => {
+    render(<SignupPage />);
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+  });
+
+  // T003: Links to login page
   it('renders login link', () => {
     render(<SignupPage />);
     const link = screen.getByRole('link', { name: /sign in/i });
@@ -60,110 +68,12 @@ describe('SignupPage', () => {
     expect(link).toHaveAttribute('href', '/login');
   });
 
-  it('sanitizes "User already registered" error (no email enumeration)', async () => {
-    mockSignUp.mockResolvedValueOnce({
-      error: { message: 'User already registered' },
-    });
-
-    render(<SignupPage />);
-
-    fireEvent.change(screen.getByLabelText(/display name/i), {
-      target: { value: 'Test User' },
-    });
-    fireEvent.change(screen.getByLabelText(/email/i), {
-      target: { value: 'test@example.com' },
-    });
-    fireEvent.change(screen.getByLabelText(/password/i), {
-      target: { value: 'password123' },
-    });
-    fireEvent.click(screen.getByRole('button', { name: /sign up/i }));
-
-    await waitFor(() => {
-      expect(screen.getByRole('alert')).toHaveTextContent(
-        'Unable to create account. Try logging in or resetting your password.',
-      );
-    });
-  });
-
-  it('sanitizes network errors to friendly message', async () => {
-    mockSignUp.mockResolvedValueOnce({
-      error: { message: 'fetch failed' },
-    });
-
-    render(<SignupPage />);
-
-    fireEvent.change(screen.getByLabelText(/display name/i), {
-      target: { value: 'Test User' },
-    });
-    fireEvent.change(screen.getByLabelText(/email/i), {
-      target: { value: 'test@example.com' },
-    });
-    fireEvent.change(screen.getByLabelText(/password/i), {
-      target: { value: 'password123' },
-    });
-    fireEvent.click(screen.getByRole('button', { name: /sign up/i }));
-
-    await waitFor(() => {
-      expect(screen.getByRole('alert')).toHaveTextContent(
-        'Something went wrong. Please try again.',
-      );
-    });
-  });
-
-  it('sanitizes rate limit errors', async () => {
-    mockSignUp.mockResolvedValueOnce({
-      error: {
-        message:
-          'For security purposes, you can only request this after 60 seconds',
-      },
-    });
-
-    render(<SignupPage />);
-
-    fireEvent.change(screen.getByLabelText(/display name/i), {
-      target: { value: 'Test User' },
-    });
-    fireEvent.change(screen.getByLabelText(/email/i), {
-      target: { value: 'test@example.com' },
-    });
-    fireEvent.change(screen.getByLabelText(/password/i), {
-      target: { value: 'password123' },
-    });
-    fireEvent.click(screen.getByRole('button', { name: /sign up/i }));
-
-    await waitFor(() => {
-      expect(screen.getByRole('alert')).toHaveTextContent(
-        'Too many attempts. Please try again later.',
-      );
-    });
-  });
-
-  it('redirects to dashboard on successful signup', async () => {
-    mockSignUp.mockResolvedValueOnce({ error: null });
-
-    render(<SignupPage />);
-
-    fireEvent.change(screen.getByLabelText(/display name/i), {
-      target: { value: 'Test User' },
-    });
-    fireEvent.change(screen.getByLabelText(/email/i), {
-      target: { value: 'test@example.com' },
-    });
-    fireEvent.change(screen.getByLabelText(/password/i), {
-      target: { value: 'password123' },
-    });
-    fireEvent.click(screen.getByRole('button', { name: /sign up/i }));
-
-    await waitFor(() => {
-      expect(mockPush).toHaveBeenCalledWith('/dashboard');
-      expect(mockRefresh).toHaveBeenCalled();
-    });
-  });
-
   it('calls signInWithOAuth when Google button is clicked', () => {
     render(<SignupPage />);
 
-    fireEvent.click(screen.getByRole('button', { name: /google/i }));
+    fireEvent.click(
+      screen.getByRole('button', { name: /sign up with google/i }),
+    );
 
     expect(mockSignInWithOAuth).toHaveBeenCalledWith({
       provider: 'google',
