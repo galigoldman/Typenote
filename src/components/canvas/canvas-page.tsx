@@ -16,7 +16,10 @@ import { FontSize } from '@/lib/editor/font-size-extension';
 import { MathExpression } from '@/lib/editor/math-extension';
 import { Pencil, Sparkles, Trash2, X, Copy, Check } from 'lucide-react';
 import { PdfTextLayer } from './pdf-text-layer';
-import { findOverflowSplitIndex } from '@/lib/canvas/text-split';
+import {
+  findOverflowSplitIndex,
+  findStraddlingSplitPos,
+} from '@/lib/canvas/text-split';
 import type {
   CanvasPage as CanvasPageData,
   CanvasTool,
@@ -483,13 +486,16 @@ export function CanvasPage({
           // we fall through to the single-block word-boundary path, which
           // can actually relieve the overflow by splitting inside block 0.
           let splitIdx: number | null = null;
+          const blockTops: number[] = [];
+          const blockBottoms: number[] = [];
           if (doc.childCount > 1) {
-            const blockBottoms: number[] = [];
             for (let i = 0; i < doc.childCount; i++) {
               const el = domChildren[i] as HTMLElement | undefined;
               if (el) {
+                blockTops.push(el.offsetTop);
                 blockBottoms.push(el.offsetTop + el.offsetHeight);
               } else {
+                blockTops.push(Infinity);
                 blockBottoms.push(Infinity);
               }
             }
@@ -497,7 +503,68 @@ export function CanvasPage({
           }
 
           if (splitIdx !== null && splitIdx < doc.childCount) {
-            // Multi-block path — move trailing blocks [splitIdx..end) to the
+            // Check if the block at splitIdx straddles the page boundary
+            // (top within page, bottom past it). If so, split within the
+            // block at the line level instead of moving it wholesale.
+            const blockStraddles =
+              blockTops[splitIdx] < PAGE_HEIGHT &&
+              blockBottoms[splitIdx] > PAGE_HEIGHT;
+
+            if (blockStraddles) {
+              const layerRect = layer.getBoundingClientRect();
+              const bottomY = layerRect.top + PAGE_HEIGHT - 20;
+              const leftX = layerRect.left + PAGE_WIDTH / 2;
+              const straddleResult = findStraddlingSplitPos(
+                (coords) => ed.view.posAtCoords(coords),
+                doc,
+                splitIdx,
+                bottomY,
+                leftX,
+              );
+
+              if (straddleResult) {
+                // Hybrid split: split the straddling block at the word
+                // boundary, keep the first half + all preceding blocks,
+                // move the second half + all trailing blocks to next page.
+                isSplittingRef.current = true;
+                ed.chain()
+                  .setTextSelection(straddleResult.splitPos)
+                  .splitBlock()
+                  .run();
+
+                const newDoc = ed.state.doc;
+                const overflowNodes: unknown[] = [];
+                for (let i = splitIdx + 1; i < newDoc.childCount; i++) {
+                  overflowNodes.push(newDoc.child(i).toJSON());
+                }
+
+                let deleteFrom = 0;
+                for (let i = 0; i <= splitIdx; i++) {
+                  deleteFrom += newDoc.child(i).nodeSize;
+                }
+                ed.chain()
+                  .deleteRange({
+                    from: deleteFrom,
+                    to: newDoc.content.size,
+                  })
+                  .run();
+                isSplittingRef.current = false;
+
+                onFlowContentUpdateRef.current?.(
+                  pageIdRef.current,
+                  ed.getJSON() as Record<string, unknown>,
+                );
+
+                onTextOverflowRef.current?.(pageIdRef.current, {
+                  type: 'doc',
+                  content: overflowNodes,
+                } as Record<string, unknown>);
+                return;
+              }
+              // straddleResult null → fall through to wholesale move
+            }
+
+            // Wholesale move — move trailing blocks [splitIdx..end) to the
             // next page. Block 0 (and blocks before splitIdx) stays here.
             const overflowNodes: unknown[] = [];
             for (let i = splitIdx; i < doc.childCount; i++) {
@@ -512,9 +579,6 @@ export function CanvasPage({
             ed.chain()
               .deleteRange({ from: deleteFrom, to: doc.content.size })
               .run();
-            // Don't blur — let ProseMirror's selection mapping keep
-            // the cursor at the edge of the remaining content (same
-            // approach as the -ftb text box overflow path).
 
             onTextOverflowRef.current?.(pageIdRef.current, {
               type: 'doc',

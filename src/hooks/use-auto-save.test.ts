@@ -716,6 +716,33 @@ describe('useAutoSave', () => {
       expect(result.current.errorType).toBe('network');
     });
 
+    it('fires pending save on unmount instead of discarding it', async () => {
+      const saveFn = vi.fn().mockResolvedValue(undefined);
+      const { result, unmount } = renderHook(() => useAutoSave(saveFn, 800));
+
+      // Trigger a save — starts 800ms debounce
+      act(() => {
+        result.current.trigger();
+      });
+
+      // Unmount before debounce fires (simulates SPA navigation)
+      unmount();
+
+      // The save function should have been called immediately on unmount
+      expect(saveFn).toHaveBeenCalledOnce();
+    });
+
+    it('does not fire save on unmount when no pending debounce', () => {
+      const saveFn = vi.fn().mockResolvedValue(undefined);
+      const { unmount } = renderHook(() => useAutoSave(saveFn, 800));
+
+      // Unmount without triggering any save
+      unmount();
+
+      // saveFn should NOT have been called — nothing was pending
+      expect(saveFn).not.toHaveBeenCalled();
+    });
+
     it('classifies non-Error thrown values as permanent', async () => {
       const saveFn = vi.fn().mockRejectedValue('some string error');
       const { result } = renderHook(() => useAutoSave(saveFn, 800));

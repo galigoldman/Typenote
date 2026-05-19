@@ -44,6 +44,11 @@ export type CursorTarget =
  * @param splitIndex       First block index that overflows — i.e. the index
  *                         where `deleteRange` starts when handing content off
  *                         to the next page.
+ * @param withinBlockSplitOffset  Optional. When the straddling block at
+ *                         `splitIndex` is split mid-block (hybrid split),
+ *                         this is the text offset within that block where
+ *                         the split occurs. Enables the cursor to stay if
+ *                         it's in the kept (first) half of the split block.
  * @returns                `{ kind: 'stay' }` if the cursor survives on the
  *                         current page, or `{ kind: 'move', newBlockIndex,
  *                         offset }` if the cursor moves with the overflow.
@@ -52,10 +57,27 @@ export function decideCursorTarget(
   cursorBlockIndex: number,
   cursorOffset: number,
   splitIndex: number,
+  withinBlockSplitOffset?: number,
 ): CursorTarget {
   if (cursorBlockIndex < splitIndex) {
     return { kind: 'stay' };
   }
+
+  // Cursor is in the straddling block and we have a mid-block split.
+  // If the cursor is before the within-block split point, it stays on
+  // the current page (it's in the kept first half). Otherwise it moves
+  // with the overflow (second half becomes block 0 on the next page).
+  if (cursorBlockIndex === splitIndex && withinBlockSplitOffset !== undefined) {
+    if (cursorOffset < withinBlockSplitOffset) {
+      return { kind: 'stay' };
+    }
+    return {
+      kind: 'move',
+      newBlockIndex: 0,
+      offset: cursorOffset - withinBlockSplitOffset,
+    };
+  }
+
   return {
     kind: 'move',
     newBlockIndex: cursorBlockIndex - splitIndex,

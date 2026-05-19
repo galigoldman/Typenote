@@ -50,6 +50,11 @@ The project uses a two-branch model: `dev` (integration) and `main` (production)
 - PRs cannot be merged unless CI passes. This is enforced via GitHub branch protection rules on both `main` and `dev`.
 
 ## Active Technologies
+- TypeScript 5 / Node.js 22+ + Next.js 16 (App Router), React 19, @supabase/ssr, shadcn/ui (042-google-signup)
+- N/A — no schema changes, uses existing `profiles` table and `handle_new_user` trigger (042-google-signup)
+- TypeScript 5 / Node.js 22+ + React 19, Next.js 16 (App Router), Supabase SSR (043-fix-image-resize-persist)
+- PostgreSQL via Supabase -- existing `pages` JSONB column on `documents` table (no migration) (043-fix-image-resize-persist)
+- TypeScript 5 / Node.js 22+ + React 19, Next.js 16 (App Router), TipTap 3 (ProseMirror), Canvas 2D API (044-fix-page-overflow)
 
 - TypeScript 5 / Node.js 22+ + Next.js 16 (App Router), React 19, Tailwind CSS 4, shadcn/ui (New York), Lucide icons (041-ui-redesign)
 

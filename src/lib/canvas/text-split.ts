@@ -100,6 +100,71 @@ export function findOverflowSplitIndex(
   return null;
 }
 
+/**
+ * Find the split position within a straddling block for hybrid page overflow.
+ *
+ * When a block straddles the page boundary (top within page, bottom past it),
+ * this function finds the word-boundary position near the page bottom where
+ * the block should be split. This enables line-level splitting instead of
+ * moving the entire block to the next page.
+ *
+ * Pure function — accepts a `posAtCoords` callback and doc interface so it
+ * can be unit-tested without a real TipTap editor or DOM.
+ *
+ * @param posAtCoords  Callback that maps viewport coordinates to a
+ *                     ProseMirror position (from `editor.view.posAtCoords`).
+ * @param doc          ProseMirror document interface with `resolve` and
+ *                     `child` methods.
+ * @param splitIdx     Index of the straddling block (from `findOverflowSplitIndex`).
+ * @param bottomY      Viewport Y coordinate near the page bottom.
+ * @param leftX        Viewport X coordinate (center of editor).
+ * @returns            `{ splitPos, withinBlockSplitOffset }` if a valid split
+ *                     point was found, or `null` if the caller should fall
+ *                     back to a wholesale block move.
+ */
+export function findStraddlingSplitPos(
+  posAtCoords: (coords: { left: number; top: number }) => { pos: number } | null,
+  doc: {
+    resolve: (pos: number) => {
+      parent: { textContent: string };
+      parentOffset: number;
+      start: () => number;
+    };
+    child: (index: number) => { nodeSize: number };
+  },
+  splitIdx: number,
+  bottomY: number,
+  leftX: number,
+): { splitPos: number; withinBlockSplitOffset: number } | null {
+  const posInfo = posAtCoords({ left: leftX, top: bottomY });
+  if (!posInfo || posInfo.pos <= 2) return null;
+
+  const $pos = doc.resolve(posInfo.pos);
+  const text = $pos.parent.textContent;
+  const offset = $pos.parentOffset;
+
+  // Walk backward to nearest word boundary (space character)
+  let wordBreak = offset;
+  while (wordBreak > 0 && text[wordBreak - 1] !== ' ') {
+    wordBreak--;
+  }
+
+  const splitPos = wordBreak > 0 ? $pos.start() + wordBreak : posInfo.pos;
+  const withinBlockSplitOffset = wordBreak > 0 ? wordBreak : offset;
+
+  // Guard: if split position is at or before the straddling block's content
+  // start, even one line doesn't fit — return null to avoid infinite loops.
+  let blockStart = 0;
+  for (let i = 0; i < splitIdx; i++) {
+    blockStart += doc.child(i).nodeSize;
+  }
+  // blockStart is the position of the straddling block's open token;
+  // blockStart + 1 is the first content position inside the block.
+  if (splitPos <= blockStart + 1) return null;
+
+  return { splitPos, withinBlockSplitOffset };
+}
+
 export function findSplitIndex(
   editorView: {
     posAtCoords: (coords: {

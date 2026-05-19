@@ -20,7 +20,10 @@ import type {
 } from '@/types/canvas';
 import { PAGE_WIDTH, PAGE_HEIGHT } from '@/types/canvas';
 import { processClipboardImage } from '@/lib/canvas/image-utils';
-import { findOverflowSplitIndex } from '@/lib/canvas/text-split';
+import {
+  findOverflowSplitIndex,
+  findStraddlingSplitPos,
+} from '@/lib/canvas/text-split';
 import { decideCursorTarget } from '@/lib/canvas/cursor-target';
 import type { Document } from '@/types/database';
 import type { SaveStatus } from '@/hooks/use-auto-save';
@@ -1263,13 +1266,16 @@ export function CanvasEditor({
       const containerRect = containerEl.getBoundingClientRect();
       const editorDom = editor.view.dom as HTMLElement;
       const domChildren = editorDom.children;
+      const blockTops: number[] = [];
       const blockBottoms: number[] = [];
       for (let i = 0; i < doc.childCount; i++) {
         const el = domChildren[i] as HTMLElement | undefined;
         if (el) {
           const rect = el.getBoundingClientRect();
+          blockTops.push(rect.top - containerRect.top);
           blockBottoms.push(rect.bottom - containerRect.top);
         } else {
+          blockTops.push(Infinity);
           blockBottoms.push(Infinity);
         }
       }
@@ -1282,25 +1288,86 @@ export function CanvasEditor({
         );
         if (splitIdx === null || splitIdx >= doc.childCount) return;
 
-        // Collect overflow blocks as JSON.
-        const overflowNodes: unknown[] = [];
-        for (let i = splitIdx; i < doc.childCount; i++) {
-          overflowNodes.push(doc.child(i).toJSON());
-        }
+        // Check if the block at splitIdx straddles the boundary
+        // (top within container, bottom past it). If so, split within
+        // the block at the line level (hybrid split).
+        const blockStraddles =
+          blockTops[splitIdx] < availableContainerHeight &&
+          blockBottoms[splitIdx] > availableContainerHeight;
 
-        // Compute the ProseMirror position where overflow starts.
-        let deleteFrom = 0;
-        for (let i = 0; i < splitIdx; i++) {
-          deleteFrom += doc.child(i).nodeSize;
-        }
+        let overflowNodes: unknown[];
+        let withinBlockOffset: number | undefined;
 
-        // Remove overflow from the current text box editor. In the
-        // "stay" case, the cursor is before `deleteFrom` and survives
-        // this deletion unchanged via ProseMirror's selection mapping.
-        editor
-          .chain()
-          .deleteRange({ from: deleteFrom, to: doc.content.size })
-          .run();
+        if (blockStraddles) {
+          const editorRect = editorDom.getBoundingClientRect();
+          const bottomY =
+            containerRect.top + availableContainerHeight - 10;
+          const leftX = editorRect.left + editorRect.width / 2;
+          const straddleResult = findStraddlingSplitPos(
+            (coords) => editor.view.posAtCoords(coords),
+            doc,
+            splitIdx,
+            bottomY,
+            leftX,
+          );
+
+          if (straddleResult) {
+            // Hybrid split: split the straddling block, keep first half
+            // + all preceding blocks, move second half + trailing blocks.
+            editor
+              .chain()
+              .setTextSelection(straddleResult.splitPos)
+              .splitBlock()
+              .run();
+
+            const newDoc = editor.state.doc;
+            overflowNodes = [];
+            for (let i = splitIdx + 1; i < newDoc.childCount; i++) {
+              overflowNodes.push(newDoc.child(i).toJSON());
+            }
+
+            let deleteFrom = 0;
+            for (let i = 0; i <= splitIdx; i++) {
+              deleteFrom += newDoc.child(i).nodeSize;
+            }
+            editor
+              .chain()
+              .deleteRange({ from: deleteFrom, to: newDoc.content.size })
+              .run();
+
+            withinBlockOffset = straddleResult.withinBlockSplitOffset;
+          } else {
+            // straddleResult null — fall through to wholesale move
+            overflowNodes = [];
+            for (let i = splitIdx; i < doc.childCount; i++) {
+              overflowNodes.push(doc.child(i).toJSON());
+            }
+
+            let deleteFrom = 0;
+            for (let i = 0; i < splitIdx; i++) {
+              deleteFrom += doc.child(i).nodeSize;
+            }
+            editor
+              .chain()
+              .deleteRange({ from: deleteFrom, to: doc.content.size })
+              .run();
+          }
+        } else {
+          // Wholesale move — block is entirely past the boundary.
+          overflowNodes = [];
+          for (let i = splitIdx; i < doc.childCount; i++) {
+            overflowNodes.push(doc.child(i).toJSON());
+          }
+
+          let deleteFrom = 0;
+          for (let i = 0; i < splitIdx; i++) {
+            deleteFrom += doc.child(i).nodeSize;
+          }
+          editor
+            .chain()
+            .deleteRange({ from: deleteFrom, to: doc.content.size })
+            .run();
+        }
 
         // Propagate the cascade: register the next page's text box as
         // a downstream cascade target so its own handleTextBoxOverflow
@@ -1320,9 +1387,15 @@ export function CanvasEditor({
         // (e.g. Enter at end of page), the cursor follows the text.
         // If the user's block stays (e.g. Enter in the middle), the
         // cursor stays via ProseMirror's selection mapping.
+        // Pass withinBlockOffset for hybrid split cursor placement.
         const target = isInnerHop
           ? null
-          : decideCursorTarget(cursorBlockIndex, cursorOffsetInBlock, splitIdx);
+          : decideCursorTarget(
+              cursorBlockIndex,
+              cursorOffsetInBlock,
+              splitIdx,
+              withinBlockOffset,
+            );
 
         const cursorTargetForFocus =
           target?.kind === 'move'
