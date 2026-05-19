@@ -85,6 +85,7 @@ test.describe('Save on navigate (flush-on-unmount)', () => {
       .locator('[data-page-id]')
       .first()
       .locator('canvas')
+      .first()
       .evaluate((canvas: HTMLCanvasElement) => {
         const ctx = canvas.getContext('2d');
         if (!ctx) return -1;
