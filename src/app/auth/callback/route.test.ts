@@ -3,8 +3,15 @@ import { GET } from './route';
 
 const mockExchangeCodeForSession = vi.fn();
 
-vi.mock('@/lib/supabase/server', () => ({
-  createClient: vi.fn().mockResolvedValue({
+vi.mock('next/headers', () => ({
+  cookies: vi.fn().mockResolvedValue({
+    getAll: () => [],
+    set: vi.fn(),
+  }),
+}));
+
+vi.mock('@supabase/ssr', () => ({
+  createServerClient: () => ({
     auth: {
       exchangeCodeForSession: (...args: unknown[]) =>
         mockExchangeCodeForSession(...args),
