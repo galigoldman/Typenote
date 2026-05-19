@@ -1,5 +1,6 @@
 import { test, expect } from '@playwright/test';
 import { login } from './helpers/auth';
+import { mockLatexConversion } from './helpers/ai-mock';
 
 /**
  * Seed the test document with math content via Supabase REST API,
@@ -119,6 +120,14 @@ test.describe('LaTeX Math', () => {
   test.beforeEach(async ({ page }) => {
     await seedMathDocument();
 
+    // Mock the AI LaTeX conversion endpoint with deterministic responses so
+    // CI doesn't need GOOGLE_GENERATIVE_AI_API_KEY. The mock returns the
+    // mapped LaTeX for each natural-language input the tests send.
+    await mockLatexConversion(page, {
+      'x squared plus y': 'x^2 + y',
+      'a in A': 'a \\in A',
+    });
+
     await login(page);
     await page.goto(DOC_URL);
     await expect(page).toHaveURL(/\/dashboard\/documents\//, {
@@ -132,10 +141,6 @@ test.describe('LaTeX Math', () => {
   });
 
   test('insert math with :{ trigger', async ({ page }) => {
-    test.skip(
-      !!process.env.CI,
-      'LaTeX AI conversion needs GOOGLE_GENERATIVE_AI_API_KEY in CI',
-    );
     test.setTimeout(30_000);
 
     // Focus the editor and type the trigger sequence
@@ -268,10 +273,6 @@ test.describe('LaTeX Math', () => {
   });
 
   test('math renders LTR inside RTL text', async ({ page }) => {
-    test.skip(
-      !!process.env.CI,
-      'LaTeX AI conversion needs GOOGLE_GENERATIVE_AI_API_KEY in CI',
-    );
     test.setTimeout(30_000);
 
     // Focus the editor

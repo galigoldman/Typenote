@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback, useRef } from 'react';
+import { Puzzle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -37,6 +38,8 @@ type DialogPhase =
   | 'scraping-content'
   | 'select-content'
   | 'syncing'
+  | 'awaiting-permission'
+  | 'awaiting-login'
   | 'done'
   | 'error';
 
@@ -77,6 +80,24 @@ function isAuthError(message: string): boolean {
   return AUTH_ERROR_PATTERNS.some((p) => lower.includes(p));
 }
 
+const NETWORK_ERROR_PATTERNS = ['network', 'fetch', 'timeout', 'offline'];
+
+function isNetworkError(message: string): boolean {
+  const lower = message.toLowerCase();
+  return NETWORK_ERROR_PATTERNS.some((p) => lower.includes(p));
+}
+
+const PERMISSION_ERROR_PATTERNS = [
+  'permission',
+  'host not allowed',
+  'no access',
+];
+
+function isPermissionError(message: string): boolean {
+  const lower = message.toLowerCase();
+  return PERMISSION_ERROR_PATTERNS.some((p) => lower.includes(p));
+}
+
 const STATUS_BADGE_MAP: Record<
   CourseComparisonStatus,
   { label: string; variant: 'default' | 'secondary' | 'outline' }
@@ -92,17 +113,29 @@ export function MoodleSyncDialog({
   onOpenChange,
   moodleConnection,
 }: MoodleSyncDialogProps) {
-  const { scrapeCourses, scrapeCourseContent, downloadAndUpload } =
-    useMoodleExtension();
+  const {
+    scrapeCourses,
+    scrapeCourseContent,
+    downloadAndUpload,
+    requestPermission,
+    checkPermission,
+  } = useMoodleExtension();
   const supabaseRef = useRef(createClient());
 
   const [phase, setPhase] = useState<DialogPhase>('scraping');
+  // Ref-based cancellation so polling stops when the user clicks Cancel
+  // or closes the dialog. A boolean ref is enough — each loadCourses call
+  // bumps it to invalidate any prior polling iteration.
+  const pollCancelRef = useRef(false);
   const [courses, setCourses] = useState<CourseComparison[]>([]);
   const [selectedCourseIds, setSelectedCourseIds] = useState<Set<string>>(
     new Set(),
   );
   const [error, setError] = useState<string | null>(null);
   const [authError, setAuthError] = useState(false);
+  const [networkError, setNetworkError] = useState(false);
+  const [permissionError, setPermissionError] = useState(false);
+  const [debugInfo, setDebugInfo] = useState<string | null>(null);
   const [progress, setProgress] = useState('');
 
   // Phase 2: content selection
@@ -130,6 +163,9 @@ export function MoodleSyncDialog({
   const [downloadedCount, setDownloadedCount] = useState(0);
   const [failedCount, setFailedCount] = useState(0);
   const [totalFileJobs, setTotalFileJobs] = useState(0);
+  const [failedJobs, setFailedJobs] = useState<
+    Array<{ moodleUrl: string; fileName: string; sectionId: string }>
+  >([]);
 
   // ---- Helpers for content selection ----
   function sectionKey(courseId: string, sectionId: string) {
@@ -264,19 +300,75 @@ export function MoodleSyncDialog({
     return count;
   }
 
+  /**
+   * Poll the extension until permission for the Moodle host is granted,
+   * or the user cancels (which bumps pollCancelRef.current to true).
+   */
+  const waitForPermission = useCallback(
+    async (moodleUrl: string): Promise<boolean> => {
+      pollCancelRef.current = false;
+      const startedAt = Date.now();
+      const timeoutMs = 5 * 60 * 1000;
+      while (!pollCancelRef.current) {
+        if (Date.now() - startedAt > timeoutMs) return false;
+        const granted = await checkPermission(moodleUrl);
+        if (granted) return true;
+        await new Promise((resolve) => setTimeout(resolve, 1200));
+      }
+      return false;
+    },
+    [checkPermission],
+  );
+
   // ---- Phase 1: Load courses ----
   const loadCourses = useCallback(async () => {
     setError(null);
     setAuthError(false);
+    setNetworkError(false);
+    setPermissionError(false);
+    setDebugInfo(null);
     setCourses([]);
     setSelectedCourseIds(new Set());
 
+    const moodleUrl = `https://${moodleConnection.domain}`;
+
+    // Permission gate: declared host_permissions in the manifest are narrow
+    // (Typenote only); Moodle hosts must be granted at runtime. If we don't
+    // have the permission yet, kick off the popup handshake before even
+    // trying to scrape — otherwise we'd just get a confusing
+    // "Cannot access contents of the page" error.
     setPhase('scraping');
+    const hasPermission = await checkPermission(moodleUrl);
+    if (!hasPermission) {
+      const reqResult = await requestPermission(moodleUrl);
+      if (!reqResult.granted) {
+        if ('needsPopup' in reqResult && reqResult.needsPopup) {
+          setPhase('awaiting-permission');
+          const ok = await waitForPermission(moodleUrl);
+          if (!ok) {
+            // Distinguish user cancel from timeout: the Cancel button sets
+            // pollCancelRef.current to true AND transitions to 'error' with
+            // its own message, so we only need to handle the timeout path.
+            if (!pollCancelRef.current) {
+              setError('Permission grant timed out. Click Retry to try again.');
+              setPhase('error');
+            }
+            return;
+          }
+          setPhase('scraping');
+        } else {
+          setError(
+            reqResult.error ??
+              'Could not request permission. Reinstall the extension and try again.',
+          );
+          setPhase('error');
+          return;
+        }
+      }
+    }
 
     try {
-      const scrapeResult = await scrapeCourses(
-        `https://${moodleConnection.domain}`,
-      );
+      const scrapeResult = await scrapeCourses(moodleUrl);
 
       if (!scrapeResult) {
         setError(
@@ -288,15 +380,23 @@ export function MoodleSyncDialog({
       }
 
       if (scrapeResult.courses.length === 0) {
+        // Differentiate "logged in but no courses" from "actually a login
+        // page". The scraper returns _debug with the post-redirect tab URL —
+        // if it contains a login URL, the cookie precheck passed but the
+        // session was stale (still surface as a login prompt).
         const debug = (scrapeResult as Record<string, unknown>)._debug as
           | { title: string; url: string; cardCount: number }
           | undefined;
-        setError(
-          `No courses found. ` +
-            (debug
-              ? `Page: "${debug.title}" at ${debug.url} (${debug.cardCount} cards)`
-              : 'No debug info available.'),
-        );
+        if (debug && /\/login\/|sso|saml/i.test(debug.url)) {
+          setPhase('awaiting-login');
+          return;
+        }
+        setError('No courses found on Moodle.');
+        if (debug) {
+          setDebugInfo(
+            `Page: "${debug.title}" at ${debug.url} (${debug.cardCount} cards)`,
+          );
+        }
         setPhase('error');
         return;
       }
@@ -309,7 +409,6 @@ export function MoodleSyncDialog({
 
       setCourses(comparisons);
 
-      // Pre-select new or updated courses
       const preSelected = new Set(
         comparisons
           .filter((c) => c.status !== 'synced_by_user')
@@ -318,19 +417,50 @@ export function MoodleSyncDialog({
       setSelectedCourseIds(preSelected);
       setPhase('select-courses');
     } catch (err) {
+      const code = (err as { code?: string }).code;
+      if (code === 'NOT_LOGGED_IN') {
+        setPhase('awaiting-login');
+        return;
+      }
+      if (code === 'PERMISSION_DENIED') {
+        // Stale permission — was granted at the gate, then revoked mid-flow.
+        // Re-stash so the popup is primed, surface the permission-error UI
+        // with a Retry button. We don't auto-loop loadCourses from inside its
+        // own useCallback (self-reference cycle).
+        await requestPermission(moodleUrl);
+        setPermissionError(true);
+        setError('Permission was revoked. Click Retry to re-grant access.');
+        setPhase('error');
+        return;
+      }
       const message =
         err instanceof Error ? err.message : 'Failed to load courses';
       setError(message);
       setAuthError(isAuthError(message));
+      setNetworkError(isNetworkError(message) && !isAuthError(message));
+      setPermissionError(isPermissionError(message) && !isAuthError(message));
       setPhase('error');
     }
-  }, [scrapeCourses, moodleConnection.domain]);
+  }, [
+    scrapeCourses,
+    moodleConnection.domain,
+    checkPermission,
+    requestPermission,
+    waitForPermission,
+  ]);
 
   useEffect(() => {
     if (open) {
       // eslint-disable-next-line react-hooks/set-state-in-effect -- loadCourses fetches from external Moodle API
       loadCourses();
+    } else {
+      // Closing the dialog mid-permission-wait must stop the polling loop,
+      // otherwise it leaks and could resume into a stale state on re-open.
+      pollCancelRef.current = true;
     }
+    return () => {
+      pollCancelRef.current = true;
+    };
   }, [open, loadCourses]);
 
   function toggleCourse(moodleCourseId: string) {
@@ -431,14 +561,61 @@ export function MoodleSyncDialog({
         err instanceof Error ? err.message : 'Failed to scrape content';
       setError(message);
       setAuthError(isAuthError(message));
+      setNetworkError(isNetworkError(message) && !isAuthError(message));
+      setPermissionError(isPermissionError(message) && !isAuthError(message));
       setPhase('error');
     }
   }
 
   // ---- Phase 3: Sync selected content ----
+  async function runDownloadJobs(
+    jobs: Array<{ moodleUrl: string; fileName: string; sectionId: string }>,
+    authToken: string | undefined,
+    uploadEndpoint: string,
+  ): Promise<{
+    downloaded: number;
+    failed: number;
+    failedJobs: typeof jobs;
+    errors: string[];
+  }> {
+    let downloaded = 0;
+    let failed = 0;
+    const errors: string[] = [];
+    const newFailed: typeof jobs = [];
+
+    for (const job of jobs) {
+      try {
+        await downloadAndUpload({
+          moodleFileUrl: job.moodleUrl,
+          uploadEndpoint,
+          authToken,
+          metadata: {
+            sectionId: job.sectionId,
+            moodleUrl: job.moodleUrl,
+            fileName: job.fileName,
+          },
+        });
+        downloaded++;
+      } catch (dlErr) {
+        failed++;
+        if (errors.length < 3) {
+          errors.push(
+            `${job.fileName}: ${dlErr instanceof Error ? dlErr.message : String(dlErr)}`,
+          );
+        }
+        newFailed.push(job);
+      }
+      setProgress(
+        `Downloading files... (${downloaded + failed}/${jobs.length})`,
+      );
+    }
+    return { downloaded, failed, failedJobs: newFailed, errors };
+  }
+
   async function handleSync() {
     setPhase('syncing');
     setError(null);
+    setFailedJobs([]);
     setProgress('Saving to registry...');
 
     try {
@@ -514,7 +691,6 @@ export function MoodleSyncDialog({
       let failed = 0;
       const errors: string[] = [];
       if (fileJobs.length > 0) {
-        // Get auth token for extension → API upload
         const {
           data: { session },
         } = await supabaseRef.current.auth.getSession();
@@ -522,32 +698,15 @@ export function MoodleSyncDialog({
         const uploadEndpoint = `${window.location.origin}/api/moodle/upload`;
 
         setProgress(`Downloading files... (0/${fileJobs.length})`);
-        for (const job of fileJobs) {
-          try {
-            // Extension downloads from Moodle (with cookies) and uploads directly to our API
-            await downloadAndUpload({
-              moodleFileUrl: job.moodleUrl,
-              uploadEndpoint,
-              authToken,
-              metadata: {
-                sectionId: job.sectionId,
-                moodleUrl: job.moodleUrl,
-                fileName: job.fileName,
-              },
-            });
-            downloaded++;
-          } catch (dlErr) {
-            failed++;
-            if (errors.length < 3) {
-              errors.push(
-                `${job.fileName}: ${dlErr instanceof Error ? dlErr.message : String(dlErr)}`,
-              );
-            }
-          }
-          setProgress(
-            `Downloading files... (${downloaded + failed}/${fileJobs.length})`,
-          );
-        }
+        const dlResult = await runDownloadJobs(
+          fileJobs,
+          authToken,
+          uploadEndpoint,
+        );
+        downloaded = dlResult.downloaded;
+        failed = dlResult.failed;
+        errors.push(...dlResult.errors);
+        setFailedJobs(dlResult.failedJobs);
       }
 
       setSyncedCount(result.syncedCount);
@@ -561,8 +720,46 @@ export function MoodleSyncDialog({
       const message = err instanceof Error ? err.message : 'Sync failed';
       setError(message);
       setAuthError(isAuthError(message));
+      setNetworkError(isNetworkError(message) && !isAuthError(message));
+      setPermissionError(isPermissionError(message) && !isAuthError(message));
       setPhase('error');
     }
+  }
+
+  function cancelPolling() {
+    pollCancelRef.current = true;
+  }
+
+  async function handleRetryLogin() {
+    // User has (presumably) just logged into Moodle in another tab.
+    // Re-run the full handshake from the top.
+    await loadCourses();
+  }
+
+  async function handleRetryFailed() {
+    if (failedJobs.length === 0) return;
+    setPhase('syncing');
+    setError(null);
+    setProgress(`Retrying ${failedJobs.length} failed file(s)...`);
+
+    const {
+      data: { session },
+    } = await supabaseRef.current.auth.getSession();
+    const authToken = session?.access_token;
+    const uploadEndpoint = `${window.location.origin}/api/moodle/upload`;
+
+    const result = await runDownloadJobs(failedJobs, authToken, uploadEndpoint);
+    setDownloadedCount((prev) => prev + result.downloaded);
+    setFailedCount(result.failed);
+    setFailedJobs(result.failedJobs);
+    if (result.errors.length > 0) {
+      setError(
+        `${result.failed} file(s) still failed:\n${result.errors.join('\n')}`,
+      );
+    } else {
+      setError(null);
+    }
+    setPhase('done');
   }
 
   // ---- Render ----
@@ -610,6 +807,47 @@ export function MoodleSyncDialog({
                 {phase === 'scraping-content' && progress}
                 {phase === 'syncing' && progress}
               </p>
+            </div>
+          )}
+
+          {/* Awaiting permission grant via popup */}
+          {phase === 'awaiting-permission' && (
+            <div className="flex flex-col items-center gap-3 py-6 text-center">
+              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/10">
+                <Puzzle className="h-5 w-5 text-primary" />
+              </div>
+              <p className="text-sm font-medium">
+                Approve access to{' '}
+                <span className="font-mono">{moodleConnection.domain}</span>
+              </p>
+              <p className="max-w-xs text-xs text-muted-foreground">
+                A Typenote popup opened in your toolbar. Click{' '}
+                <strong>Allow</strong> there to continue. If you don&rsquo;t see
+                it, click the Typenote icon in the Chrome toolbar.
+              </p>
+              <p className="text-xs text-muted-foreground">
+                Waiting for permission&hellip;
+              </p>
+            </div>
+          )}
+
+          {/* Awaiting Moodle login */}
+          {phase === 'awaiting-login' && (
+            <div className="flex flex-col items-center gap-3 py-6 text-center">
+              <p className="text-sm font-medium">
+                You&rsquo;re not logged in to Moodle
+              </p>
+              <p className="max-w-xs text-xs text-muted-foreground">
+                Open Moodle in a new tab, sign in, then click Retry below.
+              </p>
+              <a
+                href={`https://${moodleConnection.domain}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-xs underline"
+              >
+                Open {moodleConnection.domain}
+              </a>
             </div>
           )}
 
@@ -872,7 +1110,9 @@ export function MoodleSyncDialog({
                 className="text-sm text-destructive whitespace-pre-wrap"
                 role="alert"
               >
-                {error}
+                {networkError && !authError
+                  ? `Couldn't reach ${moodleConnection.domain}. Check your internet and try again.`
+                  : error}
               </p>
               {authError && (
                 <p className="text-xs text-muted-foreground">
@@ -887,6 +1127,20 @@ export function MoodleSyncDialog({
                   </a>{' '}
                   and try again.
                 </p>
+              )}
+              {permissionError && (
+                <p className="text-xs text-muted-foreground">
+                  Click <strong>Retry</strong> below — Typenote will ask the
+                  extension for access, then guide you to click{' '}
+                  <strong>Allow</strong>
+                  on the toolbar icon.
+                </p>
+              )}
+              {debugInfo && (
+                <details className="text-xs text-muted-foreground">
+                  <summary className="cursor-pointer">Debug info</summary>
+                  <pre className="mt-1 whitespace-pre-wrap">{debugInfo}</pre>
+                </details>
               )}
             </div>
           )}
@@ -915,10 +1169,34 @@ export function MoodleSyncDialog({
             </div>
           )}
           {phase === 'done' && (
-            <Button onClick={() => onOpenChange(false)}>Close</Button>
+            <div className="flex gap-2">
+              {failedJobs.length > 0 && (
+                <Button variant="outline" onClick={handleRetryFailed}>
+                  Retry failed ({failedJobs.length})
+                </Button>
+              )}
+              <Button onClick={() => onOpenChange(false)}>Close</Button>
+            </div>
           )}
           {phase === 'error' && (
             <Button variant="outline" onClick={loadCourses}>
+              Retry
+            </Button>
+          )}
+          {phase === 'awaiting-permission' && (
+            <Button
+              variant="outline"
+              onClick={() => {
+                cancelPolling();
+                setPhase('error');
+                setError('Permission grant was cancelled.');
+              }}
+            >
+              Cancel
+            </Button>
+          )}
+          {phase === 'awaiting-login' && (
+            <Button variant="outline" onClick={handleRetryLogin}>
               Retry
             </Button>
           )}

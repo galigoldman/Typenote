@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { renderHook, waitFor } from '@testing-library/react';
+import { act, renderHook, waitFor } from '@testing-library/react';
 
 // Set env var BEFORE importing the hook so the module-level constant picks it up
 vi.stubEnv('NEXT_PUBLIC_EXTENSION_ID', 'test-extension-id');
@@ -48,7 +48,7 @@ describe('useMoodleExtension', () => {
   it('detects extension as installed when ping succeeds', async () => {
     mockSendMessage.mockImplementation(
       (_id: string, _msg: unknown, callback: (...args: unknown[]) => void) => {
-        callback({ success: true, data: { version: '0.1.0' } });
+        callback({ success: true, data: { version: '0.2.0' } });
       },
     );
 
@@ -120,5 +120,102 @@ describe('useMoodleExtension', () => {
       'https://moodle.test.ac.il',
     );
     expect(data).toBeNull();
+  });
+
+  it('exposes state.status="installed" with version when ping succeeds at the expected version', async () => {
+    mockSendMessage.mockImplementation(
+      (_id: string, _msg: unknown, callback: (...args: unknown[]) => void) => {
+        callback({ success: true, data: { version: '0.2.0' } });
+      },
+    );
+
+    const { result } = renderHook(() => useMoodleExtension());
+    await waitFor(() =>
+      expect(result.current.state.status).not.toBe('checking'),
+    );
+
+    expect(result.current.state).toEqual({
+      status: 'installed',
+      version: '0.2.0',
+    });
+    expect(result.current.isInstalled).toBe(true);
+  });
+
+  it('exposes state.status="version-mismatch" when ping returns a different version', async () => {
+    mockSendMessage.mockImplementation(
+      (_id: string, _msg: unknown, callback: (...args: unknown[]) => void) => {
+        callback({ success: true, data: { version: '0.1.0' } });
+      },
+    );
+
+    const { result } = renderHook(() => useMoodleExtension());
+    await waitFor(() =>
+      expect(result.current.state.status).not.toBe('checking'),
+    );
+
+    expect(result.current.state).toEqual({
+      status: 'version-mismatch',
+      installedVersion: '0.1.0',
+    });
+    expect(result.current.isInstalled).toBe(false);
+  });
+
+  it('falls back to "not-installed" when the PING response is malformed', async () => {
+    mockSendMessage.mockImplementation(
+      (_id: string, _msg: unknown, callback: (...args: unknown[]) => void) => {
+        callback({ success: true, data: {} });
+      },
+    );
+
+    const { result } = renderHook(() => useMoodleExtension());
+    await waitFor(() =>
+      expect(result.current.state.status).not.toBe('checking'),
+    );
+
+    expect(result.current.state.status).toBe('not-installed');
+  });
+
+  it('times out to "not-installed" after 2 seconds when the extension never responds', async () => {
+    vi.useFakeTimers();
+    mockSendMessage.mockImplementation(() => {
+      // never call the callback — simulates a hung extension
+    });
+
+    const { result } = renderHook(() => useMoodleExtension());
+
+    // Advance fake timers past the 2s timeout, wrapped in act so React
+    // flushes state updates that fire as a result of the timer advancing.
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(2_000);
+    });
+
+    expect(result.current.state.status).toBe('not-installed');
+    vi.useRealTimers();
+  });
+});
+
+describe('useMoodleExtension when NEXT_PUBLIC_EXTENSION_ID is unset', () => {
+  it('treats the extension as not-installed and warns in dev', async () => {
+    vi.stubEnv('NEXT_PUBLIC_EXTENSION_ID', '');
+    const warnSpy = vi
+      .spyOn(console, 'warn')
+      .mockImplementation(() => undefined);
+    vi.resetModules();
+
+    const { useMoodleExtension: freshHook } =
+      await import('./use-moodle-extension');
+    const { result } = renderHook(() => freshHook());
+
+    await waitFor(() =>
+      expect(result.current.state.status).not.toBe('checking'),
+    );
+
+    expect(result.current.state.status).toBe('not-installed');
+    expect(warnSpy).toHaveBeenCalledWith(
+      expect.stringContaining('NEXT_PUBLIC_EXTENSION_ID'),
+    );
+
+    warnSpy.mockRestore();
+    vi.stubEnv('NEXT_PUBLIC_EXTENSION_ID', 'test-extension-id');
   });
 });
