@@ -193,6 +193,41 @@ function waitForTabLoad(tabId: number): Promise<void> {
  * one of its exported functions, returning the result.
  */
 /**
+ * Detects whether a tab URL is a login redirect rather than the expected
+ * Moodle page. Returns true if either:
+ *   1. The hostname differs from the expected URL (Moodle bounced to an SSO
+ *      provider on a different domain like `login.runi.ac.il` or `idp.*`).
+ *      This is the canonical signal — if we cannot read the tab, mapping it
+ *      to PERMISSION_DENIED would lie when the real cause is an expired
+ *      session that triggered the redirect.
+ *   2. The path looks like an in-domain login flow (`/login/`, `/auth/`,
+ *      `sso`, `saml`) but is not the page we asked for.
+ */
+function isLoginRedirect(tabUrl: string, expectedUrl: string): boolean {
+  if (!tabUrl) return false;
+  let tabHost = '';
+  let expectedHost = '';
+  try {
+    tabHost = new URL(tabUrl).hostname;
+    expectedHost = new URL(expectedUrl).hostname;
+  } catch {
+    return false;
+  }
+  if (tabHost && expectedHost && tabHost !== expectedHost) return true;
+  const expectedPath = (() => {
+    try {
+      return new URL(expectedUrl).pathname;
+    } catch {
+      return '';
+    }
+  })();
+  return (
+    /\/login\/|\/auth\/|sso|saml|oauth|idp\./i.test(tabUrl) &&
+    !tabUrl.endsWith(expectedPath)
+  );
+}
+
+/**
  * Custom error class so handlers can attach a structured error code that
  * the web app branches on (PERMISSION_DENIED vs NOT_LOGGED_IN vs raw).
  */
@@ -292,13 +327,34 @@ async function handleCheckLogin(moodleUrl: string): Promise<ExtensionResponse> {
       return { success: true, data: { loggedIn: false } as LoginStatusData };
     }
 
-    // Cookie exists, but may be expired — verify by injecting into a tab
+    // Cookie exists, but may be expired — verify by injecting into a tab.
     const tabId = await getOrCreateMoodleTab(moodleUrl);
-    const data = await executeScraperFunction<LoginStatusData>(
-      tabId,
-      'scrapeLoginStatus',
-    );
-    return { success: true, data };
+    const tab = await chrome.tabs.get(tabId);
+    if (isLoginRedirect(tab.url ?? '', moodleUrl)) {
+      // Moodle bounced the tab off-domain for SSO → server-side session is
+      // dead. Treat as logged-out so callers (and the dashboard's
+      // disambiguation) get a clean signal rather than a generic failure.
+      return { success: true, data: { loggedIn: false } as LoginStatusData };
+    }
+    try {
+      const data = await executeScraperFunction<LoginStatusData>(
+        tabId,
+        'scrapeLoginStatus',
+      );
+      return { success: true, data };
+    } catch (err) {
+      // If the script can't run because of a permission error AND the tab
+      // is off-domain, that's still a login-expired signal — fail closed
+      // to loggedIn:false instead of a generic error.
+      if (
+        err instanceof ScraperError &&
+        err.code === 'PERMISSION_DENIED' &&
+        isLoginRedirect(tab.url ?? '', moodleUrl)
+      ) {
+        return { success: true, data: { loggedIn: false } as LoginStatusData };
+      }
+      throw err;
+    }
   } catch (err) {
     return { success: false, error: `Login check failed: ${String(err)}` };
   }
@@ -329,13 +385,10 @@ async function handleScrapeCourses(
     // weren't yet granted for the Moodle domain.
     const tabAfter = await chrome.tabs.get(tabId);
     const tabUrl = tabAfter.url ?? '';
-    if (
-      /\/login\/|\/auth\/|sso|saml/i.test(tabUrl) &&
-      !tabUrl.endsWith('/my/courses.php')
-    ) {
+    if (isLoginRedirect(tabUrl, coursesPageUrl)) {
       return {
         success: false,
-        error: `Moodle redirected to a login page (${tabUrl.substring(0, 120)}).`,
+        error: `Moodle redirected to ${tabUrl.substring(0, 120)} — your session likely expired.`,
         code: 'NOT_LOGGED_IN',
       };
     }
@@ -368,6 +421,16 @@ async function handleScrapeCourseContent(
     if (tab.url !== courseUrl) {
       await chrome.tabs.update(tabId, { url: courseUrl });
       await waitForTabLoad(tabId);
+    }
+
+    const tabAfter = await chrome.tabs.get(tabId);
+    const tabUrl = tabAfter.url ?? '';
+    if (isLoginRedirect(tabUrl, courseUrl)) {
+      return {
+        success: false,
+        error: `Moodle redirected to ${tabUrl.substring(0, 120)} — your session likely expired.`,
+        code: 'NOT_LOGGED_IN',
+      };
     }
 
     // First pass: scrape what's visible (section 0 + tile metadata)

@@ -51,30 +51,88 @@ export async function removeMoodleConnection() {
 }
 
 /**
- * Get the set of Moodle file URLs already in the registry for a course.
- * Used to mark already-synced items in the content picker.
+ * Get the set of Moodle file URLs the CURRENT user has already imported
+ * for a course. Used to mark already-synced items in the content picker.
+ *
+ * The shared registry holds every file anyone has ever synced, but each
+ * user only "owns" files they themselves chose to import (tracked in
+ * user_file_imports). The picker must reflect the current user's state —
+ * never another user's — otherwise items appear locked when they're not.
  */
 export async function getExistingFileUrls(
   registryId: string,
 ): Promise<string[]> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return [];
+
   const admin = createAdminClient();
 
   const { data: sections } = await admin
     .from('moodle_sections')
     .select('id')
     .eq('course_id', registryId);
-
   if (!sections || sections.length === 0) return [];
+
+  const sectionIds = sections.map((s: { id: string }) => s.id);
 
   const { data: files } = await admin
     .from('moodle_files')
-    .select('moodle_url')
-    .in(
-      'section_id',
-      sections.map((s: { id: string }) => s.id),
-    );
+    .select('id, moodle_url')
+    .in('section_id', sectionIds);
+  if (!files || files.length === 0) return [];
 
-  return (files ?? []).map((f: { moodle_url: string }) => f.moodle_url);
+  const urlByFileId = new Map<string, string>(
+    files.map((f: { id: string; moodle_url: string }) => [f.id, f.moodle_url]),
+  );
+
+  const { data: imports } = await admin
+    .from('user_file_imports')
+    .select('moodle_file_id')
+    .eq('user_id', user.id)
+    .eq('status', 'imported')
+    .in('moodle_file_id', Array.from(urlByFileId.keys()));
+
+  return (imports ?? [])
+    .map((i: { moodle_file_id: string }) => urlByFileId.get(i.moodle_file_id))
+    .filter((u): u is string => !!u);
+}
+
+/**
+ * Record that the current user has imported a specific Moodle file.
+ * Called from the upload routes after a successful storage write so the
+ * picker can show "synced" only for files THIS user actually imported.
+ *
+ * If no user_course_syncs row exists (e.g., the file was uploaded outside
+ * the normal sync flow), this is a no-op — user_file_imports.sync_id is
+ * NOT NULL, so we can't synthesize a parent here.
+ */
+export async function recordUserFileImport(
+  userId: string,
+  moodleFileId: string,
+  moodleCourseDbId: string,
+): Promise<void> {
+  const admin = createAdminClient();
+
+  const { data: sync } = await admin
+    .from('user_course_syncs')
+    .select('id')
+    .eq('user_id', userId)
+    .eq('moodle_course_id', moodleCourseDbId)
+    .single();
+  if (!sync?.id) return;
+
+  await admin.from('user_file_imports').upsert(
+    {
+      user_id: userId,
+      moodle_file_id: moodleFileId,
+      sync_id: sync.id,
+      status: 'imported' as const,
+    },
+    { onConflict: 'user_id,moodle_file_id' },
+  );
 }
 
 /**
