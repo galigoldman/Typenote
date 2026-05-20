@@ -73,6 +73,20 @@ Follow-up to issue #118. Guards against cursor jumps when a multi-page overflow 
 
 ---
 
+## Page Overflow — Undo & Split (`e2e/page-overflow.spec.ts`) — IMPLEMENTED
+
+Fixes for #044 (line-level split) and #045 (undo data loss + Shift+Enter split).
+
+- [x] Typing at end of page splits paragraph at line level, not block level
+- [x] No content duplication after overflow split
+- [x] Undo after overflow preserves content (no data loss)
+- [x] Multiple undo/redo cycles preserve content
+- [x] Undo after overflow that created a new page removes the page
+- [x] Shift+Enter at page bottom splits at break point (pre-break text stays)
+- [x] Shift+Enter with enough remaining space does not overflow
+
+---
+
 ## Text Editor Toolbar (`e2e/editor-toolbar.spec.ts`) — IMPLEMENTED
 
 - [x] Bold/italic/underline/strikethrough formatting
@@ -195,6 +209,7 @@ context-menu entry point works end-to-end.
 | Auth                  | Implemented | `e2e/auth.spec.ts`                  | 7/7       |
 | Documents             | Implemented | `e2e/documents.spec.ts`             | 6/6       |
 | Canvas Editor         | Implemented | `e2e/canvas-editor.spec.ts`         | 15/15     |
+| Page Overflow Undo    | Implemented | `e2e/page-overflow.spec.ts`         | 7/7       |
 | Text Editor Toolbar   | Implemented | `e2e/editor-toolbar.spec.ts`        | 12/12     |
 | LaTeX Math            | Implemented | `e2e/latex-math.spec.ts`            | 5/5       |
 | Courses               | Implemented | `e2e/courses.spec.ts`               | 5/6       |
@@ -207,7 +222,7 @@ context-menu entry point works end-to-end.
 | Extension Real Load   | Implemented | `e2e/extension-real.spec.ts`        | 3/3       |
 | Version History       | Planned     | `e2e/version-history.spec.ts`       | 0/5       |
 | PDF Visual Regression | Implemented | `e2e/pdf-visual-regression.spec.ts` | 8/8       |
-| **Total**             |             |                                     | **88/94** |
+| **Total**             |             |                                     | **95/101** |
 
 ---
 

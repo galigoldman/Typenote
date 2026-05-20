@@ -71,6 +71,8 @@ interface CanvasPageProps {
   onTextOverflow?: (
     pageId: string,
     overflowContent: Record<string, unknown> | null,
+    cursorTarget?: { blockIndex: number; offset: number },
+    sourceContentBefore?: Record<string, unknown>,
   ) => void;
   canvasClass?: string;
   eraserPosition?: { x: number; y: number } | null;
@@ -499,6 +501,10 @@ export function CanvasPage({
           if (splitIdx !== null && splitIdx < doc.childCount) {
             // Multi-block path — move trailing blocks [splitIdx..end) to the
             // next page. Block 0 (and blocks before splitIdx) stays here.
+
+            // Capture snapshot BEFORE mutation for undo
+            const sourceSnapshot = ed.getJSON() as Record<string, unknown>;
+
             const overflowNodes: unknown[] = [];
             for (let i = splitIdx; i < doc.childCount; i++) {
               overflowNodes.push(doc.child(i).toJSON());
@@ -509,32 +515,85 @@ export function CanvasPage({
               deleteFrom += doc.child(i).nodeSize;
             }
 
+            // Mark as non-undoable so TipTap's per-editor undo doesn't
+            // interfere with the canvas-level overflow undo.
             ed.chain()
+              .command(({ tr }) => {
+                tr.setMeta('addToHistory', false);
+                return true;
+              })
               .deleteRange({ from: deleteFrom, to: doc.content.size })
               .run();
             // Don't blur — let ProseMirror's selection mapping keep
             // the cursor at the edge of the remaining content (same
             // approach as the -ftb text box overflow path).
 
-            onTextOverflowRef.current?.(pageIdRef.current, {
-              type: 'doc',
-              content: overflowNodes,
-            } as Record<string, unknown>);
+            onTextOverflowRef.current?.(
+              pageIdRef.current,
+              {
+                type: 'doc',
+                content: overflowNodes,
+              } as Record<string, unknown>,
+              undefined,
+              sourceSnapshot,
+            );
           } else {
             // Single-block path — either doc.childCount === 1, or block 0 is
             // itself taller than the page (see the fall-through above). In
-            // both cases we split at a word boundary near the page bottom
-            // inside block 0. The resulting overflow includes the second
-            // half of block 0 AND any blocks that were already after it.
+            // both cases we split at a word boundary (or hardBreak) near the
+            // page bottom inside block 0. The resulting overflow includes the
+            // second half of block 0 AND any blocks that were already after it.
+
+            // Capture snapshot BEFORE mutation for undo
+            const sourceSnapshot = ed.getJSON() as Record<string, unknown>;
+
             const layerRect = layer.getBoundingClientRect();
             const bottomY = layerRect.top + PAGE_HEIGHT - 20;
-            const posInfo = ed.view.posAtCoords({
-              left: layerRect.left + PAGE_WIDTH / 2,
-              top: bottomY,
-            });
 
-            if (posInfo && posInfo.pos > 2) {
-              let splitPos = posInfo.pos;
+            // --- hardBreak-aware split (Shift+Enter fix, #045 P2) ---
+            // If the overflowing block contains hardBreak nodes, prefer
+            // splitting at the last hardBreak that still fits on the page.
+            // This keeps pre-break content on the current page and moves
+            // only post-break content to the next page.
+            let hardBreakSplitPos: number | null = null;
+            const firstBlock = doc.child(0);
+            if (firstBlock.content) {
+              let pos = 1; // start inside the block (skip opening token)
+              firstBlock.content.forEach((child) => {
+                if (child.type.name === 'hardBreak') {
+                  // Check if this hardBreak's rendered position is within
+                  // the page height by using coordsAtPos
+                  try {
+                    const coords = ed.view.coordsAtPos(pos);
+                    if (coords.top < layerRect.top + PAGE_HEIGHT - 40) {
+                      hardBreakSplitPos = pos;
+                    }
+                  } catch {
+                    /* coordsAtPos can throw */
+                  }
+                }
+                pos += child.nodeSize;
+              });
+            }
+
+            // Use hardBreak split if found, otherwise fall back to word boundary
+            let splitPos: number;
+            if (hardBreakSplitPos !== null) {
+              // Split right after the hardBreak (move everything after it)
+              splitPos = hardBreakSplitPos + 1; // +1 to position after the hardBreak node
+            } else {
+              const posInfo = ed.view.posAtCoords({
+                left: layerRect.left + PAGE_WIDTH / 2,
+                top: bottomY,
+              });
+
+              if (!posInfo || posInfo.pos <= 2) {
+                // Can't determine split position — navigate to next page
+                onTextOverflowRef.current?.(pageIdRef.current, null);
+                return;
+              }
+
+              splitPos = posInfo.pos;
 
               // Walk backward to find a word boundary (space)
               const $pos = doc.resolve(splitPos);
@@ -547,44 +606,57 @@ export function CanvasPage({
               if (wordBreak > 0) {
                 splitPos = $pos.start() + wordBreak;
               }
+            }
 
-              // Split the block, then extract everything after the first
-              // (kept) block as overflow.
-              isSplittingRef.current = true;
-              ed.chain().setTextSelection(splitPos).splitBlock().run();
+            // Split the block, then extract everything after the first
+            // (kept) block as overflow. Mark transactions as non-undoable.
+            isSplittingRef.current = true;
+            ed.chain()
+              .command(({ tr }) => {
+                tr.setMeta('addToHistory', false);
+                return true;
+              })
+              .setTextSelection(splitPos)
+              .splitBlock()
+              .run();
 
-              const newDoc = ed.state.doc;
-              const overflowNodes: unknown[] = [];
-              for (let i = 1; i < newDoc.childCount; i++) {
-                overflowNodes.push(newDoc.child(i).toJSON());
-              }
+            const newDoc = ed.state.doc;
+            const overflowNodes: unknown[] = [];
+            for (let i = 1; i < newDoc.childCount; i++) {
+              overflowNodes.push(newDoc.child(i).toJSON());
+            }
 
-              const firstBlockEnd = newDoc.child(0).nodeSize;
-              ed.chain()
-                .deleteRange({
-                  from: firstBlockEnd,
-                  to: newDoc.content.size,
-                })
-                .run();
+            const firstBlockEnd = newDoc.child(0).nodeSize;
+            ed.chain()
+              .command(({ tr }) => {
+                tr.setMeta('addToHistory', false);
+                return true;
+              })
+              .deleteRange({
+                from: firstBlockEnd,
+                to: newDoc.content.size,
+              })
+              .run();
 
-              isSplittingRef.current = false;
+            isSplittingRef.current = false;
 
-              // Manually save the final state (intermediate was suppressed)
-              onFlowContentUpdateRef.current?.(
-                pageIdRef.current,
-                ed.getJSON() as Record<string, unknown>,
-              );
+            // Manually save the final state (intermediate was suppressed)
+            onFlowContentUpdateRef.current?.(
+              pageIdRef.current,
+              ed.getJSON() as Record<string, unknown>,
+            );
 
-              // Don't blur — cursor stays via selection mapping.
+            // Don't blur — cursor stays via selection mapping.
 
-              onTextOverflowRef.current?.(pageIdRef.current, {
+            onTextOverflowRef.current?.(
+              pageIdRef.current,
+              {
                 type: 'doc',
                 content: overflowNodes,
-              } as Record<string, unknown>);
-            } else {
-              // Can't determine split position — navigate to next page
-              onTextOverflowRef.current?.(pageIdRef.current, null);
-            }
+              } as Record<string, unknown>,
+              undefined,
+              sourceSnapshot,
+            );
           }
         } catch {
           /* DOM measurements can throw before editor is ready */

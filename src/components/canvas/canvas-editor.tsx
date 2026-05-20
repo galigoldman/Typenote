@@ -548,6 +548,16 @@ export function CanvasEditor({
         imageId: string;
         from: { x: number; y: number; width: number; height: number };
         to: { x: number; y: number; width: number; height: number };
+      }
+    | {
+        type: 'text-overflow';
+        sourcePageId: string;
+        sourceContentBefore: Record<string, unknown>;
+        sourceContentAfter: Record<string, unknown>;
+        destPageId: string;
+        destContentBefore: Record<string, unknown> | null;
+        destContentAfter: Record<string, unknown>;
+        newPageCreated: boolean;
       };
   const undoStackRef = useRef<CanvasAction[]>([]);
   const redoStackRef = useRef<CanvasAction[]>([]);
@@ -1152,6 +1162,7 @@ export function CanvasEditor({
       pageId: string,
       overflowContent: Record<string, unknown> | null,
       cursorTarget?: { blockIndex: number; offset: number },
+      sourceContentBefore?: Record<string, unknown>,
     ) => {
       // Read the current pages synchronously via ref — we can't rely on
       // the setPages updater function setting local variables because
@@ -1164,8 +1175,46 @@ export function CanvasEditor({
       const nextPage = currentPages[pageIndex + 1];
 
       if (nextPage) {
+        // Capture destination content BEFORE merge for undo
+        let destContentBefore: Record<string, unknown> | null = null;
+        if (sourceContentBefore) {
+          const destEditor = editorsRef.current.get(nextPage.id)
+            ?? textBoxEditorsRef.current.get(`${nextPage.id}-ftb`);
+          destContentBefore = destEditor
+            ? (destEditor.getJSON() as Record<string, unknown>)
+            : null;
+        }
+
         // Existing next page — pass overflow content to merge
         focusPage(nextPage.id, overflowContent, true, cursorTarget);
+
+        // Push undo entry if we have a source snapshot (outermost hop)
+        if (sourceContentBefore) {
+          const srcEditor = editorsRef.current.get(pageId)
+            ?? textBoxEditorsRef.current.get(`${pageId}-ftb`);
+          const sourceContentAfter = srcEditor
+            ? (srcEditor.getJSON() as Record<string, unknown>)
+            : sourceContentBefore;
+          const destEditor = editorsRef.current.get(nextPage.id)
+            ?? textBoxEditorsRef.current.get(`${nextPage.id}-ftb`);
+          const destContentAfter = destEditor
+            ? (destEditor.getJSON() as Record<string, unknown>)
+            : overflowContent ?? { type: 'doc', content: [] };
+          undoStackRef.current.push({
+            type: 'text-overflow',
+            sourcePageId: pageId,
+            sourceContentBefore,
+            sourceContentAfter,
+            destPageId: nextPage.id,
+            destContentBefore,
+            destContentAfter: destContentAfter as Record<string, unknown>,
+            newPageCreated: false,
+          });
+          redoStackRef.current = [];
+          if (undoStackRef.current.length > 100) undoStackRef.current.shift();
+          setHistoryVersion((v) => v + 1);
+        }
+
         triggerSave();
         return;
       }
@@ -1187,6 +1236,29 @@ export function CanvasEditor({
       // React processes the setPages update. Pass overflow content so
       // setContent() fires onUpdate and enables cascade.
       focusPage(newPage.id, overflowContent, false, cursorTarget);
+
+      // Push undo entry for new-page overflow
+      if (sourceContentBefore) {
+        const srcEditor = editorsRef.current.get(pageId)
+          ?? textBoxEditorsRef.current.get(`${pageId}-ftb`);
+        const sourceContentAfter = srcEditor
+          ? (srcEditor.getJSON() as Record<string, unknown>)
+          : sourceContentBefore;
+        undoStackRef.current.push({
+          type: 'text-overflow',
+          sourcePageId: pageId,
+          sourceContentBefore,
+          sourceContentAfter,
+          destPageId: newPage.id,
+          destContentBefore: null,
+          destContentAfter: overflowContent ?? ({ type: 'doc', content: [] } as Record<string, unknown>),
+          newPageCreated: true,
+        });
+        redoStackRef.current = [];
+        if (undoStackRef.current.length > 100) undoStackRef.current.shift();
+        setHistoryVersion((v) => v + 1);
+      }
+
       triggerSave();
     },
     [triggerSave, document.canvas_type, focusPage],
@@ -1274,6 +1346,12 @@ export function CanvasEditor({
         }
       }
 
+      // Capture snapshot BEFORE mutation — only for outermost hops
+      // (inner cascade hops don't push to the undo stack).
+      const sourceSnapshot = !isInnerHop
+        ? (editor.getJSON() as Record<string, unknown>)
+        : undefined;
+
       if (doc.childCount > 1) {
         // Multi-block path: split at whole-block boundary.
         const splitIdx = findOverflowSplitIndex(
@@ -1294,11 +1372,14 @@ export function CanvasEditor({
           deleteFrom += doc.child(i).nodeSize;
         }
 
-        // Remove overflow from the current text box editor. In the
-        // "stay" case, the cursor is before `deleteFrom` and survives
-        // this deletion unchanged via ProseMirror's selection mapping.
+        // Remove overflow from the current text box editor. Mark as
+        // non-undoable so TipTap's per-editor undo doesn't interfere.
         editor
           .chain()
+          .command(({ tr }) => {
+            tr.setMeta('addToHistory', false);
+            return true;
+          })
           .deleteRange({ from: deleteFrom, to: doc.content.size })
           .run();
 
@@ -1333,39 +1414,67 @@ export function CanvasEditor({
           pageId,
           { type: 'doc', content: overflowNodes } as Record<string, unknown>,
           cursorTargetForFocus,
+          sourceSnapshot,
         );
         return;
       }
 
       // Single-block path: the whole overflow is inside one paragraph/heading.
-      // Split the block at a word boundary near the bottom of the page.
-      // Cursor handling for this path is simpler — ProseMirror's
-      // setTextSelection + splitBlock + deleteRange sequence naturally
-      // leaves the cursor at the end of the first (remaining) block on
-      // the current page, which is where the user expects it to be.
-      // We do not pass a cursor target to handleTextOverflow in this
-      // case, so the overflow half moves to the next page without
-      // dragging focus with it.
+      // Split the block at a word boundary (or hardBreak) near the bottom.
+      // Mark transactions as non-undoable for canvas-level undo.
       const rect = editorDom.getBoundingClientRect();
       const bottomY = rect.top + availableContainerHeight - 10;
-      const posInfo = editor.view.posAtCoords({
-        left: rect.left + rect.width / 2,
-        top: bottomY,
-      });
-      if (!posInfo || posInfo.pos <= 2) return;
 
-      // Walk backward to find a word boundary.
-      const $pos = doc.resolve(posInfo.pos);
-      const text = $pos.parent.textContent;
-      const offset = $pos.parentOffset;
-      let wordBreak = offset;
-      while (wordBreak > 0 && text[wordBreak - 1] !== ' ') {
-        wordBreak--;
+      // --- hardBreak-aware split (Shift+Enter fix, #045 P2) ---
+      let hardBreakSplitPos: number | null = null;
+      const firstBlock = doc.child(0);
+      if (firstBlock.content) {
+        let pos = 1;
+        firstBlock.content.forEach((child) => {
+          if (child.type.name === 'hardBreak') {
+            try {
+              const coords = editor.view.coordsAtPos(pos);
+              if (coords.top < containerRect.top + availableContainerHeight - 40) {
+                hardBreakSplitPos = pos;
+              }
+            } catch {
+              /* coordsAtPos can throw */
+            }
+          }
+          pos += child.nodeSize;
+        });
       }
-      const splitPos = wordBreak > 0 ? $pos.start() + wordBreak : posInfo.pos;
+
+      let splitPos: number;
+      if (hardBreakSplitPos !== null) {
+        splitPos = hardBreakSplitPos + 1;
+      } else {
+        const posInfo = editor.view.posAtCoords({
+          left: rect.left + rect.width / 2,
+          top: bottomY,
+        });
+        if (!posInfo || posInfo.pos <= 2) return;
+
+        const $pos = doc.resolve(posInfo.pos);
+        const text = $pos.parent.textContent;
+        const offset = $pos.parentOffset;
+        let wordBreak = offset;
+        while (wordBreak > 0 && text[wordBreak - 1] !== ' ') {
+          wordBreak--;
+        }
+        splitPos = wordBreak > 0 ? $pos.start() + wordBreak : posInfo.pos;
+      }
 
       // Split, extract the overflow half, delete it from the current editor.
-      editor.chain().setTextSelection(splitPos).splitBlock().run();
+      editor
+        .chain()
+        .command(({ tr }) => {
+          tr.setMeta('addToHistory', false);
+          return true;
+        })
+        .setTextSelection(splitPos)
+        .splitBlock()
+        .run();
       const newDoc = editor.state.doc;
       const overflowNodes: unknown[] = [];
       for (let i = 1; i < newDoc.childCount; i++) {
@@ -1374,6 +1483,10 @@ export function CanvasEditor({
       const firstBlockEnd = newDoc.child(0).nodeSize;
       editor
         .chain()
+        .command(({ tr }) => {
+          tr.setMeta('addToHistory', false);
+          return true;
+        })
         .deleteRange({ from: firstBlockEnd, to: newDoc.content.size })
         .run();
 
@@ -1388,10 +1501,15 @@ export function CanvasEditor({
         cascadeTargetTextBoxIds.current.add(`${singleBlockNextPage.id}-ftb`);
       }
 
-      handleTextOverflow(pageId, {
-        type: 'doc',
-        content: overflowNodes,
-      } as Record<string, unknown>);
+      handleTextOverflow(
+        pageId,
+        {
+          type: 'doc',
+          content: overflowNodes,
+        } as Record<string, unknown>,
+        undefined,
+        sourceSnapshot,
+      );
     },
     [handleTextOverflow],
   );
@@ -1861,6 +1979,34 @@ export function CanvasEditor({
   // Undo / Redo
   const handleUndo = useCallback(() => {
     if (activeTool === 'text' && activeEditor) {
+      // Check canvas stack first for text-overflow actions — these must
+      // be undone at the canvas level because TipTap's per-editor undo
+      // can't coordinate content across two separate editors.
+      const topAction = undoStackRef.current[undoStackRef.current.length - 1];
+      if (topAction?.type === 'text-overflow') {
+        undoStackRef.current.pop();
+        const srcEditor = editorsRef.current.get(topAction.sourcePageId)
+          ?? textBoxEditorsRef.current.get(`${topAction.sourcePageId}-ftb`);
+        if (srcEditor) {
+          srcEditor.commands.setContent(topAction.sourceContentBefore);
+        }
+        if (topAction.newPageCreated) {
+          // Remove the page that was created by the overflow
+          setPages((prev) => prev
+            .filter((p) => p.id !== topAction.destPageId)
+            .map((p, i) => ({ ...p, order: i })));
+        } else {
+          const destEditor = editorsRef.current.get(topAction.destPageId)
+            ?? textBoxEditorsRef.current.get(`${topAction.destPageId}-ftb`);
+          if (destEditor && topAction.destContentBefore) {
+            destEditor.commands.setContent(topAction.destContentBefore);
+          }
+        }
+        redoStackRef.current.push(topAction);
+        setHistoryVersion((v) => v + 1);
+        triggerSave();
+        return;
+      }
       activeEditor.chain().focus().undo().run();
       return;
     }
@@ -2014,6 +2160,51 @@ export function CanvasEditor({
 
   const handleRedo = useCallback(() => {
     if (activeTool === 'text' && activeEditor) {
+      // Check canvas redo stack for text-overflow actions first.
+      const topAction = redoStackRef.current[redoStackRef.current.length - 1];
+      if (topAction?.type === 'text-overflow') {
+        redoStackRef.current.pop();
+        const srcEditor = editorsRef.current.get(topAction.sourcePageId)
+          ?? textBoxEditorsRef.current.get(`${topAction.sourcePageId}-ftb`);
+        if (srcEditor) {
+          srcEditor.commands.setContent(topAction.sourceContentAfter);
+        }
+        if (topAction.newPageCreated) {
+          // Re-create the page for the overflow
+          const currentPages = pagesRef.current;
+          const srcIdx = currentPages.findIndex((p) => p.id === topAction.sourcePageId);
+          const newPage = createEmptyPage(srcIdx + 1, currentPages[srcIdx]?.pageType || document.canvas_type);
+          // Use the original destPageId so subsequent undo/redo stays consistent
+          const restoredPage = { ...newPage, id: topAction.destPageId };
+          setPages((prev) => {
+            const idx = prev.findIndex((p) => p.id === topAction.sourcePageId);
+            if (idx === -1) return prev;
+            return [...prev.slice(0, idx + 1), restoredPage, ...prev.slice(idx + 1)]
+              .map((p, i) => ({ ...p, order: i }));
+          });
+          // Set content on the re-created page after it mounts
+          const setDestContent = (attempt = 0) => {
+            const destEditor = editorsRef.current.get(topAction.destPageId)
+              ?? textBoxEditorsRef.current.get(`${topAction.destPageId}-ftb`);
+            if (destEditor) {
+              destEditor.commands.setContent(topAction.destContentAfter);
+            } else if (attempt < 20) {
+              setTimeout(() => setDestContent(attempt + 1), 50);
+            }
+          };
+          setDestContent();
+        } else {
+          const destEditor = editorsRef.current.get(topAction.destPageId)
+            ?? textBoxEditorsRef.current.get(`${topAction.destPageId}-ftb`);
+          if (destEditor) {
+            destEditor.commands.setContent(topAction.destContentAfter);
+          }
+        }
+        undoStackRef.current.push(topAction);
+        setHistoryVersion((v) => v + 1);
+        triggerSave();
+        return;
+      }
       activeEditor.chain().focus().redo().run();
       return;
     }
