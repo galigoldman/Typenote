@@ -144,7 +144,7 @@ export default async function CoursePage({
   };
 
   let moodleSections: MoodleSectionWithFiles[] = [];
-  if (syncRecord) {
+  if (syncRecord && user) {
     const { data: sections } = await admin
       .from('moodle_sections')
       .select(
@@ -152,10 +152,37 @@ export default async function CoursePage({
       )
       .eq('course_id', syncRecord.moodle_course_id)
       .order('position');
+
+    // moodle_files is a shared registry — every user who synced this course
+    // sees every row here. Restrict to files the CURRENT user explicitly
+    // imported (user_file_imports.status='imported'), otherwise users would
+    // see materials picked up by anyone who scraped the same course.
+    const allFiles = (sections ?? [])
+      .flatMap((s) => (s as MoodleSectionWithFiles).moodle_files)
+      .filter((f) => f.storage_path);
+    const allFileIds = allFiles.map((f) => f.id);
+
+    let importedFileIds = new Set<string>();
+    if (allFileIds.length > 0) {
+      const { data: imports } = await admin
+        .from('user_file_imports')
+        .select('moodle_file_id')
+        .eq('user_id', user.id)
+        .eq('status', 'imported')
+        .in('moodle_file_id', allFileIds);
+      importedFileIds = new Set(
+        (imports ?? []).map(
+          (i: { moodle_file_id: string }) => i.moodle_file_id,
+        ),
+      );
+    }
+
     const rawSections = ((sections ?? []) as MoodleSectionWithFiles[])
       .map((s) => ({
         ...s,
-        moodle_files: s.moodle_files.filter((f) => f.storage_path),
+        moodle_files: s.moodle_files.filter(
+          (f) => f.storage_path && importedFileIds.has(f.id),
+        ),
       }))
       .filter((s) => s.moodle_files.length > 0);
 
