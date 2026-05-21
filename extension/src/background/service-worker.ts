@@ -129,34 +129,127 @@ async function handleMessage(
 }
 
 // ============================================
-// Helper: find or create a tab for a Moodle URL
+// Helper: open a dedicated scrape tab
 // ============================================
 
 /**
- * Finds an existing tab matching the Moodle origin, or creates a new one.
- * Returns the tab ID.
+ * Opens a focused popup window for scraping, waits for the page to be
+ * really-loaded (not just document 'complete' — see readySelector), then
+ * snaps focus back to the window the user was on (typically the Typenote
+ * tab). The popup stays open and inactive while we scrape its DOM, then
+ * closeScrapeWindow shuts it down.
+ *
+ * Why this dance:
+ *   - We can't reuse the user's existing Moodle tabs (hijacks them, and
+ *     introduces a stale-DOM race when their previous navigation completes
+ *     between our update call and waitForTabLoad).
+ *   - We can't open a silent background tab either: Chrome throttles
+ *     background-tab timers to ~1 Hz, so Moodle's timer-driven dashboard
+ *     loader silently never renders any cards. (Faking visibilityState in
+ *     MAIN world doesn't help — the throttle is in the browser process.)
+ *   - A focused popup runs JS at full speed, so Moodle hydrates while it
+ *     is focused. Once the readiness check passes we hand focus back, and
+ *     subsequent DOM scraping is a static read that doesn't need JS to keep
+ *     ticking.
+ *   - `type: 'popup'` also means closing the window doesn't change the
+ *     active tab inside the user's Typenote window.
+ *
+ * `readySelector` is a CSS selector that must match at least one element
+ * before we'll release focus. For /my/courses.php this should match the
+ * dashboard cards (which load via XHR after document complete). Pass
+ * undefined for pages whose content is in the initial HTML.
+ *
+ * Callers must close the window via closeScrapeWindow when done.
  */
-async function getOrCreateMoodleTab(moodleUrl: string): Promise<number> {
-  const url = new URL(moodleUrl);
-  const origin = `${url.protocol}//${url.host}`;
-
-  // Look for an existing Moodle tab
-  const tabs = await chrome.tabs.query({ url: `${origin}/*` });
-  if (tabs.length > 0 && tabs[0].id !== undefined) {
-    return tabs[0].id;
+async function openScrapeWindow(
+  moodleUrl: string,
+  readySelector?: string,
+): Promise<{ tabId: number; windowId: number }> {
+  // Snapshot the user's current window so we can put focus back there.
+  let callerWindowId: number | undefined;
+  try {
+    const focused = await chrome.windows.getLastFocused({ populate: false });
+    callerWindowId = focused.id;
+  } catch {
+    // No focused window (shouldn't happen if user just clicked something)
+    // — we just won't restore focus.
   }
 
-  // Create a new tab (in background, minimized)
-  const tab = await chrome.tabs.create({
+  const win = await chrome.windows.create({
     url: moodleUrl,
-    active: false,
-    pinned: true,
+    type: 'popup',
+    focused: true,
+    width: 900,
+    height: 700,
   });
-  if (!tab.id) throw new Error('Failed to create tab');
+  const tabId = win.tabs?.[0]?.id;
+  const windowId = win.id;
+  if (!tabId || windowId === undefined) {
+    throw new Error('Failed to create scrape window');
+  }
 
-  // Wait for the tab to finish loading
-  await waitForTabLoad(tab.id);
-  return tab.id;
+  await waitForTabLoad(tabId);
+  if (readySelector) {
+    // Keep the popup focused while we poll — that's what keeps Moodle's
+    // post-load XHRs unthrottled. The poll itself runs from the service
+    // worker (unthrottled), so the 250ms cadence is real wall-clock time.
+    await waitForSelector(tabId, readySelector, 10_000);
+  }
+
+  // Page is hydrated — hand focus back to the user. The popup gets
+  // throttled now, but the DOM we'll scrape next is already populated.
+  if (callerWindowId !== undefined && callerWindowId !== windowId) {
+    try {
+      await chrome.windows.update(callerWindowId, { focused: true });
+    } catch {
+      // Caller window was closed mid-sync — nothing to restore to.
+    }
+  }
+
+  return { tabId, windowId };
+}
+
+/**
+ * Polls the page's DOM for an element matching `selector` until one
+ * appears or `timeoutMs` elapses. Runs from the service worker so the
+ * 250 ms cadence isn't subject to the page's timer throttling — the page
+ * only does a synchronous querySelector check per tick. Returns true if
+ * found, false on timeout (caller decides whether to fail or proceed).
+ */
+async function waitForSelector(
+  tabId: number,
+  selector: string,
+  timeoutMs: number,
+): Promise<boolean> {
+  const start = Date.now();
+  const POLL_INTERVAL_MS = 250;
+  while (Date.now() - start < timeoutMs) {
+    try {
+      const results = await chrome.scripting.executeScript({
+        target: { tabId },
+        func: (sel: string) => document.querySelector(sel) !== null,
+        args: [selector],
+      });
+      if (results?.[0]?.result === true) return true;
+    } catch {
+      // Tab may have navigated mid-poll; keep trying until timeout.
+    }
+    await new Promise((r) => setTimeout(r, POLL_INTERVAL_MS));
+  }
+  return false;
+}
+
+/**
+ * Best-effort window close. Never throws — by the time we're cleaning up we
+ * usually already have the scrape result and don't want to mask it with a
+ * cleanup error (and the window may have been closed by the user already).
+ */
+async function closeScrapeWindow(windowId: number): Promise<void> {
+  try {
+    await chrome.windows.remove(windowId);
+  } catch {
+    // Window already closed or invalid — fine.
+  }
 }
 
 /**
@@ -328,32 +421,36 @@ async function handleCheckLogin(moodleUrl: string): Promise<ExtensionResponse> {
     }
 
     // Cookie exists, but may be expired — verify by injecting into a tab.
-    const tabId = await getOrCreateMoodleTab(moodleUrl);
-    const tab = await chrome.tabs.get(tabId);
-    if (isLoginRedirect(tab.url ?? '', moodleUrl)) {
-      // Moodle bounced the tab off-domain for SSO → server-side session is
-      // dead. Treat as logged-out so callers (and the dashboard's
-      // disambiguation) get a clean signal rather than a generic failure.
-      return { success: true, data: { loggedIn: false } as LoginStatusData };
-    }
+    const { tabId, windowId } = await openScrapeWindow(moodleUrl);
     try {
-      const data = await executeScraperFunction<LoginStatusData>(
-        tabId,
-        'scrapeLoginStatus',
-      );
-      return { success: true, data };
-    } catch (err) {
-      // If the script can't run because of a permission error AND the tab
-      // is off-domain, that's still a login-expired signal — fail closed
-      // to loggedIn:false instead of a generic error.
-      if (
-        err instanceof ScraperError &&
-        err.code === 'PERMISSION_DENIED' &&
-        isLoginRedirect(tab.url ?? '', moodleUrl)
-      ) {
+      const tab = await chrome.tabs.get(tabId);
+      if (isLoginRedirect(tab.url ?? '', moodleUrl)) {
+        // Moodle bounced the tab off-domain for SSO → server-side session is
+        // dead. Treat as logged-out so callers (and the dashboard's
+        // disambiguation) get a clean signal rather than a generic failure.
         return { success: true, data: { loggedIn: false } as LoginStatusData };
       }
-      throw err;
+      try {
+        const data = await executeScraperFunction<LoginStatusData>(
+          tabId,
+          'scrapeLoginStatus',
+        );
+        return { success: true, data };
+      } catch (err) {
+        // If the script can't run because of a permission error AND the tab
+        // is off-domain, that's still a login-expired signal — fail closed
+        // to loggedIn:false instead of a generic error.
+        if (
+          err instanceof ScraperError &&
+          err.code === 'PERMISSION_DENIED' &&
+          isLoginRedirect(tab.url ?? '', moodleUrl)
+        ) {
+          return { success: true, data: { loggedIn: false } as LoginStatusData };
+        }
+        throw err;
+      }
+    } finally {
+      await closeScrapeWindow(windowId);
     }
   } catch (err) {
     return { success: false, error: `Login check failed: ${String(err)}` };
@@ -367,17 +464,22 @@ async function handleCheckLogin(moodleUrl: string): Promise<ExtensionResponse> {
 async function handleScrapeCourses(
   moodleUrl: string,
 ): Promise<ExtensionResponse> {
-  try {
-    // moodleUrl is the base URL (e.g. https://moodle.runi.ac.il/2026)
-    const base = moodleUrl.replace(/\/+$/, '');
-    const coursesPageUrl = `${base}/my/courses.php`;
+  // moodleUrl is the base URL (e.g. https://moodle.runi.ac.il/2026)
+  const base = moodleUrl.replace(/\/+$/, '');
+  const coursesPageUrl = `${base}/my/courses.php`;
 
-    const tabId = await getOrCreateMoodleTab(coursesPageUrl);
-    const tab = await chrome.tabs.get(tabId);
-    if (tab.url !== coursesPageUrl) {
-      await chrome.tabs.update(tabId, { url: coursesPageUrl });
-      await waitForTabLoad(tabId);
-    }
+  let windowId: number | null = null;
+  try {
+    // The dashboard cards on /my/courses.php are XHR-hydrated after the
+    // document 'complete' event. Wait for at least one card before we let
+    // focus return to Typenote — otherwise the popup gets throttled mid-
+    // hydration and the in-page scraper poll times out with 0 cards.
+    const opened = await openScrapeWindow(
+      coursesPageUrl,
+      '[data-course-id], [data-courseid]',
+    );
+    windowId = opened.windowId;
+    const { tabId } = opened;
 
     // If Moodle bounced an unauthenticated user, the tab URL is now a login
     // page rather than the courses page. This is a more reliable signal
@@ -403,6 +505,8 @@ async function handleScrapeCourses(
       return { success: false, error: err.message, code: err.code };
     }
     return { success: false, error: `Course scraping failed: ${String(err)}` };
+  } finally {
+    if (windowId !== null) await closeScrapeWindow(windowId);
   }
 }
 
@@ -413,15 +517,17 @@ async function handleScrapeCourses(
 async function handleScrapeCourseContent(
   courseUrl: string,
 ): Promise<ExtensionResponse> {
+  let windowId: number | null = null;
+  let tabId: number | null = null;
   try {
-    const tabId = await getOrCreateMoodleTab(courseUrl);
-
-    // Navigate to the course page
-    const tab = await chrome.tabs.get(tabId);
-    if (tab.url !== courseUrl) {
-      await chrome.tabs.update(tabId, { url: courseUrl });
-      await waitForTabLoad(tabId);
-    }
+    // One dedicated popup for the whole course scrape — we then navigate it
+    // through each section page below. Subsequent section navigations
+    // happen in the now-throttled popup, which is fine because section
+    // pages render their content in the initial HTML rather than via
+    // a lazy timer chain (unlike /my/courses.php).
+    const opened = await openScrapeWindow(courseUrl);
+    windowId = opened.windowId;
+    tabId = opened.tabId;
 
     const tabAfter = await chrome.tabs.get(tabId);
     const tabUrl = tabAfter.url ?? '';
@@ -471,6 +577,8 @@ async function handleScrapeCourseContent(
       success: false,
       error: `Course content scraping failed: ${String(err)}`,
     };
+  } finally {
+    if (windowId !== null) await closeScrapeWindow(windowId);
   }
 }
 
@@ -495,26 +603,24 @@ async function resolveFileUrl(moodleUrl: string): Promise<string> {
     moodleUrl.includes('/mod/resource/view.php') ||
     moodleUrl.includes('/mod/folder/view.php')
   ) {
-    const tabId = await getOrCreateMoodleTab(moodleUrl);
-    const tab = await chrome.tabs.get(tabId);
-    if (tab.url !== moodleUrl) {
-      await chrome.tabs.update(tabId, { url: moodleUrl });
-      await waitForTabLoad(tabId);
-    }
-
+    const { tabId, windowId } = await openScrapeWindow(moodleUrl);
     try {
-      const realUrl = await executeScraperFunction<string>(
-        tabId,
-        'scrapeFileUrl',
-      );
-      if (realUrl) return realUrl;
-    } catch {
-      // scrapeFileUrl returned null — no pluginfile.php link found on page
-    }
+      try {
+        const realUrl = await executeScraperFunction<string>(
+          tabId,
+          'scrapeFileUrl',
+        );
+        if (realUrl) return realUrl;
+      } catch {
+        // scrapeFileUrl returned null — no pluginfile.php link found on page
+      }
 
-    // Fallback: try redirect=1 parameter
-    const sep = moodleUrl.includes('?') ? '&' : '?';
-    return `${moodleUrl}${sep}redirect=1`;
+      // Fallback: try redirect=1 parameter
+      const sep = moodleUrl.includes('?') ? '&' : '?';
+      return `${moodleUrl}${sep}redirect=1`;
+    } finally {
+      await closeScrapeWindow(windowId);
+    }
   }
 
   return moodleUrl;
