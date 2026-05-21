@@ -204,6 +204,23 @@ export function SidebarLayout({ sidebar, children }: SidebarLayoutProps) {
           </aside>
         )}
 
+        {/* Desktop: floating reopen button when the sidebar is collapsed.
+            Without this, a user who collapsed the sidebar (state persisted in
+            localStorage) has no way to bring it back from dashboard or course
+            pages — only the canvas editor exposes its own toggle. */}
+        {!isMobile && !isOpen && (
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            onClick={toggle}
+            aria-label="Open sidebar"
+            className="fixed left-3 top-3 z-50 size-9 border border-border/40 bg-sidebar/95 shadow-sm backdrop-blur-sm hover:bg-primary/10 hover:text-primary"
+          >
+            <Menu className="size-5" />
+          </Button>
+        )}
+
         {/* Main content — overflow-hidden only on document pages where the canvas controls its own scroll */}
         <main
           className={`flex flex-col flex-1 min-h-0 min-w-0 ${
