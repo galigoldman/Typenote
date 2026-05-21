@@ -70,13 +70,35 @@ export async function POST(request: NextRequest) {
     const safeFileName = ext ? `${contentHash}.${ext}` : contentHash;
     const storagePath = `${domain}/${moodleCourseId}/${safeFileName}`;
 
+    // The storage key is derived from the SHA-256 content hash, so a
+    // pre-existing object at this path is guaranteed to be identical bytes.
+    // Short-circuit instead of attempting createSignedUploadUrl — which
+    // returns 409 "The resource already exists" and surfaces as a sync
+    // failure to the user, even though there is nothing to do.
+    const lastSlash = storagePath.lastIndexOf('/');
+    const prefix = lastSlash >= 0 ? storagePath.slice(0, lastSlash) : '';
+    const leaf =
+      lastSlash >= 0 ? storagePath.slice(lastSlash + 1) : storagePath;
+    const { data: existingObjs } = await admin.storage
+      .from('moodle-materials')
+      .list(prefix, { search: leaf });
+    if (existingObjs?.some((o) => o.name === leaf)) {
+      return NextResponse.json({ alreadyUploaded: true, storagePath });
+    }
+
     const { data: signed, error: signError } = await admin.storage
       .from('moodle-materials')
       .createSignedUploadUrl(storagePath);
 
     if (signError || !signed) {
+      // Race: another caller may have just created the object between our
+      // list() and createSignedUploadUrl(). Treat the conflict as success.
+      const msg = signError?.message ?? '';
+      if (/already exists/i.test(msg)) {
+        return NextResponse.json({ alreadyUploaded: true, storagePath });
+      }
       return NextResponse.json(
-        { error: `Failed to create signed upload URL: ${signError?.message}` },
+        { error: `Failed to create signed upload URL: ${msg}` },
         { status: 500 },
       );
     }
