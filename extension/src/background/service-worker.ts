@@ -642,7 +642,67 @@ async function handleDownloadAndUpload(
       | string
       | undefined;
 
+    const baseOrigin = new URL(uploadEndpoint).origin;
+    const jsonHeaders: Record<string, string> = {
+      'Content-Type': 'application/json',
+    };
+    if (authToken) jsonHeaders['Authorization'] = `Bearer ${authToken}`;
+
     const downloadUrl = await resolveFileUrl(moodleFileUrl);
+
+    // Fast path: if the registry already has this file AND its size matches
+    // what Moodle says NOW, we can register the import for this user
+    // without downloading bytes again. HEAD is one round-trip and pulls no
+    // body. Any failure (HEAD unsupported, network blip, server says
+    // "can't verify") falls through to the existing full-download flow.
+    try {
+      const headResp = await fetch(downloadUrl, {
+        method: 'HEAD',
+        credentials: 'include',
+        redirect: 'follow',
+      });
+      if (headResp.ok) {
+        const sizeHeader = headResp.headers.get('content-length');
+        const observedSize = sizeHeader ? Number(sizeHeader) : NaN;
+        if (Number.isFinite(observedSize) && observedSize > 0) {
+          const fastResp = await fetch(
+            `${baseOrigin}/api/moodle/import-existing`,
+            {
+              method: 'POST',
+              headers: jsonHeaders,
+              body: JSON.stringify({
+                sectionId: metadata.sectionId,
+                moodleUrl: metadata.moodleUrl,
+                observedSize,
+              }),
+            },
+          );
+          if (fastResp.ok) {
+            const fastJson = (await fastResp.json()) as {
+              imported?: boolean;
+              contentHash?: string;
+              fileSize?: number;
+              mimeType?: string;
+            };
+            if (fastJson.imported) {
+              return {
+                success: true,
+                data: {
+                  contentHash: fastJson.contentHash ?? '',
+                  fileSize: fastJson.fileSize ?? observedSize,
+                  mimeType: fastJson.mimeType ?? '',
+                  deduplicated: true,
+                },
+              };
+            }
+          }
+        }
+      }
+    } catch {
+      // Any error in the fast-path probe — fall through to full download.
+      // We never want a HEAD failure to block an import that the slow path
+      // would otherwise complete.
+    }
 
     const response = await fetch(downloadUrl, {
       credentials: 'include',
@@ -678,16 +738,10 @@ async function handleDownloadAndUpload(
     //   PUT  uploadUrl                  → file bytes (any size)
     //   POST /api/moodle/upload-finalize → { fileId, deduplicated }
     //
-    // The caller still passes `${origin}/api/moodle/upload` as
-    // `uploadEndpoint` (legacy contract); we just take the origin off it.
-    const baseOrigin = new URL(uploadEndpoint).origin;
+    // baseOrigin and jsonHeaders were declared above for the fast-path
+    // probe — reuse them here.
     const prepareUrl = `${baseOrigin}/api/moodle/upload-prepare`;
     const finalizeUrl = `${baseOrigin}/api/moodle/upload-finalize`;
-
-    const jsonHeaders: Record<string, string> = {
-      'Content-Type': 'application/json',
-    };
-    if (authToken) jsonHeaders['Authorization'] = `Bearer ${authToken}`;
 
     const prepareResp = await fetch(prepareUrl, {
       method: 'POST',
@@ -704,23 +758,33 @@ async function handleDownloadAndUpload(
         `Upload prepare failed: ${prepareResp.status} ${prepareResp.statusText} ${body.slice(0, 200)}`,
       );
     }
-    const { uploadUrl, storagePath } = (await prepareResp.json()) as {
-      uploadUrl: string;
+    const prepareJson = (await prepareResp.json()) as {
+      uploadUrl?: string;
       storagePath: string;
+      alreadyUploaded?: boolean;
     };
+    const { uploadUrl, storagePath, alreadyUploaded } = prepareJson;
 
-    const putResp = await fetch(uploadUrl, {
-      method: 'PUT',
-      headers: {
-        'Content-Type': blob.type || 'application/octet-stream',
-      },
-      body: arrayBuffer,
-    });
-    if (!putResp.ok) {
-      const body = await putResp.text().catch(() => '');
-      throw new Error(
-        `Storage PUT failed: ${putResp.status} ${putResp.statusText} ${body.slice(0, 200)}`,
-      );
+    // Skip the PUT when the storage object already exists. The storage key
+    // is a content-hash, so the bytes are guaranteed identical — there is
+    // nothing to upload, just register the import.
+    if (!alreadyUploaded) {
+      if (!uploadUrl) {
+        throw new Error('Upload prepare returned no uploadUrl');
+      }
+      const putResp = await fetch(uploadUrl, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': blob.type || 'application/octet-stream',
+        },
+        body: arrayBuffer,
+      });
+      if (!putResp.ok) {
+        const body = await putResp.text().catch(() => '');
+        throw new Error(
+          `Storage PUT failed: ${putResp.status} ${putResp.statusText} ${body.slice(0, 200)}`,
+        );
+      }
     }
 
     const finalizeResp = await fetch(finalizeUrl, {
