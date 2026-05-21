@@ -445,7 +445,10 @@ async function handleCheckLogin(moodleUrl: string): Promise<ExtensionResponse> {
           err.code === 'PERMISSION_DENIED' &&
           isLoginRedirect(tab.url ?? '', moodleUrl)
         ) {
-          return { success: true, data: { loggedIn: false } as LoginStatusData };
+          return {
+            success: true,
+            data: { loggedIn: false } as LoginStatusData,
+          };
         }
         throw err;
       }
