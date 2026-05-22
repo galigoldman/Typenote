@@ -309,12 +309,44 @@ export async function searchContext(
   params: SearchParams,
 ): Promise<SearchResult[]> {
   const userId = await getAuthUserId();
+  const supabase = await createClient();
   const queryEmbedding = await embedQuery(params.query);
+
+  // Resolve Typenote course -> canonical moodle_courses.id (if synced).
+  // RLS restricts user_course_syncs to the caller, so no user_id filter
+  // needed here.
+  let moodleCourseId: string | null = null;
+  let importedMoodleFileIds: string[] | null = null;
+  if (params.courseId) {
+    const { data: sync } = await supabase
+      .from('user_course_syncs')
+      .select('moodle_course_id')
+      .eq('course_id', params.courseId)
+      .maybeSingle();
+    moodleCourseId =
+      (sync as { moodle_course_id: string | null } | null)
+        ?.moodle_course_id ?? null;
+
+    if (moodleCourseId) {
+      // Fetch the user's notebook — the set of moodle files they have
+      // chosen to include. user_file_imports SELECT policy restricts
+      // to the caller already.
+      const { data: imports } = await supabase
+        .from('user_file_imports')
+        .select('moodle_file_id')
+        .eq('status', 'imported');
+      importedMoodleFileIds = (
+        (imports as { moodle_file_id: string }[] | null) ?? []
+      ).map((i) => i.moodle_file_id);
+    }
+  }
 
   const matches: MatchResult[] = await matchEmbeddings({
     queryEmbedding,
     userId,
     courseId: params.courseId,
+    moodleCourseId,
+    importedMoodleFileIds,
     weekId: params.weekId ?? null,
     matchCount: params.maxResults ?? 8,
   });
