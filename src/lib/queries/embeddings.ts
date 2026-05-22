@@ -92,6 +92,8 @@ export async function matchEmbeddings(params: {
   queryEmbedding: number[];
   userId: string;
   courseId?: string | null;
+  moodleCourseId?: string | null;
+  importedMoodleFileIds?: string[] | null;
   weekId?: string | null;
   matchCount?: number;
   similarityThreshold?: number;
@@ -101,6 +103,8 @@ export async function matchEmbeddings(params: {
     query_embedding: JSON.stringify(params.queryEmbedding),
     match_user_id: params.userId,
     match_course_id: params.courseId ?? null,
+    match_moodle_course_id: params.moodleCourseId ?? null,
+    match_imported_moodle_file_ids: params.importedMoodleFileIds ?? null,
     match_week_id: params.weekId ?? null,
     match_count: params.matchCount ?? 8,
     similarity_threshold: params.similarityThreshold ?? 0.3,
