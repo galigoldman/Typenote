@@ -23,36 +23,65 @@ vi.mock('@/lib/queries/embeddings', () => ({
 }));
 
 vi.mock('@/lib/supabase/server', () => ({
-  createClient: vi.fn(async () => ({
-    auth: {
-      getUser: vi.fn(async () => ({
-        data: { user: { id: 'test-user-id' } },
-        error: null,
-      })),
-    },
-    from: vi.fn(() => ({
-      select: vi.fn(() => ({
-        eq: vi.fn(() => ({
-          single: vi.fn(async () => ({
-            data: {
-              storage_path: 'test/path.pdf',
-              file_name: 'lecture.pdf',
-              mime_type: 'application/pdf',
-            },
+  createClient: vi.fn(async () => {
+    const courseMaterialRow = {
+      storage_path: 'test/path.pdf',
+      file_name: 'lecture.pdf',
+      mime_type: 'application/pdf',
+    };
+    const syncRow = { moodle_course_id: 'moodle-course-1' };
+    const importsRows = [
+      { moodle_file_id: 'imported-file-a' },
+      { moodle_file_id: 'imported-file-b' },
+    ];
+
+    const from = vi.fn((table: string) => {
+      if (table === 'user_file_imports') {
+        // Awaitable directly (no .single/.maybeSingle in our usage)
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const chain: any = {
+          select: vi.fn(() => chain),
+          eq: vi.fn(() => chain),
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          then: (resolve: (value: any) => any) =>
+            resolve({ data: importsRows, error: null }),
+        };
+        return chain;
+      }
+      const data =
+        table === 'user_course_syncs'
+          ? syncRow
+          : table === 'course_materials'
+            ? courseMaterialRow
+            : null;
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const chain: any = {
+        select: vi.fn(() => chain),
+        eq: vi.fn(() => chain),
+        maybeSingle: vi.fn(async () => ({ data, error: null })),
+        single: vi.fn(async () => ({ data, error: null })),
+      };
+      return chain;
+    });
+
+    return {
+      auth: {
+        getUser: vi.fn(async () => ({
+          data: { user: { id: 'test-user-id' } },
+          error: null,
+        })),
+      },
+      from,
+      storage: {
+        from: vi.fn(() => ({
+          download: vi.fn(async () => ({
+            data: new Blob(['fake file content']),
             error: null,
           })),
         })),
-      })),
-    })),
-    storage: {
-      from: vi.fn(() => ({
-        download: vi.fn(async () => ({
-          data: new Blob(['fake file content']),
-          error: null,
-        })),
-      })),
-    },
-  })),
+      },
+    };
+  }),
 }));
 
 vi.mock('@/lib/supabase/admin', () => {
@@ -200,6 +229,24 @@ describe('searchContext', () => {
     expect(results[0].sourceName).toBe('Lecture 5.pdf');
     expect(results[0].segmentText).toBe('Extracted text from lecture 5');
     expect(results[0].similarity).toBe(0.92);
+  });
+
+  it('passes resolved moodleCourseId and importedMoodleFileIds to matchEmbeddings', async () => {
+    const { matchEmbeddings } = await import('@/lib/queries/embeddings');
+    vi.mocked(matchEmbeddings).mockResolvedValueOnce([]);
+
+    await searchContext({
+      query: 'what is in lecture 5?',
+      courseId: 'callers-typenote-course',
+    });
+
+    expect(matchEmbeddings).toHaveBeenCalledWith(
+      expect.objectContaining({
+        courseId: 'callers-typenote-course',
+        moodleCourseId: 'moodle-course-1',
+        importedMoodleFileIds: ['imported-file-a', 'imported-file-b'],
+      }),
+    );
   });
 });
 
