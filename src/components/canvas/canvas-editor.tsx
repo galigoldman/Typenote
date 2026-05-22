@@ -355,10 +355,6 @@ export function CanvasEditor({
 
   const [askAiDropdownOpen, setAskAiDropdownOpen] = useState(false);
   const askAiDropdownRef = useRef<HTMLDivElement>(null);
-  const [askAiDropdownPos, setAskAiDropdownPos] = useState<{
-    top: number;
-    left: number;
-  } | null>(null);
 
   // Close Ask AI dropdown on click outside
   useEffect(() => {
@@ -2680,7 +2676,7 @@ export function CanvasEditor({
 
       {/* Toolbar — sticky so it stays visible when zoomed */}
       <div className="flex flex-col items-center z-20 shrink-0 my-2 gap-1">
-        <div className="glass-panel flex items-center mx-auto px-3 py-1.5 overflow-x-auto overflow-y-visible w-fit max-w-full rounded-2xl border border-white/60 shadow-lg">
+        <div className="glass-panel flex items-center mx-auto px-3 py-1.5 overflow-visible w-fit max-w-full rounded-2xl border border-white/60 shadow-lg">
           {/* Mobile: back + home + title (hidden on desktop — shown in header) */}
           <div className="hidden pointer-touch:flex items-center gap-1 mr-2 shrink-0">
             <button
@@ -2762,14 +2758,6 @@ export function CanvasEditor({
               <button
                 onPointerDown={(e) => {
                   e.stopPropagation();
-                  if (!askAiDropdownOpen && askAiDropdownRef.current) {
-                    const rect =
-                      askAiDropdownRef.current.getBoundingClientRect();
-                    setAskAiDropdownPos({
-                      top: rect.bottom + 4,
-                      left: rect.left,
-                    });
-                  }
                   setAskAiDropdownOpen((prev) => !prev);
                 }}
                 className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
@@ -2781,14 +2769,8 @@ export function CanvasEditor({
                 <AiHeadIcon className="h-4 w-4" />
                 Ask AI
               </button>
-              {askAiDropdownOpen && askAiDropdownPos && (
-                <div
-                  className="fixed mt-1 w-44 rounded-lg border bg-popover p-1 shadow-lg z-[100]"
-                  style={{
-                    top: askAiDropdownPos.top,
-                    left: askAiDropdownPos.left,
-                  }}
-                >
+              {askAiDropdownOpen && (
+                <div className="absolute top-full left-0 mt-1 w-44 rounded-lg border bg-popover p-1 shadow-lg z-[100]">
                   <button
                     onPointerDown={(e) => {
                       e.stopPropagation();
