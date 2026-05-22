@@ -259,3 +259,33 @@ export async function recordFileImports(
     importedCount: fileIds.length,
   };
 }
+
+/**
+ * Remove a Moodle file from the current user's notebook.
+ * Hard-deletes the user_file_imports row. The file remains in the
+ * shared registry and embeddings (other users may still reference it).
+ */
+export async function removeMoodleFileFromNotebook(
+  moodleFileId: string,
+  courseId: string,
+) {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) throw new Error('Unauthorized');
+
+  // RLS already restricts user_file_imports.delete to auth.uid() =
+  // user_id; the explicit .eq is belt-and-suspenders.
+  const { error } = await supabase
+    .from('user_file_imports')
+    .delete()
+    .eq('moodle_file_id', moodleFileId)
+    .eq('user_id', user.id);
+
+  if (error) throw new Error(error.message);
+
+  // Codebase convention: literal-path revalidation (see
+  // src/lib/actions/documents.ts:152).
+  revalidatePath('/dashboard/courses/' + courseId);
+}
