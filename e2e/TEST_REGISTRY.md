@@ -130,6 +130,13 @@ Follow-up to issue #118. Guards against cursor jumps when a multi-page overflow 
 
 ---
 
+### AI chat — per-user material access (`e2e/ai-chat-per-user-materials.spec.ts`) — PLANNED
+
+- [ ] user sees materials they imported in chat — ⚠️ SKIPPED IN CI (needs AI API key)
+- [ ] removing a file from notebook hides it from chat — ⚠️ SKIPPED IN CI (needs AI API key)
+
+---
+
 ## PDF Export — IMPLEMENTED
 
 - [x] Export as PDF option in dashboard context menu (`e2e/export-pdf-dashboard.spec.ts`)
@@ -236,6 +243,7 @@ Test lives in `src/__tests__/integration/storage-rls.integration.test.ts`. Verif
 | Courses               | Implemented | `e2e/courses.spec.ts`               | 5/6       |
 | File Upload           | Implemented | `e2e/file-upload.spec.ts`           | 3/4       |
 | AI Chat               | Implemented | `e2e/ai-chat.spec.ts`               | 6/6       |
+| AI Chat — Per-user    | Planned     | `e2e/ai-chat-per-user-materials.spec.ts` | 0/2  |
 | PDF Export            | Implemented | `e2e/export-pdf-*.spec.ts`          | 6/7       |
 | Real-time Sync        | Implemented | `e2e/realtime-sync.spec.ts`         | 3/3       |
 | Drawing Copy/Paste    | Implemented | `e2e/drawing-copy-paste.spec.ts`    | 8/8       |
@@ -243,7 +251,7 @@ Test lives in `src/__tests__/integration/storage-rls.integration.test.ts`. Verif
 | Extension Real Load   | Implemented | `e2e/extension-real.spec.ts`        | 3/3       |
 | Version History       | Planned     | `e2e/version-history.spec.ts`       | 0/5       |
 | PDF Visual Regression | Implemented | `e2e/pdf-visual-regression.spec.ts` | 8/8       |
-| **Total**             |             |                                     | **88/94** |
+| **Total**             |             |                                     | **88/96** |
 
 ---
 
