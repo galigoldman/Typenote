@@ -1,3 +1,5 @@
 node_modules/
 dist/
+store-build/
+store-build.zip
 *.log

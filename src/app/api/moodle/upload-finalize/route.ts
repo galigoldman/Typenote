@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 
 import { indexContent } from '@/lib/actions/ai-context';
+import { recordUserFileImport } from '@/lib/actions/moodle-sync';
 import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 
@@ -115,6 +116,11 @@ export async function POST(request: NextRequest) {
       .single();
 
     if (!updateError && fileRecord) {
+      if (moodleCourseDbId) {
+        recordUserFileImport(userId, fileRecord.id, moodleCourseDbId).catch(
+          (err) => console.error('user_file_imports upsert failed:', err),
+        );
+      }
       if (appCourseId) {
         indexContent({
           type: 'moodle_file',
@@ -152,6 +158,11 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    if (moodleCourseDbId) {
+      recordUserFileImport(userId, newRecord.id, moodleCourseDbId).catch(
+        (err) => console.error('user_file_imports upsert failed:', err),
+      );
+    }
     if (appCourseId) {
       indexContent({
         type: 'moodle_file',

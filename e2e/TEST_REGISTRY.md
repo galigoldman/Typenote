@@ -13,13 +13,13 @@ When adding or modifying a feature, update this registry and write the correspon
 
 ## Auth (`e2e/auth.spec.ts`) — IMPLEMENTED
 
-- [x] Sign up with email and password
-- [x] Sign up with invalid email shows error
+- [x] Signup page shows only Google button (no email/password form)
 - [x] Log in with valid credentials redirects to dashboard
 - [x] Log in with wrong password shows error
 - [x] Log out returns to login page
 - [x] Password reset sends email (forgot password flow)
 - [x] Unauthenticated user is redirected to login
+- [x] Login page still shows both email/password and Google options
 
 ---
 

@@ -98,15 +98,31 @@ function isPermissionError(message: string): boolean {
   return PERMISSION_ERROR_PATTERNS.some((p) => lower.includes(p));
 }
 
+// Course statuses are per-user (see compareCourses): only `new_to_system`
+// and `synced_by_user` are actually returned. The other type members exist
+// for backward compatibility and never reach the badge map at runtime.
 const STATUS_BADGE_MAP: Record<
   CourseComparisonStatus,
   { label: string; variant: 'default' | 'secondary' | 'outline' }
 > = {
   new_to_system: { label: 'New', variant: 'default' },
-  synced_by_others: { label: 'Available', variant: 'secondary' },
+  synced_by_others: { label: 'New', variant: 'default' },
   synced_by_user: { label: 'Synced', variant: 'outline' },
-  has_new_items: { label: 'New Items', variant: 'default' },
+  has_new_items: { label: 'New', variant: 'default' },
 };
+
+function friendlyFileLabel(mimeType: string | undefined): string {
+  if (!mimeType) return 'file';
+  if (mimeType === 'application/pdf') return 'PDF';
+  if (
+    mimeType.includes('wordprocessingml') ||
+    mimeType === 'application/msword'
+  )
+    return 'DOCX';
+  if (mimeType.includes('presentationml') || mimeType.includes('ms-powerpoint'))
+    return 'PPTX';
+  return 'file';
+}
 
 export function MoodleSyncDialog({
   open,
@@ -119,6 +135,7 @@ export function MoodleSyncDialog({
     downloadAndUpload,
     requestPermission,
     checkPermission,
+    checkMoodleLogin,
   } = useMoodleExtension();
   const supabaseRef = useRef(createClient());
 
@@ -135,6 +152,7 @@ export function MoodleSyncDialog({
   const [authError, setAuthError] = useState(false);
   const [networkError, setNetworkError] = useState(false);
   const [permissionError, setPermissionError] = useState(false);
+  const [noCoursesError, setNoCoursesError] = useState(false);
   const [debugInfo, setDebugInfo] = useState<string | null>(null);
   const [progress, setProgress] = useState('');
 
@@ -326,6 +344,7 @@ export function MoodleSyncDialog({
     setAuthError(false);
     setNetworkError(false);
     setPermissionError(false);
+    setNoCoursesError(false);
     setDebugInfo(null);
     setCourses([]);
     setSelectedCourseIds(new Set());
@@ -391,7 +410,8 @@ export function MoodleSyncDialog({
           setPhase('awaiting-login');
           return;
         }
-        setError('No courses found on Moodle.');
+        setError(`Couldn't find any courses on ${moodleConnection.domain}.`);
+        setNoCoursesError(true);
         if (debug) {
           setDebugInfo(
             `Page: "${debug.title}" at ${debug.url} (${debug.cardCount} cards)`,
@@ -423,13 +443,23 @@ export function MoodleSyncDialog({
         return;
       }
       if (code === 'PERMISSION_DENIED') {
-        // Stale permission — was granted at the gate, then revoked mid-flow.
-        // Re-stash so the popup is primed, surface the permission-error UI
-        // with a Retry button. We don't auto-loop loadCourses from inside its
-        // own useCallback (self-reference cycle).
+        // PERMISSION_DENIED is ambiguous from the dashboard side: it can be
+        // a genuine permission revocation OR a session expiry whose redirect
+        // landed on a cross-host SSO page the extension cannot read. Probe
+        // login state first so we route to the right UI instead of always
+        // blaming permissions. checkMoodleLogin's fast path checks for the
+        // MoodleSession cookie and returns loggedIn:false without needing
+        // tab access, so it works even when permissions are the issue.
+        const loginStatus = await checkMoodleLogin(moodleUrl);
+        if (loginStatus?.loggedIn === false) {
+          setPhase('awaiting-login');
+          return;
+        }
         await requestPermission(moodleUrl);
         setPermissionError(true);
-        setError('Permission was revoked. Click Retry to re-grant access.');
+        setError(
+          'Could not access Moodle. Your session may have expired, or the extension may have lost permission for this host.',
+        );
         setPhase('error');
         return;
       }
@@ -447,6 +477,7 @@ export function MoodleSyncDialog({
     checkPermission,
     requestPermission,
     waitForPermission,
+    checkMoodleLogin,
   ]);
 
   useEffect(() => {
@@ -1063,8 +1094,7 @@ export function MoodleSyncDialog({
                                         className="text-[10px] px-1.5 py-0"
                                       >
                                         {item.type === 'file'
-                                          ? (item.mimeType?.split('/')[1] ??
-                                            'file')
+                                          ? friendlyFileLabel(item.mimeType)
                                           : 'link'}
                                       </Badge>
                                     </label>
@@ -1130,10 +1160,34 @@ export function MoodleSyncDialog({
               )}
               {permissionError && (
                 <p className="text-xs text-muted-foreground">
-                  Click <strong>Retry</strong> below — Typenote will ask the
-                  extension for access, then guide you to click{' '}
-                  <strong>Allow</strong>
-                  on the toolbar icon.
+                  Two things to check: (1) you&rsquo;re signed in to{' '}
+                  <a
+                    href={`https://${moodleConnection.domain}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="underline"
+                  >
+                    {moodleConnection.domain}
+                  </a>{' '}
+                  (open it in a new tab and confirm), and (2) the extension has
+                  permission for that host. Then click <strong>Retry</strong>{' '}
+                  below.
+                </p>
+              )}
+              {noCoursesError && (
+                <p className="text-xs text-muted-foreground">
+                  Open{' '}
+                  <a
+                    href={`https://${moodleConnection.domain}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="underline"
+                  >
+                    {moodleConnection.domain}
+                  </a>{' '}
+                  in a tab, make sure you&rsquo;re signed in and your courses
+                  show on the <strong>My Courses</strong> page, then click{' '}
+                  <strong>Retry</strong>.
                 </p>
               )}
               {debugInfo && (

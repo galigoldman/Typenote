@@ -5,10 +5,12 @@
   "scripts": {
     "dev": "esbuild src/background/service-worker.ts src/content/moodle-scraper.ts src/popup/popup.ts --bundle --outdir=dist --sourcemap --watch",
     "build": "esbuild src/background/service-worker.ts src/content/moodle-scraper.ts src/popup/popup.ts --bundle --outdir=dist --minify",
+    "build:store": "node scripts/build-store.mjs",
     "typecheck": "tsc --noEmit"
   },
   "devDependencies": {
     "@types/chrome": "^0.0.287",
+    "adm-zip": "^0.5.17",
     "esbuild": "^0.24.0",
     "typescript": "^5.0.0"
   }

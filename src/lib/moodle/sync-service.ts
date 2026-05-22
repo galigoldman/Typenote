@@ -30,14 +30,11 @@ export interface CourseComparison {
 }
 
 /**
- * Compare scraped Moodle courses against the shared registry
- * to determine each course's status for the current user.
- *
- * Logic per course:
- * 1. Look up instance by domain
- * 2. Check if course exists in `moodle_courses`
- * 3. If exists, check if this user has a `user_course_syncs` record
- * 4. Return appropriate status
+ * Compare scraped Moodle courses against the shared registry for the
+ * current user. The returned status only reflects what THIS user has
+ * actually imported — never what another user has done. The shared
+ * registry is used purely to scope per-user queries, never to surface
+ * "available because someone else synced it" hints.
  */
 export async function compareCourses(
   instanceDomain: string,
@@ -46,14 +43,12 @@ export async function compareCourses(
 ): Promise<CourseComparison[]> {
   const admin = createAdminClient();
 
-  // Step 1: Look up instance by domain
   const { data: instance } = await admin
     .from('moodle_instances')
     .select('id')
     .eq('domain', instanceDomain)
     .single();
 
-  // If instance doesn't exist, all courses are new
   if (!instance) {
     return scrapedCourses.map((course) => ({
       moodleCourseId: course.moodleCourseId,
@@ -66,7 +61,6 @@ export async function compareCourses(
   const results: CourseComparison[] = [];
 
   for (const scraped of scrapedCourses) {
-    // Step 2: Check if course exists in the shared registry
     const { data: registryCourse } = await admin
       .from('moodle_courses')
       .select('id')
@@ -84,29 +78,6 @@ export async function compareCourses(
       continue;
     }
 
-    // Step 3: Check if the course actually has content (sections with files)
-    const { count: fileCount } = await admin
-      .from('moodle_sections')
-      .select('id, moodle_files(id)', { count: 'exact', head: false })
-      .eq('course_id', registryCourse.id);
-
-    // Count actual files across all sections
-    const { count: totalFiles } = await admin
-      .from('moodle_files')
-      .select('id', { count: 'exact', head: true })
-      .in(
-        'section_id',
-        (
-          await admin
-            .from('moodle_sections')
-            .select('id')
-            .eq('course_id', registryCourse.id)
-        ).data?.map((s: { id: string }) => s.id) ?? [],
-      );
-
-    const hasContent = (totalFiles ?? 0) > 0;
-
-    // Step 4: Check if this user has a sync record
     const { data: userSync } = await admin
       .from('user_course_syncs')
       .select('id, last_synced_at')
@@ -115,15 +86,10 @@ export async function compareCourses(
       .single();
 
     if (!userSync) {
-      results.push({
-        moodleCourseId: scraped.moodleCourseId,
-        name: scraped.name,
-        moodleUrl: scraped.url,
-        status: hasContent ? 'synced_by_others' : 'new_to_system',
-        registryId: registryCourse.id,
-      });
-    } else if (!hasContent) {
-      // User has a sync record but no actual content — treat as new
+      // Course exists in the shared registry because someone else once
+      // synced it, but this user has never touched it. From the user's
+      // perspective it's brand new — we deliberately do not leak the
+      // existence of other users' syncs into the UI.
       results.push({
         moodleCourseId: scraped.moodleCourseId,
         name: scraped.name,
@@ -131,17 +97,57 @@ export async function compareCourses(
         status: 'new_to_system',
         registryId: registryCourse.id,
       });
-    } else {
+      continue;
+    }
+
+    // Count THIS user's imported files for files in this course.
+    const { data: sectionRows } = await admin
+      .from('moodle_sections')
+      .select('id')
+      .in('course_id', [registryCourse.id]);
+    const sectionIds = (sectionRows ?? []).map((s: { id: string }) => s.id);
+
+    let userFileCount = 0;
+    if (sectionIds.length > 0) {
+      const { data: fileRows } = await admin
+        .from('moodle_files')
+        .select('id')
+        .in('section_id', sectionIds);
+      const fileIds = (fileRows ?? []).map((f: { id: string }) => f.id);
+      if (fileIds.length > 0) {
+        const { count } = await admin
+          .from('user_file_imports')
+          .select('id', { count: 'exact', head: true })
+          .eq('user_id', userId)
+          .eq('status', 'imported')
+          .in('moodle_file_id', fileIds);
+        userFileCount = count ?? 0;
+      }
+    }
+
+    if (userFileCount === 0) {
+      // Sync row exists but zero per-user imports — either a stale row or
+      // a previous failed download. From the user's perspective they have
+      // nothing here yet, so show it as new.
       results.push({
         moodleCourseId: scraped.moodleCourseId,
         name: scraped.name,
         moodleUrl: scraped.url,
-        status: 'synced_by_user',
+        status: 'new_to_system',
         registryId: registryCourse.id,
-        lastSyncedAt: userSync.last_synced_at,
-        syncedFileCount: totalFiles ?? 0,
       });
+      continue;
     }
+
+    results.push({
+      moodleCourseId: scraped.moodleCourseId,
+      name: scraped.name,
+      moodleUrl: scraped.url,
+      status: 'synced_by_user',
+      registryId: registryCourse.id,
+      lastSyncedAt: userSync.last_synced_at,
+      syncedFileCount: userFileCount,
+    });
   }
 
   return results;
