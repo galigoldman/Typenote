@@ -10,13 +10,13 @@ import { WeekDialog } from '@/components/dashboard/week-dialog';
 import { EmptyState } from '@/components/dashboard/empty-state';
 import { PersonalFileUpload } from '@/components/dashboard/personal-file-upload';
 import { PersonalFileItem } from '@/components/dashboard/personal-file-item';
+import { MoodleFileRow } from '@/components/dashboard/moodle-file-row';
 import {
   getPersonalFilesByCourse,
   getPersonalFilesByWeeks,
 } from '@/lib/queries/personal-files';
 import type { PersonalFile } from '@/types/database';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
 import { ChevronLeft } from 'lucide-react';
 import {
   Breadcrumb,
@@ -373,35 +373,17 @@ export default async function CoursePage({
                           const href = file.downloadUrl ?? file.moodle_url;
                           const isStored = !!file.downloadUrl;
                           return (
-                            <a
+                            <MoodleFileRow
                               key={file.id}
+                              fileId={file.id}
+                              fileName={file.file_name}
+                              fileType={file.type}
+                              mimeType={file.mime_type}
+                              fileSize={file.file_size}
                               href={href}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="flex items-center gap-3 px-4 py-2 hover:bg-accent/30 transition-colors"
-                              {...(isStored
-                                ? { download: file.file_name }
-                                : {})}
-                            >
-                              <span className="flex-1 text-sm truncate">
-                                {file.file_name}
-                              </span>
-                              {file.file_size && (
-                                <span className="text-xs text-muted-foreground shrink-0">
-                                  {file.file_size > 1024 * 1024
-                                    ? `${(file.file_size / (1024 * 1024)).toFixed(1)} MB`
-                                    : `${Math.round(file.file_size / 1024)} KB`}
-                                </span>
-                              )}
-                              <Badge
-                                variant="outline"
-                                className="text-xs shrink-0"
-                              >
-                                {file.type === 'file'
-                                  ? (file.mime_type?.split('/')[1] ?? 'file')
-                                  : 'link'}
-                              </Badge>
-                            </a>
+                              isStored={isStored}
+                              courseId={courseId}
+                            />
                           );
                         })}
                     </div>
