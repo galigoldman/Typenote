@@ -42,26 +42,28 @@ Reported symptom: *"for one user (maybe the one who uploaded the files) chat has
 | Column | `moodle_file` rows (today) | `moodle_file` rows (after fix) | `course_material` rows |
 | --- | --- | --- | --- |
 | `user_id` | `NULL` (shared) | `NULL` (unchanged) | `<uploader>` (unchanged) |
-| `course_id` | `<first-indexer's Typenote course>` (buggy) | `<moodle_files.course_id>` = upstream Moodle course id (canonical) | `<uploader's Typenote course>` (unchanged) |
+| `course_id` | `<first-indexer's Typenote course>` (buggy) | `moodle_sections.course_id` (= `moodle_courses.id`, the Typenote-side UUID PK of the upstream Moodle course; canonical, one-per-file) | `<uploader's Typenote course>` (unchanged) |
 | `week_id` | `NULL` typically | `NULL` (unchanged) | `<material's week>` (unchanged) |
 | `UNIQUE (source_type, source_id, segment_index)` | enforced | **unchanged** — one row per file segment globally | unchanged |
 
-Key insight: a Moodle file belongs to exactly one upstream Moodle course. That's its canonical home and never changes. Different users mirror that course into different Typenote courses, but the file's home in the upstream registry is invariant. So `moodle_course_id` is the right key for the embedding row.
+Key insight: a Moodle file belongs to exactly one upstream Moodle course (reached in our schema via `moodle_files.section_id → moodle_sections.course_id → moodle_courses.id`). That's its canonical home and never changes. Different users mirror that course into different Typenote courses, but the file's home in the registry is invariant. So `moodle_courses.id` (referred to throughout this doc as the "moodle_course_id" — which is also how `user_course_syncs.moodle_course_id` is named, distinct from the upstream text identifier `moodle_courses.moodle_course_id`) is the right key for the embedding row.
 
 ### `user_file_imports`
 
 No schema change. Hard-delete the row when the user removes a file from their notebook.
 
-The existing `status` enum (`'imported'`, `'removed_from_moodle'`) stays. `'removed_from_moodle'` continues to mean *"upstream removed this; we preserved an audit row"*. User-initiated delete is just a `DELETE`, which is simpler and lossless (the user can re-import to re-create).
+The existing `status` enum (`'imported'`, `'removed_from_moodle'`) stays. `'removed_from_moodle'` continues to mean *"upstream removed this; we preserved an audit row"* and is already excluded from the import-list filter in §5.2, so those rows correctly produce no RAG hits. If upstream later re-adds a file, the existing moodle-sync flow flips the status back to `'imported'` (via `recordUserFileImport`) on the user's next sync — no spec change needed.
+
+User-initiated delete is just a `DELETE`, which is simpler and lossless (the user can re-import to re-create).
 
 ## 5. Code changes
 
 ### 5.1 `src/lib/actions/ai-context.ts` — `indexContent`
 
 For `source.type === 'moodle_file'`:
-- Select `course_id` from `moodle_files` along with `storage_path`, `file_name`, `mime_type`.
-- Use `fileRow.course_id` (the upstream Moodle course id) as the `courseId` variable for the embedding rows. **Ignore** `source.courseId` (the caller's Typenote course id) for the embedding row.
-- The content-hash gate is now stable: any user importing file F looks up the row with `course_id = mf.course_id`, sees the existing hash, and short-circuits. No wasted re-embedding.
+- Select `storage_path, file_name, mime_type, section_id` from `moodle_files`, then resolve `section_id → moodle_sections.course_id`. (Alternatively: a single query with an inner-join via Supabase's `.select('storage_path, file_name, mime_type, moodle_sections!inner(course_id)')`.)
+- Use the resolved `moodle_sections.course_id` (the `moodle_courses.id` of the file's upstream course) as the `courseId` variable for the embedding rows. **Ignore** `source.courseId` (the caller's Typenote course id) for the embedding row.
+- The content-hash gate is now stable: any user importing file F looks up the row by `(source_type, source_id)` — the existing `(source_type, source_id, segment_index)` UNIQUE ensures there is only one row, with the canonical `course_id` — sees the existing hash, and short-circuits. No wasted re-embedding.
 
 For `source.type === 'course_material'`: unchanged.
 
@@ -117,20 +119,30 @@ matchEmbeddings({
 
 ```sql
 -- Step A: Backfill — repoint moodle_file embeddings to the canonical
--- Moodle course id (today they point at the first-indexer's Typenote
+-- moodle_courses.id (today they point at the first-indexer's Typenote
 -- course id, which causes the access bug for every later user).
+-- moodle_files has no course_id — we reach the course through
+-- moodle_sections.
 UPDATE public.content_embeddings ce
-SET course_id = mf.course_id
+SET course_id = ms.course_id
 FROM public.moodle_files mf
+JOIN public.moodle_sections ms ON ms.id = mf.section_id
 WHERE ce.source_type = 'moodle_file'
   AND ce.source_id = mf.id
-  AND ce.course_id IS DISTINCT FROM mf.course_id;
+  AND ce.course_id IS DISTINCT FROM ms.course_id;
 
--- Step B: Replace match_embeddings RPC with the new signature.
+-- Step B: Replace match_embeddings RPC. The 00014 migration registered
+-- the function with bare `vector` (not `extensions.vector`); we drop
+-- using the exact form it was created with to avoid leaving the old
+-- function alongside the new one.
 DROP FUNCTION IF EXISTS public.match_embeddings(
-  extensions.vector, uuid, uuid, uuid, integer, double precision
+  vector, uuid, uuid, uuid, integer, double precision
 );
 
+-- LANGUAGE sql STABLE matches the original 00012 declaration (00014
+-- accidentally regressed to plpgsql). STABLE lets the planner cache
+-- function results within a single query, which matters because RAG
+-- hits this RPC on every chat turn.
 CREATE OR REPLACE FUNCTION public.match_embeddings(
   query_embedding extensions.vector(1536),
   match_user_id uuid,
@@ -154,10 +166,8 @@ RETURNS TABLE (
   mime_type text,
   similarity float
 )
-LANGUAGE plpgsql
+LANGUAGE sql STABLE
 AS $$
-BEGIN
-  RETURN QUERY
   SELECT
     ce.id, ce.source_type, ce.source_id, ce.source_name, ce.segment_text,
     ce.page_start, ce.page_end, ce.course_id, ce.week_id, ce.mime_type,
@@ -170,7 +180,7 @@ BEGIN
         AND match_course_id IS NOT NULL
         AND ce.course_id = match_course_id)
       OR
-      -- moodle_file: keyed by upstream Moodle course_id; access is
+      -- moodle_file: keyed by moodle_courses.id (canonical); access is
       -- whitelisted by the user's imported file set
       (ce.source_type = 'moodle_file'
         AND match_moodle_course_id IS NOT NULL
@@ -182,7 +192,6 @@ BEGIN
     AND 1 - (ce.embedding <=> query_embedding) > similarity_threshold
   ORDER BY ce.embedding <=> query_embedding
   LIMIT match_count;
-END;
 $$;
 ```
 
@@ -205,7 +214,16 @@ export async function removeMoodleFileFromNotebook(moodleFileId: string) {
     .eq('user_id', user.id);
 
   if (error) throw new Error(error.message);
-  revalidatePath('/dashboard/courses/[courseId]', 'page');
+  // Codebase convention is literal-path revalidation (see
+  // src/lib/actions/documents.ts:152). The caller passes courseId from
+  // the page so we don't have to derive it.
+}
+
+export async function removeMoodleFileFromNotebook(
+  moodleFileId: string,
+  courseId: string,
+) { /* ... as above; then: */
+  revalidatePath('/dashboard/courses/' + courseId);
 }
 ```
 
@@ -234,6 +252,8 @@ Two batched DB queries + N parallel signed-URL generations adds well under 500 m
 
 The SSE event `{ type: 'sources', sources: [...] }` payload gains the optional `signedUrl` field — backward compatible (older clients ignore unknown fields).
 
+**Known wart:** signed URLs live for 1 hour. If a user deletes a file from their notebook after the AI cites it, the existing chat message's link will still resolve until expiry. Acceptable for v1 — the file isn't gone, the user just removed their personal access record; the signed URL is a direct storage handle that doesn't go through `user_file_imports`.
+
 ## 6. Backwards compatibility
 
 - Existing embedding rows: the migration's `UPDATE` repoints them to `moodle_course_id` in-place. No row deletions, no embedding API calls.
@@ -246,7 +266,7 @@ The SSE event `{ type: 'sources', sources: [...] }` payload gains the optional `
 | --- | --- | --- | --- | --- |
 | Course is Moodle-synced, user has imports | typenote uuid | moodle uuid | non-empty `uuid[]` | matched iff in the imported set |
 | Course is Moodle-synced, user has no imports yet | typenote uuid | moodle uuid | `[]` | none (correct — nothing in notebook) |
-| Course is not Moodle-synced | typenote uuid | `NULL` | `NULL` | none (no moodle branch) |
+| Course is not Moodle-synced | typenote uuid | `NULL` | `NULL` | none (no moodle branch fires). `course_material` rows still match via `match_course_id`. |
 | Caller passes `NULL` for imported list explicitly | typenote uuid | moodle uuid | `NULL` | all moodle files in that Moodle course (today's permissive behavior) |
 
 We deliberately treat `NULL` as "no filter" so the RPC remains usable for admin/diagnostic queries without changing its semantics from the caller side. `searchContext` always passes a concrete array (possibly empty); it never passes `NULL` for `match_imported_moodle_file_ids` when `match_moodle_course_id` is set.
@@ -265,7 +285,10 @@ We deliberately treat `NULL` as "no filter" so the RPC remains usable for admin/
 - **Integration (against local Supabase):**
   - Seed two users, one shared moodle_file row, both users have `user_file_imports` for it. Both users' `match_embeddings` calls return the row.
   - Delete user B's import row. User B's `match_embeddings` no longer returns it. User A still does.
+  - User has `user_course_syncs` but **zero imports** → `match_embeddings` returns no moodle_file rows (even though the embeddings exist).
+  - Course with no Moodle sync but with `course_material` uploads → `match_embeddings` still returns the course_material rows via `match_course_id`.
   - Verify the backfill `UPDATE` repoints existing rows without violating the `UNIQUE` constraint.
+  - Orphan-row resilience: an embedding row whose `moodle_files` parent was hard-deleted upstream remains in the table with a stale `course_id`. The backfill `UPDATE` simply skips it (no row in `mf`). Verify it doesn't break the migration; verify that orphaned moodle_file embeddings are eventually cleaned by `deleteEmbeddingsBySource` when the upstream sync flags the file removed (existing behavior — sanity-check it still runs).
 - **E2E (Playwright):** two-user scenario per the original symptom. Logged in as A, import file, ask AI — answer cites the file. Logged in as B (same Moodle source), import the same file via the course page, ask AI — answer cites the file. Then delete from B's notebook, ask AI — no longer cited; A still works.
 - **Manual:** clickable citation opens the file in a new tab via signed URL.
 - **TEST_REGISTRY:** add the two-user RAG visibility scenario and the delete-from-notebook scenario to `e2e/TEST_REGISTRY.md`.
