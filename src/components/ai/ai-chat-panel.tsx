@@ -25,6 +25,7 @@ interface ChatSource {
   sourceName: string;
   weekId: string | null;
   pageRange: string | null;
+  signedUrl: string | null;
 }
 
 interface ChatMessage {
@@ -614,16 +615,35 @@ export function AiChatPanel({
                         {/* Sources */}
                         {msg.sources && msg.sources.length > 0 && (
                           <div className="mt-2 flex flex-wrap gap-1.5">
-                            {msg.sources.map((src, j) => (
-                              <span
-                                key={j}
-                                className="inline-flex items-center gap-1 rounded-full border bg-background px-2.5 py-0.5 text-[10px] text-muted-foreground"
-                              >
-                                <BookOpen className="h-2.5 w-2.5" />
-                                {src.sourceName}
-                                {src.pageRange && ` (${src.pageRange})`}
-                              </span>
-                            ))}
+                            {msg.sources.map((src, j) => {
+                              const content = (
+                                <>
+                                  <BookOpen className="h-2.5 w-2.5" />
+                                  {src.sourceName}
+                                  {src.pageRange && ` (${src.pageRange})`}
+                                </>
+                              );
+                              const className =
+                                'inline-flex items-center gap-1 rounded-full border bg-background px-2.5 py-0.5 text-[10px] text-muted-foreground';
+                              return src.signedUrl ? (
+                                <a
+                                  key={j}
+                                  href={src.signedUrl}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className={
+                                    className +
+                                    ' hover:bg-accent hover:text-foreground transition-colors'
+                                  }
+                                >
+                                  {content}
+                                </a>
+                              ) : (
+                                <span key={j} className={className}>
+                                  {content}
+                                </span>
+                              );
+                            })}
                           </div>
                         )}
 
