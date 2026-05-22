@@ -55,32 +55,43 @@ vi.mock('@/lib/supabase/server', () => ({
   })),
 }));
 
-vi.mock('@/lib/supabase/admin', () => ({
-  createAdminClient: vi.fn(() => ({
-    from: vi.fn(() => ({
-      select: vi.fn(() => ({
-        eq: vi.fn(() => ({
-          single: vi.fn(async () => ({
-            data: {
-              storage_path: 'test/path.pdf',
-              file_name: 'lecture.pdf',
-              mime_type: 'application/pdf',
-            },
+vi.mock('@/lib/supabase/admin', () => {
+  const moodleFileRow = {
+    storage_path: 'test/path.pdf',
+    file_name: 'lecture.pdf',
+    mime_type: 'application/pdf',
+    section_id: 'section-1',
+  };
+  const moodleSectionRow = { course_id: 'moodle-course-1' };
+
+  return {
+    createAdminClient: vi.fn(() => ({
+      from: vi.fn((table: string) => {
+        const data =
+          table === 'moodle_files'
+            ? moodleFileRow
+            : table === 'moodle_sections'
+              ? moodleSectionRow
+              : null;
+        return {
+          select: vi.fn(() => ({
+            eq: vi.fn(() => ({
+              single: vi.fn(async () => ({ data, error: null })),
+            })),
+          })),
+        };
+      }),
+      storage: {
+        from: vi.fn(() => ({
+          download: vi.fn(async () => ({
+            data: new Blob(['fake pdf content']),
             error: null,
           })),
         })),
-      })),
+      },
     })),
-    storage: {
-      from: vi.fn(() => ({
-        download: vi.fn(async () => ({
-          data: new Blob(['fake pdf content']),
-          error: null,
-        })),
-      })),
-    },
-  })),
-}));
+  };
+});
 
 const mockGenerateContent = vi.fn(async () => ({
   text: 'This is the AI answer based on the lecture materials.',
@@ -142,16 +153,21 @@ describe('indexContent', () => {
     expect(getContentHash).toHaveBeenCalledWith('course_material', 'mat-1');
   });
 
-  it('embeds moodle_file as shared (user_id=null)', async () => {
+  it('embeds moodle_file with canonical moodle_courses.id (not caller course_id)', async () => {
     const result = await indexContent({
       type: 'moodle_file',
       fileId: 'file-1',
-      courseId: 'course-1',
+      courseId: 'callers-typenote-course', // should be IGNORED for the embedding row
     });
 
     expect(result.success).toBe(true);
     expect(upsertEmbeddings).toHaveBeenCalledWith(
-      expect.arrayContaining([expect.objectContaining({ user_id: null })]),
+      expect.arrayContaining([
+        expect.objectContaining({
+          user_id: null,
+          course_id: 'moodle-course-1', // looked up via section_id
+        }),
+      ]),
     );
   });
 });
