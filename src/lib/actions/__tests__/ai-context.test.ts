@@ -29,7 +29,7 @@ vi.mock('@/lib/supabase/server', () => ({
       file_name: 'lecture.pdf',
       mime_type: 'application/pdf',
     };
-    const syncRow = { moodle_course_id: 'moodle-course-1' };
+    const syncRow = { id: 'sync-1', moodle_course_id: 'moodle-course-1' };
     const importsRows = [
       { moodle_file_id: 'imported-file-a' },
       { moodle_file_id: 'imported-file-b' },
