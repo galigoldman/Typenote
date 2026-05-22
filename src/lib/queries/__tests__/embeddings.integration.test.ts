@@ -192,3 +192,96 @@ describe('matchEmbeddings new signature', () => {
     expect(Array.isArray(result)).toBe(true);
   });
 });
+
+describe('per-user moodle_file access', () => {
+  // These ids must match rows seeded in supabase/seed.sql. If they
+  // don't exist yet, the inserts below will fail with FK errors and
+  // a human should update the seed.
+  const USER_A = TEST_USER_ID;
+  const USER_B = 'b0000000-0000-0000-0000-000000000002';
+  const TYPENOTE_COURSE_A = COURSE_ID; // from seed
+  const TYPENOTE_COURSE_B = '30000000-0000-0000-0000-000000000002';
+  const MOODLE_COURSE = 'c0000000-0000-0000-0000-000000000001';
+  const MOODLE_FILE = '70000000-0000-0000-0000-000000000099';
+
+  beforeAll(async () => {
+    // Idempotent: clear any leftover state then insert one canonical
+    // embedding row keyed by the canonical moodle_courses.id.
+    await supabase
+      .from('content_embeddings')
+      .delete()
+      .eq('source_id', MOODLE_FILE);
+
+    await supabase.from('content_embeddings').insert([
+      {
+        source_type: 'moodle_file',
+        source_id: MOODLE_FILE,
+        segment_index: 0,
+        page_start: null,
+        page_end: null,
+        segment_text: 'shared file content',
+        embedding: JSON.stringify(makeVector(1)),
+        user_id: null,
+        course_id: MOODLE_COURSE, // canonical, NOT a Typenote course id
+        week_id: null,
+        source_name: 'shared.pdf',
+        mime_type: 'application/pdf',
+        content_hash: 'test-hash-shared',
+      },
+    ]);
+  });
+
+  afterAll(async () => {
+    await supabase
+      .from('content_embeddings')
+      .delete()
+      .eq('source_id', MOODLE_FILE);
+  });
+
+  it('returns the row when the imported file is in the whitelist', async () => {
+    const { data, error } = await supabase.rpc('match_embeddings', {
+      query_embedding: JSON.stringify(makeVector(1)),
+      match_user_id: USER_A,
+      match_course_id: TYPENOTE_COURSE_A,
+      match_moodle_course_id: MOODLE_COURSE,
+      match_imported_moodle_file_ids: [MOODLE_FILE],
+      match_count: 8,
+      similarity_threshold: 0,
+    });
+    expect(error).toBeNull();
+    expect(data).toHaveLength(1);
+    expect((data as { source_id: string }[])[0].source_id).toBe(MOODLE_FILE);
+  });
+
+  it('returns nothing when the imported list is empty', async () => {
+    const { data } = await supabase.rpc('match_embeddings', {
+      query_embedding: JSON.stringify(makeVector(1)),
+      match_user_id: USER_B,
+      match_course_id: TYPENOTE_COURSE_B,
+      match_moodle_course_id: MOODLE_COURSE,
+      match_imported_moodle_file_ids: [],
+      match_count: 8,
+      similarity_threshold: 0,
+    });
+    expect(data).toEqual([]);
+  });
+
+  it('returns nothing when the course is not Moodle-synced (no moodleCourseId)', async () => {
+    const { data } = await supabase.rpc('match_embeddings', {
+      query_embedding: JSON.stringify(makeVector(1)),
+      match_user_id: USER_A,
+      match_course_id: TYPENOTE_COURSE_A,
+      match_moodle_course_id: null,
+      match_imported_moodle_file_ids: null,
+      match_count: 8,
+      similarity_threshold: 0,
+    });
+    // course_material rows might match, but our seeded moodle_file row
+    // must NOT (the moodle branch doesn't fire without moodle_course_id).
+    expect(
+      ((data as { source_id: string }[] | null) ?? []).some(
+        (r) => r.source_id === MOODLE_FILE,
+      ),
+    ).toBe(false);
+  });
+});
