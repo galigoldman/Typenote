@@ -320,20 +320,27 @@ export async function searchContext(
   if (params.courseId) {
     const { data: sync } = await supabase
       .from('user_course_syncs')
-      .select('moodle_course_id')
+      .select('id, moodle_course_id')
       .eq('course_id', params.courseId)
       .maybeSingle();
-    moodleCourseId =
-      (sync as { moodle_course_id: string | null } | null)
-        ?.moodle_course_id ?? null;
+    const syncRow = sync as {
+      id: string;
+      moodle_course_id: string | null;
+    } | null;
+    moodleCourseId = syncRow?.moodle_course_id ?? null;
+    const syncId = syncRow?.id ?? null;
 
-    if (moodleCourseId) {
-      // Fetch the user's notebook — the set of moodle files they have
-      // chosen to include. user_file_imports SELECT policy restricts
-      // to the caller already.
+    if (moodleCourseId && syncId) {
+      // Fetch the user's notebook for THIS course — files they imported
+      // into the current sync, not every file they ever imported across
+      // every course. The SQL function also re-filters by
+      // ce.course_id = match_moodle_course_id, but scoping here keeps
+      // the allowlist tight and avoids dragging unrelated file ids
+      // across the wire.
       const { data: imports } = await supabase
         .from('user_file_imports')
         .select('moodle_file_id')
+        .eq('sync_id', syncId)
         .eq('status', 'imported');
       importedMoodleFileIds = (
         (imports as { moodle_file_id: string }[] | null) ?? []
