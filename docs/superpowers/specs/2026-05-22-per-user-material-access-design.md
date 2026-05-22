@@ -71,12 +71,15 @@ For `source.type === 'course_material'`: unchanged.
 
 Add a "resolve user's view" pre-step:
 
+Use the regular (RLS-scoped) client — both `user_course_syncs` and `user_file_imports` have SELECT policies of `auth.uid() = user_id`, so the regular client naturally restricts results to the caller. No admin client needed.
+
 ```ts
-// 1. Resolve Typenote course → upstream Moodle course (if synced)
-const { data: sync } = await admin
+const supabase = await createClient();
+
+// 1. Resolve Typenote course → moodle_courses.id (if synced)
+const { data: sync } = await supabase
   .from('user_course_syncs')
   .select('moodle_course_id')
-  .eq('user_id', userId)
   .eq('course_id', params.courseId)
   .maybeSingle();
 const moodleCourseId = sync?.moodle_course_id ?? null;
@@ -84,10 +87,9 @@ const moodleCourseId = sync?.moodle_course_id ?? null;
 // 2. Fetch the set of moodle files the user has imported
 let importedMoodleFileIds: string[] | null = null;
 if (moodleCourseId) {
-  const { data: imports } = await admin
+  const { data: imports } = await supabase
     .from('user_file_imports')
     .select('moodle_file_id')
-    .eq('user_id', userId)
     .eq('status', 'imported');
   importedMoodleFileIds = (imports ?? []).map((i) => i.moodle_file_id);
 }
@@ -201,12 +203,18 @@ $$;
 
 ```ts
 'use server';
-export async function removeMoodleFileFromNotebook(moodleFileId: string) {
+export async function removeMoodleFileFromNotebook(
+  moodleFileId: string,
+  courseId: string,
+) {
   const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
   if (!user) throw new Error('Unauthorized');
 
-  // RLS already enforces user_id = auth.uid(); the .eq() is belt-and-suspenders.
+  // RLS already enforces user_id = auth.uid(); the .eq() is
+  // belt-and-suspenders.
   const { error } = await supabase
     .from('user_file_imports')
     .delete()
@@ -214,15 +222,10 @@ export async function removeMoodleFileFromNotebook(moodleFileId: string) {
     .eq('user_id', user.id);
 
   if (error) throw new Error(error.message);
-  // Codebase convention is literal-path revalidation (see
-  // src/lib/actions/documents.ts:152). The caller passes courseId from
-  // the page so we don't have to derive it.
-}
 
-export async function removeMoodleFileFromNotebook(
-  moodleFileId: string,
-  courseId: string,
-) { /* ... as above; then: */
+  // Codebase convention is literal-path revalidation
+  // (src/lib/actions/documents.ts:152). The caller passes courseId
+  // from the page so we don't derive it here.
   revalidatePath('/dashboard/courses/' + courseId);
 }
 ```
@@ -274,7 +277,7 @@ We deliberately treat `NULL` as "no filter" so the RPC remains usable for admin/
 ## 7. Risk + rollback
 
 - Risk: a user whose `user_course_syncs` row is missing (edge case — they imported files but the sync row got cleaned up) would not be able to see their moodle files in chat because `moodle_course_id` resolves to null. Mitigation: defensive null-check in `searchContext`; we can fall back to "no moodle results" cleanly, never to "leak other users' data".
-- Rollback: revert the migration commit + re-deploy. The old RPC signature is preserved in `00012_create_content_embeddings.sql` history; resurrecting it is a small inverse migration.
+- Rollback: revert the migration commit **and** the TS caller change in `src/lib/queries/embeddings.ts` (`matchEmbeddings` signature gains two params, all callers must revert in lockstep with the RPC). The old RPC signature is preserved in `00014_match_embeddings_return_text.sql` history; resurrecting it is a small inverse migration.
 
 ## 8. Test plan
 
