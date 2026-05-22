@@ -1,6 +1,7 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import { createAdminClient, TEST_USER_ID } from '@/test/supabase-client';
+import { matchEmbeddings } from '../embeddings';
 
 const supabase = createAdminClient();
 
@@ -174,5 +175,20 @@ describe('content_embeddings table (v2 — 1536 dims, page segments)', () => {
       .eq('source_id', tempId);
 
     expect(data).toHaveLength(0);
+  });
+});
+
+describe('matchEmbeddings new signature', () => {
+  it('accepts moodleCourseId and importedMoodleFileIds without throwing', async () => {
+    // Smoke test the new params are wired through the RPC; functional
+    // behavior is covered in subsequent tasks.
+    const result = await matchEmbeddings({
+      queryEmbedding: Array.from({ length: 1536 }, () => 0),
+      userId: TEST_USER_ID,
+      courseId: COURSE_ID,
+      moodleCourseId: null,
+      importedMoodleFileIds: null,
+    });
+    expect(Array.isArray(result)).toBe(true);
   });
 });
