@@ -58,6 +58,8 @@ export function SidebarLayout({ sidebar, children }: SidebarLayoutProps) {
   const pathname = usePathname();
   const router = useRouter();
   const isDocumentPage = pathname.includes('/documents/');
+  const isCoursePage = /^\/dashboard\/courses\/[^/]+$/.test(pathname);
+  const isOwnLayoutPage = isDocumentPage || isCoursePage;
   const isDashboardRoot = pathname === '/dashboard';
   // Use 1280px (xl) so iPads get the mobile sheet pattern — the inline
   // sidebar wastes space on tablets where users primarily use touch.
@@ -221,10 +223,11 @@ export function SidebarLayout({ sidebar, children }: SidebarLayoutProps) {
           </Button>
         )}
 
-        {/* Main content — overflow-hidden only on document pages where the canvas controls its own scroll */}
+        {/* Main content — overflow-hidden on pages that own their internal scroll
+            layout (document pages, course pages with the AI chat sidebar) */}
         <main
           className={`flex flex-col flex-1 min-h-0 min-w-0 ${
-            isDocumentPage ? 'overflow-hidden' : 'overflow-y-auto'
+            isOwnLayoutPage ? 'overflow-hidden' : 'overflow-y-auto'
           }`}
         >
           {children}

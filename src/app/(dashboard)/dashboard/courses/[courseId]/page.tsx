@@ -231,187 +231,191 @@ export default async function CoursePage({
     moodleSections.length === 0;
 
   return (
-    <div className="h-full overflow-y-auto p-6">
-      <Link
-        href="/dashboard"
-        className="mb-4 inline-flex items-center gap-1 rounded bg-muted px-2 py-1 text-sm text-muted-foreground hover:text-foreground min-h-[44px]"
-      >
-        <ChevronLeft className="size-3.5" />
-        Dashboard
-      </Link>
-      <div className="mb-6 flex flex-wrap items-center justify-between gap-2">
-        <Breadcrumb className="min-w-0">
-          <BreadcrumbList className="flex-wrap">
-            <BreadcrumbItem>
-              <BreadcrumbLink asChild>
-                <Link href="/dashboard">Home</Link>
-              </BreadcrumbLink>
-            </BreadcrumbItem>
-            {parentFolder && (
-              <>
-                <BreadcrumbSeparator />
-                <BreadcrumbItem>
-                  <BreadcrumbLink asChild>
-                    <Link href={`/dashboard/folders/${parentFolder.id}`}>
-                      {parentFolder.name}
-                    </Link>
-                  </BreadcrumbLink>
-                </BreadcrumbItem>
-              </>
-            )}
-            <BreadcrumbSeparator />
-            <BreadcrumbItem>
-              <BreadcrumbPage>{typedCourse.name}</BreadcrumbPage>
-            </BreadcrumbItem>
-          </BreadcrumbList>
-        </Breadcrumb>
-        <div className="flex flex-wrap items-center gap-2">
-          <AiChatWrapper courseId={courseId} courseName={typedCourse.name} />
-          <CreateDocumentDialog folderId={null} courseId={courseId}>
-            <Button variant="outline" size="sm">
-              New Document
-            </Button>
-          </CreateDocumentDialog>
-          <WeekDialog courseId={courseId} />
-          <PersonalFileUpload
-            courseId={courseId}
-            userId={user?.id ?? ''}
-            category="material"
-            label="Import File"
+    <div className="flex min-h-0 flex-1">
+      <div className="min-w-0 flex-1 overflow-y-auto p-6">
+        <Link
+          href="/dashboard"
+          className="mb-4 inline-flex items-center gap-1 rounded bg-muted px-2 py-1 text-sm text-muted-foreground hover:text-foreground min-h-[44px]"
+        >
+          <ChevronLeft className="size-3.5" />
+          Dashboard
+        </Link>
+        <div className="mb-6 flex flex-wrap items-center justify-between gap-2">
+          <Breadcrumb className="min-w-0">
+            <BreadcrumbList className="flex-wrap">
+              <BreadcrumbItem>
+                <BreadcrumbLink asChild>
+                  <Link href="/dashboard">Home</Link>
+                </BreadcrumbLink>
+              </BreadcrumbItem>
+              {parentFolder && (
+                <>
+                  <BreadcrumbSeparator />
+                  <BreadcrumbItem>
+                    <BreadcrumbLink asChild>
+                      <Link href={`/dashboard/folders/${parentFolder.id}`}>
+                        {parentFolder.name}
+                      </Link>
+                    </BreadcrumbLink>
+                  </BreadcrumbItem>
+                </>
+              )}
+              <BreadcrumbSeparator />
+              <BreadcrumbItem>
+                <BreadcrumbPage>{typedCourse.name}</BreadcrumbPage>
+              </BreadcrumbItem>
+            </BreadcrumbList>
+          </Breadcrumb>
+          <div className="flex flex-wrap items-center gap-2">
+            <CreateDocumentDialog folderId={null} courseId={courseId}>
+              <Button variant="outline" size="sm">
+                New Document
+              </Button>
+            </CreateDocumentDialog>
+            <WeekDialog courseId={courseId} />
+            <PersonalFileUpload
+              courseId={courseId}
+              userId={user?.id ?? ''}
+              category="material"
+              label="Import File"
+            />
+          </div>
+        </div>
+
+        {/* Course header */}
+        <div className="mb-6">
+          <div className="flex items-center gap-3">
+            <h1 className="text-2xl font-bold">{typedCourse.name}</h1>
+          </div>
+        </div>
+
+        {isEmpty && coursePersonalFiles.length === 0 ? (
+          <EmptyState
+            title="This course is empty"
+            description="Add weeks to organize your materials, or create a document to start taking notes."
           />
-        </div>
-      </div>
-
-      {/* Course header */}
-      <div className="mb-6">
-        <div className="flex items-center gap-3">
-          <h1 className="text-2xl font-bold">{typedCourse.name}</h1>
-        </div>
-      </div>
-
-      {isEmpty && coursePersonalFiles.length === 0 ? (
-        <EmptyState
-          title="This course is empty"
-          description="Add weeks to organize your materials, or create a document to start taking notes."
-        />
-      ) : (
-        <>
-          {/* Course-level documents (not assigned to a week) */}
-          {courseDocuments.length > 0 && (
-            <div className="mb-6">
-              <h2 className="mb-3 text-sm font-medium text-muted-foreground">
-                Documents
-              </h2>
-              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
-                <DocumentListWithMove documents={courseDocuments} />
+        ) : (
+          <>
+            {/* Course-level documents (not assigned to a week) */}
+            {courseDocuments.length > 0 && (
+              <div className="mb-6">
+                <h2 className="mb-3 text-sm font-medium text-muted-foreground">
+                  Documents
+                </h2>
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
+                  <DocumentListWithMove documents={courseDocuments} />
+                </div>
               </div>
-            </div>
-          )}
+            )}
 
-          {/* Course-level imported files */}
-          {coursePersonalFiles.length > 0 && (
-            <div className="mb-6">
-              <h2 className="mb-3 text-sm font-medium text-muted-foreground">
-                Imported Files
-              </h2>
-              <div className="space-y-0.5">
-                {coursePersonalFiles.map((file) => (
-                  <PersonalFileItem key={file.id} file={file} />
-                ))}
+            {/* Course-level imported files */}
+            {coursePersonalFiles.length > 0 && (
+              <div className="mb-6">
+                <h2 className="mb-3 text-sm font-medium text-muted-foreground">
+                  Imported Files
+                </h2>
+                <div className="space-y-0.5">
+                  {coursePersonalFiles.map((file) => (
+                    <PersonalFileItem key={file.id} file={file} />
+                  ))}
+                </div>
               </div>
-            </div>
-          )}
+            )}
 
-          {/* Weeks section */}
-          {typedWeeks.length > 0 && (
-            <div>
-              <h2 className="mb-3 text-sm font-medium text-muted-foreground">
-                Weeks
-              </h2>
-              <div className="space-y-3">
-                {typedWeeks.map((week) => (
-                  <WeekSection
-                    key={week.id}
-                    week={week}
-                    courseId={courseId}
-                    userId={user?.id ?? ''}
-                    materials={allMaterials.filter(
-                      (m) => m.week_id === week.id && m.category === 'material',
-                    )}
-                    homework={allMaterials.filter(
-                      (m) => m.week_id === week.id && m.category === 'homework',
-                    )}
-                    documents={weekDocuments.filter(
-                      (d) => d.week_id === week.id,
-                    )}
-                    personalFiles={allWeekPersonalFiles.filter(
-                      (f) => f.week_id === week.id,
-                    )}
-                    moodleFiles={importableMoodleFiles}
-                  />
-                ))}
+            {/* Weeks section */}
+            {typedWeeks.length > 0 && (
+              <div>
+                <h2 className="mb-3 text-sm font-medium text-muted-foreground">
+                  Weeks
+                </h2>
+                <div className="space-y-3">
+                  {typedWeeks.map((week) => (
+                    <WeekSection
+                      key={week.id}
+                      week={week}
+                      courseId={courseId}
+                      userId={user?.id ?? ''}
+                      materials={allMaterials.filter(
+                        (m) =>
+                          m.week_id === week.id && m.category === 'material',
+                      )}
+                      homework={allMaterials.filter(
+                        (m) =>
+                          m.week_id === week.id && m.category === 'homework',
+                      )}
+                      documents={weekDocuments.filter(
+                        (d) => d.week_id === week.id,
+                      )}
+                      personalFiles={allWeekPersonalFiles.filter(
+                        (f) => f.week_id === week.id,
+                      )}
+                      moodleFiles={importableMoodleFiles}
+                    />
+                  ))}
+                </div>
               </div>
-            </div>
-          )}
+            )}
 
-          {/* Moodle materials */}
-          {moodleSections.length > 0 && (
-            <div className="mt-6">
-              <h2 className="mb-3 text-sm font-medium text-muted-foreground">
-                Moodle Materials
-              </h2>
-              <div className="space-y-3">
-                {moodleSections.map((section) => (
-                  <div key={section.id} className="rounded-lg border">
-                    <div className="border-b bg-muted/30 px-4 py-2">
-                      <h3 className="text-sm font-medium">{section.title}</h3>
-                    </div>
-                    <div className="divide-y">
-                      {section.moodle_files
-                        .sort((a, b) => a.position - b.position)
-                        .map((file) => {
-                          const href = file.downloadUrl ?? file.moodle_url;
-                          const isStored = !!file.downloadUrl;
-                          return (
-                            <a
-                              key={file.id}
-                              href={href}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="flex items-center gap-3 px-4 py-2 hover:bg-accent/30 transition-colors"
-                              {...(isStored
-                                ? { download: file.file_name }
-                                : {})}
-                            >
-                              <span className="flex-1 text-sm truncate">
-                                {file.file_name}
-                              </span>
-                              {file.file_size && (
-                                <span className="text-xs text-muted-foreground shrink-0">
-                                  {file.file_size > 1024 * 1024
-                                    ? `${(file.file_size / (1024 * 1024)).toFixed(1)} MB`
-                                    : `${Math.round(file.file_size / 1024)} KB`}
-                                </span>
-                              )}
-                              <Badge
-                                variant="outline"
-                                className="text-xs shrink-0"
+            {/* Moodle materials */}
+            {moodleSections.length > 0 && (
+              <div className="mt-6">
+                <h2 className="mb-3 text-sm font-medium text-muted-foreground">
+                  Moodle Materials
+                </h2>
+                <div className="space-y-3">
+                  {moodleSections.map((section) => (
+                    <div key={section.id} className="rounded-lg border">
+                      <div className="border-b bg-muted/30 px-4 py-2">
+                        <h3 className="text-sm font-medium">{section.title}</h3>
+                      </div>
+                      <div className="divide-y">
+                        {section.moodle_files
+                          .sort((a, b) => a.position - b.position)
+                          .map((file) => {
+                            const href = file.downloadUrl ?? file.moodle_url;
+                            const isStored = !!file.downloadUrl;
+                            return (
+                              <a
+                                key={file.id}
+                                href={href}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="flex items-center gap-3 px-4 py-2 hover:bg-accent/30 transition-colors"
+                                {...(isStored
+                                  ? { download: file.file_name }
+                                  : {})}
                               >
-                                {file.type === 'file'
-                                  ? (file.mime_type?.split('/')[1] ?? 'file')
-                                  : 'link'}
-                              </Badge>
-                            </a>
-                          );
-                        })}
+                                <span className="flex-1 text-sm truncate">
+                                  {file.file_name}
+                                </span>
+                                {file.file_size && (
+                                  <span className="text-xs text-muted-foreground shrink-0">
+                                    {file.file_size > 1024 * 1024
+                                      ? `${(file.file_size / (1024 * 1024)).toFixed(1)} MB`
+                                      : `${Math.round(file.file_size / 1024)} KB`}
+                                  </span>
+                                )}
+                                <Badge
+                                  variant="outline"
+                                  className="text-xs shrink-0"
+                                >
+                                  {file.type === 'file'
+                                    ? (file.mime_type?.split('/')[1] ?? 'file')
+                                    : 'link'}
+                                </Badge>
+                              </a>
+                            );
+                          })}
+                      </div>
                     </div>
-                  </div>
-                ))}
+                  ))}
+                </div>
               </div>
-            </div>
-          )}
-        </>
-      )}
+            )}
+          </>
+        )}
+      </div>
+      <AiChatWrapper courseId={courseId} courseName={typedCourse.name} />
     </div>
   );
 }
