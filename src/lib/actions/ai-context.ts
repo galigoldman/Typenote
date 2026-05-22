@@ -79,6 +79,7 @@ export type QuestionResult = {
     sourceName: string;
     weekId: string | null;
     pageRange: string | null;
+    signedUrl: string | null;
   }>;
   model: 'flash' | 'pro';
   cached: boolean;
@@ -422,6 +423,7 @@ export async function askQuestion(
         sourceName: r.sourceName,
         weekId: r.weekId,
         pageRange: null,
+        signedUrl: null,
       });
     }
   }
@@ -549,6 +551,7 @@ export async function buildAiContext(params: QuestionParams): Promise<{
   sources: QuestionResult['sources'];
 }> {
   await getAuthUserId();
+  const supabase = await createClient();
   const {
     question,
     courseId,
@@ -577,6 +580,7 @@ export async function buildAiContext(params: QuestionParams): Promise<{
 
   const contextTexts: string[] = [];
   const sources: QuestionResult['sources'] = [];
+  const sourceIds: { sourceId: string; sourceType: string; idx: number }[] = [];
   const seen = new Set<string>();
 
   for (const r of results) {
@@ -588,9 +592,74 @@ export async function buildAiContext(params: QuestionParams): Promise<{
         sourceName: r.sourceName,
         weekId: r.weekId,
         pageRange: null,
+        signedUrl: null, // populated by the URL-attach block below
+      });
+      sourceIds.push({
+        sourceId: r.sourceId,
+        sourceType: r.sourceType,
+        idx: sources.length - 1,
       });
     }
   }
+
+  // Batch-fetch storage paths per source type, then generate signed URLs
+  // in parallel. If anything fails, leave signedUrl null — the chat
+  // falls back to a non-clickable badge.
+  const moodleIds = sourceIds
+    .filter((s) => s.sourceType === 'moodle_file')
+    .map((s) => s.sourceId);
+  const materialIds = sourceIds
+    .filter((s) => s.sourceType === 'course_material')
+    .map((s) => s.sourceId);
+
+  const admin = createAdminClient();
+  const moodlePaths: Record<string, string> = {};
+  const materialPaths: Record<string, string> = {};
+
+  if (moodleIds.length > 0) {
+    const { data } = await admin
+      .from('moodle_files')
+      .select('id, storage_path')
+      .in('id', moodleIds);
+    for (const row of (data ?? []) as {
+      id: string;
+      storage_path: string | null;
+    }[]) {
+      if (row.storage_path) moodlePaths[row.id] = row.storage_path;
+    }
+  }
+  if (materialIds.length > 0) {
+    const { data } = await supabase
+      .from('course_materials')
+      .select('id, storage_path')
+      .in('id', materialIds);
+    for (const row of (data ?? []) as { id: string; storage_path: string }[]) {
+      materialPaths[row.id] = row.storage_path;
+    }
+  }
+
+  await Promise.all(
+    sourceIds.map(async ({ sourceId, sourceType, idx }) => {
+      const bucket =
+        sourceType === 'moodle_file'
+          ? 'moodle-materials'
+          : sourceType === 'course_material'
+            ? 'course-materials'
+            : null;
+      const path =
+        sourceType === 'moodle_file'
+          ? moodlePaths[sourceId]
+          : sourceType === 'course_material'
+            ? materialPaths[sourceId]
+            : null;
+      if (!bucket || !path) return;
+      const client = bucket === 'moodle-materials' ? admin : supabase;
+      const { data } = await client.storage
+        .from(bucket)
+        .createSignedUrl(path, 3600);
+      sources[idx].signedUrl = data?.signedUrl ?? null;
+    }),
+  );
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const contents: Array<{ role: string; parts: any[] }> = [];

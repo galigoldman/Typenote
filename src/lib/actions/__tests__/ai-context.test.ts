@@ -48,12 +48,31 @@ vi.mock('@/lib/supabase/server', () => ({
         };
         return chain;
       }
+      if (table === 'course_materials') {
+        const rows = [{ id: 'mat-1', storage_path: 'materials/mat-1.pdf' }];
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const chain: any = {
+          select: vi.fn(() => chain),
+          eq: vi.fn(() => chain),
+          in: vi.fn(() => chain),
+          maybeSingle: vi.fn(async () => ({
+            data: courseMaterialRow,
+            error: null,
+          })),
+          single: vi.fn(async () => ({
+            data: courseMaterialRow,
+            error: null,
+          })),
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          then: (resolve: (value: any) => any) =>
+            resolve({ data: rows, error: null }),
+        };
+        return chain;
+      }
       const data =
         table === 'user_course_syncs'
           ? syncRow
-          : table === 'course_materials'
-            ? courseMaterialRow
-            : null;
+          : null;
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const chain: any = {
         select: vi.fn(() => chain),
@@ -78,6 +97,10 @@ vi.mock('@/lib/supabase/server', () => ({
             data: new Blob(['fake file content']),
             error: null,
           })),
+          createSignedUrl: vi.fn(async () => ({
+            data: { signedUrl: 'https://example.com/signed/test.pdf' },
+            error: null,
+          })),
         })),
       },
     };
@@ -96,12 +119,27 @@ vi.mock('@/lib/supabase/admin', () => {
   return {
     createAdminClient: vi.fn(() => ({
       from: vi.fn((table: string) => {
+        if (table === 'moodle_files') {
+          const rows = [{ id: 'file-1', storage_path: 'moodle/file-1.pdf' }];
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const chain: any = {
+            select: vi.fn(() => chain),
+            eq: vi.fn(() => chain),
+            in: vi.fn(() => chain),
+            single: vi.fn(async () => ({
+              data: moodleFileRow,
+              error: null,
+            })),
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            then: (resolve: (value: any) => any) =>
+              resolve({ data: rows, error: null }),
+          };
+          return chain;
+        }
         const data =
-          table === 'moodle_files'
-            ? moodleFileRow
-            : table === 'moodle_sections'
-              ? moodleSectionRow
-              : null;
+          table === 'moodle_sections'
+            ? moodleSectionRow
+            : null;
         return {
           select: vi.fn(() => ({
             eq: vi.fn(() => ({
@@ -114,6 +152,10 @@ vi.mock('@/lib/supabase/admin', () => {
         from: vi.fn(() => ({
           download: vi.fn(async () => ({
             data: new Blob(['fake pdf content']),
+            error: null,
+          })),
+          createSignedUrl: vi.fn(async () => ({
+            data: { signedUrl: 'https://example.com/signed/test.pdf' },
             error: null,
           })),
         })),
@@ -139,7 +181,7 @@ vi.mock('@/lib/ai/prompts', () => ({
 import { extractPdfText } from '@/lib/ai/extraction/pdf';
 import { getContentHash, upsertEmbeddings } from '@/lib/queries/embeddings';
 
-import { askQuestion, indexContent, searchContext } from '../ai-context';
+import { askQuestion, buildAiContext, indexContent, searchContext } from '../ai-context';
 
 afterEach(() => {
   vi.clearAllMocks();
@@ -315,5 +357,35 @@ describe('askQuestion', () => {
         model: 'gemini-2.5-pro',
       }),
     );
+  });
+});
+
+describe('buildAiContext attaches signedUrl to sources', () => {
+  it('returns a signed URL for each moodle_file source', async () => {
+    const { matchEmbeddings } = await import('@/lib/queries/embeddings');
+    vi.mocked(matchEmbeddings).mockResolvedValueOnce([
+      {
+        id: 1,
+        source_type: 'moodle_file',
+        source_id: 'file-1',
+        source_name: 'lecture5.pdf',
+        segment_text: 'foo',
+        page_start: null,
+        page_end: null,
+        course_id: 'moodle-course-1',
+        week_id: null,
+        mime_type: 'application/pdf',
+        similarity: 0.9,
+      },
+    ]);
+
+    const { sources } = await buildAiContext({
+      question: 'q',
+      courseId: 'callers-typenote-course',
+      mode: 'quick',
+    });
+
+    expect(sources).toHaveLength(1);
+    expect(sources[0].signedUrl).toMatch(/^https?:\/\//);
   });
 });
