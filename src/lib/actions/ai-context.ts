@@ -131,7 +131,7 @@ export async function indexContent(source: IndexSource): Promise<IndexResult> {
 
       const { data: fileRow, error: fileErr } = await admin
         .from('moodle_files')
-        .select('storage_path, file_name, mime_type')
+        .select('storage_path, file_name, mime_type, section_id')
         .eq('id', source.fileId)
         .single();
 
@@ -144,6 +144,25 @@ export async function indexContent(source: IndexSource): Promise<IndexResult> {
         };
       }
 
+      // Look up canonical moodle_courses.id via the section. This is the file's
+      // upstream home and stays stable across users — using it on the embedding
+      // row makes the same file findable for everyone who imports it.
+      const { data: sectionRow, error: sectionErr } = await admin
+        .from('moodle_sections')
+        .select('course_id')
+        .eq('id', fileRow.section_id)
+        .single();
+
+      if (sectionErr || !sectionRow?.course_id) {
+        return {
+          success: false,
+          segmentsIndexed: 0,
+          skipped: false,
+          error: 'Moodle section not found for file',
+        };
+      }
+
+      courseId = sectionRow.course_id;
       sourceName = fileRow.file_name;
       mimeType = fileRow.mime_type ?? 'application/octet-stream';
       storageBucket = 'moodle-materials';
