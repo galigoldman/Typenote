@@ -96,6 +96,10 @@ test.describe('File Upload', () => {
     await expect(fileRow).toBeVisible({ timeout: 10_000 });
     await fileRow.hover();
 
+    // Delete uses window.confirm — Playwright dismisses dialogs by
+    // default, so opt into accepting this one before triggering it.
+    page.once('dialog', (d) => d.accept());
+
     // Click the delete button (trash icon, appears on hover)
     const deleteButton = fileRow.locator('button').last();
     await deleteButton.click();
