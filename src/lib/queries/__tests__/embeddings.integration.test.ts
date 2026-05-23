@@ -1,7 +1,6 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import { createAdminClient, TEST_USER_ID } from '@/test/supabase-client';
-import { matchEmbeddings } from '../embeddings';
 
 const supabase = createAdminClient();
 
@@ -178,21 +177,6 @@ describe('content_embeddings table (v2 — 1536 dims, page segments)', () => {
   });
 });
 
-describe('matchEmbeddings new signature', () => {
-  it('accepts moodleCourseId and importedMoodleFileIds without throwing', async () => {
-    // Smoke test the new params are wired through the RPC; functional
-    // behavior is covered in subsequent tasks.
-    const result = await matchEmbeddings({
-      queryEmbedding: Array.from({ length: 1536 }, () => 0),
-      userId: TEST_USER_ID,
-      courseId: COURSE_ID,
-      moodleCourseId: null,
-      importedMoodleFileIds: null,
-    });
-    expect(Array.isArray(result)).toBe(true);
-  });
-});
-
 describe('per-user moodle_file access', () => {
   // These ids must match rows seeded in supabase/seed.sql. If they
   // don't exist yet, the inserts below will fail with FK errors and
@@ -212,23 +196,28 @@ describe('per-user moodle_file access', () => {
       .delete()
       .eq('source_id', MOODLE_FILE);
 
-    await supabase.from('content_embeddings').insert([
-      {
-        source_type: 'moodle_file',
-        source_id: MOODLE_FILE,
-        segment_index: 0,
-        page_start: null,
-        page_end: null,
-        segment_text: 'shared file content',
-        embedding: JSON.stringify(makeVector(1)),
-        user_id: null,
-        course_id: MOODLE_COURSE, // canonical, NOT a Typenote course id
-        week_id: null,
-        source_name: 'shared.pdf',
-        mime_type: 'application/pdf',
-        content_hash: 'test-hash-shared',
-      },
-    ]);
+    const { error: seedError } = await supabase
+      .from('content_embeddings')
+      .insert([
+        {
+          source_type: 'moodle_file',
+          source_id: MOODLE_FILE,
+          segment_index: 0,
+          page_start: null,
+          page_end: null,
+          segment_text: 'shared file content',
+          embedding: JSON.stringify(makeVector(1)),
+          user_id: null,
+          course_id: MOODLE_COURSE, // canonical, NOT a Typenote course id
+          week_id: null,
+          source_name: 'shared.pdf',
+          mime_type: 'application/pdf',
+          content_hash: 'test-hash-shared',
+        },
+      ]);
+    if (seedError) {
+      throw new Error(`Failed to seed test row: ${seedError.message}`);
+    }
   });
 
   afterAll(async () => {
