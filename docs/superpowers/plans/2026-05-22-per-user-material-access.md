@@ -15,6 +15,7 @@
 Before you start: read the spec. The plan below assumes you've read it.
 
 Confirm:
+
 - Working directory is the worktree at `C:\projects\Typenote\.claude\worktrees\unified-juggling-matsumoto`.
 - On branch `fix/ai-chat-per-user-material-access`.
 - `git status` is clean.
@@ -26,6 +27,7 @@ Confirm:
 ## Task 1: Write the migration SQL
 
 **Files:**
+
 - Create: `supabase/migrations/20260522123000_per_user_material_access.sql`
 
 **Background:** Today's `match_embeddings` (from `00014_match_embeddings_return_text.sql`) takes 6 args and filters by a single `match_course_id`. We're replacing it with a function that handles two source types (`course_material` keyed by the user's Typenote `course_id`, `moodle_file` keyed by the canonical `moodle_courses.id`) plus a per-user file whitelist. We also backfill existing rows in-place (no embedding API calls).
@@ -167,6 +169,7 @@ Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>"
 ## Task 2: Update `matchEmbeddings` TS signature
 
 **Files:**
+
 - Modify: `src/lib/queries/embeddings.ts` (the `matchEmbeddings` function around line 91)
 - Test: `src/lib/queries/__tests__/embeddings.integration.test.ts` (NEW test for new params)
 
@@ -269,6 +272,7 @@ Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>"
 ## Task 3: `indexContent` uses canonical `moodle_courses.id` for moodle_file
 
 **Files:**
+
 - Modify: `src/lib/actions/ai-context.ts` (the `if (source.type === 'moodle_file')` block around line 124)
 - Modify: `src/lib/actions/__tests__/ai-context.test.ts` (the "embeds moodle_file as shared" test and add a new one)
 
@@ -292,9 +296,11 @@ vi.mock('@/lib/supabase/admin', () => {
     createAdminClient: vi.fn(() => ({
       from: vi.fn((table: string) => {
         const data =
-          table === 'moodle_files' ? moodleFileRow :
-          table === 'moodle_sections' ? moodleSectionRow :
-          null;
+          table === 'moodle_files'
+            ? moodleFileRow
+            : table === 'moodle_sections'
+              ? moodleSectionRow
+              : null;
         return {
           select: vi.fn(() => ({
             eq: vi.fn(() => ({
@@ -446,6 +452,7 @@ Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>"
 ## Task 4: `searchContext` resolves moodle_course_id and imported files
 
 **Files:**
+
 - Modify: `src/lib/actions/ai-context.ts` (the `searchContext` function around line 289)
 - Modify: `src/lib/actions/__tests__/ai-context.test.ts` (the existing `searchContext` describe block)
 
@@ -480,8 +487,9 @@ vi.mock('@/lib/supabase/server', () => ({
         { moodle_file_id: 'imported-file-b' },
       ];
       const result =
-        table === 'user_file_imports' ? { data: imports, error: null } :
-        { data, error: null };
+        table === 'user_file_imports'
+          ? { data: imports, error: null }
+          : { data, error: null };
       const chain: any = {
         select: vi.fn(() => chain),
         eq: vi.fn(() => chain),
@@ -561,8 +569,8 @@ export async function searchContext(
       .eq('course_id', params.courseId)
       .maybeSingle();
     moodleCourseId =
-      (sync as { moodle_course_id: string | null } | null)
-        ?.moodle_course_id ?? null;
+      (sync as { moodle_course_id: string | null } | null)?.moodle_course_id ??
+      null;
 
     if (moodleCourseId) {
       // Fetch the user's notebook — the set of moodle files they have
@@ -633,6 +641,7 @@ Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>"
 ## Task 5: Integration test for the two-user scenario
 
 **Files:**
+
 - Modify: `src/lib/queries/__tests__/embeddings.integration.test.ts`
 
 **Background:** Verify the migration + code changes against the real DB. Seed two users, one shared moodle_file row, embedding row pointing at `moodle_courses.id`. Both users should match it. Then delete user B's `user_file_imports` row → user B no longer matches.
@@ -665,25 +674,23 @@ describe('per-user moodle_file access', () => {
     // Set up the shared registry rows. The seed may already have a
     // moodle_courses + moodle_sections + moodle_files row — if not,
     // these inserts create them.
-    await supabase
-      .from('content_embeddings')
-      .insert([
-        {
-          source_type: 'moodle_file',
-          source_id: MOODLE_FILE,
-          segment_index: 0,
-          page_start: null,
-          page_end: null,
-          segment_text: 'shared file content',
-          embedding: JSON.stringify(makeVector(1)),
-          user_id: null,
-          course_id: MOODLE_COURSE, // canonical
-          week_id: null,
-          source_name: 'shared.pdf',
-          mime_type: 'application/pdf',
-          content_hash: 'test-hash-shared',
-        },
-      ]);
+    await supabase.from('content_embeddings').insert([
+      {
+        source_type: 'moodle_file',
+        source_id: MOODLE_FILE,
+        segment_index: 0,
+        page_start: null,
+        page_end: null,
+        segment_text: 'shared file content',
+        embedding: JSON.stringify(makeVector(1)),
+        user_id: null,
+        course_id: MOODLE_COURSE, // canonical
+        week_id: null,
+        source_name: 'shared.pdf',
+        mime_type: 'application/pdf',
+        content_hash: 'test-hash-shared',
+      },
+    ]);
   });
 
   afterAll(async () => {
@@ -764,6 +771,7 @@ Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>"
 ## Task 6: Server action — delete moodle file from notebook
 
 **Files:**
+
 - Create or extend: `src/lib/actions/moodle-sync.ts` (it already has `recordUserFileImport`; add the remove action there)
 - Create: `src/lib/actions/__tests__/moodle-sync.test.ts` (if it doesn't exist; otherwise add to it)
 
@@ -901,6 +909,7 @@ Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>"
 ## Task 7: Trash button on Moodle file rows
 
 **Files:**
+
 - Create: `src/components/dashboard/moodle-file-row.tsx` (client component for one row with the delete control)
 - Modify: `src/app/(dashboard)/dashboard/courses/[courseId]/page.tsx` (the Moodle Materials section, around lines 358–410)
 
@@ -1011,25 +1020,27 @@ import { MoodleFileRow } from '@/components/dashboard/moodle-file-row';
 Replace the inner mapping (within `{section.moodle_files.sort(...).map((file) => { ... })}`) with:
 
 ```tsx
-{section.moodle_files
-  .sort((a, b) => a.position - b.position)
-  .map((file) => {
-    const href = file.downloadUrl ?? file.moodle_url;
-    const isStored = !!file.downloadUrl;
-    return (
-      <MoodleFileRow
-        key={file.id}
-        fileId={file.id}
-        fileName={file.file_name}
-        fileType={file.type}
-        mimeType={file.mime_type}
-        fileSize={file.file_size}
-        href={href}
-        isStored={isStored}
-        courseId={courseId}
-      />
-    );
-  })}
+{
+  section.moodle_files
+    .sort((a, b) => a.position - b.position)
+    .map((file) => {
+      const href = file.downloadUrl ?? file.moodle_url;
+      const isStored = !!file.downloadUrl;
+      return (
+        <MoodleFileRow
+          key={file.id}
+          fileId={file.id}
+          fileName={file.file_name}
+          fileType={file.type}
+          mimeType={file.mime_type}
+          fileSize={file.file_size}
+          href={href}
+          isStored={isStored}
+          courseId={courseId}
+        />
+      );
+    });
+}
 ```
 
 - [ ] **Step 7.3: Lint and type-check**
@@ -1076,6 +1087,7 @@ Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>"
 ## Task 8: Signed-URL source citations — backend
 
 **Files:**
+
 - Modify: `src/lib/actions/ai-context.ts` (the `buildAiContext` function, where `sources` is assembled, around lines 521–533)
 - Modify: `src/lib/actions/__tests__/ai-context.test.ts`
 
@@ -1304,6 +1316,7 @@ Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>"
 ## Task 9: Clickable source citations — frontend
 
 **Files:**
+
 - Modify: `src/components/ai/ai-chat-panel.tsx` (the `ChatSource` interface and the source badge rendering, around lines 23–28 and 615–627)
 
 **Background:** Add `signedUrl: string | null` to the `ChatSource` type, then render the badge as `<a>` when present.
@@ -1325,32 +1338,36 @@ interface ChatSource {
 Replace the badge rendering (around lines 615–627) — the `{msg.sources.map(...)}` block — with:
 
 ```tsx
-{msg.sources.map((src, j) => {
-  const content = (
-    <>
-      <BookOpen className="h-2.5 w-2.5" />
-      {src.sourceName}
-      {src.pageRange && ` (${src.pageRange})`}
-    </>
-  );
-  const className =
-    'inline-flex items-center gap-1 rounded-full border bg-background px-2.5 py-0.5 text-[10px] text-muted-foreground';
-  return src.signedUrl ? (
-    <a
-      key={j}
-      href={src.signedUrl}
-      target="_blank"
-      rel="noopener noreferrer"
-      className={className + ' hover:bg-accent hover:text-foreground transition-colors'}
-    >
-      {content}
-    </a>
-  ) : (
-    <span key={j} className={className}>
-      {content}
-    </span>
-  );
-})}
+{
+  msg.sources.map((src, j) => {
+    const content = (
+      <>
+        <BookOpen className="h-2.5 w-2.5" />
+        {src.sourceName}
+        {src.pageRange && ` (${src.pageRange})`}
+      </>
+    );
+    const className =
+      'inline-flex items-center gap-1 rounded-full border bg-background px-2.5 py-0.5 text-[10px] text-muted-foreground';
+    return src.signedUrl ? (
+      <a
+        key={j}
+        href={src.signedUrl}
+        target="_blank"
+        rel="noopener noreferrer"
+        className={
+          className + ' hover:bg-accent hover:text-foreground transition-colors'
+        }
+      >
+        {content}
+      </a>
+    ) : (
+      <span key={j} className={className}>
+        {content}
+      </span>
+    );
+  });
+}
 ```
 
 - [ ] **Step 9.2: Lint and format**
@@ -1388,6 +1405,7 @@ Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>"
 ## Task 10: E2E spec — two-user notebook + delete
 
 **Files:**
+
 - Modify: `e2e/TEST_REGISTRY.md`
 - Create: `e2e/ai-chat-per-user-materials.spec.ts`
 
@@ -1428,8 +1446,9 @@ test.describe('AI chat — per-user material access', () => {
     await page.getByPlaceholder(/Ask anything/).fill(TEST_QUESTION);
     await page.getByRole('button', { name: /Send|submit/ }).click();
     // Wait for at least one source badge
-    await expect(page.getByRole('link', { name: /\.pdf|\.docx|\.pptx/i }).first())
-      .toBeVisible({ timeout: 30_000 });
+    await expect(
+      page.getByRole('link', { name: /\.pdf|\.docx|\.pptx/i }).first(),
+    ).toBeVisible({ timeout: 30_000 });
   });
 
   test('removing a file from notebook hides it from chat', async ({ page }) => {
@@ -1445,7 +1464,9 @@ test.describe('AI chat — per-user material access', () => {
 
     // Confirm dialog: stub it
     page.once('dialog', (d) => d.accept());
-    await fileRow.getByRole('button', { name: /Remove .* from notebook/ }).click();
+    await fileRow
+      .getByRole('button', { name: /Remove .* from notebook/ })
+      .click();
     await expect(page.getByText(fileName)).toHaveCount(0);
 
     // Re-open chat and ask the question
@@ -1455,7 +1476,9 @@ test.describe('AI chat — per-user material access', () => {
 
     // The deleted file must NOT appear as a source
     const responses = page.locator('[role="article"]'); // adjust if needed
-    await expect(responses.last()).not.toContainText(fileName, { timeout: 30_000 });
+    await expect(responses.last()).not.toContainText(fileName, {
+      timeout: 30_000,
+    });
   });
 });
 ```

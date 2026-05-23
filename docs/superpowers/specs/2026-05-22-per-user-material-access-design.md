@@ -16,14 +16,14 @@ The shared `moodle_files` registry is one row per file even when many users sync
 2. User B imports F → `indexContent` runs → content-hash matches (same file bytes) → **skipped**. No rows for B's Typenote course exist.
 3. User B's chat queries `match_embeddings` with `match_course_id = B's Typenote course` → zero rows match → AI replies "no materials".
 
-If step 2 *had* re-indexed instead of skipping (e.g. a content change), `upsertEmbeddings` deletes by `source_id` alone — so A's rows would be wiped and replaced with B's.
+If step 2 _had_ re-indexed instead of skipping (e.g. a content change), `upsertEmbeddings` deletes by `source_id` alone — so A's rows would be wiped and replaced with B's.
 
-Reported symptom: *"for one user (maybe the one who uploaded the files) chat has access to material and for other it doesn't."* This is consistent with the bug.
+Reported symptom: _"for one user (maybe the one who uploaded the files) chat has access to material and for other it doesn't."_ This is consistent with the bug.
 
 ## 2. Goals
 
 1. **One canonical set of embeddings per Moodle file.** Storage and embedding compute cost both stay at O(1) per file regardless of how many users sync.
-2. **Per-user access** to those embeddings is derived from `user_file_imports` — *"if you have it in your materials list, the AI can see it."*
+2. **Per-user access** to those embeddings is derived from `user_file_imports` — _"if you have it in your materials list, the AI can see it."_
 3. **Delete-from-notebook** for Moodle files: removes only the caller's `user_file_imports` row. The shared storage object and the shared embedding stay alive for other users.
 4. **Forward-compatible** with two near-term features:
    - personal user-uploaded files indexed like NotebookLM (each user's own files indexed into their own course),
@@ -39,12 +39,12 @@ Reported symptom: *"for one user (maybe the one who uploaded the files) chat has
 
 ### `content_embeddings`
 
-| Column | `moodle_file` rows (today) | `moodle_file` rows (after fix) | `course_material` rows |
-| --- | --- | --- | --- |
-| `user_id` | `NULL` (shared) | `NULL` (unchanged) | `<uploader>` (unchanged) |
-| `course_id` | `<first-indexer's Typenote course>` (buggy) | `moodle_sections.course_id` (= `moodle_courses.id`, the Typenote-side UUID PK of the upstream Moodle course; canonical, one-per-file) | `<uploader's Typenote course>` (unchanged) |
-| `week_id` | `NULL` typically | `NULL` (unchanged) | `<material's week>` (unchanged) |
-| `UNIQUE (source_type, source_id, segment_index)` | enforced | **unchanged** — one row per file segment globally | unchanged |
+| Column                                           | `moodle_file` rows (today)                  | `moodle_file` rows (after fix)                                                                                                        | `course_material` rows                     |
+| ------------------------------------------------ | ------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------ |
+| `user_id`                                        | `NULL` (shared)                             | `NULL` (unchanged)                                                                                                                    | `<uploader>` (unchanged)                   |
+| `course_id`                                      | `<first-indexer's Typenote course>` (buggy) | `moodle_sections.course_id` (= `moodle_courses.id`, the Typenote-side UUID PK of the upstream Moodle course; canonical, one-per-file) | `<uploader's Typenote course>` (unchanged) |
+| `week_id`                                        | `NULL` typically                            | `NULL` (unchanged)                                                                                                                    | `<material's week>` (unchanged)            |
+| `UNIQUE (source_type, source_id, segment_index)` | enforced                                    | **unchanged** — one row per file segment globally                                                                                     | unchanged                                  |
 
 Key insight: a Moodle file belongs to exactly one upstream Moodle course (reached in our schema via `moodle_files.section_id → moodle_sections.course_id → moodle_courses.id`). That's its canonical home and never changes. Different users mirror that course into different Typenote courses, but the file's home in the registry is invariant. So `moodle_courses.id` (referred to throughout this doc as the "moodle_course_id" — which is also how `user_course_syncs.moodle_course_id` is named, distinct from the upstream text identifier `moodle_courses.moodle_course_id`) is the right key for the embedding row.
 
@@ -52,7 +52,7 @@ Key insight: a Moodle file belongs to exactly one upstream Moodle course (reache
 
 No schema change. Hard-delete the row when the user removes a file from their notebook.
 
-The existing `status` enum (`'imported'`, `'removed_from_moodle'`) stays. `'removed_from_moodle'` continues to mean *"upstream removed this; we preserved an audit row"* and is already excluded from the import-list filter in §5.2, so those rows correctly produce no RAG hits. If upstream later re-adds a file, the existing moodle-sync flow flips the status back to `'imported'` (via `recordUserFileImport`) on the user's next sync — no spec change needed.
+The existing `status` enum (`'imported'`, `'removed_from_moodle'`) stays. `'removed_from_moodle'` continues to mean _"upstream removed this; we preserved an audit row"_ and is already excluded from the import-list filter in §5.2, so those rows correctly produce no RAG hits. If upstream later re-adds a file, the existing moodle-sync flow flips the status back to `'imported'` (via `recordUserFileImport`) on the user's next sync — no spec change needed.
 
 User-initiated delete is just a `DELETE`, which is simpler and lossless (the user can re-import to re-create).
 
@@ -61,6 +61,7 @@ User-initiated delete is just a `DELETE`, which is simpler and lossless (the use
 ### 5.1 `src/lib/actions/ai-context.ts` — `indexContent`
 
 For `source.type === 'moodle_file'`:
+
 - Select `storage_path, file_name, mime_type, section_id` from `moodle_files`, then resolve `section_id → moodle_sections.course_id`. (Alternatively: a single query with an inner-join via Supabase's `.select('storage_path, file_name, mime_type, moodle_sections!inner(course_id)')`.)
 - Use the resolved `moodle_sections.course_id` (the `moodle_courses.id` of the file's upstream course) as the `courseId` variable for the embedding rows. **Ignore** `source.courseId` (the caller's Typenote course id) for the embedding row.
 - The content-hash gate is now stable: any user importing file F looks up the row by `(source_type, source_id)` — the existing `(source_type, source_id, segment_index)` UNIQUE ensures there is only one row, with the canonical `course_id` — sees the existing hash, and short-circuits. No wasted re-embedding.
@@ -111,10 +112,15 @@ Signature extends with two optional params; both default null:
 
 ```ts
 matchEmbeddings({
-  queryEmbedding, userId,
-  courseId, moodleCourseId, importedMoodleFileIds,
-  weekId, matchCount, similarityThreshold,
-})
+  queryEmbedding,
+  userId,
+  courseId,
+  moodleCourseId,
+  importedMoodleFileIds,
+  weekId,
+  matchCount,
+  similarityThreshold,
+});
 ```
 
 ### 5.4 `supabase/migrations/20260522123000_per_user_material_access.sql`
@@ -239,7 +245,9 @@ For `course_materials`, the existing delete flow stays — same UX, different ac
 The AI's source array currently looks like:
 
 ```ts
-{ sourceType, sourceName, weekId, pageRange }
+{
+  (sourceType, sourceName, weekId, pageRange);
+}
 ```
 
 To make citations linkable:
@@ -265,12 +273,12 @@ The SSE event `{ type: 'sources', sources: [...] }` payload gains the optional `
 
 ## 6.1 Edge-case behavior of the new RPC
 
-| Caller state | `match_course_id` | `match_moodle_course_id` | `match_imported_moodle_file_ids` | Result for moodle_file rows |
-| --- | --- | --- | --- | --- |
-| Course is Moodle-synced, user has imports | typenote uuid | moodle uuid | non-empty `uuid[]` | matched iff in the imported set |
-| Course is Moodle-synced, user has no imports yet | typenote uuid | moodle uuid | `[]` | none (correct — nothing in notebook) |
-| Course is not Moodle-synced | typenote uuid | `NULL` | `NULL` | none (no moodle branch fires). `course_material` rows still match via `match_course_id`. |
-| Caller passes `NULL` for imported list explicitly | typenote uuid | moodle uuid | `NULL` | all moodle files in that Moodle course (today's permissive behavior) |
+| Caller state                                      | `match_course_id` | `match_moodle_course_id` | `match_imported_moodle_file_ids` | Result for moodle_file rows                                                              |
+| ------------------------------------------------- | ----------------- | ------------------------ | -------------------------------- | ---------------------------------------------------------------------------------------- |
+| Course is Moodle-synced, user has imports         | typenote uuid     | moodle uuid              | non-empty `uuid[]`               | matched iff in the imported set                                                          |
+| Course is Moodle-synced, user has no imports yet  | typenote uuid     | moodle uuid              | `[]`                             | none (correct — nothing in notebook)                                                     |
+| Course is not Moodle-synced                       | typenote uuid     | `NULL`                   | `NULL`                           | none (no moodle branch fires). `course_material` rows still match via `match_course_id`. |
+| Caller passes `NULL` for imported list explicitly | typenote uuid     | moodle uuid              | `NULL`                           | all moodle files in that Moodle course (today's permissive behavior)                     |
 
 We deliberately treat `NULL` as "no filter" so the RPC remains usable for admin/diagnostic queries without changing its semantics from the caller side. `searchContext` always passes a concrete array (possibly empty); it never passes `NULL` for `match_imported_moodle_file_ids` when `match_moodle_course_id` is set.
 
