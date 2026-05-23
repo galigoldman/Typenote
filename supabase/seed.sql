@@ -559,6 +559,61 @@ VALUES (
 ) ON CONFLICT (id) DO NOTHING;
 
 -- ============================================
+-- COURSE DOCUMENTS (for homework session testing)
+-- ============================================
+
+-- Exercise document in CS101 (the homework questions)
+INSERT INTO public.documents (id, user_id, course_id, week_id, purpose, title, content, subject, canvas_type, position)
+VALUES (
+  '20000000-0000-0000-0000-000000000010',
+  'ac3be77d-4566-406c-9ac0-7c410634ad41',
+  '30000000-0000-0000-0000-000000000001',
+  '40000000-0000-0000-0000-000000000001',
+  'homework',
+  'Problem Set 1: Variables',
+  '{"type":"doc","content":[{"type":"heading","attrs":{"level":1,"textAlign":null},"content":[{"type":"text","text":"Problem Set 1: Variables and Data Types"}]},{"type":"heading","attrs":{"level":2,"textAlign":null},"content":[{"type":"text","text":"Question 1"}]},{"type":"paragraph","content":[{"type":"text","text":"Explain the difference between mutable and immutable data types in Python. Give two examples of each."}]},{"type":"heading","attrs":{"level":2,"textAlign":null},"content":[{"type":"text","text":"Question 2"}]},{"type":"paragraph","content":[{"type":"text","text":"What is the output of the following code? Explain why."}]},{"type":"codeBlock","content":[{"type":"text","text":"x = [1, 2, 3]\\ny = x\\ny.append(4)\\nprint(x)"}]},{"type":"heading","attrs":{"level":2,"textAlign":null},"content":[{"type":"text","text":"Question 3"}]},{"type":"paragraph","content":[{"type":"text","text":"Write a function that takes a list of integers and returns a dictionary mapping each integer to its square."}]}]}',
+  'data_structures',
+  'blank',
+  0
+) ON CONFLICT (id) DO NOTHING;
+
+-- Homework document (the student's work on the exercise)
+INSERT INTO public.documents (id, user_id, course_id, week_id, purpose, title, content, subject, canvas_type, position)
+VALUES (
+  '20000000-0000-0000-0000-000000000011',
+  'ac3be77d-4566-406c-9ac0-7c410634ad41',
+  '30000000-0000-0000-0000-000000000001',
+  '40000000-0000-0000-0000-000000000001',
+  'homework',
+  'HW — Problem Set 1: Variables',
+  '{"type":"doc","content":[{"type":"paragraph","content":[{"type":"text","text":"My solutions for Problem Set 1..."}]}]}',
+  'data_structures',
+  'blank',
+  1
+) ON CONFLICT (id) DO NOTHING;
+
+-- ============================================
+-- HOMEWORK SESSIONS (test data)
+-- ============================================
+
+INSERT INTO public.homework_sessions (id, document_id, exercise_document_id, course_id, user_id)
+VALUES (
+  'a0000000-0000-0000-0000-000000000001',
+  '20000000-0000-0000-0000-000000000011',
+  '20000000-0000-0000-0000-000000000010',
+  '30000000-0000-0000-0000-000000000001',
+  'ac3be77d-4566-406c-9ac0-7c410634ad41'
+) ON CONFLICT (id) DO NOTHING;
+
+INSERT INTO public.homework_session_materials (id, session_id, material_type, material_id)
+VALUES (
+  'a1000000-0000-0000-0000-000000000001',
+  'a0000000-0000-0000-0000-000000000001',
+  'course_material',
+  '50000000-0000-0000-0000-000000000001'
+) ON CONFLICT (id) DO NOTHING;
+
+-- ============================================
 -- DOCUMENT VERSIONS (test data for version history)
 -- ============================================
 
