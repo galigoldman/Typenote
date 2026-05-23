@@ -69,10 +69,7 @@ vi.mock('@/lib/supabase/server', () => ({
         };
         return chain;
       }
-      const data =
-        table === 'user_course_syncs'
-          ? syncRow
-          : null;
+      const data = table === 'user_course_syncs' ? syncRow : null;
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const chain: any = {
         select: vi.fn(() => chain),
@@ -136,10 +133,7 @@ vi.mock('@/lib/supabase/admin', () => {
           };
           return chain;
         }
-        const data =
-          table === 'moodle_sections'
-            ? moodleSectionRow
-            : null;
+        const data = table === 'moodle_sections' ? moodleSectionRow : null;
         return {
           select: vi.fn(() => ({
             eq: vi.fn(() => ({
@@ -181,7 +175,12 @@ vi.mock('@/lib/ai/prompts', () => ({
 import { extractPdfText } from '@/lib/ai/extraction/pdf';
 import { getContentHash, upsertEmbeddings } from '@/lib/queries/embeddings';
 
-import { askQuestion, buildAiContext, indexContent, searchContext } from '../ai-context';
+import {
+  askQuestion,
+  buildAiContext,
+  indexContent,
+  searchContext,
+} from '../ai-context';
 
 afterEach(() => {
   vi.clearAllMocks();
