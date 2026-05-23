@@ -75,7 +75,10 @@ test.describe('AI chat — per-user material access', () => {
       .isVisible({ timeout: 10_000 })
       .catch(() => false);
     if (!rowVisible) {
-      test.skip(true, 'No file rows with [data-moodle-file-row] visible — seed data may be missing');
+      test.skip(
+        true,
+        'No file rows with [data-moodle-file-row] visible — seed data may be missing',
+      );
     }
 
     // Capture the display name of the first file so we can check it disappears.
@@ -115,9 +118,9 @@ test.describe('AI chat — per-user material access', () => {
     });
 
     // The deleted file must NOT appear in any source citation in the response.
-    const chatPanel = page.locator('[data-chat-panel]').or(
-      page.locator('div').filter({ hasText: 'AI Tutor' }).last(),
-    );
+    const chatPanel = page
+      .locator('[data-chat-panel]')
+      .or(page.locator('div').filter({ hasText: 'AI Tutor' }).last());
     await expect(chatPanel.getByText(fileName)).toHaveCount(0, {
       timeout: 5_000,
     });
