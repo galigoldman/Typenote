@@ -5,16 +5,32 @@
 -- be tied to the FIRST indexer's Typenote course_id, so only one user
 -- could ever find the file via RAG. This migration:
 --
---   A. Repoints moodle_file embedding rows from <typenote course_id>
+--   A. Drops the FK on content_embeddings.course_id (now a polymorphic
+--      reference: courses.id for course_material, moodle_courses.id for
+--      moodle_file).
+--
+--   B. Repoints moodle_file embedding rows from <typenote course_id>
 --      to the canonical moodle_courses.id (reached via
 --      moodle_files.section_id -> moodle_sections.course_id).
 --
---   B. Replaces match_embeddings with a version that handles two
+--   C. Replaces match_embeddings with a version that handles two
 --      source-type branches and accepts an imported-file whitelist for
 --      per-user access enforcement.
 
 -- ---------------------------------------------------------------------------
--- Step A: Backfill embedding course_id for moodle_file rows.
+-- Step A: Relax the course_id foreign key.
+--
+-- 00012 declared `course_id uuid references public.courses(id)`. With per-user
+-- access we now also store moodle_courses.id in this column for moodle_file
+-- rows, so the single-target FK no longer fits. Drop it; integrity is handled
+-- application-side (deletes cascade from the source registries via
+-- deleteEmbeddingsBySource and explicit cleanup paths).
+-- ---------------------------------------------------------------------------
+alter table public.content_embeddings
+  drop constraint if exists content_embeddings_course_id_fkey;
+
+-- ---------------------------------------------------------------------------
+-- Step B: Backfill embedding course_id for moodle_file rows.
 -- ---------------------------------------------------------------------------
 update public.content_embeddings ce
 set course_id = ms.course_id
@@ -25,7 +41,7 @@ where ce.source_type = 'moodle_file'
   and ce.course_id is distinct from ms.course_id;
 
 -- ---------------------------------------------------------------------------
--- Step B: Replace match_embeddings RPC.
+-- Step C: Replace match_embeddings RPC.
 --
 -- 00014 registered the function with bare `vector` (not extensions.vector),
 -- so we drop using the exact same form to avoid leaving the old function
