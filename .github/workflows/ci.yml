@@ -143,7 +143,9 @@ jobs:
           VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
 
       - name: Build production bundle
-        run: vercel build --prod --token=${{ secrets.VERCEL_TOKEN }}
+        run: |
+          set -a && source .vercel/.env.production.local && set +a
+          vercel build --prod --token=${{ secrets.VERCEL_TOKEN }}
         env:
           VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
           VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
