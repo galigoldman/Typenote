@@ -87,26 +87,30 @@ test.describe('File Upload', () => {
       timeout: 15_000,
     });
 
-    // Find the file row and hover to reveal delete button
+    // Find the file row by scoping to the PersonalFileItem button that
+    // displays the file name, then walking up to its row container. Using
+    // `.locator('div').filter({ hasText }).first()` returned the whole
+    // page, so the delete-button selector grabbed the wrong button.
     const displayName = fileName.replace('.pdf', '');
-    const fileRow = page
-      .locator('div')
-      .filter({ hasText: displayName })
+    const fileNameButton = page
+      .locator('button', { hasText: displayName })
       .first();
-    await expect(fileRow).toBeVisible({ timeout: 10_000 });
+    await expect(fileNameButton).toBeVisible({ timeout: 10_000 });
+    const fileRow = fileNameButton.locator(
+      'xpath=ancestor::div[contains(@class, "group")][1]',
+    );
     await fileRow.hover();
 
     // Delete uses window.confirm — Playwright dismisses dialogs by
     // default, so opt into accepting this one before triggering it.
     page.once('dialog', (d) => d.accept());
 
-    // Click the delete button (trash icon, appears on hover)
+    // Click the trash icon (the row has two buttons: the filename button
+    // and the trash button, which is rendered last).
     const deleteButton = fileRow.locator('button').last();
     await deleteButton.click();
 
-    // File should disappear
-    await expect(
-      page.locator('button', { hasText: displayName }),
-    ).not.toBeVisible({ timeout: 10_000 });
+    // The filename button for this file should disappear from the page.
+    await expect(fileNameButton).not.toBeVisible({ timeout: 10_000 });
   });
 });
