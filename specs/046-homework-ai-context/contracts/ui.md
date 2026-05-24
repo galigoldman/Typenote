@@ -7,6 +7,7 @@
 **Location**: `src/components/dashboard/start-homework-dialog.tsx`
 
 **Props**:
+
 ```ts
 {
   courseId: string;
@@ -19,6 +20,7 @@
 ```
 
 **Behavior**:
+
 1. Opens a dialog with two sections:
    - **Select Exercise**: Radio-button list of course documents (single-select, required)
    - **Select Reference Materials**: Checkbox list of materials grouped by week (multi-select, optional)
@@ -32,6 +34,7 @@
 **Location**: `src/components/ai/homework-context-badges.tsx`
 
 **Props**:
+
 ```ts
 {
   context: HomeworkContext;
@@ -39,6 +42,7 @@
 ```
 
 **Behavior**:
+
 - Renders a collapsible section showing the exercise document name and material names as badges
 - Collapsed by default, shows "Homework context: {exercise name} + {N} materials"
 - Expanded shows the full list
@@ -96,7 +100,9 @@ The course page (`src/app/(dashboard)/dashboard/courses/[courseId]/page.tsx`) ad
   personalFiles={[...allWeekPersonalFiles, ...coursePersonalFiles]}
   weeks={typedWeeks}
 >
-  <Button variant="outline" size="sm">Start Homework</Button>
+  <Button variant="outline" size="sm">
+    Start Homework
+  </Button>
 </StartHomeworkDialog>
 ```
 

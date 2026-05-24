@@ -18,6 +18,7 @@ Represents a homework session linking a working document to an exercise source a
 **RLS**: Users can only read/insert/delete their own rows (`user_id = auth.uid()`). No UPDATE policy — sessions are immutable once created.
 
 **Notes**:
+
 - `document_id` is UNIQUE — each document can have at most one homework session.
 - `exercise_document_id` is the existing document containing the homework questions.
 - Deleting the homework document cascades to delete the session.
@@ -29,17 +30,18 @@ Represents a homework session linking a working document to an exercise source a
 
 Junction table linking a homework session to its reference materials (polymorphic).
 
-| Field           | Type        | Constraints                                                                     |
-| --------------- | ----------- | ------------------------------------------------------------------------------- |
-| `id`            | uuid        | PK, default `gen_random_uuid()`                                                |
-| `session_id`    | uuid        | FK → `homework_sessions(id)` ON DELETE CASCADE, NOT NULL                        |
-| `material_type` | text        | NOT NULL, CHECK IN (`'course_material'`, `'personal_file'`, `'document'`)       |
-| `material_id`   | uuid        | NOT NULL                                                                        |
-| `created_at`    | timestamptz | default `now()`                                                                 |
+| Field           | Type        | Constraints                                                               |
+| --------------- | ----------- | ------------------------------------------------------------------------- |
+| `id`            | uuid        | PK, default `gen_random_uuid()`                                           |
+| `session_id`    | uuid        | FK → `homework_sessions(id)` ON DELETE CASCADE, NOT NULL                  |
+| `material_type` | text        | NOT NULL, CHECK IN (`'course_material'`, `'personal_file'`, `'document'`) |
+| `material_id`   | uuid        | NOT NULL                                                                  |
+| `created_at`    | timestamptz | default `now()`                                                           |
 
 **RLS**: Inherited through parent session — SELECT requires EXISTS subquery checking `homework_sessions.user_id = auth.uid()`. INSERT requires the same. No UPDATE policy.
 
 **Notes**:
+
 - `material_id` is a polymorphic reference — no FK constraint since it can point to `course_materials`, `personal_files`, or `documents`.
 - Unique constraint on `(session_id, material_type, material_id)` prevents duplicate entries.
 - Deleting the session cascades to delete all material links.
@@ -79,6 +81,7 @@ homework_session_materials ──> course_materials | personal_files | documents
 ## State Transitions
 
 Homework sessions are **create-once, read-many**:
+
 1. **Created** when the student confirms the "Start Homework" dialog
 2. **Read** every time the homework document is opened (to load context for AI)
 3. **Deleted** only when the parent document or exercise is deleted (cascade)
@@ -112,7 +115,7 @@ interface HomeworkContext {
   materials: Array<{
     type: 'course_material' | 'personal_file' | 'document';
     id: string;
-    name: string;  // display name from the source table
+    name: string; // display name from the source table
   }>;
 }
 ```

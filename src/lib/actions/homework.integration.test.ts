@@ -135,13 +135,11 @@ describe('homework session CRUD', () => {
 
   it('should enforce UNIQUE on (session_id, material_type, material_id)', async () => {
     // Try to add duplicate material to seeded session
-    const { error } = await admin
-      .from('homework_session_materials')
-      .insert({
-        session_id: HW_SESSION_ID,
-        material_type: 'course_material',
-        material_id: MATERIAL_ID,
-      });
+    const { error } = await admin.from('homework_session_materials').insert({
+      session_id: HW_SESSION_ID,
+      material_type: 'course_material',
+      material_id: MATERIAL_ID,
+    });
 
     expect(error).toBeTruthy();
     expect(error!.code).toBe('23505');
