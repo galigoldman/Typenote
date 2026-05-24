@@ -100,4 +100,4 @@ These exercise the failure paths. Run them before bumping to a new release.
   The manifest probably wasn't rebuilt after a change. Run `(cd extension && npm run build)` and reload the extension at `chrome://extensions`.
 
 - **"Update Extension" card.**
-  The loaded extension's manifest `version` doesn't match `EXPECTED_EXTENSION_VERSION` in `src/hooks/use-moodle-extension.ts`. Rebuild the extension or update the constant in lockstep.
+  The loaded extension's manifest `version` is _older_ than `MINIMUM_EXTENSION_VERSION` in `src/hooks/use-moodle-extension.ts`. Rebuild/reload the extension at or above that version (a newer version is accepted — the check is a minimum, not an exact match).
