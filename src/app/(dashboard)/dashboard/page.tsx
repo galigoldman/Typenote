@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase/server';
+import { getCurrentUser } from '@/lib/auth/get-current-user';
 import { FolderCard } from '@/components/dashboard/folder-card';
 import { FolderDialog } from '@/components/dashboard/folder-dialog';
 import { CourseCard } from '@/components/dashboard/course-card';
@@ -19,49 +20,47 @@ import type { Folder, Document, Course } from '@/types/database';
 
 export default async function DashboardPage() {
   const supabase = await createClient();
+  const user = await getCurrentUser();
 
-  // Fetch current user for Moodle connection lookup
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const [
+    moodleConnection,
+    foldersResult,
+    coursesResult,
+    documentsResult,
+  ] = await Promise.all([
+    user ? getUserMoodleConnection(user.id) : Promise.resolve(null),
+    supabase
+      .from('folders')
+      .select('*')
+      .is('parent_id', null)
+      .order('position', { ascending: true }),
+    supabase
+      .from('courses')
+      .select('*')
+      .is('folder_id', null)
+      .order('position', { ascending: true }),
+    supabase
+      .from('documents')
+      .select('*')
+      .is('folder_id', null)
+      .order('position', { ascending: true }),
+  ]);
 
-  // Fetch Moodle connection (returns null if none configured)
-  let moodleConnection: { domain: string; instanceId: string } | null = null;
-  if (user) {
-    const connection = await getUserMoodleConnection(user.id);
-    if (connection?.moodle_instances) {
-      const instance = connection.moodle_instances as {
-        id: string;
-        domain: string;
-      };
-      moodleConnection = {
-        domain: instance.domain,
-        instanceId: instance.id,
-      };
-    }
+  let moodleConnectionInfo: { domain: string; instanceId: string } | null = null;
+  if (moodleConnection?.moodle_instances) {
+    const instance = moodleConnection.moodle_instances as {
+      id: string;
+      domain: string;
+    };
+    moodleConnectionInfo = {
+      domain: instance.domain,
+      instanceId: instance.id,
+    };
   }
 
-  const { data: folders } = await supabase
-    .from('folders')
-    .select('*')
-    .is('parent_id', null)
-    .order('position', { ascending: true });
-
-  const { data: courses } = await supabase
-    .from('courses')
-    .select('*')
-    .is('folder_id', null)
-    .order('position', { ascending: true });
-
-  const { data: documents } = await supabase
-    .from('documents')
-    .select('*')
-    .is('folder_id', null)
-    .order('position', { ascending: true });
-
-  const typedFolders = (folders as Folder[] | null) ?? [];
-  const typedCourses = (courses as Course[] | null) ?? [];
-  const typedDocuments = (documents as Document[] | null) ?? [];
+  const typedFolders = (foldersResult.data as Folder[] | null) ?? [];
+  const typedCourses = (coursesResult.data as Course[] | null) ?? [];
+  const typedDocuments = (documentsResult.data as Document[] | null) ?? [];
   const isEmpty =
     typedFolders.length === 0 &&
     typedCourses.length === 0 &&
@@ -69,7 +68,7 @@ export default async function DashboardPage() {
 
   return (
     <div className="p-6">
-      <MoodleSyncPromptWrapper moodleConnection={moodleConnection} />
+      <MoodleSyncPromptWrapper moodleConnection={moodleConnectionInfo} />
 
       <div className="mb-6 mt-4 flex flex-wrap items-center justify-between gap-2">
         <Breadcrumb>
