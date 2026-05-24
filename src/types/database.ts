@@ -203,6 +203,38 @@ export interface AiMessage {
   created_at: string;
 }
 
+export type HomeworkMaterialType =
+  | 'course_material'
+  | 'personal_file'
+  | 'document';
+
+export interface HomeworkSession {
+  id: string;
+  document_id: string;
+  exercise_document_id: string;
+  course_id: string;
+  user_id: string;
+  created_at: string;
+}
+
+export interface HomeworkSessionMaterial {
+  id: string;
+  session_id: string;
+  material_type: HomeworkMaterialType;
+  material_id: string;
+  created_at: string;
+}
+
+export interface HomeworkContext {
+  session: HomeworkSession;
+  exerciseDocument: { id: string; title: string };
+  materials: Array<{
+    type: HomeworkMaterialType;
+    id: string;
+    name: string;
+  }>;
+}
+
 export type VersionTrigger = 'idle' | 'periodic' | 'close' | 'before_restore';
 
 export interface DocumentVersion {

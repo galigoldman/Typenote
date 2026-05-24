@@ -5,6 +5,7 @@ import { createAdminClient } from '@/lib/supabase/admin';
 import { AiChatWrapper } from '@/components/ai/ai-chat-wrapper';
 import { DocumentListWithMove } from '@/components/dashboard/document-list-with-move';
 import { CreateDocumentDialog } from '@/components/dashboard/create-document-dialog';
+import { StartHomeworkDialog } from '@/components/dashboard/start-homework-dialog';
 import { WeekSection } from '@/components/dashboard/week-section';
 import { WeekDialog } from '@/components/dashboard/week-dialog';
 import { EmptyState } from '@/components/dashboard/empty-state';
@@ -267,6 +268,17 @@ export default async function CoursePage({
         </Breadcrumb>
         <div className="flex flex-wrap items-center gap-2">
           <AiChatWrapper courseId={courseId} courseName={typedCourse.name} />
+          <StartHomeworkDialog
+            courseId={courseId}
+            documents={typedDocuments}
+            materials={allMaterials}
+            personalFiles={[...allWeekPersonalFiles, ...coursePersonalFiles]}
+            weeks={typedWeeks}
+          >
+            <Button variant="outline" size="sm">
+              Start Homework
+            </Button>
+          </StartHomeworkDialog>
           <CreateDocumentDialog folderId={null} courseId={courseId}>
             <Button variant="outline" size="sm">
               New Document
