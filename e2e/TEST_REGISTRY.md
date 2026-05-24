@@ -20,6 +20,7 @@ When adding or modifying a feature, update this registry and write the correspon
 - [x] Password reset sends email (forgot password flow)
 - [x] Unauthenticated user is redirected to login
 - [x] Login page still shows both email/password and Google options
+- [x] Privacy policy (`/privacy`) is publicly reachable while logged out (required for Chrome Web Store review)
 
 ---
 

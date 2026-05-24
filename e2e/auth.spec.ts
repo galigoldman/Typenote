@@ -74,6 +74,20 @@ test.describe('Auth', () => {
     await expect(page).toHaveURL(/\/login/, { timeout: 10_000 });
   });
 
+  test('privacy policy is publicly reachable while logged out', async ({
+    page,
+  }) => {
+    // The Chrome Web Store reviewer (and any logged-out visitor following the
+    // privacy link in the extension listing) hits this URL unauthenticated.
+    // It must render the policy, not redirect to /login.
+    await page.goto('/privacy');
+
+    await expect(page).toHaveURL(/\/privacy/);
+    await expect(
+      page.getByRole('heading', { name: 'Privacy Policy' }),
+    ).toBeVisible();
+  });
+
   test('forgot password shows confirmation message', async ({ page }) => {
     await page.goto('/forgot-password');
 
