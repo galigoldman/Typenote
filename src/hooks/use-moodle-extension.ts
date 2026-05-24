@@ -1,9 +1,14 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
+import { isAtLeastVersion } from '@/lib/version';
 
 const EXTENSION_ID = process.env.NEXT_PUBLIC_EXTENSION_ID ?? '';
-export const EXPECTED_EXTENSION_VERSION = '0.2.0';
+// Lowest extension version the web app supports. The installed extension may
+// be this version OR NEWER — we no longer require an exact match, so a Web
+// Store auto-update that bumps the extension ahead of a web deploy (or vice
+// versa) doesn't block syncing during the rollout window.
+export const MINIMUM_EXTENSION_VERSION = '0.2.0';
 const PING_TIMEOUT_MS = 2_000;
 
 export type ExtensionState =
@@ -78,7 +83,7 @@ export function useMoodleExtension() {
         setState({ status: 'not-installed' });
         return;
       }
-      if (version !== EXPECTED_EXTENSION_VERSION) {
+      if (!isAtLeastVersion(version, MINIMUM_EXTENSION_VERSION)) {
         setState({ status: 'version-mismatch', installedVersion: version });
         return;
       }

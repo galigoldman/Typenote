@@ -10,7 +10,7 @@ import {
 } from '@/components/ui/card';
 import {
   useMoodleExtension,
-  EXPECTED_EXTENSION_VERSION,
+  MINIMUM_EXTENSION_VERSION,
 } from '@/hooks/use-moodle-extension';
 import { MoodleCardSkeleton } from './moodle-card-skeleton';
 import { MoodleConnectionSetup } from './moodle-connection-setup';
@@ -65,8 +65,8 @@ export function MoodleSyncPrompt({
           <CardTitle className="text-base">Moodle Integration</CardTitle>
           <CardDescription>
             Update the Typenote extension to continue syncing. Installed
-            version: <strong>{state.installedVersion}</strong>. Required:{' '}
-            <strong>{EXPECTED_EXTENSION_VERSION}</strong>.
+            version: <strong>{state.installedVersion}</strong>. Minimum
+            required: <strong>{MINIMUM_EXTENSION_VERSION}</strong> or newer.
           </CardDescription>
         </CardHeader>
         <CardContent>
