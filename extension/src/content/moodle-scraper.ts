@@ -62,16 +62,47 @@ export function scrapeLoginStatus(): LoginStatusData {
  *       span[aria-hidden="true"]  ->  visible course name
  *       span.sr-only              ->  accessible course name (fallback)
  */
-export function scrapeCourses(): ScrapedCoursesData & {
-  _debug?: { title: string; url: string; cardCount: number };
-} {
-  const cards = document.querySelectorAll<HTMLElement>(
+export async function scrapeCourses(): Promise<
+  ScrapedCoursesData & {
+    _debug?: { title: string; url: string; cardCount: number };
+  }
+> {
+  // Moodle's /my/courses.php hydrates the dashboard cards via XHR after
+  // DOMContentLoaded — the SW's waitForTabLoad only waits for tab
+  // status:'complete' (network idle for the document itself, not for the
+  // follow-up AJAX). If the user navigates quickly we'd query the DOM
+  // before the cards mount and falsely report "no courses". Poll instead.
+  //
+  // We also try several selectors: institutions and Moodle themes vary —
+  // some render `.card.dashboard-card[data-course-id]`, some only set
+  // `[data-courseid]`, some wrap differently. Any one matching is enough.
+  const CARD_SELECTORS = [
     '.card.dashboard-card[data-course-id]',
-  );
+    '.dashboard-card[data-course-id]',
+    '[data-region="paged-content-page"] [data-course-id]',
+    '[data-region="paged-content-page"] [data-courseid]',
+    '[data-courseid]',
+  ];
+  const findCards = (): HTMLElement[] => {
+    for (const sel of CARD_SELECTORS) {
+      const els = Array.from(document.querySelectorAll<HTMLElement>(sel));
+      if (els.length > 0) return els;
+    }
+    return [];
+  };
+  const POLL_INTERVAL_MS = 250;
+  const POLL_TIMEOUT_MS = 8000;
+  const start = Date.now();
+  let cards = findCards();
+  while (cards.length === 0 && Date.now() - start < POLL_TIMEOUT_MS) {
+    await new Promise((r) => setTimeout(r, POLL_INTERVAL_MS));
+    cards = findCards();
+  }
+
   const courses: ScrapedCourse[] = [];
 
   cards.forEach((card) => {
-    const moodleCourseId = card.dataset.courseId;
+    const moodleCourseId = card.dataset.courseId ?? card.dataset.courseid ?? '';
     if (!moodleCourseId) return;
 
     // Extract course name from .multiline area
@@ -105,6 +136,39 @@ export function scrapeCourses(): ScrapedCoursesData & {
       courses.push({ moodleCourseId, name, url });
     }
   });
+
+  // Theme-agnostic fallback: if the card selectors still found nothing
+  // (or the cards lacked the expected name/link structure), harvest course
+  // links from the page's main content. This catches list/summary views
+  // and themes that completely restructure the dashboard. We dedupe by
+  // course id and skip the nav/sidebar so we don't pick up "recent courses"
+  // widgets duplicating the real list.
+  if (courses.length === 0) {
+    const container =
+      document.querySelector('#region-main, #page-content, main') ??
+      document.body;
+    const seen = new Set<string>();
+    const links = container.querySelectorAll<HTMLAnchorElement>(
+      'a[href*="/course/view.php?id="]',
+    );
+    for (const link of Array.from(links)) {
+      const m = link.href.match(/[?&]id=(\d+)/);
+      if (!m) continue;
+      const moodleCourseId = m[1];
+      if (seen.has(moodleCourseId)) continue;
+      const aria = link.getAttribute('aria-label') ?? '';
+      const clone = link.cloneNode(true) as HTMLElement;
+      clone
+        .querySelectorAll('.sr-only, .accesshide')
+        .forEach((el) => el.remove());
+      const name = (aria || clone.textContent || '')
+        .replace(/\s+/g, ' ')
+        .trim();
+      if (!name || name.length < 2) continue;
+      seen.add(moodleCourseId);
+      courses.push({ moodleCourseId, name, url: link.href });
+    }
+  }
 
   return {
     courses,
@@ -171,6 +235,12 @@ function mimeFromExtension(ext: string): string | undefined {
   return map[ext.toLowerCase()];
 }
 
+// Only these file types are imported. Everything else (URLs, assignments,
+// zips, images, video/audio, unknown extensions, etc.) is dropped at scrape
+// time so it never reaches the picker or the downloader. Matches the set
+// processable by the AI-context pipeline in src/lib/actions/ai-context.ts.
+const ALLOWED_FILE_EXTENSIONS = new Set(['pdf', 'docx', 'doc', 'pptx', 'ppt']);
+
 /**
  * Parses a single activity element into a ScrapedItem.
  *
@@ -198,11 +268,9 @@ function parseActivity(activity: HTMLElement): ScrapedItem | null {
     activity.querySelector<HTMLImageElement>('img.activityicon')?.alt ?? '';
   const classes = activity.className;
 
-  // Determine if this is a file or a link
-  const isFile =
-    modType.startsWith('resource') ||
-    classes.includes('modtype_resource') ||
-    iconAlt === 'File icon';
+  // Determine if this is an external URL resource (filtered out below).
+  // Files are identified by file-extension detection rather than a heuristic
+  // flag — see ALLOWED_FILE_EXTENSIONS guard further down.
   const isUrl =
     modType === 'url' ||
     classes.includes('modtype_url') ||
@@ -230,31 +298,36 @@ function parseActivity(activity: HTMLElement): ScrapedItem | null {
     return null;
   }
 
-  // Assignments are not downloadable files — treat them as links
-  if (baseModType === 'assign' || moodleUrl.includes('/mod/assign/')) {
-    return {
-      type: 'link',
-      name,
-      moodleUrl,
-      externalUrl: moodleUrl,
-    };
+  // Assignments and URL resources are not downloadable files we can embed
+  // — drop them. (Previously surfaced as type:'link' but the dashboard /
+  // AI-context pipeline can't do anything with them.)
+  if (
+    isUrl ||
+    baseModType === 'assign' ||
+    baseModType === 'url' ||
+    moodleUrl.includes('/mod/assign/')
+  ) {
+    return null;
   }
 
-  // For files: extract file extension from modtype or icon
+  // For files: extract file extension from modtype or icon.
+  // Filter to ALLOWED_FILE_EXTENSIONS so zips / images / video / unknown
+  // types never reach the picker. Items without a detectable extension are
+  // dropped too — we can't import what we can't classify. (This also
+  // implicitly drops modtype_page, modtype_folder, modtype_book, etc.
+  // since extractFileType returns their bare modtype name, which isn't
+  // in the allow-list.)
   const fileExt = extractFileType(classes);
-  const mimeType = fileExt ? mimeFromExtension(fileExt) : undefined;
+  if (!fileExt || !ALLOWED_FILE_EXTENSIONS.has(fileExt.toLowerCase())) {
+    return null;
+  }
+  const mimeType = mimeFromExtension(fileExt);
 
   const item: ScrapedItem = {
-    type: isUrl ? 'link' : 'file',
+    type: 'file',
     name,
     moodleUrl,
   };
-
-  if (isUrl) {
-    // For URL resources, the actual external URL is behind the Moodle redirect
-    // The extension will resolve it when downloading
-    item.externalUrl = moodleUrl;
-  }
 
   if (mimeType) {
     item.mimeType = mimeType;
@@ -264,19 +337,128 @@ function parseActivity(activity: HTMLElement): ScrapedItem | null {
 }
 
 /**
- * Scrapes activities from a section element.
+ * Extracts an allowed-extension file item from a pluginfile.php anchor.
+ * Returns null if the link is missing a recognizable allowed extension.
+ * Wrapped in its own helper because malformed URLs would otherwise throw
+ * out of decodeURIComponent and abort the parent loop.
+ */
+function fileItemFromPluginfileLink(
+  link: HTMLAnchorElement,
+): ScrapedItem | null {
+  try {
+    const url = link.href;
+    if (!url) return null;
+    let filename = '';
+    try {
+      filename = decodeURIComponent(url.split('/').pop()?.split('?')[0] ?? '');
+    } catch {
+      filename = url.split('/').pop()?.split('?')[0] ?? '';
+    }
+    if (!filename) return null;
+    const extMatch = filename.match(/\.([^.]+)$/);
+    const ext = extMatch?.[1]?.toLowerCase();
+    if (!ext || !ALLOWED_FILE_EXTENSIONS.has(ext)) return null;
+    const name =
+      (link.textContent ?? '').replace(/\s+/g, ' ').trim() || filename;
+    const item: ScrapedItem = { type: 'file', name, moodleUrl: url };
+    const mime = mimeFromExtension(ext);
+    if (mime) item.mimeType = mime;
+    return item;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Scrapes allowed-extension file links inline inside a Moodle folder
+ * activity. Folders rendered with "display inline" expose children as
+ * pluginfile.php links in .foldertree / .contentafterlink. Each child
+ * becomes its own ScrapedItem so it appears flat in the picker.
+ *
+ * "Download folder" zip button is naturally skipped — .zip isn't in
+ * ALLOWED_FILE_EXTENSIONS.
+ */
+function scrapeFolderActivity(folderEl: HTMLElement): ScrapedItem[] {
+  const items: ScrapedItem[] = [];
+  const seen = new Set<string>();
+  try {
+    const links = folderEl.querySelectorAll<HTMLAnchorElement>(
+      'a[href*="/pluginfile.php/"]',
+    );
+    for (const link of Array.from(links)) {
+      if (seen.has(link.href)) continue;
+      const item = fileItemFromPluginfileLink(link);
+      if (!item) continue;
+      seen.add(link.href);
+      items.push(item);
+    }
+  } catch {
+    // Defensive: any DOM surprise on a single folder shouldn't blank
+    // out the whole section.
+  }
+  return items;
+}
+
+/**
+ * Scrapes activities from a section element. Per-activity errors are
+ * swallowed so one malformed activity DOM can't blank the section.
+ * If the structured pass finds zero items, a link-sweep fallback
+ * harvests pluginfile.php links of allowed extensions directly from
+ * the section's DOM — this catches custom themes, raw HTML blocks
+ * with file links, and folder activities that render outside the
+ * expected modtype_folder shell.
  */
 function scrapeActivitiesFromSection(sectionEl: HTMLElement): ScrapedItem[] {
-  // Select only the wrapper activities (not the nested .activity-item duplicates)
-  const activities = sectionEl.querySelectorAll<HTMLElement>(
-    '.activity.activity-wrapper[data-for="cmitem"]',
-  );
   const items: ScrapedItem[] = [];
 
+  let activities: NodeListOf<HTMLElement> | HTMLElement[] = [];
+  try {
+    activities = sectionEl.querySelectorAll<HTMLElement>(
+      '.activity.activity-wrapper[data-for="cmitem"]',
+    );
+  } catch {
+    activities = [];
+  }
+
   activities.forEach((act) => {
-    const item = parseActivity(act);
-    if (item) items.push(item);
+    try {
+      const modType = act.dataset.modtype ?? '';
+      const baseModType = modType.split('_')[0];
+      const isFolder =
+        baseModType === 'folder' || act.className.includes('modtype_folder');
+
+      if (isFolder) {
+        items.push(...scrapeFolderActivity(act));
+        return;
+      }
+
+      const item = parseActivity(act);
+      if (item) items.push(item);
+    } catch {
+      // Swallow per-activity failures — keep scraping the rest.
+    }
   });
+
+  // Link-sweep fallback. Only kicks in if the structured pass found
+  // nothing — we don't want to dedupe-merge with a working pass.
+  if (items.length === 0) {
+    const seen = new Set<string>();
+    let links: NodeListOf<HTMLAnchorElement> | HTMLAnchorElement[] = [];
+    try {
+      links = sectionEl.querySelectorAll<HTMLAnchorElement>(
+        'a[href*="/pluginfile.php/"]',
+      );
+    } catch {
+      links = [];
+    }
+    for (const link of Array.from(links)) {
+      if (seen.has(link.href)) continue;
+      const item = fileItemFromPluginfileLink(link);
+      if (!item) continue;
+      seen.add(link.href);
+      items.push(item);
+    }
+  }
 
   return items;
 }
@@ -373,8 +555,59 @@ function scrapeStandardFormat(): ScrapedSection[] {
 }
 
 /**
+ * Sweeps a scope element for every pluginfile.php link whose filename
+ * extension is in ALLOWED_FILE_EXTENSIONS, dedups by href, returns
+ * ScrapedItems. Used as a backstop so we never miss a file just because
+ * its surrounding DOM didn't match an activity-wrapper selector.
+ */
+function linkSweep(scope: HTMLElement): ScrapedItem[] {
+  const items: ScrapedItem[] = [];
+  const seen = new Set<string>();
+  let links: NodeListOf<HTMLAnchorElement> | HTMLAnchorElement[] = [];
+  try {
+    links = scope.querySelectorAll<HTMLAnchorElement>(
+      'a[href*="/pluginfile.php/"]',
+    );
+  } catch {
+    links = [];
+  }
+  for (const link of Array.from(links)) {
+    if (seen.has(link.href)) continue;
+    const item = fileItemFromPluginfileLink(link);
+    if (!item) continue;
+    seen.add(link.href);
+    items.push(item);
+  }
+  return items;
+}
+
+function getMainContentArea(): HTMLElement {
+  return (
+    document.querySelector<HTMLElement>('#region-main .course-content') ??
+    document.querySelector<HTMLElement>('#region-main') ??
+    document.querySelector<HTMLElement>('main') ??
+    document.body
+  );
+}
+
+function mergeUnique(into: ScrapedItem[], extras: ScrapedItem[]): void {
+  const seen = new Set(into.map((i) => i.moodleUrl));
+  for (const e of extras) {
+    if (seen.has(e.moodleUrl)) continue;
+    seen.add(e.moodleUrl);
+    into.push(e);
+  }
+}
+
+/**
  * Scrapes the full course content (sections + items) from a course page.
  * Handles both "tiles" and standard (topics/weeks) formats.
+ *
+ * Backstop: if structured detection found no sections, OR every section
+ * is empty, we add a synthetic "Course Materials" section populated from
+ * a full link sweep of the main content area. This protects against
+ * Moodle themes that completely restructure the section DOM beyond
+ * recognition — we'd rather show a flat list than nothing.
  */
 export function scrapeCourseContent(): ScrapedCourseContentData {
   const format = getCourseFormat();
@@ -384,6 +617,19 @@ export function scrapeCourseContent(): ScrapedCourseContentData {
     sections = scrapeTilesFormat();
   } else {
     sections = scrapeStandardFormat();
+  }
+
+  const totalItems = sections.reduce((n, s) => n + s.items.length, 0);
+  if (totalItems === 0) {
+    const sweep = linkSweep(getMainContentArea());
+    if (sweep.length > 0) {
+      sections.push({
+        moodleSectionId: 'sweep',
+        title: 'Course Materials',
+        position: sections.length,
+        items: sweep,
+      });
+    }
   }
 
   return { sections };
@@ -399,37 +645,56 @@ export function scrapeCourseContent(): ScrapedCourseContentData {
  * we skip those — only scrape the target section's activities.
  */
 export function scrapeSectionPage(): ScrapedItem[] {
-  // Find the visible loaded section (not section-0)
-  // The target section has class "state-visible" or is the only non-zero section with activities
-  const loadedSection = document.querySelector<HTMLElement>(
-    'li.section.course-section.state-visible, li.section.moveablesection.state-visible',
-  );
-  if (loadedSection) {
-    return scrapeActivitiesFromSection(loadedSection);
-  }
+  const items: ScrapedItem[] = [];
 
-  // Fallback: find sections with activities, skip section-0
-  const allSections = document.querySelectorAll<HTMLElement>(
-    'li.section.course-section, li.section.moveablesection',
-  );
-  for (const section of allSections) {
-    const sectionNum =
-      section.dataset.section ?? section.id.replace('section-', '');
-    if (sectionNum === '0') continue;
-    const activities = section.querySelectorAll(
-      '.activity.activity-wrapper[data-for="cmitem"]',
-    );
-    if (activities.length > 0) {
-      return scrapeActivitiesFromSection(section);
+  // Pass 1: structured detection. Theme variants emit .state-visible on
+  // different wrappers, so try several.
+  const visibleSelectors = [
+    'li.section.course-section.state-visible',
+    'li.section.moveablesection.state-visible',
+    '[data-region="section"].state-visible',
+    '.section.course-section.state-visible',
+  ];
+  for (const sel of visibleSelectors) {
+    const el = document.querySelector<HTMLElement>(sel);
+    if (el) {
+      mergeUnique(items, scrapeActivitiesFromSection(el));
+      if (items.length > 0) break;
     }
   }
 
-  // Final fallback: use the whole content area
-  const contentArea = document.querySelector<HTMLElement>(
-    '#region-main .course-content',
-  );
-  if (!contentArea) return [];
-  return scrapeActivitiesFromSection(contentArea);
+  // Pass 2: if pass 1 found nothing, walk any section wrapper that has
+  // activity children, skipping section-0.
+  if (items.length === 0) {
+    let allSections: NodeListOf<HTMLElement> | HTMLElement[] = [];
+    try {
+      allSections = document.querySelectorAll<HTMLElement>(
+        'li.section.course-section, li.section.moveablesection, [data-region="section"], .section.course-section',
+      );
+    } catch {
+      allSections = [];
+    }
+    for (const section of Array.from(allSections)) {
+      const sectionNum =
+        section.dataset.section ?? section.id.replace('section-', '');
+      if (sectionNum === '0') continue;
+      const activities = section.querySelectorAll(
+        '.activity.activity-wrapper[data-for="cmitem"], .activity[data-for="cmitem"]',
+      );
+      if (activities.length > 0) {
+        mergeUnique(items, scrapeActivitiesFromSection(section));
+        if (items.length > 0) break;
+      }
+    }
+  }
+
+  // Pass 3: ALWAYS run a link sweep across the main content area as a
+  // backstop. Merges in any pluginfile.php links of allowed extensions
+  // that the structured passes missed. Deduped by href so we don't
+  // double-count items already captured by passes 1/2.
+  mergeUnique(items, linkSweep(getMainContentArea()));
+
+  return items;
 }
 
 // ============================================

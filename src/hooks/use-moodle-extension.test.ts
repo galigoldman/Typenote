@@ -141,7 +141,7 @@ describe('useMoodleExtension', () => {
     expect(result.current.isInstalled).toBe(true);
   });
 
-  it('exposes state.status="version-mismatch" when ping returns a different version', async () => {
+  it('exposes state.status="version-mismatch" when the installed version is below the minimum', async () => {
     mockSendMessage.mockImplementation(
       (_id: string, _msg: unknown, callback: (...args: unknown[]) => void) => {
         callback({ success: true, data: { version: '0.1.0' } });
@@ -158,6 +158,25 @@ describe('useMoodleExtension', () => {
       installedVersion: '0.1.0',
     });
     expect(result.current.isInstalled).toBe(false);
+  });
+
+  it('treats a version NEWER than the minimum as installed (no mismatch)', async () => {
+    mockSendMessage.mockImplementation(
+      (_id: string, _msg: unknown, callback: (...args: unknown[]) => void) => {
+        callback({ success: true, data: { version: '0.3.0' } });
+      },
+    );
+
+    const { result } = renderHook(() => useMoodleExtension());
+    await waitFor(() =>
+      expect(result.current.state.status).not.toBe('checking'),
+    );
+
+    expect(result.current.state).toEqual({
+      status: 'installed',
+      version: '0.3.0',
+    });
+    expect(result.current.isInstalled).toBe(true);
   });
 
   it('falls back to "not-installed" when the PING response is malformed', async () => {

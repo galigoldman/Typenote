@@ -188,11 +188,12 @@ describe('compareCourses', () => {
     ]);
   });
 
-  it('returns synced_by_others when course exists but user has no sync record', async () => {
+  it('returns new_to_system when course exists in registry but user has no sync record', async () => {
+    // Per-user isolation: another user may have synced this course before,
+    // but the current user should never see that — it's brand new to them.
     const mock = createMockAdmin([
       { data: { id: 'inst-1' } }, // instance exists (.single())
       { data: { id: 'course-uuid-1' } }, // course exists in registry (.single())
-      { data: null, count: 5 }, // moodle_files count query (.in()) — has content
       { data: null }, // no user_course_syncs record (.single())
     ]);
     mockCreateAdminClient.mockReturnValue(mock);
@@ -208,23 +209,52 @@ describe('compareCourses', () => {
         moodleCourseId: 'CS101',
         name: 'Intro to CS',
         moodleUrl: 'https://moodle.example.com/course/view.php?id=101',
-        status: 'synced_by_others',
+        status: 'new_to_system',
         registryId: 'course-uuid-1',
       },
     ]);
   });
 
-  it('returns synced_by_user when course exists and user has a sync record', async () => {
+  it('returns new_to_system when user has sync row but no actual file imports', async () => {
     const mock = createMockAdmin([
-      { data: { id: 'inst-1' } }, // instance exists (.single())
-      { data: { id: 'course-uuid-1' } }, // course exists in registry (.single())
-      { data: null, count: 3 }, // moodle_files count query (.in()) — has content
+      { data: { id: 'inst-1' } }, // instance .single()
+      { data: { id: 'course-uuid-1' } }, // registry course .single()
       {
-        data: {
-          id: 'sync-1',
-          last_synced_at: '2026-03-10T12:00:00Z',
-        },
-      }, // user has sync record (.single())
+        data: { id: 'sync-1', last_synced_at: '2026-03-10T12:00:00Z' },
+      }, // user_course_syncs .single()
+      { data: [{ id: 's1' }] }, // sections .in()
+      { data: [{ id: 'f1' }, { id: 'f2' }] }, // files .in()
+      { data: null, count: 0 }, // user_file_imports count .in() — zero
+    ]);
+    mockCreateAdminClient.mockReturnValue(mock);
+
+    const result = await compareCourses(
+      'moodle.example.com',
+      scrapedCourses,
+      'user-1',
+    );
+
+    expect(result).toEqual([
+      {
+        moodleCourseId: 'CS101',
+        name: 'Intro to CS',
+        moodleUrl: 'https://moodle.example.com/course/view.php?id=101',
+        status: 'new_to_system',
+        registryId: 'course-uuid-1',
+      },
+    ]);
+  });
+
+  it('returns synced_by_user with the user-specific import count', async () => {
+    const mock = createMockAdmin([
+      { data: { id: 'inst-1' } }, // instance .single()
+      { data: { id: 'course-uuid-1' } }, // registry course .single()
+      {
+        data: { id: 'sync-1', last_synced_at: '2026-03-10T12:00:00Z' },
+      }, // user_course_syncs .single()
+      { data: [{ id: 's1' }] }, // sections .in()
+      { data: [{ id: 'f1' }, { id: 'f2' }, { id: 'f3' }] }, // files .in()
+      { data: null, count: 3 }, // user_file_imports count .in() — three
     ]);
     mockCreateAdminClient.mockReturnValue(mock);
 
@@ -247,7 +277,7 @@ describe('compareCourses', () => {
     ]);
   });
 
-  it('handles multiple courses with different statuses', async () => {
+  it('handles multiple courses with mixed per-user states', async () => {
     const multiCourses = [
       {
         moodleCourseId: 'CS101',
@@ -267,19 +297,17 @@ describe('compareCourses', () => {
     ];
 
     const mock = createMockAdmin([
-      { data: { id: 'inst-1' } }, // instance exists (.single())
-      { data: null }, // CS101: not in registry (.single())
-      { data: { id: 'course-uuid-2' } }, // CS201: in registry (.single())
-      { data: null, count: 4 }, // CS201: moodle_files count (.in()) — has content
-      { data: null }, // CS201: no user sync (.single())
-      { data: { id: 'course-uuid-3' } }, // CS301: in registry (.single())
-      { data: null, count: 2 }, // CS301: moodle_files count (.in()) — has content
+      { data: { id: 'inst-1' } }, // instance .single()
+      { data: null }, // CS101: not in registry — done
+      { data: { id: 'course-uuid-2' } }, // CS201: in registry .single()
+      { data: null }, // CS201: no user_course_syncs .single() — done (new_to_system)
+      { data: { id: 'course-uuid-3' } }, // CS301: in registry .single()
       {
-        data: {
-          id: 'sync-3',
-          last_synced_at: '2026-03-09T08:00:00Z',
-        },
-      }, // CS301: user has sync (.single())
+        data: { id: 'sync-3', last_synced_at: '2026-03-09T08:00:00Z' },
+      }, // CS301: user_course_syncs .single()
+      { data: [{ id: 's3' }] }, // CS301: sections .in()
+      { data: [{ id: 'f3a' }, { id: 'f3b' }] }, // CS301: files .in()
+      { data: null, count: 2 }, // CS301: user imports count .in()
     ]);
     mockCreateAdminClient.mockReturnValue(mock);
 
@@ -291,11 +319,12 @@ describe('compareCourses', () => {
 
     expect(result).toHaveLength(3);
     expect(result[0].status).toBe('new_to_system');
-    expect(result[1].status).toBe('synced_by_others');
+    expect(result[1].status).toBe('new_to_system');
     expect(result[1].registryId).toBe('course-uuid-2');
     expect(result[2].status).toBe('synced_by_user');
     expect(result[2].registryId).toBe('course-uuid-3');
     expect(result[2].lastSyncedAt).toBe('2026-03-09T08:00:00Z');
+    expect(result[2].syncedFileCount).toBe(2);
   });
 });
 

@@ -164,11 +164,21 @@ export function useAutoSave(
     return () => window.removeEventListener('beforeunload', handler);
   }, [flush]);
 
-  // Cleanup timeout on unmount
+  // Flush pending save on unmount (fire-and-forget) instead of discarding it.
+  // This prevents data loss when users navigate away via SPA routing before
+  // the debounce timer fires. The fetch continues after unmount; setState
+  // calls become safe no-ops on unmounted components in React 19.
   useEffect(() => {
     return () => {
-      if (timeoutRef.current) clearTimeout(timeoutRef.current);
-      if (retryTimeoutRef.current) clearTimeout(retryTimeoutRef.current);
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
+        timeoutRef.current = null;
+        Promise.resolve(saveFnRef.current()).catch(() => {});
+      }
+      if (retryTimeoutRef.current) {
+        clearTimeout(retryTimeoutRef.current);
+        retryTimeoutRef.current = null;
+      }
     };
   }, []);
 
