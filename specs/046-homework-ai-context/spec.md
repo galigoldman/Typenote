@@ -10,6 +10,7 @@
 ### User Story 1 - Start a Homework Session (Priority: P1)
 
 A student opens a course page and clicks "Start Homework" (next to the existing "New Document" button). A dialog appears letting them select:
+
 1. The exercise document — an existing document in the course that contains the homework questions.
 2. The relevant reference materials — lectures, recitations, and/or uploaded materials from the course that the homework is based on.
 

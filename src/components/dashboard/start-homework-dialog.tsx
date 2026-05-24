@@ -44,9 +44,9 @@ export function StartHomeworkDialog({
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [selectedExercise, setSelectedExercise] = useState<string | null>(null);
-  const [selectedMaterials, setSelectedMaterials] = useState<
-    Set<string>
-  >(new Set());
+  const [selectedMaterials, setSelectedMaterials] = useState<Set<string>>(
+    new Set(),
+  );
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -91,9 +91,7 @@ export function StartHomeworkDialog({
       resetForm();
       router.push(`/dashboard/documents/${result.documentId}`);
     } catch (err) {
-      setError(
-        err instanceof Error ? err.message : 'Failed to start homework',
-      );
+      setError(err instanceof Error ? err.message : 'Failed to start homework');
     } finally {
       setIsSubmitting(false);
     }
@@ -121,10 +119,11 @@ export function StartHomeworkDialog({
         <DialogHeader>
           <DialogTitle>Start Homework</DialogTitle>
           <DialogDescription>
-            Choose the exercise you&apos;re working on and the relevant lectures,
-            recitations, or materials. The AI chat will use all of this as
-            context so you can ask questions like &quot;what does question 2
-            mean?&quot; and it will know exactly what you&apos;re referring to.
+            Choose the exercise you&apos;re working on and the relevant
+            lectures, recitations, or materials. The AI chat will use all of
+            this as context so you can ask questions like &quot;what does
+            question 2 mean?&quot; and it will know exactly what you&apos;re
+            referring to.
           </DialogDescription>
         </DialogHeader>
 
@@ -184,7 +183,8 @@ export function StartHomeworkDialog({
             </p>
             <div className="max-h-48 space-y-2 overflow-y-auto rounded-md border p-2">
               {/* Documents (excluding the selected exercise) */}
-              {documents.filter((d) => d.id !== selectedExercise).length > 0 && (
+              {documents.filter((d) => d.id !== selectedExercise).length >
+                0 && (
                 <div>
                   <p className="mb-1 text-xs font-medium text-muted-foreground">
                     Documents
@@ -213,9 +213,7 @@ export function StartHomeworkDialog({
 
               {/* Course materials grouped by week */}
               {weeks.map((week) => {
-                const weekMats = materials.filter(
-                  (m) => m.week_id === week.id,
-                );
+                const weekMats = materials.filter((m) => m.week_id === week.id);
                 if (weekMats.length === 0) return null;
                 return (
                   <div key={week.id}>
@@ -272,7 +270,8 @@ export function StartHomeworkDialog({
             </div>
             {selectedMaterials.size > 0 && (
               <p className="text-xs text-primary">
-                {selectedMaterials.size} material{selectedMaterials.size > 1 ? 's' : ''} selected
+                {selectedMaterials.size} material
+                {selectedMaterials.size > 1 ? 's' : ''} selected
               </p>
             )}
           </div>
