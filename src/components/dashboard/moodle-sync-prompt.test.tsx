@@ -4,7 +4,7 @@ import type { ExtensionState } from '@/hooks/use-moodle-extension';
 
 vi.mock('@/hooks/use-moodle-extension', () => ({
   useMoodleExtension: vi.fn(),
-  EXPECTED_EXTENSION_VERSION: '0.2.0',
+  MINIMUM_EXTENSION_VERSION: '0.2.0',
 }));
 
 import { useMoodleExtension } from '@/hooks/use-moodle-extension';

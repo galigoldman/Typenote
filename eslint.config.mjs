@@ -15,6 +15,8 @@ const eslintConfig = defineConfig([
     '.claude/**',
     '.specify/**',
     'public/pdf.worker.min.mjs',
+    '.chrome-debug/**',
+    '.chrome-debug-moodle/**',
   ]),
 ]);
 

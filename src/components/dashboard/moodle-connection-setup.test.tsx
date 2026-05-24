@@ -4,7 +4,7 @@ import userEvent from '@testing-library/user-event';
 
 vi.mock('@/hooks/use-moodle-extension', () => ({
   useMoodleExtension: vi.fn(),
-  EXPECTED_EXTENSION_VERSION: '0.2.0',
+  MINIMUM_EXTENSION_VERSION: '0.2.0',
 }));
 
 vi.mock('@/lib/actions/moodle-sync', () => ({

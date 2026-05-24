@@ -101,10 +101,6 @@ const TEXT_HIGHLIGHT_COLORS = [
 function HighlightButton({ editor }: { editor: Editor }) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
-  const [popoverPos, setPopoverPos] = useState<{
-    top: number;
-    left: number;
-  } | null>(null);
 
   useEffect(() => {
     if (!open) return;
@@ -120,10 +116,6 @@ function HighlightButton({ editor }: { editor: Editor }) {
   const activeColor = (editor.getAttributes('highlight').color as string) || '';
 
   const handleToggle = () => {
-    if (!open && ref.current) {
-      const rect = ref.current.getBoundingClientRect();
-      setPopoverPos({ top: rect.bottom + 4, left: rect.left + rect.width / 2 });
-    }
     setOpen((o) => !o);
   };
 
@@ -157,11 +149,8 @@ function HighlightButton({ editor }: { editor: Editor }) {
           <p>Highlight</p>
         </TooltipContent>
       </Tooltip>
-      {open && popoverPos && (
-        <div
-          className="fixed p-2 bg-popover border rounded-lg shadow-lg z-[100] -translate-x-1/2"
-          style={{ top: popoverPos.top, left: popoverPos.left }}
-        >
+      {open && (
+        <div className="absolute top-full left-1/2 -translate-x-1/2 mt-1 p-2 bg-popover border rounded-lg shadow-lg z-[100]">
           <div className="flex gap-1.5">
             {TEXT_HIGHLIGHT_COLORS.map((c) => (
               <button

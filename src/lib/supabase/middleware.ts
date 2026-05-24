@@ -36,6 +36,26 @@ export async function updateSession(request: NextRequest) {
     // treat as unauthenticated rather than crashing the error overlay.
   }
 
+  // Handle OAuth error redirects (e.g. Google consent screen double-callback).
+  // GoTrue redirects to /?error=... when OAuth state expires. If the user
+  // already has a valid session from the first (successful) callback,
+  // send them to the dashboard instead of showing an error.
+  if (
+    request.nextUrl.searchParams.get('error_code') === 'bad_oauth_state' &&
+    user
+  ) {
+    const url = request.nextUrl.clone();
+    url.pathname = '/dashboard';
+    url.search = '';
+    return NextResponse.redirect(url);
+  }
+
+  // Public pages: readable by anyone, logged in or out. The privacy policy
+  // MUST stay reachable while logged out — the Chrome Web Store reviewer (and
+  // any visitor who clicks the policy link in the extension listing) hits it
+  // unauthenticated, and a redirect to /login would fail store review.
+  const isPublicPage = request.nextUrl.pathname.startsWith('/privacy');
+
   // Route protection: unauthenticated users can only access auth pages
   const isAuthPage =
     request.nextUrl.pathname.startsWith('/login') ||
@@ -43,7 +63,7 @@ export async function updateSession(request: NextRequest) {
     request.nextUrl.pathname.startsWith('/forgot-password') ||
     request.nextUrl.pathname.startsWith('/auth');
 
-  if (!user && !isAuthPage) {
+  if (!user && !isAuthPage && !isPublicPage) {
     const url = request.nextUrl.clone();
     url.pathname = '/login';
     return NextResponse.redirect(url);
