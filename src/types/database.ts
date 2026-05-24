@@ -203,7 +203,10 @@ export interface AiMessage {
   created_at: string;
 }
 
-export type HomeworkMaterialType = 'course_material' | 'personal_file' | 'document';
+export type HomeworkMaterialType =
+  | 'course_material'
+  | 'personal_file'
+  | 'document';
 
 export interface HomeworkSession {
   id: string;

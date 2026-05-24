@@ -58,7 +58,8 @@ export async function createHomeworkSession(data: {
     })
     .select('id')
     .single();
-  if (docErr || !doc) throw new Error(docErr?.message ?? 'Failed to create document');
+  if (docErr || !doc)
+    throw new Error(docErr?.message ?? 'Failed to create document');
 
   // Create the homework session
   const { data: session, error: sessionErr } = await supabase
@@ -127,7 +128,8 @@ export async function getHomeworkContext(data: {
     .select('*')
     .eq('session_id', typedSession.id);
 
-  const typedMaterials = (materialsData as HomeworkSessionMaterial[] | null) ?? [];
+  const typedMaterials =
+    (materialsData as HomeworkSessionMaterial[] | null) ?? [];
 
   // Resolve display names for each material
   const materials: HomeworkContext['materials'] = [];
@@ -162,7 +164,10 @@ export async function getHomeworkContext(data: {
     session: typedSession,
     exerciseDocument: exerciseDoc
       ? { id: exerciseDoc.id, title: exerciseDoc.title }
-      : { id: typedSession.exercise_document_id, title: 'Exercise unavailable' },
+      : {
+          id: typedSession.exercise_document_id,
+          title: 'Exercise unavailable',
+        },
     materials,
   };
 }

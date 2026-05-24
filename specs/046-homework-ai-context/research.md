@@ -7,6 +7,7 @@
 **Rationale**: The homework session links a homework document to an exercise source document and zero or more reference materials. Materials are polymorphic — they can be `course_materials`, `personal_files`, or other `documents`. A normalized relational model with a junction table is the cleanest approach, follows the existing codebase pattern (e.g., `ai_conversations` + `ai_messages`, `document_versions`), and is a strong interview topic (normalization, junction tables, polymorphic associations).
 
 **Alternatives considered**:
+
 - **JSONB column on `documents`** (e.g., `homework_context: { exercise_document_id, material_ids: [...] }`): Simpler but loses FK constraints, makes querying relationships harder, and mixes concerns. Rejected because the codebase already uses dedicated tables for related entities.
 - **Extending the existing `purpose` field**: Too limited — `purpose` is just a label (`homework`, `summary`, `notes`). It doesn't carry relational data. Could add `exercise_document_id` as a column, but the many-to-many materials relationship still needs a junction table.
 
@@ -19,6 +20,7 @@
 **Rationale**: The existing AI pipeline already injects context via synthetic user/model exchanges in the Gemini `contents` array (see `buildAiContext` in `src/lib/actions/ai-context.ts`). Adding homework context follows the same pattern — the exercise document text and material text are prepended as additional context turns. This keeps all context assembly server-side (secure, no client-side file fetching) and leverages the existing streaming SSE architecture.
 
 **Alternatives considered**:
+
 - **Client-side context injection**: Pass exercise/material text from client. Rejected — requires fetching potentially large files client-side, exposes content in network requests, and duplicates server-side logic.
 - **RAG-only approach (use existing embeddings)**: Rely entirely on pgvector search to find relevant chunks. Rejected — RAG is probabilistic and might miss specific questions. For homework, we want the full exercise text injected directly so the AI can reference "question 2" precisely. RAG can supplement but shouldn't be the only mechanism.
 
@@ -31,6 +33,7 @@
 **Rationale**: The existing `buildSystemPrompt` in `src/lib/ai/prompts.ts` already accepts optional context parameters (`courseName`, `weekLabel`, `hasDocumentContent`). Adding `isHomeworkMode` is consistent with this pattern. The homework prompt additions instruct the AI to be pedagogical rather than solution-oriented.
 
 **Alternatives considered**:
+
 - **Completely separate prompt builder**: Unnecessary duplication. The base prompt is 90% the same.
 - **Prompt in the API route directly**: Scatters prompt logic. The existing pattern keeps all prompts in `prompts.ts`.
 
@@ -43,6 +46,7 @@
 **Rationale**: The existing `CreateDocumentDialog` uses a simple form with selects. The homework dialog needs more — it's selecting from lists of existing items rather than filling in new data. A grouped checkbox list follows shadcn/ui patterns and handles the "zero or more materials" requirement naturally.
 
 **Alternatives considered**:
+
 - **Two separate dialogs (pick exercise, then pick materials)**: More steps for the user. Rejected — one dialog with two sections is faster.
 - **Combobox/search-based**: Overkill for typical course sizes (5-30 items). Simple scrollable lists are sufficient.
 
@@ -55,6 +59,7 @@
 **Rationale**: The user needs transparency about what the AI "knows" (spec FR-010). A non-intrusive collapsible section doesn't interfere with the chat flow but is always accessible. Badges are compact and scannable.
 
 **Alternatives considered**:
+
 - **Tooltip on the AI bubble**: Too hidden — users might not discover it.
 - **Separate tab/panel**: Over-engineered for showing a short list of linked items.
 
