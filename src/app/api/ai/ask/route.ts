@@ -13,11 +13,9 @@ export async function POST(req: Request) {
     const {
       question,
       courseId,
-      weekId,
       documentId,
       mode,
       courseName,
-      weekLabel,
       documentContent,
       conversationHistory,
       conversationId,
@@ -297,11 +295,9 @@ export async function POST(req: Request) {
     const params: QuestionParams = {
       question: question.trim(),
       courseId,
-      weekId: weekId || undefined,
       documentId: documentId || undefined,
       mode,
       courseName: courseName || undefined,
-      weekLabel: weekLabel || undefined,
       documentContent: documentContent || undefined,
       // Use server-loaded history if available, otherwise fall back to client-sent history
       conversationHistory:
