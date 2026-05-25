@@ -10,16 +10,12 @@ interface TiptapEditorWithVersionsProps {
   document: Document;
   courseId?: string;
   courseName?: string;
-  weekId?: string;
-  weekLabel?: string;
 }
 
 export function TiptapEditorWithVersions({
   document,
   courseId,
   courseName,
-  weekId,
-  weekLabel,
 }: TiptapEditorWithVersionsProps) {
   const [isVersionHistoryOpen, setIsVersionHistoryOpen] = useState(() => {
     if (typeof window === 'undefined') return false;
@@ -59,8 +55,6 @@ export function TiptapEditorWithVersions({
       <AiChatWrapper
         courseId={courseId}
         courseName={courseName}
-        weekId={weekId}
-        weekLabel={weekLabel}
       />
     </div>
   );
