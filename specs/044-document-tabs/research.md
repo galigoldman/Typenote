@@ -12,12 +12,12 @@ A client-side React context (`TabsProvider`) manages the list of open tabs and t
 
 ### Alternatives Considered
 
-| Alternative | Why Rejected |
-|---|---|
-| **Pure Next.js routing** (`router.push`) | Server round-trip on every switch. Even with `loading.tsx` skeleton, perceived latency is 200-500ms. Does not meet SC-001. |
-| **URL query params** (`?tabs=id1,id2&active=id2`) | URL becomes unwieldy with many tabs. Browser history pollution. Hard to share/bookmark. |
-| **Next.js Parallel Routes** | Over-engineered for this use case. Parallel routes are designed for modals/slots, not dynamic tab lists. Would require generating route segments dynamically. |
-| **Zustand/Redux global store** | Overkill — a simple React context with localStorage persistence is sufficient. No cross-component communication complexity. |
+| Alternative                                       | Why Rejected                                                                                                                                                  |
+| ------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Pure Next.js routing** (`router.push`)          | Server round-trip on every switch. Even with `loading.tsx` skeleton, perceived latency is 200-500ms. Does not meet SC-001.                                    |
+| **URL query params** (`?tabs=id1,id2&active=id2`) | URL becomes unwieldy with many tabs. Browser history pollution. Hard to share/bookmark.                                                                       |
+| **Next.js Parallel Routes**                       | Over-engineered for this use case. Parallel routes are designed for modals/slots, not dynamic tab lists. Would require generating route segments dynamically. |
+| **Zustand/Redux global store**                    | Overkill — a simple React context with localStorage persistence is sufficient. No cross-component communication complexity.                                   |
 
 ---
 
@@ -33,6 +33,7 @@ Two approaches exist for managing inactive tab editors:
 2. **Mount/Unmount with cache**: Unmount inactive editors, cache their document data. Remount on switch using cached data (no network fetch).
 
 We choose **mount/unmount** because:
+
 - Each editor instance (TipTap or Canvas) consumes significant memory (DOM nodes, ProseMirror state, canvas buffers)
 - Each document subscribes to a Supabase Realtime channel — keeping 10+ channels open is wasteful
 - The `useAutoSave` hook runs debounced timers per editor — multiple concurrent timers increase complexity
@@ -41,10 +42,10 @@ We choose **mount/unmount** because:
 
 ### Alternatives Considered
 
-| Alternative | Why Rejected |
-|---|---|
-| **CSS hide/show** | Memory scales linearly with open tabs. 10 canvas editors with drawings could consume 200MB+. Realtime channels multiply. |
-| **Hybrid (keep last 3 mounted)** | Added complexity for marginal benefit. Cache-based remount is fast enough. |
+| Alternative                      | Why Rejected                                                                                                             |
+| -------------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
+| **CSS hide/show**                | Memory scales linearly with open tabs. 10 canvas editors with drawings could consume 200MB+. Realtime channels multiply. |
+| **Hybrid (keep last 3 mounted)** | Added complexity for marginal benefit. Cache-based remount is fast enough.                                               |
 
 ---
 
@@ -55,6 +56,7 @@ We choose **mount/unmount** because:
 ### Rationale
 
 The spec assumes local persistence (no cross-device sync). `localStorage` is the simplest approach:
+
 - No database migration needed
 - No additional API calls
 - Instant read/write (synchronous)
@@ -75,11 +77,11 @@ The stored shape:
 
 ### Alternatives Considered
 
-| Alternative | Why Rejected |
-|---|---|
+| Alternative                           | Why Rejected                                                                                       |
+| ------------------------------------- | -------------------------------------------------------------------------------------------------- |
 | **Supabase `user_preferences` table** | Adds database migration, API calls, and sync complexity. Cross-device sync is out of scope for v1. |
-| **sessionStorage** | Lost when browser closes, violating FR-010 (persist across sessions). |
-| **Cookies** | Size limited (4KB), sent on every request, not appropriate for UI state. |
+| **sessionStorage**                    | Lost when browser closes, violating FR-010 (persist across sessions).                              |
+| **Cookies**                           | Size limited (4KB), sent on every request, not appropriate for UI state.                           |
 
 ---
 
@@ -90,6 +92,7 @@ The stored shape:
 ### Rationale
 
 The URL should always reflect the active document (`/dashboard/documents/{activeDocId}`) so that:
+
 - Browser refresh loads the correct document
 - Bookmarking works naturally
 - The sidebar's "active document" highlighting works correctly
@@ -98,10 +101,10 @@ We use `window.history.replaceState` (not `router.push`) to update the URL witho
 
 ### Alternatives Considered
 
-| Alternative | Why Rejected |
-|---|---|
+| Alternative                    | Why Rejected                                                                    |
+| ------------------------------ | ------------------------------------------------------------------------------- |
 | **`router.replace`** (Next.js) | Triggers RSC re-render unnecessarily. We already have the document data cached. |
-| **Static URL** (don't update) | Breaks refresh, bookmark, and sidebar highlighting. |
+| **Static URL** (don't update)  | Breaks refresh, bookmark, and sidebar highlighting.                             |
 
 ---
 
@@ -114,10 +117,12 @@ We use `window.history.replaceState` (not `router.push`) to update the URL witho
 Currently, navigating to a document uses `router.push('/dashboard/documents/${id}')`. To add documents as tabs instead of doing a full navigation, we need to intercept these navigation calls and delegate to the `TabsProvider`.
 
 Two approaches:
+
 1. **Modify each navigation call site** — change `router.push` to `tabsContext.openTab(id, title)` in `DocumentCard`, `SidebarFolderTree`, etc.
 2. **Middleware/wrapper** — wrap `router.push` to detect document URLs and intercept them.
 
 We choose **approach 1** (explicit modification) because:
+
 - Only a few call sites exist (DocumentCard, SidebarFolderTree, material/file openers)
 - Explicit is better than implicit — no "magic" URL interception
 - Some navigations (e.g., server action redirects from `openMaterialAsDocument`) will need special handling anyway
@@ -145,6 +150,7 @@ This keeps data fetching on the server (secure, uses service role or RLS) while 
 ### Rationale
 
 When restoring tabs from localStorage, some documents may have been deleted since the last session. Options:
+
 1. Fetch all tab documents on restore, remove tabs for deleted ones
 2. Optimistically restore all tabs, show error when a deleted document's tab is activated
 

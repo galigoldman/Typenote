@@ -153,7 +153,15 @@ export function TabsProvider({ children }: { children: React.ReactNode }) {
       registerTab,
       updateTabTitle,
     }),
-    [tabs, activeTabId, openTab, closeTab, switchTab, registerTab, updateTabTitle],
+    [
+      tabs,
+      activeTabId,
+      openTab,
+      closeTab,
+      switchTab,
+      registerTab,
+      updateTabTitle,
+    ],
   );
 
   return <TabsContext.Provider value={value}>{children}</TabsContext.Provider>;

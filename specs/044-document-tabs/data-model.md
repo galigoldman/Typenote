@@ -10,14 +10,15 @@ This feature is **purely client-side** — no database migrations or schema chan
 
 Represents a single document tab in the tab bar.
 
-| Field | Type | Description |
-|---|---|---|
+| Field      | Type          | Description                           |
+| ---------- | ------------- | ------------------------------------- |
 | documentId | string (UUID) | References `documents.id` in Supabase |
-| title | string | Document title displayed in the tab |
+| title      | string        | Document title displayed in the tab   |
 
 **Relationships**: References existing `documents` table (read-only, no FK enforced client-side).
 
 **Validation**:
+
 - `documentId` must be a valid UUID
 - `title` must be non-empty (fallback to "Untitled" if empty)
 
@@ -25,12 +26,13 @@ Represents a single document tab in the tab bar.
 
 The full tab state for a user session on a given browser/device.
 
-| Field | Type | Description |
-|---|---|---|
-| tabs | OpenTab[] | Ordered list of open tabs (insertion order) |
+| Field       | Type          | Description                                  |
+| ----------- | ------------- | -------------------------------------------- |
+| tabs        | OpenTab[]     | Ordered list of open tabs (insertion order)  |
 | activeTabId | string (UUID) | The `documentId` of the currently active tab |
 
 **Validation**:
+
 - `activeTabId` must be present in `tabs` array
 - `tabs` must not contain duplicate `documentId` values
 - If `tabs` is empty, `activeTabId` is null (no active tab → redirect to dashboard)
