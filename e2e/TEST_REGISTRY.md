@@ -319,3 +319,19 @@ the standard local-Supabase JWT, so CI / local default works without env tweaks)
 
 After regenerating, commit the updated PNGs in the same PR as the intentional change. CI will
 fail any PR that drifts from the committed baselines — which is the whole point.
+
+---
+
+## Image Paste Targeting (`e2e/image-paste-page.spec.ts`) — IMPLEMENTED
+
+- [x] Paste image on page 1 of document places it on page 1
+- [x] Scroll to page 3 and paste image places it on page 3
+- [x] Paste image when scrolled between pages lands on nearest page
+
+---
+
+## Cross-Page Object Movement (`e2e/cross-page-move.spec.ts`) — IMPLEMENTED
+
+- [x] Draw stroke, select, and verify selection exists
+- [x] Undo restores previous state after drawing
+- [x] Cut and paste stroke to different page

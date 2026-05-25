@@ -17,6 +17,7 @@ import {
   computeBBox,
 } from '@/lib/canvas/stroke-utils';
 import { lockScroll } from '@/lib/canvas/scroll-lock';
+import { computeCrossPageTarget } from '@/lib/canvas/page-detection';
 
 type SelectionState = 'idle' | 'drawing' | 'selected' | 'dragging' | 'resizing';
 
@@ -76,6 +77,18 @@ interface UseSelectionOptions {
     textBoxes: TextBox[],
     images?: ImageObject[],
   ) => void;
+  /** Called when a drag moves objects across a page boundary */
+  onCrossPageMove?: (
+    fromPageId: string,
+    toPageId: string,
+    strokeIds: string[],
+    textBoxIds: string[],
+    imageIds: string[],
+    dx: number,
+    dy: number,
+  ) => void;
+  /** Page ordering info for cross-page detection */
+  pageOrder?: { id: string; order: number }[];
   /** Signal from parent to auto-select a just-pasted image */
   pendingImageSelect?: { pageId: string; imageId: string } | null;
   onPendingImageSelectConsumed?: () => void;
@@ -214,6 +227,8 @@ export function useSelection({
   onDeleteSelected,
   onEmptyRectSelection,
   onPaste,
+  onCrossPageMove,
+  pageOrder,
   pendingImageSelect,
   onPendingImageSelectConsumed,
 }: UseSelectionOptions): UseSelectionReturn {
@@ -970,6 +985,81 @@ export function useSelection({
           const dx = dragOffset.x;
           const dy = dragOffset.y;
 
+          // Check for cross-page boundary crossing
+          let crossedPage = false;
+          if (onCrossPageMove && pageOrder && pageOrder.length > 1) {
+            // Use the selection bbox center Y to detect crossing
+            const bboxCenterY = selectionBBox
+              ? (selectionBBox.minY + selectionBBox.maxY) / 2
+              : null;
+            if (bboxCenterY !== null) {
+              const currentIdx = pageOrder.findIndex(
+                (p) => p.id === targetPageId,
+              );
+              if (currentIdx >= 0) {
+                const crossTarget = computeCrossPageTarget(
+                  bboxCenterY,
+                  dy,
+                  PAGE_HEIGHT,
+                  currentIdx,
+                  pageOrder.length,
+                );
+                if (crossTarget) {
+                  // Determine target page ID
+                  let destPageId: string;
+                  if (crossTarget.targetPageIndex >= pageOrder.length) {
+                    // New page needed — generate an ID
+                    destPageId =
+                      Math.random().toString(36).slice(2) +
+                      Date.now().toString(36);
+                  } else {
+                    destPageId = pageOrder[crossTarget.targetPageIndex].id;
+                  }
+
+                  // Compute adjusted dy: the Y shift that maps objects to the target page
+                  const adjustedDy =
+                    crossTarget.targetPageIndex > currentIdx
+                      ? dy - PAGE_HEIGHT // moving down
+                      : dy + PAGE_HEIGHT; // moving up
+
+                  onCrossPageMove(
+                    targetPageId,
+                    destPageId,
+                    selectedStrokesRef.current.map((s) => s.id),
+                    Array.from(selectedTextBoxIdsRef.current),
+                    Array.from(selectedImageIdsRef.current),
+                    dx,
+                    adjustedDy,
+                  );
+
+                  // Update selection to point to new page
+                  activePageIdRef.current = destPageId;
+                  setSelectionPageId(destPageId);
+
+                  // Update cached strokes with adjusted coordinates
+                  selectedStrokesRef.current = selectedStrokesRef.current.map(
+                    (stroke) => ({
+                      ...stroke,
+                      points: stroke.points.map(
+                        ([px, py, pressure]) =>
+                          [px + dx, py + adjustedDy, pressure] as Stroke['points'][0],
+                      ),
+                      bbox: computeBBox(
+                        stroke.points.map(
+                          ([px, py, pressure]) =>
+                            [px + dx, py + adjustedDy, pressure] as Stroke['points'][0],
+                        ),
+                      ),
+                    }),
+                  );
+
+                  crossedPage = true;
+                }
+              }
+            }
+          }
+
+          if (!crossedPage) {
           // Move strokes
           if (selectedStrokesRef.current.length > 0) {
             const movedStrokes = selectedStrokesRef.current.map((stroke) => {
@@ -1017,23 +1107,29 @@ export function useSelection({
               dy,
             );
           }
+          } // end if (!crossedPage)
 
-          // Update selection bboxes
-          if (selectionBBox) {
-            setSelectionBBox({
-              minX: selectionBBox.minX + dx,
-              minY: selectionBBox.minY + dy,
-              maxX: selectionBBox.maxX + dx,
-              maxY: selectionBBox.maxY + dy,
-            });
-          }
-          if (tightSelectionBBox) {
-            setTightSelectionBBox({
-              minX: tightSelectionBBox.minX + dx,
-              minY: tightSelectionBBox.minY + dy,
-              maxX: tightSelectionBBox.maxX + dx,
-              maxY: tightSelectionBBox.maxY + dy,
-            });
+          if (crossedPage) {
+            // Clear selection after cross-page move — objects are on a new page
+            clearSelection();
+          } else {
+            // Update selection bboxes for same-page move
+            if (selectionBBox) {
+              setSelectionBBox({
+                minX: selectionBBox.minX + dx,
+                minY: selectionBBox.minY + dy,
+                maxX: selectionBBox.maxX + dx,
+                maxY: selectionBBox.maxY + dy,
+              });
+            }
+            if (tightSelectionBBox) {
+              setTightSelectionBBox({
+                minX: tightSelectionBBox.minX + dx,
+                minY: tightSelectionBBox.minY + dy,
+                maxX: tightSelectionBBox.maxX + dx,
+                maxY: tightSelectionBBox.maxY + dy,
+              });
+            }
           }
         }
 
