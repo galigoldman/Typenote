@@ -61,28 +61,48 @@ function saveTabSession(session: TabSession) {
 export function TabsProvider({ children }: { children: React.ReactNode }) {
   const router = useRouter();
 
-  // Start with empty state to avoid hydration mismatch (server has no localStorage).
-  // Hydrate from localStorage after mount using a ref to avoid cascading renders.
-  const [tabs, setTabs] = useState<OpenTab[]>([]);
-  const [activeTabId, setActiveTabId] = useState<string | null>(null);
+  // Single state object to avoid multiple setState calls in the hydration effect.
+  const [session, setSession] = useState<TabSession>({
+    tabs: [],
+    activeTabId: null,
+  });
   const hydratedRef = useRef(false);
 
-  // Hydrate from localStorage after mount (single batched update)
+  // Hydrate from localStorage after mount
   useEffect(() => {
     if (hydratedRef.current) return;
     hydratedRef.current = true;
-    const session = loadTabSession();
-    if (session.tabs.length > 0 || session.activeTabId) {
-      setTabs(session.tabs);
-      setActiveTabId(session.activeTabId);
+    const saved = loadTabSession();
+    if (saved.tabs.length > 0 || saved.activeTabId) {
+      setSession(saved);
     }
   }, []);
 
-  // Persist to localStorage whenever tabs/activeTabId change (only after hydration)
+  const tabs = session.tabs;
+  const activeTabId = session.activeTabId;
+
+  const setTabs = useCallback(
+    (updater: OpenTab[] | ((prev: OpenTab[]) => OpenTab[])) => {
+      setSession((prev) => ({
+        ...prev,
+        tabs: typeof updater === 'function' ? updater(prev.tabs) : updater,
+      }));
+    },
+    [],
+  );
+
+  const setActiveTabId = useCallback(
+    (id: string | null) => {
+      setSession((prev) => ({ ...prev, activeTabId: id }));
+    },
+    [],
+  );
+
+  // Persist to localStorage whenever session changes (only after hydration)
   useEffect(() => {
     if (!hydratedRef.current) return;
-    saveTabSession({ tabs, activeTabId });
-  }, [tabs, activeTabId]);
+    saveTabSession(session);
+  }, [session]);
 
   const openTab = useCallback(
     (documentId: string, title: string) => {

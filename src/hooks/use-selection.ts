@@ -782,7 +782,6 @@ export function useSelection({
     [activeTool, cancelLongPress],
   );
 
-  // eslint-disable-next-line react-compiler/react-compiler -- complex callback with many deps
   const handlePointerUp = useCallback(
     (e: React.PointerEvent, pageId: string) => {
       if (activeTool !== 'select') return;
