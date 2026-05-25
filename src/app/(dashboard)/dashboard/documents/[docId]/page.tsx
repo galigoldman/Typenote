@@ -2,9 +2,9 @@ import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { GraduationCap } from 'lucide-react';
 import { createClient } from '@/lib/supabase/server';
-import { AiChatWrapper } from '@/components/ai/ai-chat-wrapper';
 import { DocumentWithAi } from '@/components/ai/document-with-ai';
 import { TiptapEditorWithVersions } from '@/components/editor/tiptap-editor-with-versions';
+import { TabRegistrar } from '@/components/tabs/tab-registrar';
 import type { Course, CourseWeek, Document } from '@/types/database';
 
 interface DocumentPageProps {
@@ -54,6 +54,7 @@ export default async function DocumentPage({ params }: DocumentPageProps) {
 
   return (
     <div className="flex flex-1 min-h-0 flex-col overflow-hidden">
+      <TabRegistrar documentId={docId} title={typedDocument.title} />
       {/* Course breadcrumb (desktop only) */}
       {course && (
         <div className="flex pointer-touch:hidden items-center justify-between px-4 pt-2">

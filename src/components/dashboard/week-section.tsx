@@ -1,7 +1,6 @@
 'use client';
 
 import { useState } from 'react';
-import { useRouter } from 'next/navigation';
 import {
   ChevronDown,
   MoreHorizontal,
@@ -33,6 +32,7 @@ import type {
   Document,
   PersonalFile,
 } from '@/types/database';
+import { useTabs } from '@/contexts/tabs-context';
 import { cn } from '@/lib/utils';
 
 interface MoodleFileOption {
@@ -65,7 +65,7 @@ export function WeekSection({
   personalFiles = [],
   moodleFiles = [],
 }: WeekSectionProps) {
-  const router = useRouter();
+  const { openTab } = useTabs();
   const [expanded, setExpanded] = useState(true);
   const [editOpen, setEditOpen] = useState(false);
   const [deleting, setDeleting] = useState(false);
@@ -90,7 +90,7 @@ export function WeekSection({
         week_number: week.week_number,
         purpose,
       });
-      router.push(`/dashboard/documents/${doc.id}`);
+      openTab(doc.id, doc.title);
     } catch {
       setCreating(null);
     }
@@ -159,7 +159,7 @@ export function WeekSection({
                   <button
                     key={doc.id}
                     onClick={() =>
-                      router.push(`/dashboard/documents/${doc.id}`)
+                      openTab(doc.id, doc.title)
                     }
                     className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-muted"
                   >
@@ -349,7 +349,7 @@ function DocumentGroup({
   icon: React.ReactNode;
   docs: Document[];
 }) {
-  const router = useRouter();
+  const { openTab } = useTabs();
   if (docs.length === 0) return null;
 
   return (
@@ -362,7 +362,7 @@ function DocumentGroup({
         {docs.map((doc) => (
           <button
             key={doc.id}
-            onClick={() => router.push(`/dashboard/documents/${doc.id}`)}
+            onClick={() => openTab(doc.id, doc.title)}
             className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-muted"
           >
             <FileText className="size-3.5 text-muted-foreground" />

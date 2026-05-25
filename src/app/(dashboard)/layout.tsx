@@ -3,6 +3,7 @@ import { createClient } from '@/lib/supabase/server';
 import { signOut } from '@/lib/actions/auth';
 import { SidebarFolderTree } from '@/components/dashboard/sidebar-folder-tree';
 import { SidebarLayout } from '@/components/dashboard/sidebar-layout';
+import { TabsProvider } from '@/contexts/tabs-context';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import { LogOut } from 'lucide-react';
@@ -48,5 +49,9 @@ export default async function DashboardLayout({
     </>
   );
 
-  return <SidebarLayout sidebar={sidebarContent}>{children}</SidebarLayout>;
+  return (
+    <TabsProvider>
+      <SidebarLayout sidebar={sidebarContent}>{children}</SidebarLayout>
+    </TabsProvider>
+  );
 }

@@ -288,6 +288,42 @@ export async function openMaterialAsDocument(
   return { documentId: doc.id, created: true };
 }
 
+export async function getDocument(id: string) {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) throw new Error('Not authenticated');
+
+  const { data: doc, error } = await supabase
+    .from('documents')
+    .select('*')
+    .eq('id', id)
+    .eq('user_id', user.id)
+    .single();
+
+  if (error) return null;
+  return doc;
+}
+
+export async function getDocumentsBatch(ids: string[]) {
+  if (ids.length === 0) return [];
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) throw new Error('Not authenticated');
+
+  const { data, error } = await supabase
+    .from('documents')
+    .select('id, title')
+    .eq('user_id', user.id)
+    .in('id', ids);
+
+  if (error) return [];
+  return data;
+}
+
 export async function createWeekDocument(data: {
   course_id: string;
   week_id: string;

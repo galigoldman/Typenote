@@ -1,6 +1,5 @@
 'use client';
 
-import { useRouter } from 'next/navigation';
 import {
   MoreHorizontal,
   Pencil,
@@ -14,6 +13,7 @@ import { SUBJECTS } from '@/lib/constants/subjects';
 import { deleteDocument } from '@/lib/actions/documents';
 import { trackEvent } from '@/lib/analytics/events';
 import { useExportPdf } from '@/hooks/use-export-pdf';
+import { useTabs } from '@/contexts/tabs-context';
 import { cn } from '@/lib/utils';
 import {
   Card,
@@ -85,7 +85,7 @@ export function DocumentCard({
   onMove,
   onDelete,
 }: DocumentCardProps) {
-  const router = useRouter();
+  const { openTab, closeTab } = useTabs();
   const { exportPdf, isExporting } = useExportPdf();
 
   const subjectLabel =
@@ -104,6 +104,7 @@ export function DocumentCard({
     } else {
       await deleteDocument(document.id);
     }
+    closeTab(document.id);
     trackEvent('document_deleted', { document_id: document.id });
   }
 
@@ -113,7 +114,7 @@ export function DocumentCard({
         'cursor-pointer overflow-hidden border-t-4 transition-shadow hover:shadow-md',
         subjectBorderColor,
       )}
-      onClick={() => router.push(`/dashboard/documents/${document.id}`)}
+      onClick={() => openTab(document.id, document.title)}
       data-testid="document-card"
     >
       <CardHeader>

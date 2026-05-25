@@ -1,7 +1,6 @@
 'use client';
 
 import { useState } from 'react';
-import { useRouter } from 'next/navigation';
 import { FileText, FileType2, Loader2, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { createClient } from '@/lib/supabase/client';
@@ -9,6 +8,7 @@ import {
   openPersonalFileAsDocument,
   deletePersonalFile,
 } from '@/lib/actions/personal-files';
+import { useTabs } from '@/contexts/tabs-context';
 import { toast } from 'sonner';
 import type { PersonalFile } from '@/types/database';
 
@@ -31,7 +31,7 @@ async function getPdfPageCount(signedUrl: string): Promise<number> {
 }
 
 export function PersonalFileItem({ file }: PersonalFileItemProps) {
-  const router = useRouter();
+  const { openTab } = useTabs();
   const [opening, setOpening] = useState(false);
   const [deleting, setDeleting] = useState(false);
 
@@ -61,7 +61,7 @@ export function PersonalFileItem({ file }: PersonalFileItemProps) {
           pageCount,
         });
 
-        router.push(`/dashboard/documents/${result.documentId}`);
+        openTab(result.documentId, file.display_name);
       } catch {
         toast.error('Failed to open file');
         setOpening(false);
@@ -73,7 +73,7 @@ export function PersonalFileItem({ file }: PersonalFileItemProps) {
           fileId: file.id,
         });
 
-        router.push(`/dashboard/documents/${result.documentId}`);
+        openTab(result.documentId, file.display_name);
       } catch {
         toast.error('Failed to open file');
         setOpening(false);

@@ -1,10 +1,10 @@
 'use client';
 
 import { useState } from 'react';
-import { useRouter } from 'next/navigation';
 import { SUBJECTS, CANVAS_TYPES } from '@/lib/constants/subjects';
 import { createDocument } from '@/lib/actions/documents';
 import { trackEvent } from '@/lib/analytics/events';
+import { useTabs } from '@/contexts/tabs-context';
 import {
   Dialog,
   DialogContent,
@@ -39,7 +39,7 @@ export function CreateDocumentDialog({
   children,
   defaultOpen = false,
 }: CreateDocumentDialogProps) {
-  const router = useRouter();
+  const { openTab } = useTabs();
   const [open, setOpen] = useState(defaultOpen);
   const [title, setTitle] = useState('Untitled');
   const [subject, setSubject] = useState('calculus');
@@ -70,7 +70,7 @@ export function CreateDocumentDialog({
       });
       setOpen(false);
       resetForm();
-      router.push(`/dashboard/documents/${doc.id}`);
+      openTab(doc.id, doc.title);
     } catch (err) {
       setError(
         err instanceof Error ? err.message : 'Failed to create document',
