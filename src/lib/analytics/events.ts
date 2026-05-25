@@ -17,7 +17,6 @@ type AnalyticsEventMap = {
   file_uploaded: {
     file_size: number;
     mime_type: string;
-    week_id: string;
   };
   ai_chat_message_sent: {
     course_id: string | undefined;

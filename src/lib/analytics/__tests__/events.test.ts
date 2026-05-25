@@ -41,13 +41,11 @@ describe('trackEvent', () => {
     trackEvent('file_uploaded', {
       file_size: 1024000,
       mime_type: 'application/pdf',
-      week_id: 'week-789',
     });
 
     expect(posthog.capture).toHaveBeenCalledWith('file_uploaded', {
       file_size: 1024000,
       mime_type: 'application/pdf',
-      week_id: 'week-789',
     });
   });
 
