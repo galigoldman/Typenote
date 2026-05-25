@@ -142,9 +142,19 @@ export default async function CoursePage({
           <AiChatWrapper courseId={courseId} courseName={typedCourse.name} />
           <StartHomeworkDialog
             courseId={courseId}
-            documents={typedDocuments}
-            materials={courseMaterials}
-            personalFiles={personalFiles}
+            documents={typedDocuments.map((d) => ({
+              id: d.id,
+              title: d.title,
+            }))}
+            materials={courseMaterials.map((m) => ({
+              id: m.id,
+              label: m.label,
+              file_name: m.file_name,
+            }))}
+            personalFiles={personalFiles.map((f) => ({
+              id: f.id,
+              display_name: f.display_name,
+            }))}
           >
             <Button variant="outline" size="sm">
               Start Homework
