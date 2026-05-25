@@ -66,40 +66,29 @@ export async function deleteCourse(id: string) {
   } = await supabase.auth.getUser();
   if (!user) throw new Error('Not authenticated');
 
-  // Step a: Get all weeks for this course
-  const { data: weeks, error: weeksError } = await supabase
-    .from('course_weeks')
-    .select('id')
+  // Step b: Get all materials for this course (for embeddings + storage cleanup)
+  const { data: materials, error: materialsError } = await supabase
+    .from('course_materials')
+    .select('id, storage_path')
     .eq('course_id', id)
     .eq('user_id', user.id);
-  if (weeksError) throw new Error(weeksError.message);
+  if (materialsError) throw new Error(materialsError.message);
 
-  // Step b: Get all materials for those weeks
-  if (weeks && weeks.length > 0) {
-    const weekIds = weeks.map((w) => w.id);
-    const { data: materials, error: materialsError } = await supabase
-      .from('course_materials')
-      .select('id, storage_path')
-      .in('week_id', weekIds)
-      .eq('user_id', user.id);
-    if (materialsError) throw new Error(materialsError.message);
-
-    // Step b2: Delete embeddings for each material
-    for (const material of materials ?? []) {
-      await deleteEmbeddingsBySource('course_material', material.id);
-    }
-
-    // Step c: Remove files from storage
-    if (materials && materials.length > 0) {
-      const paths = materials.map((m) => m.storage_path);
-      const { error: storageError } = await supabase.storage
-        .from('course-materials')
-        .remove(paths);
-      if (storageError) throw new Error(storageError.message);
-    }
+  // Step b2: Delete embeddings for each material
+  for (const material of materials ?? []) {
+    await deleteEmbeddingsBySource('course_material', material.id);
   }
 
-  // Step d: Delete course record (DB cascade handles weeks and materials)
+  // Step c: Remove files from storage
+  if (materials && materials.length > 0) {
+    const paths = materials.map((m) => m.storage_path);
+    const { error: storageError } = await supabase.storage
+      .from('course-materials')
+      .remove(paths);
+    if (storageError) throw new Error(storageError.message);
+  }
+
+  // Step d: Delete course record (DB cascade handles materials)
   const { error } = await supabase
     .from('courses')
     .delete()
