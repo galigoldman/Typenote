@@ -198,6 +198,16 @@ context-menu entry point works end-to-end.
 
 ---
 
+## Homework-focused AI context (Phase 2) (`e2e/homework-ai-context.spec.ts`) — IMPLEMENTED
+
+Covers the Phase 2 feature that wires the persisted Homework object into the AI tutor.
+The seeded course "Introduction to CS" has exercise document "Problem Set 1: Variables" and a homework session pointing at a working document.
+
+- [x] Start Homework from a course page → pick the seeded exercise → land on the new homework document → the homework context chip (`data-testid="homework-context"`) is visible and contains the exercise title "Problem Set 1"
+- [x] Inside the homework document, open the AI Tutor panel → send a question about the exercise → an AI response bubble ("AI Assistant") renders (requires `GOOGLE_GENERATIVE_AI_API_KEY` which is present in CI; the chip/navigation assertions run unconditionally)
+
+---
+
 ## Version History (`e2e/version-history.spec.ts`) — PLANNED
 
 - [ ] Open version history sidebar from canvas editor toolbar
@@ -263,9 +273,10 @@ Test lives in `src/__tests__/integration/storage-rls.integration.test.ts`. Verif
 | Drawing Copy/Paste    | Implemented | `e2e/drawing-copy-paste.spec.ts`         | 8/8       |
 | Moodle Ext Gating     | Implemented | `e2e/moodle-touch-gating.spec.ts`        | 2/2       |
 | Extension Real Load   | Implemented | `e2e/extension-real.spec.ts`             | 3/3       |
+| Homework AI Context   | Implemented | `e2e/homework-ai-context.spec.ts`        | 1/1       |
 | Version History       | Planned     | `e2e/version-history.spec.ts`            | 0/5       |
 | PDF Visual Regression | Implemented | `e2e/pdf-visual-regression.spec.ts`      | 8/8       |
-| **Total**             |             |                                          | **91/99** |
+| **Total**             |             |                                          | **92/100** |
 
 ---
 
