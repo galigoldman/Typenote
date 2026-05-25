@@ -44,7 +44,7 @@
 Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>
 ```
 
-**Run between tasks:** `pnpm test` (unit) for unit tasks, `pnpm test:integration` for integration tasks, `pnpm exec tsc --noEmit` after any type/signature change. Full gate is Task 13.
+**Run between tasks:** `pnpm test` (unit) for unit tasks, `pnpm test:integration` for integration tasks. **Type-check gate caveat:** CI does NOT run `tsc --noEmit`; type safety is enforced by `pnpm build` (which excludes `*.test.ts`/`e2e/`). A bare `pnpm exec tsc --noEmit` already reports **pre-existing** errors in test files (e.g. `math-extension.test.ts`, `canvas-page-renderer.test.ts`, `rls-isolation.integration.test.ts`) — vitest tolerates these (no type-check). So where a task step says "verify compiles", it means **introduce no NEW tsc error in the files you changed** — check with `pnpm exec tsc --noEmit 2>&1 | grep <your-changed-file>` (should be empty). The authoritative full type gate is `pnpm build` in Task 13.
 
 ---
 
