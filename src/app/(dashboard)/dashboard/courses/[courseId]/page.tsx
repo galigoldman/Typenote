@@ -200,10 +200,11 @@ export default async function CoursePage({
             </div>
           )}
 
-          {/* Moodle Materials — lazy-loaded on demand */}
-          <MoodleMaterialsSection courseId={courseId} />
         </>
       )}
+
+      {/* Moodle Materials — lazy-loaded on demand; always shown regardless of local-content emptiness */}
+      <MoodleMaterialsSection courseId={courseId} />
     </div>
   );
 }
