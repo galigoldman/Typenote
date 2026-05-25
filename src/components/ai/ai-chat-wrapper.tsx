@@ -10,6 +10,7 @@ import { AiChatPanel } from './ai-chat-panel';
 interface AiChatWrapperProps {
   courseId?: string;
   courseName?: string;
+  documentId?: string;
   getDocumentContent?: () => string;
   pendingContextItems?: AiContextItem[];
   onRemoveContextItem?: (index: number) => void;
@@ -22,6 +23,7 @@ interface AiChatWrapperProps {
 export function AiChatWrapper({
   courseId,
   courseName,
+  documentId,
   getDocumentContent,
   pendingContextItems = [],
   onRemoveContextItem,
@@ -58,6 +60,7 @@ export function AiChatWrapper({
       <AiChatPanel
         courseId={courseId}
         courseName={courseName}
+        documentId={documentId}
         getDocumentContent={getDocumentContent}
         isOpen={isOpen}
         onClose={handleClose}

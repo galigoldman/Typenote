@@ -55,6 +55,7 @@ export type AiContextItem =
 interface AiChatPanelProps {
   courseId?: string;
   courseName?: string;
+  documentId?: string;
   getDocumentContent?: () => string;
   isOpen: boolean;
   onClose: () => void;
@@ -66,6 +67,7 @@ interface AiChatPanelProps {
 export function AiChatPanel({
   courseId,
   courseName,
+  documentId,
   getDocumentContent,
   isOpen,
   onClose,
@@ -309,6 +311,7 @@ export function AiChatPanel({
         body: JSON.stringify({
           question: fullQuestion,
           courseId,
+          documentId,
           mode,
           courseName,
           documentContent,
@@ -372,6 +375,12 @@ export function AiChatPanel({
             if (event.type === 'sources') {
               sources = event.sources ?? [];
               model = event.model ?? 'flash';
+              if (event.homeworkContextUsed) {
+                trackEvent('homework_context_used', {
+                  course_id: courseId,
+                  pinned_count: (event.sources ?? []).length,
+                });
+              }
             } else if (event.type === 'conversation') {
               // Server created or confirmed the conversation
               if (event.conversationId) {
