@@ -99,6 +99,7 @@ export function DocumentWithAi({
       <AiChatWrapper
         courseId={courseId}
         courseName={courseName}
+        documentId={document.id}
         getDocumentContent={getDocumentContent}
         pendingContextItems={contextItems}
         onRemoveContextItem={handleRemoveContextItem}
