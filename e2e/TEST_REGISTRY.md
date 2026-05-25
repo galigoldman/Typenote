@@ -201,10 +201,10 @@ context-menu entry point works end-to-end.
 ## Homework-focused AI context (Phase 2) (`e2e/homework-ai-context.spec.ts`) — IMPLEMENTED
 
 Covers the Phase 2 feature that wires the persisted Homework object into the AI tutor.
-The seeded course "Introduction to CS" has exercise document "Problem Set 1: Variables" and a homework session pointing at a working document.
+The seed (`supabase/seed.sql`) contains a complete homework session: working document `20000000-…-0011` linked to exercise "Problem Set 1: Variables" with pinned course material `lecture-1-slides.pdf`. The test opens that document directly — it does **not** drive the course page's Start Homework dialog, which is flaky in CI (the same reason `ai-chat.spec.ts` skips in CI). The Gemini call is mocked via `page.route('**/api/ai/ask')`, so the test needs no `GOOGLE_GENERATIVE_AI_API_KEY` (the test CI job has none) and is fully deterministic; the real context-building logic is covered by unit + integration tests.
 
-- [x] Start Homework from a course page → pick the seeded exercise → land on the new homework document → the homework context chip (`data-testid="homework-context"`) is visible and contains the exercise title "Problem Set 1"
-- [x] Inside the homework document, open the AI Tutor panel → send a question about the exercise → an AI response bubble ("AI Assistant") renders (requires `GOOGLE_GENERATIVE_AI_API_KEY` which is present in CI; the chip/navigation assertions run unconditionally)
+- [x] Open the seeded homework document → the homework context chip (`data-testid="homework-context"`) is visible and names the exercise ("Problem Set 1: Variables") and the pinned material (`lecture-1-slides.pdf`)
+- [x] Open the AI Tutor panel → send a question → the mocked assistant response renders in the chat (quota and conversation-history endpoints are also mocked so the chat opens clean)
 
 ---
 
