@@ -72,3 +72,39 @@ describe('buildLatexPrompt', () => {
     expect(prompt).toContain('notation conventions');
   });
 });
+
+describe('buildSystemPrompt — homework mode', () => {
+  it('omits homework section when not in homework mode', () => {
+    const p = buildSystemPrompt({ courseName: 'CS101', hasDocumentContent: false });
+    expect(p).not.toMatch(/HOMEWORK SESSION/);
+  });
+
+  it('includes exercise name and pinned materials when in homework mode', () => {
+    const p = buildSystemPrompt({
+      courseName: 'CS101',
+      hasDocumentContent: true,
+      isHomeworkMode: true,
+      exerciseName: 'Problem Set 1',
+      pinnedMaterialNames: ['Lecture 1', 'Notes'],
+    });
+    expect(p).toMatch(/HOMEWORK SESSION/);
+    expect(p).toMatch(/Problem Set 1/);
+    expect(p).toMatch(/Lecture 1/);
+    expect(p).toMatch(/Notes/);
+    // prioritize, don't restrict
+    expect(p).toMatch(/not restricted|freely use/i);
+    // tutoring stance
+    expect(p).toMatch(/hint|guide|rather than/i);
+  });
+
+  it('handles homework mode with no pinned materials', () => {
+    const p = buildSystemPrompt({
+      hasDocumentContent: false,
+      isHomeworkMode: true,
+      exerciseName: 'PS2',
+      pinnedMaterialNames: [],
+    });
+    expect(p).toMatch(/PS2/);
+    expect(p).not.toMatch(/marked as most relevant/);
+  });
+});

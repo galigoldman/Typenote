@@ -1,16 +1,39 @@
 export interface SystemPromptContext {
   courseName?: string;
   hasDocumentContent: boolean;
+  isHomeworkMode?: boolean;
+  exerciseName?: string;
+  pinnedMaterialNames?: string[];
 }
 
 export function buildSystemPrompt(context: SystemPromptContext): string {
-  const { courseName, hasDocumentContent } = context;
+  const {
+    courseName,
+    hasDocumentContent,
+    isHomeworkMode,
+    exerciseName,
+    pinnedMaterialNames,
+  } = context;
   const courseContext = courseName
     ? `You are a tutor for **${courseName}**.`
     : 'You are a course tutor.';
   const documentContext = hasDocumentContent
     ? `\n\n## STUDENT'S DOCUMENT\nThe student has shared their current document with you. When they ask about their own writing (e.g., "is my solution correct?"), refer to its content specifically.`
     : '';
+
+  let homeworkContext = '';
+  if (isHomeworkMode) {
+    const pinned =
+      pinnedMaterialNames && pinnedMaterialNames.length > 0
+        ? ` They marked these materials as most relevant: ${pinnedMaterialNames.join(', ')}.`
+        : '';
+    homeworkContext = `\n\n## HOMEWORK SESSION
+The student is working on the exercise "${exerciseName ?? 'their homework'}".${pinned}
+- Ground your answers in the exercise and any pinned materials **first** — that is what the student's questions refer to.
+- You are **not restricted** to them: freely use the student's other course materials and your own knowledge when helpful.
+- **Tutor** the student — explain, guide, and give hints toward understanding rather than just handing over the full solution.`;
+  }
+
   return `${courseContext} You are a knowledgeable, friendly tutor and study partner. You have deep expertise in the subject matter AND access to the student's course materials.
 
 ## HOW TO USE COURSE MATERIALS
@@ -28,7 +51,7 @@ export function buildSystemPrompt(context: SystemPromptContext): string {
 5. **Source citations format.** When you referenced course materials, list them at the end:
 [Sources]
 - Material Name: brief description of what was referenced
-${documentContext}`;
+${documentContext}${homeworkContext}`;
 }
 
 export const LATEX_SYSTEM_PROMPT = `You are a LaTeX conversion assistant.
