@@ -5,7 +5,6 @@ import { createAdminClient, TEST_USER_ID } from '@/test/supabase-client';
 const supabase = createAdminClient();
 
 const COURSE_ID = '30000000-0000-0000-0000-000000000001'; // CS101 from seed
-const WEEK_ID = '40000000-0000-0000-0000-000000000001'; // Week 1 from seed
 const SOURCE_ID_1 = '70000000-0000-0000-0000-000000000001';
 const SOURCE_ID_2 = '70000000-0000-0000-0000-000000000002';
 
@@ -41,7 +40,6 @@ describe('content_embeddings table (v2 — 1536 dims, page segments)', () => {
         embedding: JSON.stringify(makeVector(1)),
         user_id: TEST_USER_ID,
         course_id: COURSE_ID,
-        week_id: WEEK_ID,
         source_name: 'Lecture 1 Slides.pdf',
         mime_type: 'application/pdf',
         content_hash: 'pdf-hash-1',
@@ -56,7 +54,6 @@ describe('content_embeddings table (v2 — 1536 dims, page segments)', () => {
         embedding: JSON.stringify(makeVector(2)),
         user_id: TEST_USER_ID,
         course_id: COURSE_ID,
-        week_id: WEEK_ID,
         source_name: 'Lecture 1 Slides.pdf',
         mime_type: 'application/pdf',
         content_hash: 'pdf-hash-1',
@@ -77,7 +74,6 @@ describe('content_embeddings table (v2 — 1536 dims, page segments)', () => {
       embedding: JSON.stringify(makeVector(3)),
       user_id: null,
       course_id: COURSE_ID,
-      week_id: WEEK_ID,
       source_name: 'Shared Lecture.pdf',
       mime_type: 'application/pdf',
       content_hash: 'shared-hash-1',
@@ -209,7 +205,6 @@ describe('per-user moodle_file access', () => {
           embedding: JSON.stringify(makeVector(1)),
           user_id: null,
           course_id: MOODLE_COURSE, // canonical, NOT a Typenote course id
-          week_id: null,
           source_name: 'shared.pdf',
           mime_type: 'application/pdf',
           content_hash: 'test-hash-shared',
