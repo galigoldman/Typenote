@@ -112,6 +112,18 @@ Follow-up to issue #118. Guards against cursor jumps when a multi-page overflow 
 
 ---
 
+## Flat Course Page — Materials Layout (`e2e/course-materials.spec.ts`) — IMPLEMENTED
+
+Covers the Phase 1 refactor that removed the "Weeks" model and replaced it with a flat
+**Documents + Materials** layout on the course page.
+
+- [x] No "Weeks" heading is present on the course page (flat layout confirmed)
+- [x] A "Materials" heading IS visible (seeded `course_materials` + `personal_files` shown)
+- [x] Imported personal files appear under the Materials section
+- [x] Moodle materials section is present without crashing (lazy-loaded on demand)
+
+---
+
 ## File Upload (`e2e/file-upload.spec.ts`) — IMPLEMENTED
 
 - [x] Import file into course (PDF upload)
@@ -242,6 +254,7 @@ Test lives in `src/__tests__/integration/storage-rls.integration.test.ts`. Verif
 | Text Editor Toolbar   | Implemented | `e2e/editor-toolbar.spec.ts`             | 12/12     |
 | LaTeX Math            | Implemented | `e2e/latex-math.spec.ts`                 | 5/5       |
 | Courses               | Implemented | `e2e/courses.spec.ts`                    | 5/6       |
+| Flat Course Page      | Implemented | `e2e/course-materials.spec.ts`           | 3/3       |
 | File Upload           | Implemented | `e2e/file-upload.spec.ts`                | 3/4       |
 | AI Chat               | Implemented | `e2e/ai-chat.spec.ts`                    | 6/6       |
 | AI Chat — Per-user    | Planned     | `e2e/ai-chat-per-user-materials.spec.ts` | 0/2       |
@@ -252,7 +265,7 @@ Test lives in `src/__tests__/integration/storage-rls.integration.test.ts`. Verif
 | Extension Real Load   | Implemented | `e2e/extension-real.spec.ts`             | 3/3       |
 | Version History       | Planned     | `e2e/version-history.spec.ts`            | 0/5       |
 | PDF Visual Regression | Implemented | `e2e/pdf-visual-regression.spec.ts`      | 8/8       |
-| **Total**             |             |                                          | **88/96** |
+| **Total**             |             |                                          | **91/99** |
 
 ---
 
