@@ -193,12 +193,17 @@ export interface AiMessage {
 export type HomeworkMaterialType =
   | 'course_material'
   | 'personal_file'
-  | 'document';
+  | 'document'
+  | 'moodle_file';
 
 export interface HomeworkSession {
   id: string;
   document_id: string;
-  exercise_document_id: string;
+  // Polymorphic exercise: today always a document (exercise_document_id set),
+  // but migration 20260524144454 made it nullable and added exercise_type/id.
+  exercise_document_id: string | null;
+  exercise_type: string | null;
+  exercise_id: string | null;
   course_id: string;
   user_id: string;
   created_at: string;
