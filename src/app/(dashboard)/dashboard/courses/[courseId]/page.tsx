@@ -1,22 +1,15 @@
 import { notFound } from 'next/navigation';
 import Link from 'next/link';
 import { createClient } from '@/lib/supabase/server';
-import { createAdminClient } from '@/lib/supabase/admin';
 import { AiChatWrapper } from '@/components/ai/ai-chat-wrapper';
 import { DocumentListWithMove } from '@/components/dashboard/document-list-with-move';
 import { CreateDocumentDialog } from '@/components/dashboard/create-document-dialog';
 import { StartHomeworkDialog } from '@/components/dashboard/start-homework-dialog';
-import { WeekSection } from '@/components/dashboard/week-section';
-import { WeekDialog } from '@/components/dashboard/week-dialog';
 import { EmptyState } from '@/components/dashboard/empty-state';
 import { PersonalFileUpload } from '@/components/dashboard/personal-file-upload';
 import { PersonalFileItem } from '@/components/dashboard/personal-file-item';
-import { MoodleFileRow } from '@/components/dashboard/moodle-file-row';
-import {
-  getPersonalFilesByCourse,
-  getPersonalFilesByWeeks,
-} from '@/lib/queries/personal-files';
-import type { PersonalFile } from '@/types/database';
+import { MaterialItem } from '@/components/dashboard/material-item';
+import { MoodleMaterialsSection } from '@/components/dashboard/moodle-materials-section';
 import { Button } from '@/components/ui/button';
 import { ChevronLeft } from 'lucide-react';
 import {
@@ -27,12 +20,7 @@ import {
   BreadcrumbPage,
   BreadcrumbSeparator,
 } from '@/components/ui/breadcrumb';
-import type {
-  Course,
-  CourseWeek,
-  CourseMaterial,
-  Document,
-} from '@/types/database';
+import type { Course, CourseMaterial, Document, PersonalFile } from '@/types/database';
 
 export default async function CoursePage({
   params,
@@ -47,7 +35,7 @@ export default async function CoursePage({
     data: { user },
   } = await supabase.auth.getUser();
 
-  // Fetch course
+  // Fetch course first (need to 404 early if missing)
   const { data: course } = await supabase
     .from('courses')
     .select('*')
@@ -60,48 +48,37 @@ export default async function CoursePage({
 
   const typedCourse = course as Course;
 
-  // Fetch weeks
-  const { data: weeks } = await supabase
-    .from('course_weeks')
-    .select('*')
-    .eq('course_id', courseId)
-    .order('week_number', { ascending: true });
+  // Parallel fetch: documents, course_materials, personal_files, and folder breadcrumb
+  const [documentsResult, materialsResult, personalFilesResult, folderResult] =
+    await Promise.all([
+      supabase
+        .from('documents')
+        .select('*')
+        .eq('course_id', courseId)
+        .order('position', { ascending: true }),
+      supabase
+        .from('course_materials')
+        .select('*')
+        .eq('course_id', courseId)
+        .order('created_at', { ascending: true }),
+      supabase
+        .from('personal_files')
+        .select('*')
+        .eq('course_id', courseId)
+        .order('created_at', { ascending: true }),
+      typedCourse.folder_id
+        ? supabase
+            .from('folders')
+            .select('*')
+            .eq('id', typedCourse.folder_id)
+            .single()
+        : Promise.resolve({ data: null }),
+    ]);
 
-  // Fetch documents for this course
-  const { data: documents } = await supabase
-    .from('documents')
-    .select('*')
-    .eq('course_id', courseId)
-    .order('position', { ascending: true });
-
-  const typedWeeks = (weeks as CourseWeek[] | null) ?? [];
-  const typedDocuments = (documents as Document[] | null) ?? [];
-
-  // Split documents: course-level (no week) vs week-level
-  const courseDocuments = typedDocuments.filter((d) => !d.week_id);
-  const weekDocuments = typedDocuments.filter((d) => d.week_id);
-
-  // Fetch materials for all weeks
-  const weekIds = typedWeeks.map((w) => w.id);
-  let allMaterials: CourseMaterial[] = [];
-  if (weekIds.length > 0) {
-    const { data: materialsData } = await supabase
-      .from('course_materials')
-      .select('*')
-      .in('week_id', weekIds)
-      .order('created_at', { ascending: true });
-    allMaterials = (materialsData as CourseMaterial[] | null) ?? [];
-  }
-
-  // Fetch week-level personal files
-  const allWeekPersonalFilesRaw = (await getPersonalFilesByWeeks(
-    weekIds,
-  )) as PersonalFile[];
-
-  // Fetch course-level personal files (no week)
-  const coursePersonalFilesRaw = (await getPersonalFilesByCourse(
-    courseId,
-  )) as PersonalFile[];
+  const typedDocuments = (documentsResult.data as Document[] | null) ?? [];
+  const courseMaterials = (materialsResult.data as CourseMaterial[] | null) ?? [];
+  const personalFilesRaw = (personalFilesResult.data as PersonalFile[] | null) ?? [];
+  const parentFolder = folderResult.data ?? null;
 
   // Hide personal files that already have a linked document
   // (the document replaces the file in the UI once opened)
@@ -110,126 +87,14 @@ export default async function CoursePage({
       .filter((d) => d.personal_file_id)
       .map((d) => d.personal_file_id),
   );
-  const allWeekPersonalFiles = allWeekPersonalFilesRaw.filter(
+  const personalFiles = personalFilesRaw.filter(
     (f) => !linkedFileIds.has(f.id),
-  );
-  const coursePersonalFiles = coursePersonalFilesRaw.filter(
-    (f) => !linkedFileIds.has(f.id),
-  );
-
-  // Fetch linked Moodle data (if this course was created from a Moodle sync)
-  const admin = createAdminClient();
-  const { data: syncRecord } = await admin
-    .from('user_course_syncs')
-    .select('moodle_course_id')
-    .eq('user_id', user?.id ?? '')
-    .eq('course_id', courseId)
-    .single();
-
-  type MoodleFileRow = {
-    id: string;
-    file_name: string;
-    type: string;
-    moodle_url: string;
-    storage_path: string | null;
-    mime_type: string | null;
-    file_size: number | null;
-    position: number;
-    downloadUrl?: string;
-  };
-  type MoodleSectionWithFiles = {
-    id: string;
-    title: string;
-    position: number;
-    moodle_files: MoodleFileRow[];
-  };
-
-  let moodleSections: MoodleSectionWithFiles[] = [];
-  if (syncRecord && user) {
-    const { data: sections } = await admin
-      .from('moodle_sections')
-      .select(
-        'id, title, position, moodle_files(id, file_name, type, moodle_url, storage_path, mime_type, file_size, position)',
-      )
-      .eq('course_id', syncRecord.moodle_course_id)
-      .order('position');
-
-    // moodle_files is a shared registry — every user who synced this course
-    // sees every row here. Restrict to files the CURRENT user explicitly
-    // imported (user_file_imports.status='imported'), otherwise users would
-    // see materials picked up by anyone who scraped the same course.
-    const allFiles = (sections ?? [])
-      .flatMap((s) => (s as MoodleSectionWithFiles).moodle_files)
-      .filter((f) => f.storage_path);
-    const allFileIds = allFiles.map((f) => f.id);
-
-    let importedFileIds = new Set<string>();
-    if (allFileIds.length > 0) {
-      const { data: imports } = await admin
-        .from('user_file_imports')
-        .select('moodle_file_id')
-        .eq('user_id', user.id)
-        .eq('status', 'imported')
-        .in('moodle_file_id', allFileIds);
-      importedFileIds = new Set(
-        (imports ?? []).map(
-          (i: { moodle_file_id: string }) => i.moodle_file_id,
-        ),
-      );
-    }
-
-    const rawSections = ((sections ?? []) as MoodleSectionWithFiles[])
-      .map((s) => ({
-        ...s,
-        moodle_files: s.moodle_files.filter(
-          (f) => f.storage_path && importedFileIds.has(f.id),
-        ),
-      }))
-      .filter((s) => s.moodle_files.length > 0);
-
-    // Generate signed download URLs for files stored in Supabase Storage
-    for (const section of rawSections) {
-      for (const file of section.moodle_files) {
-        if (file.storage_path) {
-          const { data: signedUrl } = await admin.storage
-            .from('moodle-materials')
-            .createSignedUrl(file.storage_path, 3600); // 1 hour
-          file.downloadUrl = signedUrl?.signedUrl ?? undefined;
-        }
-      }
-    }
-    moodleSections = rawSections;
-  }
-
-  // Build breadcrumbs - if course is in a folder, include it
-  let parentFolder = null;
-  if (typedCourse.folder_id) {
-    const { data: folder } = await supabase
-      .from('folders')
-      .select('*')
-      .eq('id', typedCourse.folder_id)
-      .single();
-    parentFolder = folder;
-  }
-
-  // Build flat list of importable Moodle files for the week import picker
-  const importableMoodleFiles = moodleSections.flatMap((section) =>
-    section.moodle_files
-      .filter((f) => f.storage_path && f.type === 'file')
-      .map((f) => ({
-        id: f.id,
-        file_name: f.file_name,
-        storage_path: f.storage_path,
-        mime_type: f.mime_type,
-        file_size: f.file_size,
-        sectionTitle: section.title,
-      })),
   );
 
   const isEmpty =
-    typedWeeks.length === 0 &&
-    courseDocuments.length === 0 &&
-    moodleSections.length === 0;
+    typedDocuments.length === 0 &&
+    courseMaterials.length === 0 &&
+    personalFiles.length === 0;
 
   return (
     <div className="h-full overflow-y-auto p-6">
@@ -271,9 +136,8 @@ export default async function CoursePage({
           <StartHomeworkDialog
             courseId={courseId}
             documents={typedDocuments}
-            materials={allMaterials}
-            personalFiles={[...allWeekPersonalFiles, ...coursePersonalFiles]}
-            weeks={typedWeeks}
+            materials={courseMaterials}
+            personalFiles={personalFiles}
           >
             <Button variant="outline" size="sm">
               Start Homework
@@ -284,7 +148,6 @@ export default async function CoursePage({
               New Document
             </Button>
           </CreateDocumentDialog>
-          <WeekDialog courseId={courseId} />
           <PersonalFileUpload
             courseId={courseId}
             userId={user?.id ?? ''}
@@ -301,109 +164,44 @@ export default async function CoursePage({
         </div>
       </div>
 
-      {isEmpty && coursePersonalFiles.length === 0 ? (
+      {isEmpty ? (
         <EmptyState
           title="This course is empty"
-          description="Add weeks to organize your materials, or create a document to start taking notes."
+          description="Import materials or create a document to start."
         />
       ) : (
         <>
-          {/* Course-level documents (not assigned to a week) */}
-          {courseDocuments.length > 0 && (
+          {/* Documents */}
+          {typedDocuments.length > 0 && (
             <div className="mb-6">
               <h2 className="mb-3 text-sm font-medium text-muted-foreground">
                 Documents
               </h2>
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
-                <DocumentListWithMove documents={courseDocuments} />
+                <DocumentListWithMove documents={typedDocuments} />
               </div>
             </div>
           )}
 
-          {/* Course-level imported files */}
-          {coursePersonalFiles.length > 0 && (
+          {/* Materials: course_materials + personal_files combined */}
+          {(courseMaterials.length > 0 || personalFiles.length > 0) && (
             <div className="mb-6">
               <h2 className="mb-3 text-sm font-medium text-muted-foreground">
-                Imported Files
+                Materials
               </h2>
               <div className="space-y-0.5">
-                {coursePersonalFiles.map((file) => (
-                  <PersonalFileItem key={file.id} file={file} />
+                {courseMaterials.map((m) => (
+                  <MaterialItem key={m.id} material={m} />
+                ))}
+                {personalFiles.map((f) => (
+                  <PersonalFileItem key={f.id} file={f} />
                 ))}
               </div>
             </div>
           )}
 
-          {/* Weeks section */}
-          {typedWeeks.length > 0 && (
-            <div>
-              <h2 className="mb-3 text-sm font-medium text-muted-foreground">
-                Weeks
-              </h2>
-              <div className="space-y-3">
-                {typedWeeks.map((week) => (
-                  <WeekSection
-                    key={week.id}
-                    week={week}
-                    courseId={courseId}
-                    userId={user?.id ?? ''}
-                    materials={allMaterials.filter(
-                      (m) => m.week_id === week.id && m.category === 'material',
-                    )}
-                    homework={allMaterials.filter(
-                      (m) => m.week_id === week.id && m.category === 'homework',
-                    )}
-                    documents={weekDocuments.filter(
-                      (d) => d.week_id === week.id,
-                    )}
-                    personalFiles={allWeekPersonalFiles.filter(
-                      (f) => f.week_id === week.id,
-                    )}
-                    moodleFiles={importableMoodleFiles}
-                  />
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* Moodle materials */}
-          {moodleSections.length > 0 && (
-            <div className="mt-6">
-              <h2 className="mb-3 text-sm font-medium text-muted-foreground">
-                Moodle Materials
-              </h2>
-              <div className="space-y-3">
-                {moodleSections.map((section) => (
-                  <div key={section.id} className="rounded-lg border">
-                    <div className="border-b bg-muted/30 px-4 py-2">
-                      <h3 className="text-sm font-medium">{section.title}</h3>
-                    </div>
-                    <div className="divide-y">
-                      {section.moodle_files
-                        .sort((a, b) => a.position - b.position)
-                        .map((file) => {
-                          const href = file.downloadUrl ?? file.moodle_url;
-                          const isStored = !!file.downloadUrl;
-                          return (
-                            <MoodleFileRow
-                              key={file.id}
-                              fileId={file.id}
-                              fileName={file.file_name}
-                              fileType={file.type}
-                              mimeType={file.mime_type}
-                              fileSize={file.file_size}
-                              href={href}
-                              isStored={isStored}
-                              courseId={courseId}
-                            />
-                          );
-                        })}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
+          {/* Moodle Materials — lazy-loaded on demand */}
+          <MoodleMaterialsSection courseId={courseId} />
         </>
       )}
     </div>
