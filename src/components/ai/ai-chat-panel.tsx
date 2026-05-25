@@ -23,7 +23,6 @@ import { trackEvent } from '@/lib/analytics/events';
 interface ChatSource {
   sourceType: string;
   sourceName: string;
-  weekId: string | null;
   pageRange: string | null;
   signedUrl: string | null;
 }
@@ -55,9 +54,7 @@ export type AiContextItem =
 
 interface AiChatPanelProps {
   courseId?: string;
-  weekId?: string;
   courseName?: string;
-  weekLabel?: string;
   getDocumentContent?: () => string;
   isOpen: boolean;
   onClose: () => void;
@@ -68,9 +65,7 @@ interface AiChatPanelProps {
 
 export function AiChatPanel({
   courseId,
-  weekId,
   courseName,
-  weekLabel,
   getDocumentContent,
   isOpen,
   onClose,
@@ -314,10 +309,8 @@ export function AiChatPanel({
         body: JSON.stringify({
           question: fullQuestion,
           courseId,
-          weekId,
           mode,
           courseName,
-          weekLabel,
           documentContent,
           // Server loads conversation history from DB if conversationId is set
           conversationId: currentConversationId || undefined,
@@ -476,11 +469,6 @@ export function AiChatPanel({
               {messages[0]?.content?.slice(0, 30)}...
             </span>
           )}
-          {weekLabel && (
-            <span className="truncate rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground">
-              {weekLabel}
-            </span>
-          )}
         </div>
         <div className="flex flex-shrink-0 items-center gap-2">
           {/* Mode toggle */}
@@ -582,9 +570,7 @@ export function AiChatPanel({
                         : 'Ask anything about your course materials'}
                     </p>
                     <p className="mt-1 text-xs text-muted-foreground/60">
-                      {weekLabel
-                        ? `I can see all materials for ${weekLabel}`
-                        : "I'll search across all weeks"}
+                      {"I'll search across all course materials"}
                     </p>
                   </div>
                 )}

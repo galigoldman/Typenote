@@ -12,8 +12,6 @@ import { AiChatWrapper } from './ai-chat-wrapper';
 interface DocumentWithAiProps {
   courseId?: string;
   courseName?: string;
-  weekId?: string;
-  weekLabel?: string;
   document: Document;
   materialId?: string | null;
   personalFileId?: string | null;
@@ -22,8 +20,6 @@ interface DocumentWithAiProps {
 export function DocumentWithAi({
   courseId,
   courseName,
-  weekId,
-  weekLabel,
   document,
   materialId,
   personalFileId,
@@ -103,8 +99,6 @@ export function DocumentWithAi({
       <AiChatWrapper
         courseId={courseId}
         courseName={courseName}
-        weekId={weekId}
-        weekLabel={weekLabel}
         getDocumentContent={getDocumentContent}
         pendingContextItems={contextItems}
         onRemoveContextItem={handleRemoveContextItem}
