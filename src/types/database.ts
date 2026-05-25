@@ -43,19 +43,9 @@ export interface Course {
   updated_at: string;
 }
 
-export interface CourseWeek {
-  id: string;
-  course_id: string;
-  user_id: string;
-  week_number: number;
-  topic: string | null;
-  created_at: string;
-  updated_at: string;
-}
-
 export interface CourseMaterial {
   id: string;
-  week_id: string;
+  course_id: string;
   user_id: string;
   category: MaterialCategory;
   storage_path: string;
@@ -72,7 +62,6 @@ export interface Document {
   user_id: string;
   folder_id: string | null;
   course_id: string | null;
-  week_id: string | null;
   material_id: string | null;
   personal_file_id: string | null;
   purpose: 'homework' | 'summary' | 'notes' | null;
@@ -91,7 +80,6 @@ export interface PersonalFile {
   id: string;
   user_id: string;
   course_id: string;
-  week_id: string | null;
   category: MaterialCategory;
   file_name: string;
   display_name: string;
@@ -189,7 +177,6 @@ export interface AiConversation {
 export interface ChatSource {
   sourceType: string;
   sourceName: string;
-  weekId: string | null;
   pageRange: string | null;
 }
 
