@@ -1,9 +1,10 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { BookOpen, FileText } from 'lucide-react';
 import { createHomeworkSession } from '@/lib/actions/homework';
+import { getMoodleMaterialsForCourse, type MoodleSectionDto } from '@/lib/actions/moodle-materials';
 import { trackEvent } from '@/lib/analytics/events';
 import {
   Dialog,
@@ -46,6 +47,16 @@ export function StartHomeworkDialog({
   );
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [moodleSections, setMoodleSections] = useState<MoodleSectionDto[]>([]);
+  const [moodleLoaded, setMoodleLoaded] = useState(false);
+
+  useEffect(() => {
+    if (!open || moodleLoaded) return;
+    setMoodleLoaded(true);
+    getMoodleMaterialsForCourse(courseId)
+      .then(setMoodleSections)
+      .catch(() => setMoodleSections([]));
+  }, [open, moodleLoaded, courseId]);
 
   const hasDocuments = documents.length > 0;
 
@@ -260,6 +271,34 @@ export function StartHomeworkDialog({
                       </label>
                     );
                   })}
+                </div>
+              )}
+
+              {/* Moodle files (lazy-loaded) */}
+              {moodleSections.some((s) => s.files.length > 0) && (
+                <div>
+                  <p className="mb-1 text-xs font-medium text-muted-foreground">
+                    Moodle Files
+                  </p>
+                  {moodleSections.flatMap((s) =>
+                    s.files.map((f) => {
+                      const key = `moodle_file:${f.id}`;
+                      return (
+                        <label
+                          key={key}
+                          className="flex cursor-pointer items-center gap-2 rounded px-2 py-1 text-sm hover:bg-accent"
+                        >
+                          <input
+                            type="checkbox"
+                            checked={selectedMaterials.has(key)}
+                            onChange={() => toggleMaterial(key)}
+                            className="accent-primary"
+                          />
+                          <span className="truncate">{f.file_name}</span>
+                        </label>
+                      );
+                    }),
+                  )}
                 </div>
               )}
             </div>
