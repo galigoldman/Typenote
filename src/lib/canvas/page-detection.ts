@@ -1,5 +1,3 @@
-import { PAGE_HEIGHT } from '@/types/canvas';
-
 /** Minimal page rectangle for viewport detection (document-space coordinates) */
 export interface PageRect {
   id: string;
