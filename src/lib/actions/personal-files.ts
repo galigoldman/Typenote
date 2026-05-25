@@ -6,7 +6,6 @@ import { createAdminClient } from '@/lib/supabase/admin';
 
 export async function createPersonalFile(data: {
   courseId: string;
-  weekId?: string;
   category: 'material' | 'homework';
   fileName: string;
   mimeType: string;
@@ -27,7 +26,6 @@ export async function createPersonalFile(data: {
     .insert({
       user_id: user.id,
       course_id: data.courseId,
-      week_id: data.weekId ?? null,
       category: data.category,
       file_name: data.fileName,
       display_name: displayName,
@@ -39,6 +37,16 @@ export async function createPersonalFile(data: {
     .single();
 
   if (error) throw new Error(error.message);
+
+  const embeddable =
+    data.mimeType === 'application/pdf' ||
+    data.mimeType.includes('wordprocessingml') ||
+    data.mimeType.includes('presentationml');
+  if (embeddable) {
+    const { indexContent } = await import('@/lib/actions/ai-context');
+    void indexContent({ type: 'personal_file', fileId: file.id, courseId: data.courseId });
+  }
+
   revalidatePath('/dashboard');
   return { id: file.id };
 }
@@ -132,7 +140,6 @@ export async function openPersonalFileAsDocument(data: {
         canvas_type: 'blank',
         folder_id: null,
         course_id: file.course_id,
-        week_id: file.week_id ?? null,
         purpose,
         personal_file_id: data.fileId,
         position: 0,
@@ -189,7 +196,6 @@ export async function openPersonalFileAsDocument(data: {
         canvas_type: 'blank',
         folder_id: null,
         course_id: file.course_id,
-        week_id: file.week_id ?? null,
         purpose,
         personal_file_id: data.fileId,
         position: 0,
