@@ -23,13 +23,9 @@ import { createClient } from '@/lib/supabase/server';
 // ---------------------------------------------------------------------------
 
 export type IndexSource =
-  | { type: 'moodle_file'; fileId: string; courseId: string; weekId?: string }
-  | {
-      type: 'course_material';
-      materialId: string;
-      courseId: string;
-      weekId: string;
-    };
+  | { type: 'moodle_file'; fileId: string; courseId: string }
+  | { type: 'course_material'; materialId: string; courseId: string }
+  | { type: 'personal_file'; fileId: string; courseId: string };
 
 export type IndexResult = {
   success: boolean;
@@ -41,7 +37,6 @@ export type IndexResult = {
 export type SearchParams = {
   query: string;
   courseId: string;
-  weekId?: string;
   maxResults?: number;
 };
 
@@ -54,7 +49,6 @@ export type SearchResult = {
   pageStart: number | null;
   pageEnd: number | null;
   courseId: string;
-  weekId: string | null;
   mimeType: string | null;
   similarity: number;
 };
@@ -62,11 +56,9 @@ export type SearchResult = {
 export type QuestionParams = {
   question: string;
   courseId?: string;
-  weekId?: string;
   documentId?: string;
   mode: 'quick' | 'deep';
   courseName?: string;
-  weekLabel?: string;
   documentContent?: string;
   conversationHistory?: Array<{ role: 'user' | 'assistant'; content: string }>;
   imageData?: string;
@@ -77,7 +69,6 @@ export type QuestionResult = {
   sources: Array<{
     sourceType: string;
     sourceName: string;
-    weekId: string | null;
     pageRange: string | null;
     signedUrl: string | null;
   }>;
@@ -118,7 +109,6 @@ export async function indexContent(source: IndexSource): Promise<IndexResult> {
     let sourceId = '';
     let userId: string | null = null;
     let courseId: string | null = null;
-    let weekId: string | null = null;
     let mimeType = 'application/octet-stream';
     let storageBucket = '';
 
@@ -127,7 +117,6 @@ export async function indexContent(source: IndexSource): Promise<IndexResult> {
       sourceType = 'moodle_file';
       sourceId = source.fileId;
       courseId = source.courseId;
-      weekId = source.weekId ?? null;
       userId = null;
 
       const { data: fileRow, error: fileErr } = await admin
@@ -182,46 +171,37 @@ export async function indexContent(source: IndexSource): Promise<IndexResult> {
       }
 
       fileBuffer = Buffer.from(await fileData.arrayBuffer());
-    } else {
+    } else if (source.type === 'course_material') {
       const supabase = await createClient();
       userId = await getAuthUserId();
       sourceType = 'course_material';
       sourceId = source.materialId;
       courseId = source.courseId;
-      weekId = source.weekId;
-
       const { data: matRow, error: matErr } = await supabase
-        .from('course_materials')
-        .select('storage_path, file_name, mime_type')
-        .eq('id', source.materialId)
-        .single();
-
-      if (matErr || !matRow) {
-        return {
-          success: false,
-          segmentsIndexed: 0,
-          skipped: false,
-          error: 'Course material not found',
-        };
-      }
-
+        .from('course_materials').select('storage_path, file_name, mime_type')
+        .eq('id', source.materialId).single();
+      if (matErr || !matRow) return { success: false, segmentsIndexed: 0, skipped: false, error: 'Course material not found' };
       sourceName = matRow.file_name;
       mimeType = matRow.mime_type ?? 'application/octet-stream';
       storageBucket = 'course-materials';
-
-      const { data: fileData, error: dlErr } = await supabase.storage
-        .from(storageBucket)
-        .download(matRow.storage_path);
-
-      if (dlErr || !fileData) {
-        return {
-          success: false,
-          segmentsIndexed: 0,
-          skipped: false,
-          error: 'Failed to download course material',
-        };
-      }
-
+      const { data: fileData, error: dlErr } = await supabase.storage.from(storageBucket).download(matRow.storage_path);
+      if (dlErr || !fileData) return { success: false, segmentsIndexed: 0, skipped: false, error: 'Failed to download course material' };
+      fileBuffer = Buffer.from(await fileData.arrayBuffer());
+    } else {
+      const supabase = await createClient();
+      userId = await getAuthUserId();
+      sourceType = 'personal_file';
+      sourceId = source.fileId;
+      courseId = source.courseId;
+      const { data: fileRow, error: fileErr } = await supabase
+        .from('personal_files').select('storage_path, file_name, mime_type')
+        .eq('id', source.fileId).single();
+      if (fileErr || !fileRow) return { success: false, segmentsIndexed: 0, skipped: false, error: 'Personal file not found' };
+      sourceName = fileRow.file_name;
+      mimeType = fileRow.mime_type ?? 'application/octet-stream';
+      storageBucket = 'personal-files';
+      const { data: fileData, error: dlErr } = await supabase.storage.from(storageBucket).download(fileRow.storage_path);
+      if (dlErr || !fileData) return { success: false, segmentsIndexed: 0, skipped: false, error: 'Failed to download personal file' };
       fileBuffer = Buffer.from(await fileData.arrayBuffer());
     }
 
@@ -276,7 +256,6 @@ export async function indexContent(source: IndexSource): Promise<IndexResult> {
         embedding,
         user_id: userId,
         course_id: courseId,
-        week_id: weekId,
         source_name: sourceName,
         mime_type: mimeType,
         content_hash: hash,
@@ -355,7 +334,6 @@ export async function searchContext(
     courseId: params.courseId,
     moodleCourseId,
     importedMoodleFileIds,
-    weekId: params.weekId ?? null,
     matchCount: params.maxResults ?? 8,
   });
 
@@ -368,7 +346,6 @@ export async function searchContext(
     pageStart: m.page_start,
     pageEnd: m.page_end,
     courseId: params.courseId ?? '',
-    weekId: m.week_id,
     mimeType: m.mime_type,
     similarity: m.similarity,
   }));
@@ -387,16 +364,14 @@ export async function askQuestion(
     courseId,
     mode,
     courseName,
-    weekLabel,
     documentContent,
     conversationHistory,
   } = params;
 
-  // Build dynamic system prompt with course/week context
+  // Build dynamic system prompt with course context
   const hasDocumentContent = !!documentContent?.trim();
   const systemPrompt = buildSystemPrompt({
     courseName,
-    weekLabel,
     hasDocumentContent,
   });
 
@@ -421,7 +396,6 @@ export async function askQuestion(
       sourcesUsed.push({
         sourceType: r.sourceType,
         sourceName: r.sourceName,
-        weekId: r.weekId,
         pageRange: null,
         signedUrl: null,
       });
@@ -557,7 +531,6 @@ export async function buildAiContext(params: QuestionParams): Promise<{
     courseId,
     mode,
     courseName,
-    weekLabel,
     documentContent,
     conversationHistory,
   } = params;
@@ -565,7 +538,6 @@ export async function buildAiContext(params: QuestionParams): Promise<{
   const hasDocumentContent = !!documentContent?.trim();
   const systemPrompt = buildSystemPrompt({
     courseName,
-    weekLabel,
     hasDocumentContent,
   });
 
@@ -590,7 +562,6 @@ export async function buildAiContext(params: QuestionParams): Promise<{
       sources.push({
         sourceType: r.sourceType,
         sourceName: r.sourceName,
-        weekId: r.weekId,
         pageRange: null,
         signedUrl: null, // populated by the URL-attach block below
       });
@@ -611,10 +582,12 @@ export async function buildAiContext(params: QuestionParams): Promise<{
   const materialIds = sourceIds
     .filter((s) => s.sourceType === 'course_material')
     .map((s) => s.sourceId);
+  const personalIds = sourceIds.filter((s) => s.sourceType === 'personal_file').map((s) => s.sourceId);
 
   const admin = createAdminClient();
   const moodlePaths: Record<string, string> = {};
   const materialPaths: Record<string, string> = {};
+  const personalPaths: Record<string, string> = {};
 
   if (moodleIds.length > 0) {
     const { data } = await admin
@@ -637,21 +610,19 @@ export async function buildAiContext(params: QuestionParams): Promise<{
       materialPaths[row.id] = row.storage_path;
     }
   }
+  if (personalIds.length > 0) {
+    const { data } = await supabase.from('personal_files').select('id, storage_path').in('id', personalIds);
+    for (const row of (data ?? []) as { id: string; storage_path: string }[]) personalPaths[row.id] = row.storage_path;
+  }
 
   await Promise.all(
     sourceIds.map(async ({ sourceId, sourceType, idx }) => {
-      const bucket =
-        sourceType === 'moodle_file'
-          ? 'moodle-materials'
-          : sourceType === 'course_material'
-            ? 'course-materials'
-            : null;
-      const path =
-        sourceType === 'moodle_file'
-          ? moodlePaths[sourceId]
-          : sourceType === 'course_material'
-            ? materialPaths[sourceId]
-            : null;
+      const bucket = sourceType === 'moodle_file' ? 'moodle-materials'
+        : sourceType === 'course_material' ? 'course-materials'
+        : sourceType === 'personal_file' ? 'personal-files' : null;
+      const path = sourceType === 'moodle_file' ? moodlePaths[sourceId]
+        : sourceType === 'course_material' ? materialPaths[sourceId]
+        : sourceType === 'personal_file' ? personalPaths[sourceId] : null;
       if (!bucket || !path) return;
       const client = bucket === 'moodle-materials' ? admin : supabase;
       const { data } = await client.storage
