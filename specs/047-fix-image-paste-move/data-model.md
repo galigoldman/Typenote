@@ -5,6 +5,7 @@
 ## Existing Entities (unchanged)
 
 ### CanvasPage
+
 ```
 id: string (UUID)
 order: number (0-based index)
@@ -17,6 +18,7 @@ pdfPage: number | undefined
 ```
 
 ### ImageObject
+
 ```
 id: string (random)
 x: number (page-relative, 0 = left edge)
@@ -29,6 +31,7 @@ createdAt: number (timestamp)
 ```
 
 ### ClipboardData
+
 ```
 strokes: Stroke[]
 textBoxes: TextBox[]
@@ -58,12 +61,15 @@ dy: number (displacement applied to Y, adjusted for page boundary)
 ## State Changes (in-memory only)
 
 ### Paste Target Fix
+
 - No new state. The viewport detection logic is improved to always find the correct page.
 
 ### Cross-Page Drag
+
 - `activePageIdRef` in `use-selection.ts` may change during drag commit when objects cross a page boundary.
 - `selectionPageId` updates to the new target page after a cross-page move.
 - Objects are removed from source page's array (strokes/textBoxes/images) and added to target page's array.
 
 ### Persistence
+
 - No change. The `pages` JSONB column already serializes the full page array including all objects. Moving an object between pages just changes which page's array contains it.

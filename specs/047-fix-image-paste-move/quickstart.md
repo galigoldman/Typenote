@@ -17,13 +17,13 @@ pnpm dev            # Start dev server
 
 ## Key Files to Modify
 
-| File | Change | Priority |
-| ---- | ------ | -------- |
-| `src/components/canvas/canvas-editor.tsx` | Fix paste page detection fallback (line ~2339) | P1 |
-| `src/components/canvas/canvas-editor.tsx` | Add `cross-page-move` undo action type (~line 510) | P2 |
-| `src/components/canvas/canvas-editor.tsx` | Add `handleCrossPageMove` callback | P2 |
-| `src/hooks/use-selection.ts` | Detect page boundary crossing at drag commit (~line 962) | P2 |
-| `src/types/canvas.ts` | No changes needed (types are sufficient) | - |
+| File                                      | Change                                                   | Priority |
+| ----------------------------------------- | -------------------------------------------------------- | -------- |
+| `src/components/canvas/canvas-editor.tsx` | Fix paste page detection fallback (line ~2339)           | P1       |
+| `src/components/canvas/canvas-editor.tsx` | Add `cross-page-move` undo action type (~line 510)       | P2       |
+| `src/components/canvas/canvas-editor.tsx` | Add `handleCrossPageMove` callback                       | P2       |
+| `src/hooks/use-selection.ts`              | Detect page boundary crossing at drag commit (~line 962) | P2       |
+| `src/types/canvas.ts`                     | No changes needed (types are sufficient)                 | -        |
 
 ## Verify the Fix
 

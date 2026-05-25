@@ -162,9 +162,11 @@ test.describe('Cross-Page Object Movement', () => {
 
     // Selection border should be visible
     const selectionBorder = page.locator('[data-testid="selection-border"]');
-    await expect(selectionBorder).toBeVisible({ timeout: 2000 }).catch(() => {
-      // Selection might use different indicator
-    });
+    await expect(selectionBorder)
+      .toBeVisible({ timeout: 2000 })
+      .catch(() => {
+        // Selection might use different indicator
+      });
   });
 
   test('undo restores previous state after drawing', async ({ page }) => {

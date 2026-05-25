@@ -23,13 +23,13 @@ Fix the bug where pasted images always land on page 1 instead of the currently v
 
 _GATE: Must pass before Phase 0 research. Re-check after Phase 1 design._
 
-| Principle | Status | Notes |
-| --------- | ------ | ----- |
-| I. Incremental Development | PASS | Builds on existing canvas infrastructure. P1 (paste fix) is a standalone increment. P2/P3 build on top. |
-| II. Test-Driven Quality | PASS | Plan includes unit tests for page detection logic, E2E tests for paste and cross-page drag. Bug fix starts with a failing test. |
-| III. Protected Branches | PASS | Working on feature branch `047-fix-image-paste-move` off `dev`. |
-| IV. Migrations as Code | N/A | No database changes. |
-| V. Interview-Ready Architecture | PASS | Cross-page move uses a compound undo action — demonstrates the Command pattern (common interview topic). |
+| Principle                       | Status | Notes                                                                                                                           |
+| ------------------------------- | ------ | ------------------------------------------------------------------------------------------------------------------------------- |
+| I. Incremental Development      | PASS   | Builds on existing canvas infrastructure. P1 (paste fix) is a standalone increment. P2/P3 build on top.                         |
+| II. Test-Driven Quality         | PASS   | Plan includes unit tests for page detection logic, E2E tests for paste and cross-page drag. Bug fix starts with a failing test. |
+| III. Protected Branches         | PASS   | Working on feature branch `047-fix-image-paste-move` off `dev`.                                                                 |
+| IV. Migrations as Code          | N/A    | No database changes.                                                                                                            |
+| V. Interview-Ready Architecture | PASS   | Cross-page move uses a compound undo action — demonstrates the Command pattern (common interview topic).                        |
 
 **Post-Phase 1 re-check**: All gates still pass. No new dependencies, no schema changes, no architectural violations.
 
@@ -74,9 +74,11 @@ e2e/
 **Goal**: Images pasted from the system clipboard appear on the currently visible page.
 
 **Files**:
+
 - `src/components/canvas/canvas-editor.tsx` (~lines 2339-2343)
 
 **Changes**:
+
 1. Replace the first-page fallback with a "closest page to viewport center" algorithm:
    - After the existing intersection loop fails, iterate all page elements
    - For each page, compute distance from page center to viewport center
@@ -85,6 +87,7 @@ e2e/
 2. Apply the same fix to the internal keyboard paste handler (~lines 2223-2267) which currently silently fails when no page intersects the center
 
 **Unit Test** (`cross-page-move.test.ts`):
+
 - Extract the page detection logic into a pure function `findClosestPage(pageRects, viewportCenter)` that can be tested without DOM
 - Test cases: viewport center on page 3, viewport center between pages, viewport center past last page, single page document
 
@@ -97,10 +100,12 @@ e2e/
 **Goal**: Users can drag selected objects past a page boundary to move them to the adjacent page.
 
 **Files**:
+
 - `src/hooks/use-selection.ts` (~lines 962-1043, drag commit)
 - `src/components/canvas/canvas-editor.tsx` (new `handleCrossPageMove` callback, new undo action type)
 
 **Changes to `use-selection.ts`**:
+
 1. At drag commit, after computing final positions, check each object's new Y:
    - If `newY > PAGE_HEIGHT`: object crossed bottom boundary → target is next page
    - If `newY < 0`: object crossed top boundary → target is previous page
@@ -110,6 +115,7 @@ e2e/
 5. If target is past the last page, the canvas-editor callback creates a new page first
 
 **Changes to `canvas-editor.tsx`**:
+
 1. Add `cross-page-move` to the `CanvasAction` union type:
    ```
    { type: 'cross-page-move', fromPageId, toPageId, strokes, textBoxes, images, dx, dy }
@@ -126,12 +132,14 @@ e2e/
    - If the target page was auto-created and is now empty, optionally strip it
 
 **Coordinate Adjustment**:
+
 - Moving down: `newY = objectY + dy - PAGE_HEIGHT` (object Y relative to next page)
 - Moving up: `newY = objectY + dy + PAGE_HEIGHT` (object Y relative to previous page)
 - X coordinates stay unchanged
 - Clamp final positions to `[0, PAGE_WIDTH]` × `[0, PAGE_HEIGHT]`
 
 **Unit Tests**:
+
 - Coordinate transformation: given object at Y=1100 dragged dy=50, verify newY=27 on next page
 - Boundary detection: given object at Y=1100 with dy=30 → crosses; dy=20 → doesn't cross
 - Multiple objects: all objects in selection cross together
@@ -143,10 +151,12 @@ e2e/
 **Goal**: Users can cut objects on one page, scroll to another, and paste them there.
 
 **Files**:
+
 - `src/components/canvas/canvas-editor.tsx` (paste handler, ~lines 2223-2267)
 - `src/hooks/use-selection.ts` (cut handler, paste handler)
 
 **Changes**:
+
 1. The internal paste handler already uses viewport detection to find the target page. Once Phase 1 fixes the detection, paste will naturally target the correct page.
 2. Verify that cut (which already removes objects and stores them in `clipboardRef`) works correctly when the paste target is a different page than the source.
 3. The paste offset should be computed relative to the target page center, not the source page center, when `sourcePageId !== targetPageId`.
@@ -160,6 +170,7 @@ e2e/
 **Goal**: Comprehensive browser tests for all three user stories.
 
 **Files**:
+
 - `e2e/image-paste-page.spec.ts` (new)
 - `e2e/cross-page-move.spec.ts` (new)
 - `e2e/TEST_REGISTRY.md` (update)
@@ -167,11 +178,13 @@ e2e/
 **Test Scenarios**:
 
 `image-paste-page.spec.ts`:
+
 1. Paste image on page 1 of single-page document → image on page 1
 2. Scroll to page 3, paste image → image on page 3
 3. Paste image when scrolled between pages → image on nearest page
 
 `cross-page-move.spec.ts`:
+
 1. Drag image from page 2 past bottom boundary → image on page 3
 2. Drag image from page 3 past top boundary → image on page 2
 3. Drag image past last page → new page created, image on new page
@@ -179,15 +192,16 @@ e2e/
 5. Cut image on page 1, scroll to page 3, paste → image on page 3
 
 **Test Registry Update**:
+
 - Add "Image Paste Targeting" section with 3 tests
 - Add "Cross-Page Object Movement" section with 5 tests
 
 ## Risk Assessment
 
-| Risk | Impact | Mitigation |
-| ---- | ------ | ---------- |
-| Drag performance regression from boundary checks | Medium | Boundary check is O(1) math at commit time only, not during drag |
-| Undo stack corruption from compound action | High | Unit test the undo/redo cycle thoroughly; test undo after cross-page move + additional edits |
-| Coordinate rounding errors during page transfer | Low | Round to 1 decimal place (matching existing `screenToPageCoords`) |
-| Selection state stale after cross-page move | Medium | Explicitly update `selectionPageId` and `activePageIdRef` after move |
-| Auto-created pages not cleaned up on undo | Low | Reuse `stripTrailingEmptyPages` logic in undo handler |
+| Risk                                             | Impact | Mitigation                                                                                   |
+| ------------------------------------------------ | ------ | -------------------------------------------------------------------------------------------- |
+| Drag performance regression from boundary checks | Medium | Boundary check is O(1) math at commit time only, not during drag                             |
+| Undo stack corruption from compound action       | High   | Unit test the undo/redo cycle thoroughly; test undo after cross-page move + additional edits |
+| Coordinate rounding errors during page transfer  | Low    | Round to 1 decimal place (matching existing `screenToPageCoords`)                            |
+| Selection state stale after cross-page move      | Medium | Explicitly update `selectionPageId` and `activePageIdRef` after move                         |
+| Auto-created pages not cleaned up on undo        | Low    | Reuse `stripTrailingEmptyPages` logic in undo handler                                        |

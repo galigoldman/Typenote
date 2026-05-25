@@ -24,7 +24,10 @@ function getPageElements(page: Page) {
 }
 
 /** Count images on a specific page by data-page-id */
-async function countImagesOnPage(page: Page, pageIndex: number): Promise<number> {
+async function countImagesOnPage(
+  page: Page,
+  pageIndex: number,
+): Promise<number> {
   const pageEl = getPageElements(page).nth(pageIndex);
   return pageEl.locator('img[alt=""]').count();
 }
