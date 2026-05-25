@@ -11,7 +11,6 @@ export async function createDocument(data: {
   canvas_type: string;
   folder_id: string | null;
   course_id?: string | null;
-  week_id?: string | null;
   purpose?: 'homework' | 'summary' | 'notes' | null;
 }) {
   const supabase = await createClient();
@@ -82,7 +81,7 @@ export async function deleteDocument(id: string) {
 
 export type MoveDestination =
   | { type: 'folder'; folderId: string }
-  | { type: 'course'; courseId: string; weekId?: string }
+  | { type: 'course'; courseId: string }
   | { type: 'root' };
 
 export async function moveDocument(id: string, destination: MoveDestination) {
@@ -99,7 +98,6 @@ export async function moveDocument(id: string, destination: MoveDestination) {
       updateData = {
         folder_id: destination.folderId,
         course_id: null,
-        week_id: null,
         material_id: null,
       };
       break;
@@ -107,7 +105,6 @@ export async function moveDocument(id: string, destination: MoveDestination) {
     case 'course': {
       updateData = {
         course_id: destination.courseId,
-        week_id: destination.weekId ?? null,
         folder_id: null,
       };
 
@@ -131,7 +128,6 @@ export async function moveDocument(id: string, destination: MoveDestination) {
       updateData = {
         folder_id: null,
         course_id: null,
-        week_id: null,
         material_id: null,
       };
       break;
@@ -204,7 +200,7 @@ export async function openMaterialAsDocument(
   // Fetch material and verify ownership
   const { data: material, error: matError } = await supabase
     .from('course_materials')
-    .select('id, week_id, file_name, user_id')
+    .select('id, course_id, file_name, user_id')
     .eq('id', materialId)
     .single();
 
@@ -244,13 +240,6 @@ export async function openMaterialAsDocument(
     return { documentId: existing.id, created: false };
   }
 
-  // Resolve course_id from the week
-  const { data: week } = await supabase
-    .from('course_weeks')
-    .select('course_id')
-    .eq('id', material.week_id)
-    .single();
-
   // Generate pages — one per PDF page
   const pages = Array.from({ length: pageCount }, (_, i) => ({
     id: Math.random().toString(36).slice(2) + Date.now().toString(36),
@@ -274,8 +263,7 @@ export async function openMaterialAsDocument(
       subject: 'other',
       canvas_type: 'blank',
       folder_id: null,
-      course_id: week?.course_id ?? null,
-      week_id: material.week_id,
+      course_id: material.course_id,
       material_id: materialId,
       position: 0,
     })
@@ -288,45 +276,3 @@ export async function openMaterialAsDocument(
   return { documentId: doc.id, created: true };
 }
 
-export async function createWeekDocument(data: {
-  course_id: string;
-  week_id: string;
-  week_number: number;
-  purpose: 'homework' | 'summary' | 'notes';
-}) {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) throw new Error('Not authenticated');
-
-  // Auto-generate title based on purpose
-  const purposeTitles: Record<string, string> = {
-    homework: 'Homework',
-    summary: 'Summary',
-    notes: 'Notes',
-  };
-  const title = `Week ${data.week_number} — ${purposeTitles[data.purpose]}`;
-
-  const { data: document, error } = await supabase
-    .from('documents')
-    .insert({
-      user_id: user.id,
-      title,
-      content: {},
-      subject: 'general',
-      canvas_type: 'blank',
-      folder_id: null,
-      course_id: data.course_id,
-      week_id: data.week_id,
-      purpose: data.purpose,
-      position: 0,
-    })
-    .select()
-    .single();
-
-  if (error) throw error;
-
-  revalidatePath('/dashboard');
-  return document;
-}
