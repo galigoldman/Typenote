@@ -235,3 +235,40 @@ describe('homework session RLS', () => {
     expect(data).toHaveLength(0);
   });
 });
+
+// ---------------------------------------------------------------------------
+// moodle_file material type
+// ---------------------------------------------------------------------------
+
+describe('moodle_file material type', () => {
+  it('homework_session_materials accepts moodle_file and the file name is resolvable', async () => {
+    const admin = createAdminClient();
+    const SESSION_ID = 'a0000000-0000-0000-0000-000000000001';
+    const MOODLE_FILE_ID = '63000000-0000-0000-0000-000000000001'; // syllabus.pdf
+
+    // Insert a moodle_file pin (CHECK constraint must allow 'moodle_file')
+    const { error: insErr } = await admin
+      .from('homework_session_materials')
+      .insert({
+        session_id: SESSION_ID,
+        material_type: 'moodle_file',
+        material_id: MOODLE_FILE_ID,
+      });
+    expect(insErr).toBeNull();
+
+    // The name a resolver would surface comes from moodle_files.file_name
+    const { data: mf } = await admin
+      .from('moodle_files')
+      .select('file_name')
+      .eq('id', MOODLE_FILE_ID)
+      .single();
+    expect(mf?.file_name).toBe('syllabus.pdf');
+
+    // cleanup
+    await admin
+      .from('homework_session_materials')
+      .delete()
+      .eq('session_id', SESSION_ID)
+      .eq('material_type', 'moodle_file');
+  });
+});
