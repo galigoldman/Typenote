@@ -52,10 +52,7 @@ export function TiptapEditorWithVersions({
         isOpen={isVersionHistoryOpen}
         onClose={() => setIsVersionHistoryOpen(false)}
       />
-      <AiChatWrapper
-        courseId={courseId}
-        courseName={courseName}
-      />
+      <AiChatWrapper courseId={courseId} courseName={courseName} />
     </div>
   );
 }

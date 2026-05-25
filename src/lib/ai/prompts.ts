@@ -5,7 +5,9 @@ export interface SystemPromptContext {
 
 export function buildSystemPrompt(context: SystemPromptContext): string {
   const { courseName, hasDocumentContent } = context;
-  const courseContext = courseName ? `You are a tutor for **${courseName}**.` : 'You are a course tutor.';
+  const courseContext = courseName
+    ? `You are a tutor for **${courseName}**.`
+    : 'You are a course tutor.';
   const documentContext = hasDocumentContent
     ? `\n\n## STUDENT'S DOCUMENT\nThe student has shared their current document with you. When they ask about their own writing (e.g., "is my solution correct?"), refer to its content specifically.`
     : '';

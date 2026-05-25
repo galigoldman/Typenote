@@ -19,15 +19,18 @@
 ## Complete week-surface file map (all 29 — every one is handled)
 
 **Created**
+
 - `supabase/migrations/20260525120000_flatten_remove_course_weeks.sql` (T1)
 - `src/lib/actions/moodle-materials.ts` (T15) + `src/components/dashboard/moodle-materials-section.tsx` (T15)
 - `src/lib/actions/__tests__/flatten-schema.integration.test.ts` (T3)
 - `src/lib/actions/__tests__/personal-file-embedding.integration.test.ts` (T8)
 
 **Modified**
+
 - `src/types/database.ts` (T4) · `src/lib/queries/embeddings.ts` (T5) · `src/lib/actions/ai-context.ts` (T6) · `src/lib/actions/personal-files.ts` (T7) · `src/lib/actions/documents.ts` (T9) · `src/lib/actions/course-materials.ts` (T10) · `src/lib/actions/courses.ts` (T10) · `src/lib/ai/prompts.ts` (T11) · `src/app/api/ai/ask/route.ts` (T12) · `src/app/api/ai/search/route.ts` (T12) · `src/components/ai/ai-chat-panel.tsx` (T13) · `src/components/ai/ai-chat-wrapper.tsx` (T13) · `src/components/ai/document-with-ai.tsx` (T13) · `src/components/editor/tiptap-editor-with-versions.tsx` (T13) · `src/app/(dashboard)/dashboard/documents/[docId]/page.tsx` (T13) · `src/components/dashboard/move-document-dialog.tsx` (T14) · `src/components/dashboard/personal-file-upload.tsx` (T14) · `src/lib/queries/course-materials.ts` (T14) · `src/lib/queries/personal-files.ts` (T14) · `src/app/(dashboard)/dashboard/courses/[courseId]/page.tsx` (T16) · `src/components/dashboard/start-homework-dialog.tsx` (T16) · `src/components/dashboard/material-item.tsx` (T16) · `src/lib/analytics/events.ts` (T17) · `supabase/seed.sql` (T2)
 
 **Deleted**
+
 - `src/lib/actions/course-weeks.ts`, `src/lib/queries/course-weeks.ts` (T14)
 - `src/lib/ai/context-cache.ts` (+ its test) (T14)
 - `src/components/dashboard/week-section.tsx` (+ test), `week-dialog.tsx`, `material-upload.tsx` (+ test), `moodle-import-picker.tsx` (T14)
@@ -185,11 +188,16 @@ const vec = (n: number) => JSON.stringify(Array(1536).fill(n));
 describe('flatten migration schema', () => {
   it('course_weeks no longer exists', async () => {
     const { error } = await admin.from('course_weeks').select('id').limit(1);
-    expect(error?.message ?? '').toMatch(/does not exist|could not find|schema cache/i);
+    expect(error?.message ?? '').toMatch(
+      /does not exist|could not find|schema cache/i,
+    );
   });
 
   it('course_materials has course_id, not week_id', async () => {
-    const ok = await admin.from('course_materials').select('id, course_id').limit(1);
+    const ok = await admin
+      .from('course_materials')
+      .select('id, course_id')
+      .limit(1);
     expect(ok.error).toBeNull();
     const bad = await admin.from('course_materials').select('week_id').limit(1);
     expect(bad.error?.message ?? '').toMatch(/week_id/i);
@@ -199,7 +207,9 @@ describe('flatten migration schema', () => {
     const { error } = await admin.from('content_embeddings').insert({
       source_type: 'course_material',
       source_id: '00000000-0000-0000-0000-000000000001',
-      segment_index: 0, embedding: vec(0), user_id: null,
+      segment_index: 0,
+      embedding: vec(0),
+      user_id: null,
       course_id: '00000000-0000-0000-0000-000000000002',
     });
     expect(error?.message ?? '').toMatch(/owned_user_not_null|violates check/i);
@@ -207,7 +217,8 @@ describe('flatten migration schema', () => {
 
   it('match_embeddings no longer accepts match_week_id', async () => {
     const { error } = await admin.rpc('match_embeddings', {
-      query_embedding: vec(0), match_user_id: TEST_USER_ID,
+      query_embedding: vec(0),
+      match_user_id: TEST_USER_ID,
       match_week_id: '00000000-0000-0000-0000-000000000002',
     });
     expect(error?.message ?? '').toMatch(/match_week_id|does not exist/i);
@@ -227,7 +238,7 @@ describe('flatten migration schema', () => {
 - [ ] **Step 1:** Delete the `CourseWeek` interface (lines 46-54).
 - [ ] **Step 2:** Edit `CourseMaterial`: remove `week_id`, add `course_id: string;` (after `id`).
 - [ ] **Step 3:** Remove `week_id` from `Document` (line 75) and `PersonalFile` (line 94); remove `weekId` from `ChatSource` (line 192).
-- [ ] **Step 4: Typecheck** — `pnpm exec tsc --noEmit`. Expected: errors only in files fixed by later tasks (these are the to-do list). 
+- [ ] **Step 4: Typecheck** — `pnpm exec tsc --noEmit`. Expected: errors only in files fixed by later tasks (these are the to-do list).
 - [ ] **Step 5: Commit** — `git commit -m "refactor(types): drop CourseWeek and week_id fields"`
 
 ---
@@ -302,25 +313,41 @@ export type IndexSource =
 - [ ] **Step 7:** In `buildAiContext`, add personal_file signed URLs. After the `materialIds` block (line 613) add:
 
 ```ts
-  const personalIds = sourceIds.filter((s) => s.sourceType === 'personal_file').map((s) => s.sourceId);
-  const personalPaths: Record<string, string> = {};
-  if (personalIds.length > 0) {
-    const { data } = await supabase.from('personal_files').select('id, storage_path').in('id', personalIds);
-    for (const row of (data ?? []) as { id: string; storage_path: string }[]) personalPaths[row.id] = row.storage_path;
-  }
+const personalIds = sourceIds
+  .filter((s) => s.sourceType === 'personal_file')
+  .map((s) => s.sourceId);
+const personalPaths: Record<string, string> = {};
+if (personalIds.length > 0) {
+  const { data } = await supabase
+    .from('personal_files')
+    .select('id, storage_path')
+    .in('id', personalIds);
+  for (const row of (data ?? []) as { id: string; storage_path: string }[])
+    personalPaths[row.id] = row.storage_path;
+}
 ```
 
 Then extend the bucket/path resolver in the `Promise.all` (lines 643-656):
 
 ```ts
-      const bucket = sourceType === 'moodle_file' ? 'moodle-materials'
-        : sourceType === 'course_material' ? 'course-materials'
-        : sourceType === 'personal_file' ? 'personal-files' : null;
-      const path = sourceType === 'moodle_file' ? moodlePaths[sourceId]
-        : sourceType === 'course_material' ? materialPaths[sourceId]
-        : sourceType === 'personal_file' ? personalPaths[sourceId] : null;
-      if (!bucket || !path) return;
-      const client = bucket === 'moodle-materials' ? admin : supabase; // personal-files RLS is owner-path based
+const bucket =
+  sourceType === 'moodle_file'
+    ? 'moodle-materials'
+    : sourceType === 'course_material'
+      ? 'course-materials'
+      : sourceType === 'personal_file'
+        ? 'personal-files'
+        : null;
+const path =
+  sourceType === 'moodle_file'
+    ? moodlePaths[sourceId]
+    : sourceType === 'course_material'
+      ? materialPaths[sourceId]
+      : sourceType === 'personal_file'
+        ? personalPaths[sourceId]
+        : null;
+if (!bucket || !path) return;
+const client = bucket === 'moodle-materials' ? admin : supabase; // personal-files RLS is owner-path based
 ```
 
 - [ ] **Step 8: Typecheck** (`ai-context.ts` clean) + **Commit** — `git commit -m "feat(ai): index personal_file sources; drop week from context pipeline"`
@@ -335,19 +362,23 @@ Then extend the bucket/path resolver in the `Promise.all` (lines 643-656):
 - [ ] **Step 2:** Before `revalidatePath` at the end of `createPersonalFile`, add fire-and-forget embedding:
 
 ```ts
-  if (error) throw new Error(error.message);
+if (error) throw new Error(error.message);
 
-  const embeddable =
-    data.mimeType === 'application/pdf' ||
-    data.mimeType.includes('wordprocessingml') ||
-    data.mimeType.includes('presentationml');
-  if (embeddable) {
-    const { indexContent } = await import('@/lib/actions/ai-context');
-    void indexContent({ type: 'personal_file', fileId: file.id, courseId: data.courseId });
-  }
+const embeddable =
+  data.mimeType === 'application/pdf' ||
+  data.mimeType.includes('wordprocessingml') ||
+  data.mimeType.includes('presentationml');
+if (embeddable) {
+  const { indexContent } = await import('@/lib/actions/ai-context');
+  void indexContent({
+    type: 'personal_file',
+    fileId: file.id,
+    courseId: data.courseId,
+  });
+}
 
-  revalidatePath('/dashboard');
-  return { id: file.id };
+revalidatePath('/dashboard');
+return { id: file.id };
 ```
 
 (`file.id` is in scope — the insert `.select('id').single()`. Dynamic `import()` of another `'use server'` module is fine.)
@@ -365,7 +396,11 @@ Then extend the bucket/path resolver in the `Promise.all` (lines 643-656):
 
 ```ts
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
-import { createAdminClient, TEST_USER_A, TEST_USER_B } from '@/test/supabase-client';
+import {
+  createAdminClient,
+  TEST_USER_A,
+  TEST_USER_B,
+} from '@/test/supabase-client';
 
 const admin = createAdminClient();
 const COURSE = '00000000-0000-0000-0000-0000000000aa';
@@ -376,28 +411,45 @@ describe('personal_file per-user embedding scoping', () => {
   beforeAll(async () => {
     await admin.from('content_embeddings').delete().eq('source_id', SRC);
     const { error } = await admin.from('content_embeddings').insert({
-      source_type: 'personal_file', source_id: SRC, segment_index: 0,
-      segment_text: 'secret note', embedding: vec(0.01),
-      user_id: TEST_USER_A.id, course_id: COURSE, source_name: 'a.pdf',
+      source_type: 'personal_file',
+      source_id: SRC,
+      segment_index: 0,
+      segment_text: 'secret note',
+      embedding: vec(0.01),
+      user_id: TEST_USER_A.id,
+      course_id: COURSE,
+      source_name: 'a.pdf',
     });
     expect(error).toBeNull();
   });
-  afterAll(async () => { await admin.from('content_embeddings').delete().eq('source_id', SRC); });
+  afterAll(async () => {
+    await admin.from('content_embeddings').delete().eq('source_id', SRC);
+  });
 
   it('owner (A) retrieves the personal_file', async () => {
     const { data } = await admin.rpc('match_embeddings', {
-      query_embedding: vec(0.01), match_user_id: TEST_USER_A.id,
-      match_course_id: COURSE, match_count: 8, similarity_threshold: 0,
+      query_embedding: vec(0.01),
+      match_user_id: TEST_USER_A.id,
+      match_course_id: COURSE,
+      match_count: 8,
+      similarity_threshold: 0,
     });
-    expect((data ?? []).some((r: { source_id: string }) => r.source_id === SRC)).toBe(true);
+    expect(
+      (data ?? []).some((r: { source_id: string }) => r.source_id === SRC),
+    ).toBe(true);
   });
 
   it("other user (B) cannot retrieve A's personal_file", async () => {
     const { data } = await admin.rpc('match_embeddings', {
-      query_embedding: vec(0.01), match_user_id: TEST_USER_B.id,
-      match_course_id: COURSE, match_count: 8, similarity_threshold: 0,
+      query_embedding: vec(0.01),
+      match_user_id: TEST_USER_B.id,
+      match_course_id: COURSE,
+      match_count: 8,
+      similarity_threshold: 0,
     });
-    expect((data ?? []).some((r: { source_id: string }) => r.source_id === SRC)).toBe(false);
+    expect(
+      (data ?? []).some((r: { source_id: string }) => r.source_id === SRC),
+    ).toBe(false);
   });
 });
 ```
@@ -418,26 +470,33 @@ describe('personal_file per-user embedding scoping', () => {
 - [ ] **Step 3:** Rewrite `openMaterialAsDocument` to read the course directly from `course_materials.course_id` (no week lookup):
 
 ```ts
-  // select course_id instead of week_id
-  const { data: material, error: matError } = await supabase
-    .from('course_materials')
-    .select('id, course_id, file_name, user_id')
-    .eq('id', materialId)
-    .single();
-  // ...ownership + existing checks unchanged...
+// select course_id instead of week_id
+const { data: material, error: matError } = await supabase
+  .from('course_materials')
+  .select('id, course_id, file_name, user_id')
+  .eq('id', materialId)
+  .single();
+// ...ownership + existing checks unchanged...
 
-  // (DELETE the `Resolve course_id from the week` block entirely)
+// (DELETE the `Resolve course_id from the week` block entirely)
 
-  const { data: doc, error } = await supabase
-    .from('documents')
-    .insert({
-      user_id: user.id, title, content: {}, pages: { pages },
-      subject: 'other', canvas_type: 'blank', folder_id: null,
-      course_id: material.course_id,   // was week?.course_id
-      material_id: materialId, position: 0,
-      // week_id removed
-    })
-    .select('id').single();
+const { data: doc, error } = await supabase
+  .from('documents')
+  .insert({
+    user_id: user.id,
+    title,
+    content: {},
+    pages: { pages },
+    subject: 'other',
+    canvas_type: 'blank',
+    folder_id: null,
+    course_id: material.course_id, // was week?.course_id
+    material_id: materialId,
+    position: 0,
+    // week_id removed
+  })
+  .select('id')
+  .single();
 ```
 
 - [ ] **Step 4:** Delete `createWeekDocument` entirely (lines 291-332) — its only caller was `week-section.tsx` (deleted in T14).
@@ -470,7 +529,9 @@ export interface SystemPromptContext {
 
 export function buildSystemPrompt(context: SystemPromptContext): string {
   const { courseName, hasDocumentContent } = context;
-  const courseContext = courseName ? `You are a tutor for **${courseName}**.` : 'You are a course tutor.';
+  const courseContext = courseName
+    ? `You are a tutor for **${courseName}**.`
+    : 'You are a course tutor.';
   const documentContext = hasDocumentContent
     ? `\n\n## STUDENT'S DOCUMENT\nThe student has shared their current document with you. When they ask about their own writing (e.g., "is my solution correct?"), refer to its content specifically.`
     : '';
@@ -544,7 +605,8 @@ git rm src/lib/actions/course-weeks.ts src/lib/queries/course-weeks.ts \
 export async function getPersonalFilesByCourse(courseId: string) {
   const supabase = await createClient();
   const { data } = await supabase
-    .from('personal_files').select('*')
+    .from('personal_files')
+    .select('*')
     .eq('course_id', courseId)
     .order('created_at', { ascending: true });
   return data ?? [];
@@ -569,43 +631,108 @@ import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 
 export type MoodleSectionDto = {
-  id: string; title: string;
-  files: Array<{ id: string; file_name: string; type: string; mime_type: string | null; file_size: number | null; href: string; isStored: boolean }>;
+  id: string;
+  title: string;
+  files: Array<{
+    id: string;
+    file_name: string;
+    type: string;
+    mime_type: string | null;
+    file_size: number | null;
+    href: string;
+    isStored: boolean;
+  }>;
 };
 
-export async function getMoodleMaterialsForCourse(courseId: string): Promise<MoodleSectionDto[]> {
+export async function getMoodleMaterialsForCourse(
+  courseId: string,
+): Promise<MoodleSectionDto[]> {
   const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
   if (!user) return [];
   const admin = createAdminClient();
-  const { data: sync } = await admin.from('user_course_syncs').select('moodle_course_id').eq('user_id', user.id).eq('course_id', courseId).maybeSingle();
+  const { data: sync } = await admin
+    .from('user_course_syncs')
+    .select('moodle_course_id')
+    .eq('user_id', user.id)
+    .eq('course_id', courseId)
+    .maybeSingle();
   if (!sync?.moodle_course_id) return [];
-  const { data: sections } = await admin.from('moodle_sections')
-    .select('id, title, position, moodle_files(id, file_name, type, moodle_url, storage_path, mime_type, file_size, position)')
-    .eq('course_id', sync.moodle_course_id).order('position');
-  type FileRow = { id: string; file_name: string; type: string; moodle_url: string; storage_path: string | null; mime_type: string | null; file_size: number | null; position: number };
-  type Sec = { id: string; title: string; position: number; moodle_files: FileRow[] };
-  const allFileIds = (sections ?? []).flatMap((s) => (s as Sec).moodle_files).filter((f) => f.storage_path).map((f) => f.id);
+  const { data: sections } = await admin
+    .from('moodle_sections')
+    .select(
+      'id, title, position, moodle_files(id, file_name, type, moodle_url, storage_path, mime_type, file_size, position)',
+    )
+    .eq('course_id', sync.moodle_course_id)
+    .order('position');
+  type FileRow = {
+    id: string;
+    file_name: string;
+    type: string;
+    moodle_url: string;
+    storage_path: string | null;
+    mime_type: string | null;
+    file_size: number | null;
+    position: number;
+  };
+  type Sec = {
+    id: string;
+    title: string;
+    position: number;
+    moodle_files: FileRow[];
+  };
+  const allFileIds = (sections ?? [])
+    .flatMap((s) => (s as Sec).moodle_files)
+    .filter((f) => f.storage_path)
+    .map((f) => f.id);
   let importedIds = new Set<string>();
   if (allFileIds.length > 0) {
-    const { data: imports } = await admin.from('user_file_imports').select('moodle_file_id').eq('user_id', user.id).eq('status', 'imported').in('moodle_file_id', allFileIds);
-    importedIds = new Set((imports ?? []).map((i: { moodle_file_id: string }) => i.moodle_file_id));
+    const { data: imports } = await admin
+      .from('user_file_imports')
+      .select('moodle_file_id')
+      .eq('user_id', user.id)
+      .eq('status', 'imported')
+      .in('moodle_file_id', allFileIds);
+    importedIds = new Set(
+      (imports ?? []).map((i: { moodle_file_id: string }) => i.moodle_file_id),
+    );
   }
   const visible = ((sections ?? []) as Sec[])
-    .map((s) => ({ ...s, moodle_files: s.moodle_files.filter((f) => f.storage_path && importedIds.has(f.id)) }))
+    .map((s) => ({
+      ...s,
+      moodle_files: s.moodle_files.filter(
+        (f) => f.storage_path && importedIds.has(f.id),
+      ),
+    }))
     .filter((s) => s.moodle_files.length > 0);
   const signed = new Map<string, string>();
-  await Promise.all(visible.flatMap((s) => s.moodle_files).map(async (f) => {
-    if (!f.storage_path) return;
-    const { data } = await admin.storage.from('moodle-materials').createSignedUrl(f.storage_path, 3600);
-    if (data?.signedUrl) signed.set(f.id, data.signedUrl);
-  }));
+  await Promise.all(
+    visible
+      .flatMap((s) => s.moodle_files)
+      .map(async (f) => {
+        if (!f.storage_path) return;
+        const { data } = await admin.storage
+          .from('moodle-materials')
+          .createSignedUrl(f.storage_path, 3600);
+        if (data?.signedUrl) signed.set(f.id, data.signedUrl);
+      }),
+  );
   return visible.map((s) => ({
-    id: s.id, title: s.title,
-    files: s.moodle_files.sort((a, b) => a.position - b.position).map((f) => ({
-      id: f.id, file_name: f.file_name, type: f.type, mime_type: f.mime_type,
-      file_size: f.file_size, href: signed.get(f.id) ?? f.moodle_url, isStored: signed.has(f.id),
-    })),
+    id: s.id,
+    title: s.title,
+    files: s.moodle_files
+      .sort((a, b) => a.position - b.position)
+      .map((f) => ({
+        id: f.id,
+        file_name: f.file_name,
+        type: f.type,
+        mime_type: f.mime_type,
+        file_size: f.file_size,
+        href: signed.get(f.id) ?? f.moodle_url,
+        isStored: signed.has(f.id),
+      })),
   }));
 }
 ```
@@ -616,7 +743,10 @@ export async function getMoodleMaterialsForCourse(courseId: string): Promise<Moo
 'use client';
 import { useState } from 'react';
 import { ChevronRight } from 'lucide-react';
-import { getMoodleMaterialsForCourse, type MoodleSectionDto } from '@/lib/actions/moodle-materials';
+import {
+  getMoodleMaterialsForCourse,
+  type MoodleSectionDto,
+} from '@/lib/actions/moodle-materials';
 import { MoodleFileRow } from './moodle-file-row';
 
 export function MoodleMaterialsSection({ courseId }: { courseId: string }) {
@@ -624,28 +754,54 @@ export function MoodleMaterialsSection({ courseId }: { courseId: string }) {
   const [sections, setSections] = useState<MoodleSectionDto[] | null>(null);
   const [loading, setLoading] = useState(false);
   async function toggle() {
-    const next = !open; setOpen(next);
+    const next = !open;
+    setOpen(next);
     if (next && sections === null && !loading) {
       setLoading(true);
-      try { setSections(await getMoodleMaterialsForCourse(courseId)); } finally { setLoading(false); }
+      try {
+        setSections(await getMoodleMaterialsForCourse(courseId));
+      } finally {
+        setLoading(false);
+      }
     }
   }
   return (
     <div className="mt-6">
-      <button onClick={toggle} className="mb-3 flex items-center gap-1 text-sm font-medium text-muted-foreground hover:text-foreground">
-        <ChevronRight className={`size-3.5 transition-transform ${open ? 'rotate-90' : ''}`} /> Moodle Materials
+      <button
+        onClick={toggle}
+        className="mb-3 flex items-center gap-1 text-sm font-medium text-muted-foreground hover:text-foreground"
+      >
+        <ChevronRight
+          className={`size-3.5 transition-transform ${open ? 'rotate-90' : ''}`}
+        />{' '}
+        Moodle Materials
       </button>
       {open && (
         <div className="space-y-3">
           {loading && <p className="text-sm text-muted-foreground">Loading…</p>}
-          {sections?.length === 0 && <p className="text-sm text-muted-foreground">No imported Moodle files.</p>}
+          {sections?.length === 0 && (
+            <p className="text-sm text-muted-foreground">
+              No imported Moodle files.
+            </p>
+          )}
           {sections?.map((section) => (
             <div key={section.id} className="rounded-lg border">
-              <div className="border-b bg-muted/30 px-4 py-2"><h3 className="text-sm font-medium">{section.title}</h3></div>
+              <div className="border-b bg-muted/30 px-4 py-2">
+                <h3 className="text-sm font-medium">{section.title}</h3>
+              </div>
               <div className="divide-y">
                 {section.files.map((f) => (
-                  <MoodleFileRow key={f.id} fileId={f.id} fileName={f.file_name} fileType={f.type}
-                    mimeType={f.mime_type} fileSize={f.file_size} href={f.href} isStored={f.isStored} courseId={courseId} />
+                  <MoodleFileRow
+                    key={f.id}
+                    fileId={f.id}
+                    fileName={f.file_name}
+                    fileType={f.type}
+                    mimeType={f.mime_type}
+                    fileSize={f.file_size}
+                    href={f.href}
+                    isStored={f.isStored}
+                    courseId={courseId}
+                  />
                 ))}
               </div>
             </div>
@@ -668,11 +824,24 @@ export function MoodleMaterialsSection({ courseId }: { courseId: string }) {
 - [ ] **Step 1: Rewrite `page.tsx`.** Drop all week imports/fetches and the inline Moodle block. Fetch in parallel:
 
 ```tsx
-const [{ data: documents }, { data: materials }, { data: personalFiles }] = await Promise.all([
-  supabase.from('documents').select('*').eq('course_id', courseId).order('position'),
-  supabase.from('course_materials').select('*').eq('course_id', courseId).order('created_at'),
-  supabase.from('personal_files').select('*').eq('course_id', courseId).order('created_at'),
-]);
+const [{ data: documents }, { data: materials }, { data: personalFiles }] =
+  await Promise.all([
+    supabase
+      .from('documents')
+      .select('*')
+      .eq('course_id', courseId)
+      .order('position'),
+    supabase
+      .from('course_materials')
+      .select('*')
+      .eq('course_id', courseId)
+      .order('created_at'),
+    supabase
+      .from('personal_files')
+      .select('*')
+      .eq('course_id', courseId)
+      .order('created_at'),
+  ]);
 ```
 
 Keep the existing `linkedFileIds` filter (hide personal files that have a linked document). Render flat sections: **Documents** (`DocumentListWithMove`), **Materials** — one grid combining legacy `course_materials` (rendered with `<MaterialItem>`) and `personal_files` (rendered with `<PersonalFileItem>`), then `<MoodleMaterialsSection courseId={courseId} />`. Header buttons: `AiChatWrapper`, `StartHomeworkDialog` (no `weeks` prop), `CreateDocumentDialog`, `PersonalFileUpload` (label "Import File"). Remove `<WeekDialog>`. Update the empty-state copy to not mention weeks.
@@ -681,7 +850,8 @@ Keep the existing `linkedFileIds` filter (hide personal files that have a linked
 
 ```tsx
 <p className="text-xs text-muted-foreground">
-  The AI always sees all your course materials — pinning just tells it what to focus on first.
+  The AI always sees all your course materials — pinning just tells it what to
+  focus on first.
 </p>
 ```
 
@@ -730,10 +900,15 @@ Run: `pnpm test && pnpm test:integration` → ALL PASS.
 import { test, expect } from '@playwright/test';
 import { login } from './helpers/auth';
 
-test('course page is flat: Materials section present, no Weeks heading', async ({ page }) => {
+test('course page is flat: Materials section present, no Weeks heading', async ({
+  page,
+}) => {
   await login(page);
   await page.goto('/dashboard');
-  await page.getByRole('link', { name: /CS101|<seeded course name>/i }).first().click();
+  await page
+    .getByRole('link', { name: /CS101|<seeded course name>/i })
+    .first()
+    .click();
   await expect(page.getByRole('heading', { name: 'Weeks' })).toHaveCount(0);
   await expect(page.getByRole('heading', { name: /Materials/i })).toBeVisible();
 });

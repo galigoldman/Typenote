@@ -275,4 +275,3 @@ export async function openMaterialAsDocument(
   revalidatePath('/dashboard');
   return { documentId: doc.id, created: true };
 }
-

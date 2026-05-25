@@ -176,7 +176,8 @@ export function StartHomeworkDialog({
               explain the questions.
             </p>
             <p className="text-xs text-muted-foreground">
-              The AI always sees all your course materials — pinning just tells it what to focus on first.
+              The AI always sees all your course materials — pinning just tells
+              it what to focus on first.
             </p>
             <div className="max-h-48 space-y-2 overflow-y-auto rounded-md border p-2">
               {/* Documents (excluding the selected exercise) */}
@@ -227,7 +228,9 @@ export function StartHomeworkDialog({
                           onChange={() => toggleMaterial(key)}
                           className="accent-primary"
                         />
-                        <span className="truncate">{mat.label ?? mat.file_name}</span>
+                        <span className="truncate">
+                          {mat.label ?? mat.file_name}
+                        </span>
                       </label>
                     );
                   })}

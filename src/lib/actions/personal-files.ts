@@ -44,7 +44,11 @@ export async function createPersonalFile(data: {
     data.mimeType.includes('presentationml');
   if (embeddable) {
     const { indexContent } = await import('@/lib/actions/ai-context');
-    void indexContent({ type: 'personal_file', fileId: file.id, courseId: data.courseId });
+    void indexContent({
+      type: 'personal_file',
+      fileId: file.id,
+      courseId: data.courseId,
+    });
   }
 
   revalidatePath('/dashboard');
