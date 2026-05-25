@@ -274,15 +274,6 @@ export default async function CoursePage({
             materials={allMaterials}
             personalFiles={[...allWeekPersonalFiles, ...coursePersonalFiles]}
             weeks={typedWeeks}
-            moodleSections={moodleSections.map((s) => ({
-              id: s.id,
-              title: s.title,
-              moodle_files: s.moodle_files.map((f) => ({
-                id: f.id,
-                file_name: f.file_name,
-                type: f.type,
-              })),
-            }))}
           >
             <Button variant="outline" size="sm">
               Start Homework

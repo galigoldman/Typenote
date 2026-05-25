@@ -206,15 +206,12 @@ export interface AiMessage {
 export type HomeworkMaterialType =
   | 'course_material'
   | 'personal_file'
-  | 'document'
-  | 'moodle_file';
+  | 'document';
 
 export interface HomeworkSession {
   id: string;
   document_id: string;
-  exercise_document_id: string | null;
-  exercise_type: HomeworkMaterialType | null;
-  exercise_id: string | null;
+  exercise_document_id: string;
   course_id: string;
   user_id: string;
   created_at: string;
@@ -230,7 +227,7 @@ export interface HomeworkSessionMaterial {
 
 export interface HomeworkContext {
   session: HomeworkSession;
-  exercise: { type: HomeworkMaterialType; id: string; name: string };
+  exerciseDocument: { id: string; title: string };
   materials: Array<{
     type: HomeworkMaterialType;
     id: string;

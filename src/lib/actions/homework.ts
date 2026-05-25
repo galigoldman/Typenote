@@ -2,7 +2,6 @@
 
 import { revalidatePath } from 'next/cache';
 
-import { createAdminClient } from '@/lib/supabase/admin';
 import { createClient } from '@/lib/supabase/server';
 import type {
   HomeworkContext,
@@ -12,58 +11,12 @@ import type {
 } from '@/types/database';
 
 // ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
-
-/** Resolve a display name for any material type */
-async function resolveMaterialName(
-  supabase: Awaited<ReturnType<typeof createClient>>,
-  type: HomeworkMaterialType,
-  id: string,
-): Promise<string> {
-  if (type === 'document') {
-    const { data } = await supabase
-      .from('documents')
-      .select('title')
-      .eq('id', id)
-      .single();
-    return data?.title ?? 'Unknown document';
-  }
-  if (type === 'course_material') {
-    const { data } = await supabase
-      .from('course_materials')
-      .select('file_name')
-      .eq('id', id)
-      .single();
-    return data?.file_name ?? 'Unknown material';
-  }
-  if (type === 'personal_file') {
-    const { data } = await supabase
-      .from('personal_files')
-      .select('display_name')
-      .eq('id', id)
-      .single();
-    return data?.display_name ?? 'Unknown file';
-  }
-  if (type === 'moodle_file') {
-    const admin = createAdminClient();
-    const { data } = await admin
-      .from('moodle_files')
-      .select('file_name')
-      .eq('id', id)
-      .single();
-    return data?.file_name ?? 'Unknown Moodle file';
-  }
-  return 'Unknown';
-}
-
-// ---------------------------------------------------------------------------
 // createHomeworkSession
 // ---------------------------------------------------------------------------
 
 export async function createHomeworkSession(data: {
   courseId: string;
-  exerciseRef: { type: HomeworkMaterialType; id: string };
+  exerciseDocumentId: string;
   materialRefs: Array<{ type: HomeworkMaterialType; id: string }>;
 }): Promise<{ documentId: string; sessionId: string }> {
   const supabase = await createClient();
@@ -81,12 +34,15 @@ export async function createHomeworkSession(data: {
     .single();
   if (courseErr || !course) throw new Error('Course not found');
 
-  // Resolve exercise name for the document title
-  const exerciseName = await resolveMaterialName(
-    supabase,
-    data.exerciseRef.type,
-    data.exerciseRef.id,
-  );
+  // Validate exercise document belongs to user and is in this course
+  const { data: exercise, error: exErr } = await supabase
+    .from('documents')
+    .select('id, title')
+    .eq('id', data.exerciseDocumentId)
+    .eq('user_id', user.id)
+    .eq('course_id', data.courseId)
+    .single();
+  if (exErr || !exercise) throw new Error('Exercise document not found');
 
   // Create the homework document
   const { data: doc, error: docErr } = await supabase
@@ -95,7 +51,7 @@ export async function createHomeworkSession(data: {
       user_id: user.id,
       course_id: data.courseId,
       purpose: 'homework' as const,
-      title: `HW — ${exerciseName}`,
+      title: `HW — ${exercise.title}`,
       content: {},
       subject: 'other' as const,
       canvas_type: 'blank' as const,
@@ -105,16 +61,12 @@ export async function createHomeworkSession(data: {
   if (docErr || !doc)
     throw new Error(docErr?.message ?? 'Failed to create document');
 
-  // Create the homework session with polymorphic exercise reference
-  const exerciseDocId =
-    data.exerciseRef.type === 'document' ? data.exerciseRef.id : null;
+  // Create the homework session
   const { data: session, error: sessionErr } = await supabase
     .from('homework_sessions')
     .insert({
       document_id: doc.id,
-      exercise_document_id: exerciseDocId,
-      exercise_type: data.exerciseRef.type,
-      exercise_id: data.exerciseRef.id,
+      exercise_document_id: data.exerciseDocumentId,
       course_id: data.courseId,
       user_id: user.id,
     })
@@ -163,21 +115,12 @@ export async function getHomeworkContext(data: {
 
   const typedSession = session as HomeworkSession;
 
-  // Resolve exercise name using the polymorphic reference
-  const exerciseType =
-    typedSession.exercise_type ??
-    (typedSession.exercise_document_id ? 'document' : null);
-  const exerciseId =
-    typedSession.exercise_id ?? typedSession.exercise_document_id;
-
-  let exerciseName = 'Exercise unavailable';
-  if (exerciseType && exerciseId) {
-    exerciseName = await resolveMaterialName(
-      supabase,
-      exerciseType as HomeworkMaterialType,
-      exerciseId,
-    );
-  }
+  // Fetch exercise document title
+  const { data: exerciseDoc } = await supabase
+    .from('documents')
+    .select('id, title')
+    .eq('id', typedSession.exercise_document_id)
+    .single();
 
   // Fetch session materials
   const { data: materialsData } = await supabase
@@ -191,21 +134,40 @@ export async function getHomeworkContext(data: {
   // Resolve display names for each material
   const materials: HomeworkContext['materials'] = [];
   for (const mat of typedMaterials) {
-    const name = await resolveMaterialName(
-      supabase,
-      mat.material_type,
-      mat.material_id,
-    );
+    let name = 'Unknown material';
+    if (mat.material_type === 'course_material') {
+      const { data: cm } = await supabase
+        .from('course_materials')
+        .select('file_name')
+        .eq('id', mat.material_id)
+        .single();
+      if (cm) name = cm.file_name;
+    } else if (mat.material_type === 'personal_file') {
+      const { data: pf } = await supabase
+        .from('personal_files')
+        .select('display_name')
+        .eq('id', mat.material_id)
+        .single();
+      if (pf) name = pf.display_name;
+    } else if (mat.material_type === 'document') {
+      const { data: d } = await supabase
+        .from('documents')
+        .select('title')
+        .eq('id', mat.material_id)
+        .single();
+      if (d) name = d.title;
+    }
     materials.push({ type: mat.material_type, id: mat.material_id, name });
   }
 
   return {
     session: typedSession,
-    exercise: {
-      type: (exerciseType as HomeworkMaterialType) ?? 'document',
-      id: exerciseId ?? '',
-      name: exerciseName,
-    },
+    exerciseDocument: exerciseDoc
+      ? { id: exerciseDoc.id, title: exerciseDoc.title }
+      : {
+          id: typedSession.exercise_document_id,
+          title: 'Exercise unavailable',
+        },
     materials,
   };
 }
