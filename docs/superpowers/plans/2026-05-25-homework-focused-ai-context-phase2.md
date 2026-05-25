@@ -220,12 +220,9 @@ git commit -m "feat(homework): resolve moodle_file names in getHomeworkContext"
 
 - [ ] **Step 1: Write the failing unit test**
 
-Create `src/lib/ai/__tests__/prompts.test.ts` (or append if it exists):
+`src/lib/ai/__tests__/prompts.test.ts` **already exists** (it has `describe('buildSystemPrompt')` + `describe('buildLatexPrompt')` blocks asserting strings like `'You are a course tutor.'`, `STUDENT'S DOCUMENT`, `'- Material Name: brief description of what was referenced'`). **APPEND a new `describe` block with Edit — do NOT overwrite the file with Write** (that would delete the existing tests). The Task 3 Step 3 prompt rewrite preserves every string the existing tests assert, so they must stay green. Add (`describe`/`it`/`expect` are already imported at the top of the file):
 
 ```ts
-import { describe, it, expect } from 'vitest';
-import { buildSystemPrompt } from '@/lib/ai/prompts';
-
 describe('buildSystemPrompt — homework mode', () => {
   it('omits homework section when not in homework mode', () => {
     const p = buildSystemPrompt({ courseName: 'CS101', hasDocumentContent: false });
@@ -765,6 +762,11 @@ Then add a test (adjust imports to match the file's existing style — it alread
 
 ```ts
 import { resolveHomeworkContext } from '@/lib/ai/homework-context';
+// NOTE: this file ALREADY mocks '@/lib/ai/prompts' (buildSystemPrompt returns a
+// fixed string), so we must NOT assert on systemPrompt content here — that is
+// Task 3's job. Instead assert that buildAiContext asked buildSystemPrompt for
+// homework mode (call args) and that the homework text landed in `contents`.
+import { buildSystemPrompt } from '@/lib/ai/prompts';
 
 describe('buildAiContext — homework injection', () => {
   it('injects the exercise + pins and flags homeworkContextUsed when documentId is a homework doc', async () => {
@@ -775,7 +777,7 @@ describe('buildAiContext — homework injection', () => {
       pinnedNames: ['Lecture 1'],
     });
 
-    const { contents, systemPrompt, homeworkContextUsed } = await buildAiContext({
+    const { contents, homeworkContextUsed } = await buildAiContext({
       question: 'what is q1?',
       courseId: undefined, // skip RAG to isolate homework injection
       documentId: 'hw-doc-1',
@@ -783,7 +785,15 @@ describe('buildAiContext — homework injection', () => {
     });
 
     expect(homeworkContextUsed).toBe(true);
-    expect(systemPrompt).toMatch(/HOMEWORK SESSION/);
+    // buildSystemPrompt is mocked in this file — assert the call args, not the
+    // returned string.
+    expect(vi.mocked(buildSystemPrompt)).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        isHomeworkMode: true,
+        exerciseName: 'Problem Set 1',
+        pinnedMaterialNames: ['Lecture 1'],
+      }),
+    );
     const flat = JSON.stringify(contents);
     expect(flat).toContain('EXERCISE BODY TEXT');
     expect(flat).toContain('PINNED BODY TEXT');
@@ -791,18 +801,20 @@ describe('buildAiContext — homework injection', () => {
 
   it('does not inject homework context for a non-homework document', async () => {
     vi.mocked(resolveHomeworkContext).mockResolvedValueOnce(null);
-    const { homeworkContextUsed, systemPrompt } = await buildAiContext({
+    const { homeworkContextUsed } = await buildAiContext({
       question: 'hi',
       documentId: 'normal-doc',
       mode: 'quick',
     });
     expect(homeworkContextUsed).toBe(false);
-    expect(systemPrompt).not.toMatch(/HOMEWORK SESSION/);
+    expect(vi.mocked(buildSystemPrompt)).toHaveBeenLastCalledWith(
+      expect.objectContaining({ isHomeworkMode: false }),
+    );
   });
 });
 ```
 
-> The existing `ai-context.test.ts` mocks `getAuthUserId`/Supabase; ensure those mocks cover `buildAiContext` (it calls `getAuthUserId()` and `createClient()`/`createAdminClient()`). Reuse whatever scaffolding the file already has for `searchContext`.
+> The existing `ai-context.test.ts` (verified) mocks `@/lib/ai/prompts` (so `buildSystemPrompt` returns a fixed string — hence the call-args assertions above), and mocks `getAuthUserId`/`createClient`/`createAdminClient`/`searchContext`. Reuse that scaffolding. Ensure the file's `beforeEach` clears mocks (or the `toHaveBeenLastCalledWith` assertions stay correct because we check the LAST call). Do NOT remove the `@/lib/ai/prompts` mock — homework prompt-string behavior is covered by Task 3.
 
 - [ ] **Step 2: Run it to verify it fails**
 
@@ -1369,8 +1381,8 @@ test.describe('Homework-focused AI context', () => {
     await expect(chip).toBeVisible({ timeout: 10_000 });
     await expect(chip).toContainText('Problem Set 1');
 
-    // Open the AI tutor and ask about the exercise
-    await page.getByRole('button', { name: /AI|Ask AI|Tutor/i }).first().click();
+    // Open the AI tutor (floating bubble has aria-label "Open AI chat")
+    await page.getByRole('button', { name: /open ai chat/i }).first().click();
     await expect(page.getByText('AI Tutor')).toBeVisible({ timeout: 5_000 });
 
     const input = page.locator('input[placeholder*="about your course materials"]');
