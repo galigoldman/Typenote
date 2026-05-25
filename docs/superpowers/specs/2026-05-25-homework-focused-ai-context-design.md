@@ -12,8 +12,8 @@ Feature `046-homework-ai-context` shipped a "Start Homework" flow: a student pic
 exercise + reference materials and gets a new homework document. But it is **half-built**:
 
 - `getHomeworkContext()` is fully implemented yet **never called** — the AI has zero
-  awareness of the exercise or the chosen materials. The commit said *"AI context
-  injection will be handled in a separate issue."* This is that issue.
+  awareness of the exercise or the chosen materials. The commit said _"AI context
+  injection will be handled in a separate issue."_ This is that issue.
 - The app still organizes everything around **`course_weeks`**, a concept we no longer
   want. Weeks thread through 6 tables and ~6 UI components and make the course page
   slow and confusing.
@@ -31,10 +31,10 @@ exercise + reference materials and gets a new homework document. But it is **hal
 2. **One "Materials" concept.** Moodle or manual — it's all "course material," and it is
    **always embedded on upload**.
 3. **Per-user, per-course AI scoping (hard requirement).** Every user's AI answers from
-   *their own* materials in *this* course — never another user's files, even in a shared
+   _their own_ materials in _this_ course — never another user's files, even in a shared
    Moodle course.
 4. **A persisted "Homework" object.** Homework is a first-class, **saved** concept that
-   *links* a working document to an exercise + specific materials. These links are
+   _links_ a working document to an exercise + specific materials. These links are
    **references, not ownership**: the same exercise or material can back many homeworks,
    the materials remain independent course content, and removing/unpinning never deletes
    them. The link exists purely to give the AI **better context** — nothing is exclusive
@@ -44,13 +44,13 @@ exercise + reference materials and gets a new homework document. But it is **hal
    restricted** to them — it still searches all the student's course materials and may
    use its own knowledge.
 6. **Make it clear & discoverable.** Terminology "Homework"; the materials step must
-   communicate that pinning *focuses* the AI, it does not *block* anything.
+   communicate that pinning _focuses_ the AI, it does not _block_ anything.
 7. **Faster course page.** Load the minimum on first paint; lazy-load Moodle.
 
 ## 3. Non-goals
 
 - Merging `personal_files` and `course_materials` into a single physical table (risky FK
-  churn on `documents.personal_file_id`). We unify the *concept* and *embedding/scoping*,
+  churn on `documents.personal_file_id`). We unify the _concept_ and _embedding/scoping_,
   not the storage tables.
 - Embedding the student's own documents for cross-document RAG (the current document and
   the exercise are injected directly; that is enough).
@@ -63,6 +63,7 @@ exercise + reference materials and gets a new homework document. But it is **hal
 ### 4.1 Data model — flatten weeks away
 
 **Drop:**
+
 - `course_weeks` table.
 - `context_cache_registry` table + `get_week_file_refs()` RPC — confirmed dead (no live
   AI path references them).
@@ -70,14 +71,15 @@ exercise + reference materials and gets a new homework document. But it is **hal
 **Re-parent to the course (forward-only migration).** Note `course_materials` has **no
 `course_id` today** — only `week_id NOT NULL` — so we add it.
 
-| Table | Today | After |
-|---|---|---|
-| `course_materials` | `week_id NOT NULL`, no `course_id` | **add `course_id`** (FK→courses), backfill `course_id = week.course_id`, set NOT NULL, drop `week_id` |
-| `documents` | `week_id` nullable (FK→course_weeks) | drop `week_id` + drop `chk_week_requires_course` |
-| `personal_files` | `week_id` nullable (FK→course_weeks) | drop `week_id` |
-| `content_embeddings` | `week_id` (FK→course_weeks) | drop `week_id` |
+| Table                | Today                                | After                                                                                                 |
+| -------------------- | ------------------------------------ | ----------------------------------------------------------------------------------------------------- |
+| `course_materials`   | `week_id NOT NULL`, no `course_id`   | **add `course_id`** (FK→courses), backfill `course_id = week.course_id`, set NOT NULL, drop `week_id` |
+| `documents`          | `week_id` nullable (FK→course_weeks) | drop `week_id` + drop `chk_week_requires_course`                                                      |
+| `personal_files`     | `week_id` nullable (FK→course_weeks) | drop `week_id`                                                                                        |
+| `content_embeddings` | `week_id` (FK→course_weeks)          | drop `week_id`                                                                                        |
 
 **Migration ordering (must be exact, or `DROP TABLE course_weeks` fails on dependent FKs):**
+
 1. `ALTER course_materials ADD course_id`; backfill from `course_weeks`; `SET NOT NULL`.
 2. Drop index `course_materials_week_idx (week_id, category)`; create `(course_id, category)`.
 3. Drop the `week_id` columns/FKs on `course_materials`, `documents`, `personal_files`,
@@ -106,6 +108,7 @@ Any **RLS policy** referencing `week_id` is rewritten to the `course_id`/`user_i
   any legacy `course_materials`, behind **one "Import File" button**.
 
 **Embedding pipeline changes (`indexContent` / `IndexSource`):**
+
 - Add `{ type: 'personal_file'; fileId; courseId }` to `IndexSource`.
 - Call `indexContent(...)` from the personal-file import action (fire-and-forget, same as
   Moodle).
@@ -115,7 +118,7 @@ Any **RLS policy** referencing `week_id` is rewritten to the `course_id`/`user_i
 
 **Per-user scoping — leak guard (security-critical).** `match_embeddings` is `LANGUAGE sql
 STABLE` (not `SECURITY DEFINER`), so `content_embeddings` RLS still applies; the RPC's
-`(ce.user_id = match_user_id OR ce.user_id IS NULL)` clause exists only so *shared*
+`(ce.user_id = match_user_id OR ce.user_id IS NULL)` clause exists only so _shared_
 `moodle_file` rows (`user_id IS NULL`) pass. **`personal_file` and `course_material`
 embeddings MUST be inserted with a non-null `user_id`** — otherwise that NULL clause would
 leak one user's material to everyone in the course. We enforce this with a DB `CHECK`
@@ -125,7 +128,7 @@ Moodle course).
 
 **Embed timing / failure (best-effort, graceful).** Embedding runs async and may use
 Gemini for PDF text extraction (slow, rate-limited). The window where a file is imported
-but not yet embedded only affects **Tier 3 RAG** for *other* questions — it does **not**
+but not yet embedded only affects **Tier 3 RAG** for _other_ questions — it does **not**
 affect a pinned material, because Tiers 1–2 inject the file's extracted text directly
 (independent of embeddings). Failures are logged and retriable via the existing
 `reindexCourse` path; we surface a lightweight "indexing…" state in the Materials list.
@@ -148,8 +151,9 @@ right shape and we keep them (they have no `week_id`, so the flatten doesn't tou
   files / documents / moodle files.
 
 **Semantics (important):**
+
 - **References, not ownership.** The exercise and pinned materials are normal course
-  content that exists independently. A homework only *points at* them.
+  content that exists independently. A homework only _points at_ them.
 - **Non-exclusive / reusable.** The same exercise or material can be referenced by many
   homeworks. Pinning a material to homework A does not remove it from the course or from
   homework B, and does not hide it from the AI in any other context.
@@ -162,6 +166,7 @@ right shape and we keep them (they have no `week_id`, so the flatten doesn't tou
 
 **Plumbing (net-new — the client is homework-unaware today).** Nothing currently threads
 the open document's id or homework status to the chat. We:
+
 1. On the document page (server), call `getHomeworkContext({ documentId })`; if it returns
    a session, pass `homeworkSessionId` + the resolved context down through
    `DocumentWithAi → AiChatWrapper → AiChatPanel`.
@@ -173,15 +178,16 @@ Server builds **tiered** context:
 
 1. **Tier 1 — Exercise (always injected):** the exercise's extracted text.
 2. **Tier 2 — Pinned materials (always injected):** each pinned material's extracted text.
-   Labeled *"Materials the student marked as most relevant."*
+   Labeled _"Materials the student marked as most relevant."_
 3. **Tier 3 — Everything else (RAG):** semantic search over **all the user's course
    materials** (course_materials + personal_files + moodle_files), exactly as today.
 4. **Plus** the student's current document content (existing behavior).
 
 **Text extraction per source type (B1 — the hard part).** The exercise and pinned items
 are polymorphic; each type needs its own extraction path, all **server-side**:
+
 - `document` — documents store **ProseMirror/TipTap JSON** (`pages`/`content` JSONB), not
-  text, and the only existing extractor walks *live browser editors*. We add a **new
+  text, and the only existing extractor walks _live browser editors_. We add a **new
   server-side `extractDocumentText(doc)`** that walks the stored JSON and concatenates text
   nodes. **This is the common case** (today every exercise is a document), so it is
   required, not optional.
@@ -199,8 +205,9 @@ injected. Tier 3 keeps the existing top-k.
 `indexContent` so Tier 3 also covers it (Tiers 1–2 don't depend on embeddings).
 
 **System prompt (`buildSystemPrompt`)** gains a homework mode:
+
 - When `isHomeworkMode`, instruct the AI: ground answers in the exercise + pinned material
-  *first*, but **freely use other course materials and your own knowledge**; **tutor** the
+  _first_, but **freely use other course materials and your own knowledge**; **tutor** the
   student (guide, explain, hint) rather than just handing over the full solution.
 - Drop the now-dead `"- Week X — Material Name"` citation format → `"- Material Name: …"`.
 
@@ -212,17 +219,17 @@ Non-homework documents keep today's behavior unchanged (RAG + current document).
   File" button), **Moodle** (collapsed, lazy-loaded). The **"Start Homework"** button stays
   prominent.
 - **Start Homework dialog (rewrite — it currently groups materials by week):**
-  - Step 1 — *"Which exercise are you working on?"* (required).
-  - Step 2 — *"Pin the most relevant materials (optional)"* with the line:
-    *"The AI always sees all your course materials — pinning just tells it what to focus on
-    first."* This directly defuses the "does it block other docs?" fear.
+  - Step 1 — _"Which exercise are you working on?"_ (required).
+  - Step 2 — _"Pin the most relevant materials (optional)"_ with the line:
+    _"The AI always sees all your course materials — pinning just tells it what to focus on
+    first."_ This directly defuses the "does it block other docs?" fear.
   - Both steps list materials **flat** (no week sections) across all types: documents,
     materials (course_materials + personal_files), and Moodle files. `moodle_file` becomes
     a first-class pinnable type (and `getHomeworkContext` is extended to resolve its name
     from `moodle_files`, which it does not do today).
 - **Inside a homework doc:** a small **"Homework context" chip/strip** showing the exercise
-  + pinned materials, so the student *sees* what the AI is focused on. This is what finally
-  consumes `getHomeworkContext()`.
+  - pinned materials, so the student _sees_ what the AI is focused on. This is what finally
+    consumes `getHomeworkContext()`.
 
 ### 4.6 Performance
 
@@ -282,7 +289,7 @@ row is orphaned. Local dev seed (`supabase/seed.sql`) updated to the flat model.
 ## 7. Shipping plan (one spec, reviewable phases)
 
 Implemented together (as requested). The review showed Phases 1 and 3 are coupled — the
-Start Homework dialog groups by week, so flattening *forces* the dialog rewrite — so we use
+Start Homework dialog groups by week, so flattening _forces_ the dialog rewrite — so we use
 **two** honest, independently-testable phases rather than three:
 
 1. **Phase 1 — Flat model + unified, embedded Materials + perf.** Migration (re-parent,
@@ -290,11 +297,11 @@ Start Homework dialog groups by week, so flattening *forces* the dialog rewrite 
    the Start Homework dialog to a flat material list; retire `importMoodleFile`; embed
    `personal_files` on import with the non-null `user_id` guard; one Materials list + one
    import button; parallelize the page + lazy-load Moodle; rewrite seed + broken tests.
-   *Exit:* course page works on the flat model, every import is embedded + per-user scoped.
+   _Exit:_ course page works on the flat model, every import is embedded + per-user scoped.
 2. **Phase 2 — Homework AI context.** `extractDocumentText` + per-type extraction;
    `documentId`/`homeworkSessionId` plumbing through the chat; server-side session resolve;
    tiered injection + token budget; homework system-prompt mode; homework-context chip;
-   extend `getHomeworkContext` for `moodle_file`. *Exit:* AI answers a homework doc with the
+   extend `getHomeworkContext` for `moodle_file`. _Exit:_ AI answers a homework doc with the
    exercise + pinned materials prioritized, all other materials still reachable.
 
 Each phase is a PR to `dev`; CI (lint/format/unit/integration/build/E2E) must pass.
@@ -308,7 +315,7 @@ Each phase is a PR to `dev`; CI (lint/format/unit/integration/build/E2E) must pa
   `user_id`. Mitigated by DB `CHECK` + a targeted RLS/RPC integration test (§4.2, §6).
 - **Migration ordering** — dependent FKs must drop before `DROP TABLE course_weeks`
   (§4.1). Backfill is total by construction; we still assert zero-null before `SET NOT
-  NULL`.
+NULL`.
 - **Token budget** — large pinned PDFs/exercise. Mitigated by per-source cap + max pinned
   count + total Tier-1+2 budget with RAG fallback (§4.4).
 - **Blast radius** — ~29 source files + seed + ~12 test suites reference weeks; all must be

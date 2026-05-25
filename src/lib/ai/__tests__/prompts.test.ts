@@ -47,7 +47,9 @@ describe('buildSystemPrompt', () => {
 
   it('cites materials with name-colon format', () => {
     const prompt = buildSystemPrompt({ hasDocumentContent: false });
-    expect(prompt).toContain('- Material Name: brief description of what was referenced');
+    expect(prompt).toContain(
+      '- Material Name: brief description of what was referenced',
+    );
   });
 });
 

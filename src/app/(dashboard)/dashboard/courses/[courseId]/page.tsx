@@ -20,7 +20,12 @@ import {
   BreadcrumbPage,
   BreadcrumbSeparator,
 } from '@/components/ui/breadcrumb';
-import type { Course, CourseMaterial, Document, PersonalFile } from '@/types/database';
+import type {
+  Course,
+  CourseMaterial,
+  Document,
+  PersonalFile,
+} from '@/types/database';
 
 export default async function CoursePage({
   params,
@@ -76,8 +81,10 @@ export default async function CoursePage({
     ]);
 
   const typedDocuments = (documentsResult.data as Document[] | null) ?? [];
-  const courseMaterials = (materialsResult.data as CourseMaterial[] | null) ?? [];
-  const personalFilesRaw = (personalFilesResult.data as PersonalFile[] | null) ?? [];
+  const courseMaterials =
+    (materialsResult.data as CourseMaterial[] | null) ?? [];
+  const personalFilesRaw =
+    (personalFilesResult.data as PersonalFile[] | null) ?? [];
   const parentFolder = folderResult.data ?? null;
 
   // Hide personal files that already have a linked document
@@ -199,7 +206,6 @@ export default async function CoursePage({
               </div>
             </div>
           )}
-
         </>
       )}
 

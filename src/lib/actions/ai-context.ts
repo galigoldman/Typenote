@@ -178,14 +178,30 @@ export async function indexContent(source: IndexSource): Promise<IndexResult> {
       sourceId = source.materialId;
       courseId = source.courseId;
       const { data: matRow, error: matErr } = await supabase
-        .from('course_materials').select('storage_path, file_name, mime_type')
-        .eq('id', source.materialId).single();
-      if (matErr || !matRow) return { success: false, segmentsIndexed: 0, skipped: false, error: 'Course material not found' };
+        .from('course_materials')
+        .select('storage_path, file_name, mime_type')
+        .eq('id', source.materialId)
+        .single();
+      if (matErr || !matRow)
+        return {
+          success: false,
+          segmentsIndexed: 0,
+          skipped: false,
+          error: 'Course material not found',
+        };
       sourceName = matRow.file_name;
       mimeType = matRow.mime_type ?? 'application/octet-stream';
       storageBucket = 'course-materials';
-      const { data: fileData, error: dlErr } = await supabase.storage.from(storageBucket).download(matRow.storage_path);
-      if (dlErr || !fileData) return { success: false, segmentsIndexed: 0, skipped: false, error: 'Failed to download course material' };
+      const { data: fileData, error: dlErr } = await supabase.storage
+        .from(storageBucket)
+        .download(matRow.storage_path);
+      if (dlErr || !fileData)
+        return {
+          success: false,
+          segmentsIndexed: 0,
+          skipped: false,
+          error: 'Failed to download course material',
+        };
       fileBuffer = Buffer.from(await fileData.arrayBuffer());
     } else {
       const supabase = await createClient();
@@ -194,14 +210,30 @@ export async function indexContent(source: IndexSource): Promise<IndexResult> {
       sourceId = source.fileId;
       courseId = source.courseId;
       const { data: fileRow, error: fileErr } = await supabase
-        .from('personal_files').select('storage_path, file_name, mime_type')
-        .eq('id', source.fileId).single();
-      if (fileErr || !fileRow) return { success: false, segmentsIndexed: 0, skipped: false, error: 'Personal file not found' };
+        .from('personal_files')
+        .select('storage_path, file_name, mime_type')
+        .eq('id', source.fileId)
+        .single();
+      if (fileErr || !fileRow)
+        return {
+          success: false,
+          segmentsIndexed: 0,
+          skipped: false,
+          error: 'Personal file not found',
+        };
       sourceName = fileRow.file_name;
       mimeType = fileRow.mime_type ?? 'application/octet-stream';
       storageBucket = 'personal-files';
-      const { data: fileData, error: dlErr } = await supabase.storage.from(storageBucket).download(fileRow.storage_path);
-      if (dlErr || !fileData) return { success: false, segmentsIndexed: 0, skipped: false, error: 'Failed to download personal file' };
+      const { data: fileData, error: dlErr } = await supabase.storage
+        .from(storageBucket)
+        .download(fileRow.storage_path);
+      if (dlErr || !fileData)
+        return {
+          success: false,
+          segmentsIndexed: 0,
+          skipped: false,
+          error: 'Failed to download personal file',
+        };
       fileBuffer = Buffer.from(await fileData.arrayBuffer());
     }
 
@@ -582,7 +614,9 @@ export async function buildAiContext(params: QuestionParams): Promise<{
   const materialIds = sourceIds
     .filter((s) => s.sourceType === 'course_material')
     .map((s) => s.sourceId);
-  const personalIds = sourceIds.filter((s) => s.sourceType === 'personal_file').map((s) => s.sourceId);
+  const personalIds = sourceIds
+    .filter((s) => s.sourceType === 'personal_file')
+    .map((s) => s.sourceId);
 
   const admin = createAdminClient();
   const moodlePaths: Record<string, string> = {};
@@ -611,18 +645,32 @@ export async function buildAiContext(params: QuestionParams): Promise<{
     }
   }
   if (personalIds.length > 0) {
-    const { data } = await supabase.from('personal_files').select('id, storage_path').in('id', personalIds);
-    for (const row of (data ?? []) as { id: string; storage_path: string }[]) personalPaths[row.id] = row.storage_path;
+    const { data } = await supabase
+      .from('personal_files')
+      .select('id, storage_path')
+      .in('id', personalIds);
+    for (const row of (data ?? []) as { id: string; storage_path: string }[])
+      personalPaths[row.id] = row.storage_path;
   }
 
   await Promise.all(
     sourceIds.map(async ({ sourceId, sourceType, idx }) => {
-      const bucket = sourceType === 'moodle_file' ? 'moodle-materials'
-        : sourceType === 'course_material' ? 'course-materials'
-        : sourceType === 'personal_file' ? 'personal-files' : null;
-      const path = sourceType === 'moodle_file' ? moodlePaths[sourceId]
-        : sourceType === 'course_material' ? materialPaths[sourceId]
-        : sourceType === 'personal_file' ? personalPaths[sourceId] : null;
+      const bucket =
+        sourceType === 'moodle_file'
+          ? 'moodle-materials'
+          : sourceType === 'course_material'
+            ? 'course-materials'
+            : sourceType === 'personal_file'
+              ? 'personal-files'
+              : null;
+      const path =
+        sourceType === 'moodle_file'
+          ? moodlePaths[sourceId]
+          : sourceType === 'course_material'
+            ? materialPaths[sourceId]
+            : sourceType === 'personal_file'
+              ? personalPaths[sourceId]
+              : null;
       if (!bucket || !path) return;
       const client = bucket === 'moodle-materials' ? admin : supabase;
       const { data } = await client.storage
