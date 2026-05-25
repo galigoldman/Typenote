@@ -2,6 +2,7 @@
 
 import { revalidatePath } from 'next/cache';
 
+import { createAdminClient } from '@/lib/supabase/admin';
 import { createClient } from '@/lib/supabase/server';
 import type {
   HomeworkContext,
@@ -156,6 +157,16 @@ export async function getHomeworkContext(data: {
         .eq('id', mat.material_id)
         .single();
       if (d) name = d.title;
+    } else if (mat.material_type === 'moodle_file') {
+      // Moodle files are shared (user_id null on embeddings); read via admin
+      // so RLS on the shared registry never hides the display name.
+      const admin = createAdminClient();
+      const { data: mf } = await admin
+        .from('moodle_files')
+        .select('file_name')
+        .eq('id', mat.material_id)
+        .single();
+      if (mf) name = mf.file_name;
     }
     materials.push({ type: mat.material_type, id: mat.material_id, name });
   }
@@ -165,7 +176,7 @@ export async function getHomeworkContext(data: {
     exerciseDocument: exerciseDoc
       ? { id: exerciseDoc.id, title: exerciseDoc.title }
       : {
-          id: typedSession.exercise_document_id,
+          id: typedSession.exercise_document_id ?? '',
           title: 'Exercise unavailable',
         },
     materials,
