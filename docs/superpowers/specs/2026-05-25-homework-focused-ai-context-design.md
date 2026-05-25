@@ -33,13 +33,19 @@ exercise + reference materials and gets a new homework document. But it is **hal
 3. **Per-user, per-course AI scoping (hard requirement).** Every user's AI answers from
    *their own* materials in *this* course — never another user's files, even in a shared
    Moodle course.
-4. **Wire up Homework-focused AI context.** When a student works in a homework doc, the
+4. **A persisted "Homework" object.** Homework is a first-class, **saved** concept that
+   *links* a working document to an exercise + specific materials. These links are
+   **references, not ownership**: the same exercise or material can back many homeworks,
+   the materials remain independent course content, and removing/unpinning never deletes
+   them. The link exists purely to give the AI **better context** — nothing is exclusive
+   to one homework.
+5. **Wire up Homework-focused AI context.** When a student works in a homework doc, the
    AI knows the exercise and the pinned materials, **prioritizes** them, but is **not
    restricted** to them — it still searches all the student's course materials and may
    use its own knowledge.
-5. **Make it clear & discoverable.** Terminology "Homework"; the materials step must
+6. **Make it clear & discoverable.** Terminology "Homework"; the materials step must
    communicate that pinning *focuses* the AI, it does not *block* anything.
-6. **Faster course page.** Load the minimum on first paint; lazy-load Moodle.
+7. **Faster course page.** Load the minimum on first paint; lazy-load Moodle.
 
 ## 3. Non-goals
 
@@ -93,7 +99,30 @@ course before we drop the column).
   `ce.user_id = match_user_id` (per-user). Existing `course_material` (user-scoped) and
   `moodle_file` (whitelist-scoped) branches are unchanged except for dropping `week_id`.
 
-### 4.3 AI context — Homework-aware (prioritize, don't restrict)
+### 4.3 The Homework object (persisted, non-exclusive references)
+
+The existing `homework_sessions` + `homework_session_materials` tables are exactly the
+right shape and we keep them (they have no `week_id`, so the flatten doesn't touch them):
+
+- `homework_sessions` — links one **working document** to an **exercise** (polymorphic:
+  document / course_material / personal_file / moodle_file) + the course + the user. Saved
+  once at creation; reopening the doc restores the context.
+- `homework_session_materials` — the **pinned materials**: a polymorphic junction
+  (`material_type` + `material_id`, **no FK**) pointing at course materials / personal
+  files / documents / moodle files.
+
+**Semantics (important):**
+- **References, not ownership.** The exercise and pinned materials are normal course
+  content that exists independently. A homework only *points at* them.
+- **Non-exclusive / reusable.** The same exercise or material can be referenced by many
+  homeworks. Pinning a material to homework A does not remove it from the course or from
+  homework B, and does not hide it from the AI in any other context.
+- **Durable but loosely coupled.** Because the junction has no FK, deleting an underlying
+  material leaves a dangling reference; `getHomeworkContext()` already degrades gracefully
+  (shows "Unknown material" and skips it). The flatten migration preserves all references
+  because row `id`s are unchanged when we re-parent materials to `course_id`.
+
+### 4.4 AI context — Homework-aware (prioritize, don't restrict)
 
 Client sends `homeworkSessionId` to `/api/ai/ask` when the open document is a homework doc.
 Server resolves the session (`getHomeworkContext`) and builds **tiered** context:
@@ -122,7 +151,7 @@ covers it.
 
 Non-homework documents keep today's behavior unchanged (RAG + current document).
 
-### 4.4 UI / UX
+### 4.5 UI / UX
 
 - **Course page:** flat sections — **Documents**, **Materials** (one list, one "Import
   File" button), **Moodle** (collapsed, lazy-loaded). The **"Start Homework"** button stays
@@ -136,7 +165,7 @@ Non-homework documents keep today's behavior unchanged (RAG + current document).
   + pinned materials, so the student *sees* what the AI is focused on. This is what finally
   consumes `getHomeworkContext()`.
 
-### 4.5 Performance
+### 4.6 Performance
 
 - **Parallelize** the course-page queries with `Promise.all` (course, documents, materials,
   imports) instead of ~12 sequential awaits.
@@ -144,7 +173,7 @@ Non-homework documents keep today's behavior unchanged (RAG + current document).
   first paint. Load them via a server action only when the user expands the Moodle section.
   This removes the per-file signed-URL loop from the hot path.
 
-### 4.6 Migration & data safety
+### 4.7 Migration & data safety
 
 Weeks are intentionally discarded (confirmed). The migration re-parents
 materials/documents/files to `course_id`, then drops `course_weeks`,
@@ -208,6 +237,8 @@ Each phase is a PR to `dev`; CI (lint/format/unit/integration/build/E2E) must pa
 ## 9. Resolved decisions
 
 - Terminology: **Homework** (keeps `homework_sessions` table; no rename).
+- Homework is a **persisted object** that **references** (does not own) an exercise +
+  materials; references are **non-exclusive/reusable** and exist only to improve AI context.
 - AI behavior: **prioritize, don't restrict.**
 - Materials: **one concept**, Moodle + manual, **always embedded**, **per-user scoped**.
 - Weeks: **removed for good** (no data preservation needed).
