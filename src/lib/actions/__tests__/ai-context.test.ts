@@ -192,7 +192,6 @@ describe('indexContent', () => {
       type: 'course_material',
       materialId: 'mat-1',
       courseId: 'course-1',
-      weekId: 'week-1',
     });
 
     expect(result.success).toBe(true);
@@ -216,7 +215,6 @@ describe('indexContent', () => {
       type: 'course_material',
       materialId: 'mat-1',
       courseId: 'course-1',
-      weekId: 'week-1',
     });
 
     expect(result.success).toBe(true);
@@ -255,7 +253,6 @@ describe('searchContext', () => {
         page_start: null,
         page_end: null,
         course_id: 'course-1',
-        week_id: 'week-5',
         mime_type: 'application/pdf',
         similarity: 0.92,
       },
@@ -323,7 +320,6 @@ describe('askQuestion', () => {
         page_start: null,
         page_end: null,
         course_id: 'course-1',
-        week_id: 'week-1',
         mime_type: 'application/pdf',
         similarity: 0.85,
       },
@@ -372,7 +368,6 @@ describe('buildAiContext attaches signedUrl to sources', () => {
         page_start: null,
         page_end: null,
         course_id: 'moodle-course-1',
-        week_id: null,
         mime_type: 'application/pdf',
         similarity: 0.9,
       },

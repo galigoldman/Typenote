@@ -30,7 +30,6 @@ const FIXTURES = {
     folderId: '7e000000-0000-0000-0000-00000000000a',
     docId: '7e000000-0000-0000-0000-00000000001a',
     courseId: '7e000000-0000-0000-0000-00000000002a',
-    weekId: '7e000000-0000-0000-0000-00000000003a',
     materialId: '7e000000-0000-0000-0000-00000000004a',
     conversationId: '7e000000-0000-0000-0000-00000000005a',
     messageId: '7e000000-0000-0000-0000-00000000006a',
@@ -41,7 +40,6 @@ const FIXTURES = {
     folderId: '7e000000-0000-0000-0000-00000000000b',
     docId: '7e000000-0000-0000-0000-00000000001b',
     courseId: '7e000000-0000-0000-0000-00000000002b',
-    weekId: '7e000000-0000-0000-0000-00000000003b',
     materialId: '7e000000-0000-0000-0000-00000000004b',
     conversationId: '7e000000-0000-0000-0000-00000000005b',
     messageId: '7e000000-0000-0000-0000-00000000006b',
@@ -140,14 +138,6 @@ describe('RLS isolation — cross-user access', () => {
       .from('courses')
       .select()
       .eq('id', FIXTURES.b.courseId);
-    expect(data ?? []).toHaveLength(0);
-  });
-
-  it('User A cannot read User B course_weeks', async () => {
-    const { data } = await clientA
-      .from('course_weeks')
-      .select()
-      .eq('id', FIXTURES.b.weekId);
     expect(data ?? []).toHaveLength(0);
   });
 
@@ -252,17 +242,9 @@ async function seedFor(userId: string, ids: Fixtures): Promise<void> {
     position: 0,
   });
 
-  await admin.from('course_weeks').insert({
-    id: ids.weekId,
-    course_id: ids.courseId,
-    user_id: userId,
-    week_number: 1,
-    topic: 'RLS Test Week',
-  });
-
   await admin.from('course_materials').insert({
     id: ids.materialId,
-    week_id: ids.weekId,
+    course_id: ids.courseId,
     user_id: userId,
     category: 'material',
     storage_path: `${userId}/rls-test.pdf`,
@@ -318,7 +300,6 @@ async function cleanupFixtures(): Promise<void> {
   await admin.from('ai_conversations').delete().in('id', ids);
   await admin.from('personal_files').delete().in('id', ids);
   await admin.from('course_materials').delete().in('id', ids);
-  await admin.from('course_weeks').delete().in('id', ids);
   await admin.from('documents').delete().in('id', ids);
   await admin.from('courses').delete().in('id', ids);
   await admin.from('folders').delete().in('id', ids);

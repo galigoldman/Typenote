@@ -15,7 +15,6 @@ const mockDocument: Document = {
   user_id: 'user-1',
   folder_id: null,
   course_id: null,
-  week_id: null,
   material_id: null,
   personal_file_id: null,
   purpose: null,
