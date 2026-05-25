@@ -20,7 +20,6 @@ import type {
   Document,
   CourseMaterial,
   PersonalFile,
-  CourseWeek,
   HomeworkMaterialType,
 } from '@/types/database';
 
@@ -29,7 +28,6 @@ interface StartHomeworkDialogProps {
   documents: Document[];
   materials: CourseMaterial[];
   personalFiles: PersonalFile[];
-  weeks: CourseWeek[];
   children: React.ReactNode;
 }
 
@@ -38,7 +36,6 @@ export function StartHomeworkDialog({
   documents,
   materials,
   personalFiles,
-  weeks,
   children,
 }: StartHomeworkDialogProps) {
   const router = useRouter();
@@ -102,9 +99,6 @@ export function StartHomeworkDialog({
     setSelectedMaterials(new Set());
     setError(null);
   }
-
-  // Group materials by week for display
-  const weekMap = new Map(weeks.map((w) => [w.id, w]));
 
   return (
     <Dialog
@@ -181,6 +175,9 @@ export function StartHomeworkDialog({
               homework is based on. The AI will read their content to help
               explain the questions.
             </p>
+            <p className="text-xs text-muted-foreground">
+              The AI always sees all your course materials — pinning just tells it what to focus on first.
+            </p>
             <div className="max-h-48 space-y-2 overflow-y-auto rounded-md border p-2">
               {/* Documents (excluding the selected exercise) */}
               {documents.filter((d) => d.id !== selectedExercise).length >
@@ -211,36 +208,31 @@ export function StartHomeworkDialog({
                 </div>
               )}
 
-              {/* Course materials grouped by week */}
-              {weeks.map((week) => {
-                const weekMats = materials.filter((m) => m.week_id === week.id);
-                if (weekMats.length === 0) return null;
-                return (
-                  <div key={week.id}>
-                    <p className="mb-1 text-xs font-medium text-muted-foreground">
-                      Week {week.week_number}
-                      {week.topic ? ` — ${week.topic}` : ''}
-                    </p>
-                    {weekMats.map((mat) => {
-                      const key = `course_material:${mat.id}`;
-                      return (
-                        <label
-                          key={key}
-                          className="flex cursor-pointer items-center gap-2 rounded px-2 py-1 text-sm hover:bg-accent"
-                        >
-                          <input
-                            type="checkbox"
-                            checked={selectedMaterials.has(key)}
-                            onChange={() => toggleMaterial(key)}
-                            className="accent-primary"
-                          />
-                          <span className="truncate">{mat.file_name}</span>
-                        </label>
-                      );
-                    })}
-                  </div>
-                );
-              })}
+              {/* Course materials — flat list */}
+              {materials.length > 0 && (
+                <div>
+                  <p className="mb-1 text-xs font-medium text-muted-foreground">
+                    Course Materials
+                  </p>
+                  {materials.map((mat) => {
+                    const key = `course_material:${mat.id}`;
+                    return (
+                      <label
+                        key={key}
+                        className="flex cursor-pointer items-center gap-2 rounded px-2 py-1 text-sm hover:bg-accent"
+                      >
+                        <input
+                          type="checkbox"
+                          checked={selectedMaterials.has(key)}
+                          onChange={() => toggleMaterial(key)}
+                          className="accent-primary"
+                        />
+                        <span className="truncate">{mat.label ?? mat.file_name}</span>
+                      </label>
+                    );
+                  })}
+                </div>
+              )}
 
               {/* Personal files */}
               {personalFiles.length > 0 && (
