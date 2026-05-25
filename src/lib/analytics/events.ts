@@ -40,6 +40,10 @@ type AnalyticsEventMap = {
     file_id: string;
     course_id: string;
   };
+  homework_context_used: {
+    course_id: string | undefined;
+    pinned_count: number;
+  };
 };
 
 export type AnalyticsEventName = keyof AnalyticsEventMap;
