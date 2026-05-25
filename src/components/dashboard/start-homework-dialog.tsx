@@ -24,23 +24,12 @@ import type {
   HomeworkMaterialType,
 } from '@/types/database';
 
-interface MoodleSectionForDialog {
-  id: string;
-  title: string;
-  moodle_files: Array<{
-    id: string;
-    file_name: string;
-    type: string;
-  }>;
-}
-
 interface StartHomeworkDialogProps {
   courseId: string;
   documents: Document[];
   materials: CourseMaterial[];
   personalFiles: PersonalFile[];
   weeks: CourseWeek[];
-  moodleSections: MoodleSectionForDialog[];
   children: React.ReactNode;
 }
 
@@ -50,12 +39,10 @@ export function StartHomeworkDialog({
   materials,
   personalFiles,
   weeks,
-  moodleSections,
   children,
 }: StartHomeworkDialogProps) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
-  // exercise key: "document:<id>" or "moodle_file:<id>" or "course_material:<id>"
   const [selectedExercise, setSelectedExercise] = useState<string | null>(null);
   const [selectedMaterials, setSelectedMaterials] = useState<Set<string>>(
     new Set(),
@@ -63,73 +50,7 @@ export function StartHomeworkDialog({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Build a flat list of all selectable items for the exercise picker
-  const exerciseItems: Array<{
-    key: string;
-    label: string;
-    group: string;
-  }> = [];
-
-  // Documents
-  for (const doc of documents) {
-    exerciseItems.push({
-      key: `document:${doc.id}`,
-      label: doc.title,
-      group: 'Documents',
-    });
-  }
-
-  // Course materials (uploaded PDFs in weeks)
-  for (const mat of materials) {
-    exerciseItems.push({
-      key: `course_material:${mat.id}`,
-      label: mat.file_name,
-      group: 'Course Materials',
-    });
-  }
-
-  // Moodle files
-  for (const section of moodleSections) {
-    for (const file of section.moodle_files) {
-      if (file.type === 'file') {
-        exerciseItems.push({
-          key: `moodle_file:${file.id}`,
-          label: file.file_name,
-          group: section.title,
-        });
-      }
-    }
-  }
-
-  // Personal files
-  for (const pf of personalFiles) {
-    exerciseItems.push({
-      key: `personal_file:${pf.id}`,
-      label: pf.display_name,
-      group: 'Your Files',
-    });
-  }
-
-  const hasItems = exerciseItems.length > 0;
-
-  // Group exercise items by group for display
-  const exerciseGroups = new Map<string, typeof exerciseItems>();
-  for (const item of exerciseItems) {
-    const group = exerciseGroups.get(item.group) ?? [];
-    group.push(item);
-    exerciseGroups.set(item.group, group);
-  }
-
-  // Material items: same as exercise items but excluding the selected exercise
-  const materialItems = exerciseItems.filter(
-    (item) => item.key !== selectedExercise,
-  );
-  const materialGroups = new Map<string, typeof materialItems>();
-  for (const item of materialItems) {
-    const group = materialGroups.get(item.group) ?? [];
-    group.push(item);
-    materialGroups.set(item.group, group);
-  }
+  const hasDocuments = documents.length > 0;
 
   function toggleMaterial(key: string) {
     setSelectedMaterials((prev) => {
@@ -140,7 +61,10 @@ export function StartHomeworkDialog({
     });
   }
 
-  function parseKey(key: string): { type: HomeworkMaterialType; id: string } {
+  function parseMaterialKey(key: string): {
+    type: HomeworkMaterialType;
+    id: string;
+  } {
     const [type, id] = key.split(':') as [HomeworkMaterialType, string];
     return { type, id };
   }
@@ -151,11 +75,10 @@ export function StartHomeworkDialog({
     setError(null);
 
     try {
-      const exerciseRef = parseKey(selectedExercise);
-      const materialRefs = Array.from(selectedMaterials).map(parseKey);
+      const materialRefs = Array.from(selectedMaterials).map(parseMaterialKey);
       const result = await createHomeworkSession({
         courseId,
-        exerciseRef,
+        exerciseDocumentId: selectedExercise,
         materialRefs,
       });
 
@@ -179,6 +102,9 @@ export function StartHomeworkDialog({
     setSelectedMaterials(new Set());
     setError(null);
   }
+
+  // Group materials by week for display
+  const weekMap = new Map(weeks.map((w) => [w.id, w]));
 
   return (
     <Dialog
@@ -208,47 +134,40 @@ export function StartHomeworkDialog({
               <BookOpen className="size-4" />
               1. Select the Exercise
             </Label>
-            <p className="-mt-1 text-xs text-muted-foreground">
+            <p className="text-xs text-muted-foreground -mt-1">
               Pick the homework or problem set you want to work on.
             </p>
-            {hasItems ? (
-              <div className="max-h-48 space-y-2 overflow-y-auto rounded-md border p-2">
-                {Array.from(exerciseGroups.entries()).map(([group, items]) => (
-                  <div key={group}>
-                    <p className="mb-1 text-xs font-medium text-muted-foreground">
-                      {group}
-                    </p>
-                    {items.map((item) => (
-                      <label
-                        key={item.key}
-                        className={`flex cursor-pointer items-center gap-2 rounded px-2 py-1.5 text-sm transition-colors ${
-                          selectedExercise === item.key
-                            ? 'bg-primary/10 text-primary'
-                            : 'hover:bg-accent'
-                        }`}
-                      >
-                        <input
-                          type="radio"
-                          name="exercise"
-                          value={item.key}
-                          checked={selectedExercise === item.key}
-                          onChange={() => setSelectedExercise(item.key)}
-                          className="accent-primary"
-                        />
-                        <span className="truncate">{item.label}</span>
-                      </label>
-                    ))}
-                  </div>
+            {hasDocuments ? (
+              <div className="max-h-40 space-y-1 overflow-y-auto rounded-md border p-2">
+                {documents.map((doc) => (
+                  <label
+                    key={doc.id}
+                    className={`flex cursor-pointer items-center gap-2 rounded px-2 py-1.5 text-sm transition-colors ${
+                      selectedExercise === doc.id
+                        ? 'bg-primary/10 text-primary'
+                        : 'hover:bg-accent'
+                    }`}
+                  >
+                    <input
+                      type="radio"
+                      name="exercise"
+                      value={doc.id}
+                      checked={selectedExercise === doc.id}
+                      onChange={() => setSelectedExercise(doc.id)}
+                      className="accent-primary"
+                    />
+                    <span className="truncate">{doc.title}</span>
+                  </label>
                 ))}
               </div>
             ) : (
               <p className="rounded-md border border-dashed p-3 text-center text-sm text-muted-foreground">
-                No documents or materials found in this course.
+                Create a document first to use as the exercise.
               </p>
             )}
           </div>
 
-          {/* Step 2: Materials picker */}
+          {/* Step 2: Materials picker — always visible */}
           <div className="grid gap-2">
             <Label className="flex items-center gap-1.5">
               <FileText className="size-4" />
@@ -257,40 +176,98 @@ export function StartHomeworkDialog({
                 (you can select multiple)
               </span>
             </Label>
-            <p className="-mt-1 text-xs text-muted-foreground">
-              Choose the lectures, recitations, notes, or any material that this
+            <p className="text-xs text-muted-foreground -mt-1">
+              Choose the lectures, recitations, notes, or any document that this
               homework is based on. The AI will read their content to help
               explain the questions.
             </p>
-            {materialItems.length > 0 ? (
-              <div className="max-h-48 space-y-2 overflow-y-auto rounded-md border p-2">
-                {Array.from(materialGroups.entries()).map(([group, items]) => (
-                  <div key={group}>
+            <div className="max-h-48 space-y-2 overflow-y-auto rounded-md border p-2">
+              {/* Documents (excluding the selected exercise) */}
+              {documents.filter((d) => d.id !== selectedExercise).length >
+                0 && (
+                <div>
+                  <p className="mb-1 text-xs font-medium text-muted-foreground">
+                    Documents
+                  </p>
+                  {documents
+                    .filter((d) => d.id !== selectedExercise)
+                    .map((doc) => {
+                      const key = `document:${doc.id}`;
+                      return (
+                        <label
+                          key={key}
+                          className="flex cursor-pointer items-center gap-2 rounded px-2 py-1 text-sm hover:bg-accent"
+                        >
+                          <input
+                            type="checkbox"
+                            checked={selectedMaterials.has(key)}
+                            onChange={() => toggleMaterial(key)}
+                            className="accent-primary"
+                          />
+                          <span className="truncate">{doc.title}</span>
+                        </label>
+                      );
+                    })}
+                </div>
+              )}
+
+              {/* Course materials grouped by week */}
+              {weeks.map((week) => {
+                const weekMats = materials.filter((m) => m.week_id === week.id);
+                if (weekMats.length === 0) return null;
+                return (
+                  <div key={week.id}>
                     <p className="mb-1 text-xs font-medium text-muted-foreground">
-                      {group}
+                      Week {week.week_number}
+                      {week.topic ? ` — ${week.topic}` : ''}
                     </p>
-                    {items.map((item) => (
+                    {weekMats.map((mat) => {
+                      const key = `course_material:${mat.id}`;
+                      return (
+                        <label
+                          key={key}
+                          className="flex cursor-pointer items-center gap-2 rounded px-2 py-1 text-sm hover:bg-accent"
+                        >
+                          <input
+                            type="checkbox"
+                            checked={selectedMaterials.has(key)}
+                            onChange={() => toggleMaterial(key)}
+                            className="accent-primary"
+                          />
+                          <span className="truncate">{mat.file_name}</span>
+                        </label>
+                      );
+                    })}
+                  </div>
+                );
+              })}
+
+              {/* Personal files */}
+              {personalFiles.length > 0 && (
+                <div>
+                  <p className="mb-1 text-xs font-medium text-muted-foreground">
+                    Your Files
+                  </p>
+                  {personalFiles.map((pf) => {
+                    const key = `personal_file:${pf.id}`;
+                    return (
                       <label
-                        key={item.key}
+                        key={key}
                         className="flex cursor-pointer items-center gap-2 rounded px-2 py-1 text-sm hover:bg-accent"
                       >
                         <input
                           type="checkbox"
-                          checked={selectedMaterials.has(item.key)}
-                          onChange={() => toggleMaterial(item.key)}
+                          checked={selectedMaterials.has(key)}
+                          onChange={() => toggleMaterial(key)}
                           className="accent-primary"
                         />
-                        <span className="truncate">{item.label}</span>
+                        <span className="truncate">{pf.display_name}</span>
                       </label>
-                    ))}
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <p className="rounded-md border border-dashed p-3 text-center text-sm text-muted-foreground">
-                Select an exercise first to see available materials.
-              </p>
-            )}
+                    );
+                  })}
+                </div>
+              )}
+            </div>
             {selectedMaterials.size > 0 && (
               <p className="text-xs text-primary">
                 {selectedMaterials.size} material
