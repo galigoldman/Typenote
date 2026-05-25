@@ -20,18 +20,16 @@ import {
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
-import type {
-  Document,
-  CourseMaterial,
-  PersonalFile,
-  HomeworkMaterialType,
-} from '@/types/database';
+import type { HomeworkMaterialType } from '@/types/database';
 
+// Minimal projections — the dialog only displays names. Passing full rows
+// (documents carry heavy content/pages JSONB) bloats the client-component
+// RSC payload and, on client-side navigation, drops the DialogTrigger child.
 interface StartHomeworkDialogProps {
   courseId: string;
-  documents: Document[];
-  materials: CourseMaterial[];
-  personalFiles: PersonalFile[];
+  documents: Array<{ id: string; title: string }>;
+  materials: Array<{ id: string; label: string | null; file_name: string }>;
+  personalFiles: Array<{ id: string; display_name: string }>;
   children: React.ReactNode;
 }
 

@@ -1,14 +1,13 @@
 import { test, expect } from '@playwright/test';
 import { login } from './helpers/auth';
+import { goToSeededCourse } from './helpers/navigate';
 
 // Seeded homework document (supabase/seed.sql): a homework_sessions row links
 // this doc to the exercise "Problem Set 1: Variables" and pins the course
 // material "Lecture 1: Intro to Programming". Opening the doc directly
-// exercises the real homework-context feature (server-resolved chip + AI
-// plumbing) without depending on the course page, whose Start Homework dialog
-// is flaky in CI (see ai-chat.spec.ts). The Gemini call is mocked, so no
-// GOOGLE_GENERATIVE_AI_API_KEY is needed — the context-building logic itself
-// is covered by unit + integration tests.
+// exercises the homework-context chip + AI plumbing. The Gemini call is mocked,
+// so no GOOGLE_GENERATIVE_AI_API_KEY is needed — the context-building logic
+// itself is covered by unit + integration tests.
 const HOMEWORK_DOC_URL =
   '/dashboard/documents/20000000-0000-0000-0000-000000000011';
 
@@ -106,5 +105,42 @@ test.describe('Homework-focused AI context', () => {
     await expect(
       page.getByText('mutable vs immutable types', { exact: false }),
     ).toBeVisible({ timeout: 10_000 });
+  });
+
+  // Regression: the course page passed full document rows (heavy content/pages
+  // JSONB) to the StartHomeworkDialog client component. On client-side
+  // navigation that bloated RSC payload dropped the dialog's trigger button, so
+  // "Start Homework" silently disappeared on any course that had documents.
+  // This drives the real flow via client-side nav (clicking the course link).
+  test('start homework from the course page (client-side nav) creates a session', async ({
+    page,
+  }) => {
+    test.setTimeout(60_000);
+
+    // beforeEach already logged in and left us on /dashboard.
+    await goToSeededCourse(page); // client-side navigation — the broken path
+
+    // The trigger must be present after a soft navigation to a populated course.
+    await page.getByRole('button', { name: /start homework/i }).click();
+    await expect(page.getByRole('dialog')).toBeVisible({ timeout: 5_000 });
+
+    // Pick the seeded exercise document, then start.
+    await page
+      .getByRole('dialog')
+      .getByText('Problem Set 1: Variables', { exact: false })
+      .first()
+      .click();
+    await page.getByRole('button', { name: /^start$/i }).click();
+
+    // Navigates to the freshly created homework document with the context chip.
+    await expect(page).toHaveURL(/\/dashboard\/documents\//, {
+      timeout: 15_000,
+    });
+    await expect(page.getByTestId('homework-context')).toBeVisible({
+      timeout: 10_000,
+    });
+    await expect(page.getByTestId('homework-context')).toContainText(
+      'Problem Set 1: Variables',
+    );
   });
 });
