@@ -921,8 +921,6 @@ export function useSelection({
           };
 
           const selectedStrokes: Stroke[] = [];
-          const selectedTbIds: string[] = [];
-          const selectedTbs: TextBox[] = [];
 
           // Hit-test strokes
           for (const stroke of strokes) {
