@@ -1,12 +1,12 @@
 'use client';
 
 import { useState } from 'react';
-import { useRouter } from 'next/navigation';
 import { FileText, Loader2, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { createClient } from '@/lib/supabase/client';
 import { openMaterialAsDocument } from '@/lib/actions/documents';
 import { deleteCourseMaterial } from '@/lib/actions/course-materials';
+import { useTabs } from '@/contexts/tabs-context';
 import { toast } from 'sonner';
 import type { CourseMaterial } from '@/types/database';
 
@@ -29,7 +29,7 @@ async function getPdfPageCount(signedUrl: string): Promise<number> {
 }
 
 export function MaterialItem({ material }: MaterialItemProps) {
-  const router = useRouter();
+  const { openTab } = useTabs();
   const [opening, setOpening] = useState(false);
   const [deleting, setDeleting] = useState(false);
 
@@ -63,7 +63,7 @@ export function MaterialItem({ material }: MaterialItemProps) {
       const result = await openMaterialAsDocument(material.id, pageCount);
 
       // Navigate to the document
-      router.push(`/dashboard/documents/${result.documentId}`);
+      openTab(result.documentId, material.file_name.replace(/\.[^.]+$/, ''));
     } catch {
       toast.error('Failed to open material');
       setOpening(false);

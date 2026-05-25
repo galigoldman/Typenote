@@ -12,6 +12,7 @@ import { usePathname, useRouter } from 'next/navigation';
 import { ArrowLeft, Home, Menu } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetTitle } from '@/components/ui/sheet';
+import { TabBar } from '@/components/tabs/tab-bar';
 import { useMediaQuery } from '@/hooks/use-media-query';
 import { useSwipeDrawer } from '@/hooks/use-swipe-drawer';
 import { VisuallyHidden } from 'radix-ui';
@@ -227,6 +228,7 @@ export function SidebarLayout({ sidebar, children }: SidebarLayoutProps) {
             isDocumentPage ? 'overflow-hidden' : 'overflow-y-auto'
           }`}
         >
+          {isDocumentPage && <TabBar />}
           {children}
         </main>
       </div>
