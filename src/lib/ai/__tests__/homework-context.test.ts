@@ -15,23 +15,29 @@ import {
 // Minimal chainable mock: each .from(table) returns a thenable query whose
 // terminal .maybeSingle() resolves to the configured row, plus a storage stub.
 function makeClient(opts: {
-  rows: Record<string, unknown>;          // keyed by table name -> single row
-  lists?: Record<string, unknown[]>;      // keyed by table name -> array (for .eq without maybeSingle)
-  download?: () => { data: { arrayBuffer: () => Promise<ArrayBuffer> } | null; error: unknown };
+  rows: Record<string, unknown>; // keyed by table name -> single row
+  lists?: Record<string, unknown[]>; // keyed by table name -> array (for .eq without maybeSingle)
+  download?: () => {
+    data: { arrayBuffer: () => Promise<ArrayBuffer> } | null;
+    error: unknown;
+  };
 }) {
   const client = {
     from(table: string) {
       const builder = {
         _table: table,
-        select() { return builder; },
-        eq() { return builder; },
+        select() {
+          return builder;
+        },
+        eq() {
+          return builder;
+        },
         maybeSingle: async () => ({ data: opts.rows[table] ?? null }),
         then: undefined as unknown,
       };
       // Make `await builder` (no maybeSingle) resolve to a list result
-      (builder as unknown as { then: (r: (v: unknown) => void) => void }).then = (
-        resolve,
-      ) => resolve({ data: opts.lists?.[table] ?? [] });
+      (builder as unknown as { then: (r: (v: unknown) => void) => void }).then =
+        (resolve) => resolve({ data: opts.lists?.[table] ?? [] });
       return builder;
     },
     storage: {
@@ -65,7 +71,15 @@ describe('resolveHomeworkContext', () => {
         homework_sessions: { id: 's1', exercise_document_id: 'ex1' },
         documents: {
           title: 'PS1',
-          content: { type: 'doc', content: [{ type: 'paragraph', content: [{ type: 'text', text: 'Hello exercise' }] }] },
+          content: {
+            type: 'doc',
+            content: [
+              {
+                type: 'paragraph',
+                content: [{ type: 'text', text: 'Hello exercise' }],
+              },
+            ],
+          },
         },
       },
       lists: { homework_session_materials: [] },
@@ -80,10 +94,16 @@ describe('resolveHomeworkContext', () => {
     const c = makeClient({
       rows: {
         homework_sessions: { id: 's1', exercise_document_id: null },
-        course_materials: { file_name: 'Lecture 1', storage_path: 'p/x.pdf', mime_type: 'application/pdf' },
+        course_materials: {
+          file_name: 'Lecture 1',
+          storage_path: 'p/x.pdf',
+          mime_type: 'application/pdf',
+        },
       },
       lists: {
-        homework_session_materials: [{ material_type: 'course_material', material_id: 'm1' }],
+        homework_session_materials: [
+          { material_type: 'course_material', material_id: 'm1' },
+        ],
       },
     });
     const ctx = await resolveHomeworkContext(c, c, 'hw1');
@@ -95,10 +115,16 @@ describe('resolveHomeworkContext', () => {
     const c = makeClient({
       rows: {
         homework_sessions: { id: 's1', exercise_document_id: null },
-        personal_files: { display_name: 'My Notes', storage_path: 'p/y.pdf', mime_type: 'application/pdf' },
+        personal_files: {
+          display_name: 'My Notes',
+          storage_path: 'p/y.pdf',
+          mime_type: 'application/pdf',
+        },
       },
       lists: {
-        homework_session_materials: [{ material_type: 'personal_file', material_id: 'm2' }],
+        homework_session_materials: [
+          { material_type: 'personal_file', material_id: 'm2' },
+        ],
       },
       download: () => ({ data: null, error: new Error('not found') }),
     });

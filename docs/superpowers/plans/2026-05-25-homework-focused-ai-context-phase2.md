@@ -14,7 +14,7 @@
 
 ## Context every implementer needs
 
-**This is Phase 2 of `docs/superpowers/specs/2026-05-25-homework-focused-ai-context-design.md` (read §4.4–§4.5, §6).** Phase 1 already: flattened weeks away, unified Materials, embeds every import per-user, and created the `homework_sessions` / `homework_session_materials` tables + `createHomeworkSession` / `getHomeworkContext` actions + the flat Start Homework dialog. Phase 2 makes the AI actually *use* the homework context.
+**This is Phase 2 of `docs/superpowers/specs/2026-05-25-homework-focused-ai-context-design.md` (read §4.4–§4.5, §6).** Phase 1 already: flattened weeks away, unified Materials, embeds every import per-user, and created the `homework_sessions` / `homework_session_materials` tables + `createHomeworkSession` / `getHomeworkContext` actions + the flat Start Homework dialog. Phase 2 makes the AI actually _use_ the homework context.
 
 **Key existing pieces (verified, do not recreate):**
 
@@ -50,35 +50,36 @@ Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>
 
 ## File structure (created / modified)
 
-| File | Responsibility | Tasks |
-| --- | --- | --- |
-| `src/types/database.ts` | Add `moodle_file` to `HomeworkMaterialType`; sync `HomeworkSession` polymorphic exercise columns | T1 |
-| `src/lib/actions/homework.ts` | Extend `getHomeworkContext` to resolve `moodle_file` names | T2 |
-| `src/lib/ai/prompts.ts` | `buildSystemPrompt` homework mode | T3 |
-| `src/lib/ai/homework-context.ts` (NEW) | `resolveHomeworkContext(supabase, admin, documentId)` — tiered text extraction + budgets + graceful degradation | T4, T5 |
-| `src/lib/ai/__tests__/homework-context.test.ts` (NEW) | Unit: tiering, caps, budget, degradation, moodle-via-admin | T4 |
-| `src/lib/ai/homework-context.integration.test.ts` (NEW) | Integration: real seeded exercise text + graceful pinned failure | T5 |
-| `src/lib/ai/__tests__/prompts.test.ts` (NEW/extend) | Unit: homework-mode prompt | T3 |
-| `src/lib/actions/ai-context.ts` | `buildAiContext`: resolve homework, inject Tiers 1–2, return `homeworkContextUsed` | T6 |
-| `src/lib/actions/__tests__/ai-context.test.ts` | Unit: `documentId` triggers homework injection | T6 |
-| `src/app/api/ai/ask/route.ts` | Forward `homeworkContextUsed` in the `sources` SSE event | T7 |
-| `src/lib/analytics/events.ts` | Add `homework_context_used` event | T8 |
-| `src/components/ai/ai-chat-panel.tsx` | `documentId` prop → POST body; fire `homework_context_used` | T9 |
-| `src/components/ai/ai-chat-wrapper.tsx` | Thread `documentId` | T9 |
-| `src/components/ai/document-with-ai.tsx` | Pass `documentId={document.id}` | T9 |
-| `src/components/editor/tiptap-editor-with-versions.tsx` | Pass `documentId={document.id}` | T9 |
-| `src/components/dashboard/homework-context-chip.tsx` (NEW) | Presentational "Homework context" strip | T10 |
-| `src/components/dashboard/__tests__/homework-context-chip.test.tsx` (NEW) | Unit: chip renders exercise + pinned names | T10 |
-| `src/app/(dashboard)/dashboard/documents/[docId]/page.tsx` | Fetch `getHomeworkContext`, render chip | T10 |
-| `src/components/dashboard/start-homework-dialog.tsx` | Moodle files as a pinnable type (lazy fetch) | T11 |
-| `e2e/homework-ai-context.spec.ts` (NEW) | E2E real flow: start homework → chip → ask AI | T12 |
-| `e2e/TEST_REGISTRY.md` | Register the new scenarios | T12 |
+| File                                                                      | Responsibility                                                                                                  | Tasks  |
+| ------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------- | ------ |
+| `src/types/database.ts`                                                   | Add `moodle_file` to `HomeworkMaterialType`; sync `HomeworkSession` polymorphic exercise columns                | T1     |
+| `src/lib/actions/homework.ts`                                             | Extend `getHomeworkContext` to resolve `moodle_file` names                                                      | T2     |
+| `src/lib/ai/prompts.ts`                                                   | `buildSystemPrompt` homework mode                                                                               | T3     |
+| `src/lib/ai/homework-context.ts` (NEW)                                    | `resolveHomeworkContext(supabase, admin, documentId)` — tiered text extraction + budgets + graceful degradation | T4, T5 |
+| `src/lib/ai/__tests__/homework-context.test.ts` (NEW)                     | Unit: tiering, caps, budget, degradation, moodle-via-admin                                                      | T4     |
+| `src/lib/ai/homework-context.integration.test.ts` (NEW)                   | Integration: real seeded exercise text + graceful pinned failure                                                | T5     |
+| `src/lib/ai/__tests__/prompts.test.ts` (NEW/extend)                       | Unit: homework-mode prompt                                                                                      | T3     |
+| `src/lib/actions/ai-context.ts`                                           | `buildAiContext`: resolve homework, inject Tiers 1–2, return `homeworkContextUsed`                              | T6     |
+| `src/lib/actions/__tests__/ai-context.test.ts`                            | Unit: `documentId` triggers homework injection                                                                  | T6     |
+| `src/app/api/ai/ask/route.ts`                                             | Forward `homeworkContextUsed` in the `sources` SSE event                                                        | T7     |
+| `src/lib/analytics/events.ts`                                             | Add `homework_context_used` event                                                                               | T8     |
+| `src/components/ai/ai-chat-panel.tsx`                                     | `documentId` prop → POST body; fire `homework_context_used`                                                     | T9     |
+| `src/components/ai/ai-chat-wrapper.tsx`                                   | Thread `documentId`                                                                                             | T9     |
+| `src/components/ai/document-with-ai.tsx`                                  | Pass `documentId={document.id}`                                                                                 | T9     |
+| `src/components/editor/tiptap-editor-with-versions.tsx`                   | Pass `documentId={document.id}`                                                                                 | T9     |
+| `src/components/dashboard/homework-context-chip.tsx` (NEW)                | Presentational "Homework context" strip                                                                         | T10    |
+| `src/components/dashboard/__tests__/homework-context-chip.test.tsx` (NEW) | Unit: chip renders exercise + pinned names                                                                      | T10    |
+| `src/app/(dashboard)/dashboard/documents/[docId]/page.tsx`                | Fetch `getHomeworkContext`, render chip                                                                         | T10    |
+| `src/components/dashboard/start-homework-dialog.tsx`                      | Moodle files as a pinnable type (lazy fetch)                                                                    | T11    |
+| `e2e/homework-ai-context.spec.ts` (NEW)                                   | E2E real flow: start homework → chip → ask AI                                                                   | T12    |
+| `e2e/TEST_REGISTRY.md`                                                    | Register the new scenarios                                                                                      | T12    |
 
 ---
 
 ### Task 1: Sync homework types
 
 **Files:**
+
 - Modify: `src/types/database.ts:193-205`
 
 - [ ] **Step 1: Add `moodle_file` to the material-type union and sync the session columns**
@@ -125,6 +126,7 @@ git commit -m "feat(homework): add moodle_file material type + sync session colu
 ### Task 2: Resolve `moodle_file` names in `getHomeworkContext`
 
 **Files:**
+
 - Modify: `src/lib/actions/homework.ts:1-11` (import), `:118-173` (resolution)
 - Test: `src/lib/actions/homework.integration.test.ts`
 
@@ -215,6 +217,7 @@ git commit -m "feat(homework): resolve moodle_file names in getHomeworkContext"
 ### Task 3: Homework mode in `buildSystemPrompt`
 
 **Files:**
+
 - Modify: `src/lib/ai/prompts.ts:1-32`
 - Test: `src/lib/ai/__tests__/prompts.test.ts` (create if absent)
 
@@ -225,7 +228,10 @@ git commit -m "feat(homework): resolve moodle_file names in getHomeworkContext"
 ```ts
 describe('buildSystemPrompt — homework mode', () => {
   it('omits homework section when not in homework mode', () => {
-    const p = buildSystemPrompt({ courseName: 'CS101', hasDocumentContent: false });
+    const p = buildSystemPrompt({
+      courseName: 'CS101',
+      hasDocumentContent: false,
+    });
     expect(p).not.toMatch(/HOMEWORK SESSION/);
   });
 
@@ -344,6 +350,7 @@ git commit -m "feat(homework): add homework mode to buildSystemPrompt"
 ### Task 4: `resolveHomeworkContext` resolver + unit tests
 
 **Files:**
+
 - Create: `src/lib/ai/homework-context.ts`
 - Test: `src/lib/ai/__tests__/homework-context.test.ts`
 
@@ -425,17 +432,35 @@ async function resolvePinnedMaterial(
         .eq('id', id)
         .maybeSingle();
       if (!data) return null;
-      return { name: data.title ?? 'Document', text: extractDocumentText(data) };
+      return {
+        name: data.title ?? 'Document',
+        text: extractDocumentText(data),
+      };
     }
 
     // File-backed types: { table, client, bucket, nameCol }
     const cfg =
       type === 'course_material'
-        ? { table: 'course_materials', client: supabase, bucket: 'course-materials', nameCol: 'file_name' }
+        ? {
+            table: 'course_materials',
+            client: supabase,
+            bucket: 'course-materials',
+            nameCol: 'file_name',
+          }
         : type === 'personal_file'
-          ? { table: 'personal_files', client: supabase, bucket: 'personal-files', nameCol: 'display_name' }
+          ? {
+              table: 'personal_files',
+              client: supabase,
+              bucket: 'personal-files',
+              nameCol: 'display_name',
+            }
           : type === 'moodle_file'
-            ? { table: 'moodle_files', client: admin, bucket: 'moodle-materials', nameCol: 'file_name' }
+            ? {
+                table: 'moodle_files',
+                client: admin,
+                bucket: 'moodle-materials',
+                nameCol: 'file_name',
+              }
             : null;
     if (!cfg) return null;
 
@@ -449,7 +474,8 @@ async function resolvePinnedMaterial(
     const name = (row as Record<string, string>)[cfg.nameCol] ?? 'Material';
     const storagePath = (row as { storage_path: string | null }).storage_path;
     const mimeType =
-      (row as { mime_type: string | null }).mime_type ?? 'application/octet-stream';
+      (row as { mime_type: string | null }).mime_type ??
+      'application/octet-stream';
     if (!storagePath) return { name, text: '' };
 
     const { data: file, error } = await cfg.client.storage
@@ -518,7 +544,10 @@ export async function resolveHomeworkContext(
     );
     if (!resolved) continue;
     pinnedNames.push(resolved.name);
-    const text = cap(resolved.text, Math.min(MAX_HOMEWORK_SOURCE_CHARS, budget));
+    const text = cap(
+      resolved.text,
+      Math.min(MAX_HOMEWORK_SOURCE_CHARS, budget),
+    );
     budget -= text.length;
     pinned.push({ name: resolved.name, text });
   }
@@ -549,23 +578,29 @@ import {
 // Minimal chainable mock: each .from(table) returns a thenable query whose
 // terminal .maybeSingle() resolves to the configured row, plus a storage stub.
 function makeClient(opts: {
-  rows: Record<string, unknown>;          // keyed by table name -> single row
-  lists?: Record<string, unknown[]>;      // keyed by table name -> array (for .eq without maybeSingle)
-  download?: () => { data: { arrayBuffer: () => Promise<ArrayBuffer> } | null; error: unknown };
+  rows: Record<string, unknown>; // keyed by table name -> single row
+  lists?: Record<string, unknown[]>; // keyed by table name -> array (for .eq without maybeSingle)
+  download?: () => {
+    data: { arrayBuffer: () => Promise<ArrayBuffer> } | null;
+    error: unknown;
+  };
 }) {
   const client = {
     from(table: string) {
       const builder = {
         _table: table,
-        select() { return builder; },
-        eq() { return builder; },
+        select() {
+          return builder;
+        },
+        eq() {
+          return builder;
+        },
         maybeSingle: async () => ({ data: opts.rows[table] ?? null }),
         then: undefined as unknown,
       };
       // Make `await builder` (no maybeSingle) resolve to a list result
-      (builder as unknown as { then: (r: (v: unknown) => void) => void }).then = (
-        resolve,
-      ) => resolve({ data: opts.lists?.[table] ?? [] });
+      (builder as unknown as { then: (r: (v: unknown) => void) => void }).then =
+        (resolve) => resolve({ data: opts.lists?.[table] ?? [] });
       return builder;
     },
     storage: {
@@ -599,7 +634,15 @@ describe('resolveHomeworkContext', () => {
         homework_sessions: { id: 's1', exercise_document_id: 'ex1' },
         documents: {
           title: 'PS1',
-          content: { type: 'doc', content: [{ type: 'paragraph', content: [{ type: 'text', text: 'Hello exercise' }] }] },
+          content: {
+            type: 'doc',
+            content: [
+              {
+                type: 'paragraph',
+                content: [{ type: 'text', text: 'Hello exercise' }],
+              },
+            ],
+          },
         },
       },
       lists: { homework_session_materials: [] },
@@ -614,10 +657,16 @@ describe('resolveHomeworkContext', () => {
     const c = makeClient({
       rows: {
         homework_sessions: { id: 's1', exercise_document_id: null },
-        course_materials: { file_name: 'Lecture 1', storage_path: 'p/x.pdf', mime_type: 'application/pdf' },
+        course_materials: {
+          file_name: 'Lecture 1',
+          storage_path: 'p/x.pdf',
+          mime_type: 'application/pdf',
+        },
       },
       lists: {
-        homework_session_materials: [{ material_type: 'course_material', material_id: 'm1' }],
+        homework_session_materials: [
+          { material_type: 'course_material', material_id: 'm1' },
+        ],
       },
     });
     const ctx = await resolveHomeworkContext(c, c, 'hw1');
@@ -629,10 +678,16 @@ describe('resolveHomeworkContext', () => {
     const c = makeClient({
       rows: {
         homework_sessions: { id: 's1', exercise_document_id: null },
-        personal_files: { display_name: 'My Notes', storage_path: 'p/y.pdf', mime_type: 'application/pdf' },
+        personal_files: {
+          display_name: 'My Notes',
+          storage_path: 'p/y.pdf',
+          mime_type: 'application/pdf',
+        },
       },
       lists: {
-        homework_session_materials: [{ material_type: 'personal_file', material_id: 'm2' }],
+        homework_session_materials: [
+          { material_type: 'personal_file', material_id: 'm2' },
+        ],
       },
       download: () => ({ data: null, error: new Error('not found') }),
     });
@@ -683,6 +738,7 @@ git commit -m "feat(homework): add resolveHomeworkContext tiered text resolver"
 ### Task 5: Integration test — real seeded exercise text + graceful pinned failure
 
 **Files:**
+
 - Create: `src/lib/ai/homework-context.integration.test.ts`
 
 - [ ] **Step 1: Write the integration test**
@@ -699,7 +755,11 @@ const HW_DOC_ID = '20000000-0000-0000-0000-000000000011';
 describe('resolveHomeworkContext (integration, seeded data)', () => {
   it('returns null for a non-homework document', async () => {
     const admin = createAdminClient();
-    const ctx = await resolveHomeworkContext(admin, admin, 'ffffffff-0000-0000-0000-000000000000');
+    const ctx = await resolveHomeworkContext(
+      admin,
+      admin,
+      'ffffffff-0000-0000-0000-000000000000',
+    );
     expect(ctx).toBeNull();
   });
 
@@ -742,6 +802,7 @@ git commit -m "test(homework): integration test resolver against seeded exercise
 ### Task 6: Inject homework tiers in `buildAiContext`
 
 **Files:**
+
 - Modify: `src/lib/actions/ai-context.ts:552-778`
 - Test: `src/lib/actions/__tests__/ai-context.test.ts`
 
@@ -847,22 +908,22 @@ export async function buildAiContext(params: QuestionParams): Promise<{
 (c) Right after `const supabase = await createClient();` and the destructure, create the admin client once and resolve homework BEFORE building the system prompt (move the `buildSystemPrompt` call down):
 
 ```ts
-  const admin = createAdminClient();
+const admin = createAdminClient();
 
-  // Homework context (Tiers 1–2): resolved server-side from the open document,
-  // never trusting any client-supplied material list. null for normal docs.
-  const homework = params.documentId
-    ? await resolveHomeworkContext(supabase, admin, params.documentId)
-    : null;
+// Homework context (Tiers 1–2): resolved server-side from the open document,
+// never trusting any client-supplied material list. null for normal docs.
+const homework = params.documentId
+  ? await resolveHomeworkContext(supabase, admin, params.documentId)
+  : null;
 
-  const hasDocumentContent = !!documentContent?.trim();
-  const systemPrompt = buildSystemPrompt({
-    courseName,
-    hasDocumentContent,
-    isHomeworkMode: !!homework,
-    exerciseName: homework?.exerciseName,
-    pinnedMaterialNames: homework?.pinnedNames,
-  });
+const hasDocumentContent = !!documentContent?.trim();
+const systemPrompt = buildSystemPrompt({
+  courseName,
+  hasDocumentContent,
+  isHomeworkMode: !!homework,
+  exerciseName: homework?.exerciseName,
+  pinnedMaterialNames: homework?.pinnedNames,
+});
 ```
 
 Delete the now-duplicate `const admin = createAdminClient();` that currently sits in the signed-URL block (around line 621) — reuse the one created above.
@@ -870,61 +931,68 @@ Delete the now-duplicate `const admin = createAdminClient();` that currently sit
 (d) After the `if (hasDocumentContent) { ... }` block (the student's-document turn), insert the homework tiers BEFORE the `if (contextTexts.length > 0)` RAG block:
 
 ```ts
-  // Tier 1 — exercise (always injected when present)
-  if (homework?.exerciseText) {
-    contents.push({
-      role: 'user',
-      parts: [
-        {
-          text: `Here is the EXERCISE the student is working on — "${homework.exerciseName}":\n\n${homework.exerciseText}\n\nThe student's questions refer to this.`,
-        },
-      ],
-    });
-    contents.push({
-      role: 'model',
-      parts: [{ text: 'I understand the exercise the student is working on.' }],
-    });
-  }
+// Tier 1 — exercise (always injected when present)
+if (homework?.exerciseText) {
+  contents.push({
+    role: 'user',
+    parts: [
+      {
+        text: `Here is the EXERCISE the student is working on — "${homework.exerciseName}":\n\n${homework.exerciseText}\n\nThe student's questions refer to this.`,
+      },
+    ],
+  });
+  contents.push({
+    role: 'model',
+    parts: [{ text: 'I understand the exercise the student is working on.' }],
+  });
+}
 
-  // Tier 2 — pinned materials (always injected when present)
-  const pinnedWithText = homework?.pinned.filter((p) => p.text) ?? [];
-  if (pinnedWithText.length > 0) {
-    const pinnedText = pinnedWithText
-      .map((p) => `--- ${p.name} ---\n${p.text}`)
-      .join('\n\n');
-    contents.push({
-      role: 'user',
-      parts: [
-        {
-          text: `These are the materials the student marked as most relevant:\n\n${pinnedText}\n\nPrioritize them, but you may also use other course materials.`,
-        },
-      ],
-    });
-    contents.push({
-      role: 'model',
-      parts: [{ text: 'I have reviewed the pinned materials.' }],
-    });
-  }
+// Tier 2 — pinned materials (always injected when present)
+const pinnedWithText = homework?.pinned.filter((p) => p.text) ?? [];
+if (pinnedWithText.length > 0) {
+  const pinnedText = pinnedWithText
+    .map((p) => `--- ${p.name} ---\n${p.text}`)
+    .join('\n\n');
+  contents.push({
+    role: 'user',
+    parts: [
+      {
+        text: `These are the materials the student marked as most relevant:\n\n${pinnedText}\n\nPrioritize them, but you may also use other course materials.`,
+      },
+    ],
+  });
+  contents.push({
+    role: 'model',
+    parts: [{ text: 'I have reviewed the pinned materials.' }],
+  });
+}
 ```
 
 (e) Treat homework as injected context for the final question-merge logic. Add, just before the `const questionParts` block:
 
 ```ts
-  const hasInjectedContext =
-    hasDocumentContent ||
-    contextTexts.length > 0 ||
-    !!homework?.exerciseText ||
-    pinnedWithText.length > 0;
+const hasInjectedContext =
+  hasDocumentContent ||
+  contextTexts.length > 0 ||
+  !!homework?.exerciseText ||
+  pinnedWithText.length > 0;
 ```
 
 Then change the two conditionals that currently read `contextTexts.length === 0 && !hasDocumentContent`:
+
 - the no-context note → `} else if (!hasInjectedContext) {`
 - the new-user-turn decision → `if (params.imageData || !hasInjectedContext) {`
 
 (f) Update the return statement:
 
 ```ts
-  return { systemPrompt, contents, modelName, sources, homeworkContextUsed: !!homework };
+return {
+  systemPrompt,
+  contents,
+  modelName,
+  sources,
+  homeworkContextUsed: !!homework,
+};
 ```
 
 - [ ] **Step 4: Run unit tests**
@@ -949,6 +1017,7 @@ git commit -m "feat(homework): inject exercise + pinned tiers in buildAiContext"
 ### Task 7: Forward `homeworkContextUsed` in the ask route
 
 **Files:**
+
 - Modify: `src/app/api/ai/ask/route.ts:311-313` and the `sources` SSE enqueue (`:334-338`)
 
 - [ ] **Step 1: Destructure the new flag**
@@ -956,8 +1025,8 @@ git commit -m "feat(homework): inject exercise + pinned tiers in buildAiContext"
 Change the `buildAiContext` call:
 
 ```ts
-    const { systemPrompt, contents, modelName, sources, homeworkContextUsed } =
-      await buildAiContext(params);
+const { systemPrompt, contents, modelName, sources, homeworkContextUsed } =
+  await buildAiContext(params);
 ```
 
 - [ ] **Step 2: Include it in the `sources` SSE event (both the real stream and the debug-mode stream)**
@@ -965,11 +1034,11 @@ Change the `buildAiContext` call:
 In the real stream's first enqueue:
 
 ```ts
-          controller.enqueue(
-            encoder.encode(
-              `data: ${JSON.stringify({ type: 'sources', sources, model: modelLabel, homeworkContextUsed })}\n\n`,
-            ),
-          );
+controller.enqueue(
+  encoder.encode(
+    `data: ${JSON.stringify({ type: 'sources', sources, model: modelLabel, homeworkContextUsed })}\n\n`,
+  ),
+);
 ```
 
 In the debug-mode stream's `sources` enqueue (around line 264), add `homeworkContextUsed: false` so the shape is stable:
@@ -995,6 +1064,7 @@ git commit -m "feat(homework): surface homeworkContextUsed in ask SSE stream"
 ### Task 8: Analytics event `homework_context_used`
 
 **Files:**
+
 - Modify: `src/lib/analytics/events.ts:8-43`
 
 - [ ] **Step 1: Add the event to the map**
@@ -1002,10 +1072,10 @@ git commit -m "feat(homework): surface homeworkContextUsed in ask SSE stream"
 Inside `AnalyticsEventMap`, add (no PII — counts + course UUID only):
 
 ```ts
-  homework_context_used: {
-    course_id: string | undefined;
-    pinned_count: number;
-  };
+homework_context_used: {
+  course_id: string | undefined;
+  pinned_count: number;
+}
 ```
 
 - [ ] **Step 2: Verify compile**
@@ -1025,6 +1095,7 @@ git commit -m "feat(analytics): add homework_context_used event"
 ### Task 9: Thread `documentId` through the chat chain + fire analytics
 
 **Files:**
+
 - Modify: `src/components/ai/ai-chat-panel.tsx` (props `:55-75`, POST body `:306-320`, sources handler `:372-379`)
 - Modify: `src/components/ai/ai-chat-wrapper.tsx:10-67`
 - Modify: `src/components/ai/document-with-ai.tsx:99-109`
@@ -1103,6 +1174,7 @@ git commit -m "feat(homework): thread documentId to chat + fire homework_context
 ### Task 10: Homework context chip on the document page
 
 **Files:**
+
 - Create: `src/components/dashboard/homework-context-chip.tsx`
 - Create: `src/components/dashboard/__tests__/homework-context-chip.test.tsx`
 - Modify: `src/app/(dashboard)/dashboard/documents/[docId]/page.tsx`
@@ -1119,9 +1191,14 @@ import type { HomeworkContext } from '@/types/database';
 
 const ctx: HomeworkContext = {
   session: {
-    id: 's1', document_id: 'd1', exercise_document_id: 'ex1',
-    exercise_type: null, exercise_id: null,
-    course_id: 'c1', user_id: 'u1', created_at: '2026-01-01',
+    id: 's1',
+    document_id: 'd1',
+    exercise_document_id: 'ex1',
+    exercise_type: null,
+    exercise_id: null,
+    course_id: 'c1',
+    user_id: 'u1',
+    created_at: '2026-01-01',
   },
   exerciseDocument: { id: 'ex1', title: 'Problem Set 1' },
   materials: [
@@ -1214,15 +1291,17 @@ import type { HomeworkContext } from '@/types/database';
 After resolving `course` (parallelize the homework lookup with the course fetch is fine, but a simple sequential call is acceptable), add:
 
 ```ts
-  const homeworkContext: HomeworkContext | null = await getHomeworkContext({
-    documentId: docId,
-  });
+const homeworkContext: HomeworkContext | null = await getHomeworkContext({
+  documentId: docId,
+});
 ```
 
 Then render the chip just after the breadcrumb block and before the `isTextDocument ? ... : ...` ternary:
 
 ```tsx
-      {homeworkContext && <HomeworkContextChip context={homeworkContext} />}
+{
+  homeworkContext && <HomeworkContextChip context={homeworkContext} />;
+}
 ```
 
 - [ ] **Step 6: Verify compile + tests**
@@ -1242,6 +1321,7 @@ git commit -m "feat(homework): show homework context chip in document page"
 ### Task 11: Moodle files as a pinnable type in the Start Homework dialog
 
 **Files:**
+
 - Modify: `src/components/dashboard/start-homework-dialog.tsx`
 
 - [ ] **Step 1: Lazy-fetch Moodle files when the dialog opens**
@@ -1250,7 +1330,10 @@ Add imports:
 
 ```ts
 import { useEffect } from 'react';
-import { getMoodleMaterialsForCourse, type MoodleSectionDto } from '@/lib/actions/moodle-materials';
+import {
+  getMoodleMaterialsForCourse,
+  type MoodleSectionDto,
+} from '@/lib/actions/moodle-materials';
 ```
 
 (Adjust the existing `import { useState } from 'react';` to `import { useState, useEffect } from 'react';`.)
@@ -1258,16 +1341,16 @@ import { getMoodleMaterialsForCourse, type MoodleSectionDto } from '@/lib/action
 Add state and an effect that loads when `open` becomes true (only once):
 
 ```ts
-  const [moodleSections, setMoodleSections] = useState<MoodleSectionDto[]>([]);
-  const [moodleLoaded, setMoodleLoaded] = useState(false);
+const [moodleSections, setMoodleSections] = useState<MoodleSectionDto[]>([]);
+const [moodleLoaded, setMoodleLoaded] = useState(false);
 
-  useEffect(() => {
-    if (!open || moodleLoaded) return;
-    setMoodleLoaded(true);
-    getMoodleMaterialsForCourse(courseId)
-      .then(setMoodleSections)
-      .catch(() => setMoodleSections([]));
-  }, [open, moodleLoaded, courseId]);
+useEffect(() => {
+  if (!open || moodleLoaded) return;
+  setMoodleLoaded(true);
+  getMoodleMaterialsForCourse(courseId)
+    .then(setMoodleSections)
+    .catch(() => setMoodleSections([]));
+}, [open, moodleLoaded, courseId]);
 ```
 
 - [ ] **Step 2: Render a Moodle group in the materials picker**
@@ -1275,33 +1358,37 @@ Add state and an effect that loads when `open` becomes true (only once):
 Inside the materials picker `<div className="max-h-48 ...">`, after the "Personal files" group, add:
 
 ```tsx
-              {/* Moodle files (lazy-loaded) */}
-              {moodleSections.some((s) => s.files.length > 0) && (
-                <div>
-                  <p className="mb-1 text-xs font-medium text-muted-foreground">
-                    Moodle Files
-                  </p>
-                  {moodleSections.flatMap((s) =>
-                    s.files.map((f) => {
-                      const key = `moodle_file:${f.id}`;
-                      return (
-                        <label
-                          key={key}
-                          className="flex cursor-pointer items-center gap-2 rounded px-2 py-1 text-sm hover:bg-accent"
-                        >
-                          <input
-                            type="checkbox"
-                            checked={selectedMaterials.has(key)}
-                            onChange={() => toggleMaterial(key)}
-                            className="accent-primary"
-                          />
-                          <span className="truncate">{f.file_name}</span>
-                        </label>
-                      );
-                    }),
-                  )}
-                </div>
-              )}
+{
+  /* Moodle files (lazy-loaded) */
+}
+{
+  moodleSections.some((s) => s.files.length > 0) && (
+    <div>
+      <p className="mb-1 text-xs font-medium text-muted-foreground">
+        Moodle Files
+      </p>
+      {moodleSections.flatMap((s) =>
+        s.files.map((f) => {
+          const key = `moodle_file:${f.id}`;
+          return (
+            <label
+              key={key}
+              className="flex cursor-pointer items-center gap-2 rounded px-2 py-1 text-sm hover:bg-accent"
+            >
+              <input
+                type="checkbox"
+                checked={selectedMaterials.has(key)}
+                onChange={() => toggleMaterial(key)}
+                className="accent-primary"
+              />
+              <span className="truncate">{f.file_name}</span>
+            </label>
+          );
+        }),
+      )}
+    </div>
+  );
+}
 ```
 
 > `parseMaterialKey` already splits `type:id`, and `createHomeworkSession`'s `materialRefs` type is `HomeworkMaterialType` (now includes `moodle_file`), and the DB CHECK already allows `moodle_file` — so no other change is needed for submission.
@@ -1323,12 +1410,14 @@ git commit -m "feat(homework): allow pinning Moodle files in Start Homework dial
 ### Task 12: E2E — real homework + AI flow
 
 **Files:**
+
 - Create: `e2e/homework-ai-context.spec.ts`
 - Modify: `e2e/TEST_REGISTRY.md`
 
 - [ ] **Step 1: Register the scenario in `e2e/TEST_REGISTRY.md`**
 
 Add a section (match the file's existing format) describing:
+
 - Feature: "Homework-focused AI context (Phase 2)".
 - Scenarios: (1) Start Homework from a course → land on homework doc → homework context chip shows the exercise + a pinned material; (2) inside the homework doc, open AI Tutor and send a question → a response renders.
 
@@ -1374,7 +1463,9 @@ test.describe('Homework-focused AI context', () => {
 
     // Start → navigates to the new homework document
     await page.getByRole('button', { name: /^start$/i }).click();
-    await expect(page).toHaveURL(/\/dashboard\/documents\//, { timeout: 15_000 });
+    await expect(page).toHaveURL(/\/dashboard\/documents\//, {
+      timeout: 15_000,
+    });
 
     // The homework context chip consumes getHomeworkContext
     const chip = page.getByTestId('homework-context');
@@ -1382,18 +1473,23 @@ test.describe('Homework-focused AI context', () => {
     await expect(chip).toContainText('Problem Set 1');
 
     // Open the AI tutor (floating bubble has aria-label "Open AI chat")
-    await page.getByRole('button', { name: /open ai chat/i }).first().click();
+    await page
+      .getByRole('button', { name: /open ai chat/i })
+      .first()
+      .click();
     await expect(page.getByText('AI Tutor')).toBeVisible({ timeout: 5_000 });
 
-    const input = page.locator('input[placeholder*="about your course materials"]');
+    const input = page.locator(
+      'input[placeholder*="about your course materials"]',
+    );
     await expect(input).toBeVisible({ timeout: 5_000 });
     await input.fill('What is question 1 of this exercise asking?');
     await page.keyboard.press('Enter');
 
     // A response bubble appears (real Gemini; generous timeout)
-    await expect(
-      page.locator('text=AI Assistant').first(),
-    ).toBeVisible({ timeout: 60_000 });
+    await expect(page.locator('text=AI Assistant').first()).toBeVisible({
+      timeout: 60_000,
+    });
   });
 });
 ```

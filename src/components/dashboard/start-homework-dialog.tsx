@@ -4,7 +4,10 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { BookOpen, FileText } from 'lucide-react';
 import { createHomeworkSession } from '@/lib/actions/homework';
-import { getMoodleMaterialsForCourse, type MoodleSectionDto } from '@/lib/actions/moodle-materials';
+import {
+  getMoodleMaterialsForCourse,
+  type MoodleSectionDto,
+} from '@/lib/actions/moodle-materials';
 import { trackEvent } from '@/lib/analytics/events';
 import {
   Dialog,

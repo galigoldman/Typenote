@@ -71,28 +71,46 @@ async function resolvePinnedMaterial(
         .eq('id', id)
         .maybeSingle();
       if (!data) return null;
-      return { name: data.title ?? 'Document', text: extractDocumentText(data) };
+      return {
+        name: data.title ?? 'Document',
+        text: extractDocumentText(data),
+      };
     }
 
     // File-backed types: { table, client, bucket, nameCol }
     const cfg =
       type === 'course_material'
-        ? { table: 'course_materials', client: supabase, bucket: 'course-materials', nameCol: 'file_name' }
+        ? {
+            table: 'course_materials',
+            client: supabase,
+            bucket: 'course-materials',
+            nameCol: 'file_name',
+          }
         : type === 'personal_file'
-          ? { table: 'personal_files', client: supabase, bucket: 'personal-files', nameCol: 'display_name' }
+          ? {
+              table: 'personal_files',
+              client: supabase,
+              bucket: 'personal-files',
+              nameCol: 'display_name',
+            }
           : type === 'moodle_file'
-            ? { table: 'moodle_files', client: admin, bucket: 'moodle-materials', nameCol: 'file_name' }
+            ? {
+                table: 'moodle_files',
+                client: admin,
+                bucket: 'moodle-materials',
+                nameCol: 'file_name',
+              }
             : null;
     if (!cfg) return null;
 
     // Select all columns; cast via unknown to escape Supabase's strict generic
     // inference which cannot handle the table-name string from cfg.table.
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const { data: row } = await (cfg.client as any)
+    const { data: row } = (await (cfg.client as any)
       .from(cfg.table)
       .select('*')
       .eq('id', id)
-      .maybeSingle() as { data: Record<string, unknown> | null };
+      .maybeSingle()) as { data: Record<string, unknown> | null };
     if (!row) return null;
 
     const name = String(row[cfg.nameCol] ?? 'Material');
@@ -167,7 +185,10 @@ export async function resolveHomeworkContext(
     );
     if (!resolved) continue;
     pinnedNames.push(resolved.name);
-    const text = cap(resolved.text, Math.min(MAX_HOMEWORK_SOURCE_CHARS, budget));
+    const text = cap(
+      resolved.text,
+      Math.min(MAX_HOMEWORK_SOURCE_CHARS, budget),
+    );
     budget -= text.length;
     pinned.push({ name: resolved.name, text });
   }

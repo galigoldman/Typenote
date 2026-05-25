@@ -75,7 +75,10 @@ describe('buildLatexPrompt', () => {
 
 describe('buildSystemPrompt — homework mode', () => {
   it('omits homework section when not in homework mode', () => {
-    const p = buildSystemPrompt({ courseName: 'CS101', hasDocumentContent: false });
+    const p = buildSystemPrompt({
+      courseName: 'CS101',
+      hasDocumentContent: false,
+    });
     expect(p).not.toMatch(/HOMEWORK SESSION/);
   });
 

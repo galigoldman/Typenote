@@ -35,7 +35,9 @@ test.describe('Homework-focused AI context', () => {
 
     // Start → navigates to the new homework document
     await page.getByRole('button', { name: /^start$/i }).click();
-    await expect(page).toHaveURL(/\/dashboard\/documents\//, { timeout: 15_000 });
+    await expect(page).toHaveURL(/\/dashboard\/documents\//, {
+      timeout: 15_000,
+    });
 
     // The homework context chip consumes getHomeworkContext
     const chip = page.getByTestId('homework-context');
@@ -43,17 +45,22 @@ test.describe('Homework-focused AI context', () => {
     await expect(chip).toContainText('Problem Set 1');
 
     // Open the AI tutor (floating bubble has aria-label "Open AI chat")
-    await page.getByRole('button', { name: /open ai chat/i }).first().click();
+    await page
+      .getByRole('button', { name: /open ai chat/i })
+      .first()
+      .click();
     await expect(page.getByText('AI Tutor')).toBeVisible({ timeout: 5_000 });
 
-    const input = page.locator('input[placeholder*="about your course materials"]');
+    const input = page.locator(
+      'input[placeholder*="about your course materials"]',
+    );
     await expect(input).toBeVisible({ timeout: 5_000 });
     await input.fill('What is question 1 of this exercise asking?');
     await page.keyboard.press('Enter');
 
     // A response bubble appears (real Gemini; generous timeout)
-    await expect(
-      page.locator('text=AI Assistant').first(),
-    ).toBeVisible({ timeout: 60_000 });
+    await expect(page.locator('text=AI Assistant').first()).toBeVisible({
+      timeout: 60_000,
+    });
   });
 });

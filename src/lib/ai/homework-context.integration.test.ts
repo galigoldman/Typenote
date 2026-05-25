@@ -7,7 +7,11 @@ const HW_DOC_ID = '20000000-0000-0000-0000-000000000011';
 describe('resolveHomeworkContext (integration, seeded data)', () => {
   it('returns null for a non-homework document', async () => {
     const admin = createAdminClient();
-    const ctx = await resolveHomeworkContext(admin, admin, 'ffffffff-0000-0000-0000-000000000000');
+    const ctx = await resolveHomeworkContext(
+      admin,
+      admin,
+      'ffffffff-0000-0000-0000-000000000000',
+    );
     expect(ctx).toBeNull();
   });
 
