@@ -36,13 +36,6 @@ export default defineConfig({
         command: 'pnpm dev',
         url: BASE_URL,
         reuseExistingServer: !process.env.CI,
-        // Run the AI route in debug mode for E2E: it returns a deterministic
-        // mock response instead of calling Gemini. This keeps E2E free of the
-        // GOOGLE_GENERATIVE_AI_API_KEY (which is intentionally absent from the
-        // CI test job) and makes AI-flow tests deterministic. The real
-        // context-building logic (resolveHomeworkContext, RAG injection) is
-        // covered by unit + integration tests instead.
-        env: { AI_RATE_LIMIT_DEBUG: 'true' },
       }
     : undefined,
 });
