@@ -322,8 +322,8 @@ Each phase is a PR to `dev`; CI (lint/format/unit/integration/build/E2E) must pa
 - Delete the dead `SYSTEM_PROMPT` export when refactoring `prompts.ts`.
 - Update `QuestionResult.sources` shape + any UI badge that reads `weekId` (compile break
   otherwise) and the `document_moved` analytics event's `week_id` property.
-- Decide legacy `course_materials` in the flat Materials list: editable/deletable via the
-  existing `update/deleteCourseMaterial`, or read-only. (Recommend: keep deletable.)
+- Legacy `course_materials` in the flat Materials list stay **deletable** (via the existing
+  `deleteCourseMaterial`) — **decided**.
 - Add a `homework_context_used` analytics event for observability of AI-context injection.
 
 ## 10. Resolved decisions
