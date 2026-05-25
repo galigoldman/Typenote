@@ -828,7 +828,13 @@ export async function buildAiContext(params: QuestionParams): Promise<{
 
   const modelName = mode === 'deep' ? 'gemini-2.5-pro' : 'gemini-2.5-flash';
 
-  return { systemPrompt, contents, modelName, sources, homeworkContextUsed: !!homework };
+  return {
+    systemPrompt,
+    contents,
+    modelName,
+    sources,
+    homeworkContextUsed: !!homework,
+  };
 }
 
 // ---------------------------------------------------------------------------

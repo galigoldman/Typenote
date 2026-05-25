@@ -256,26 +256,26 @@ Test lives in `src/__tests__/integration/storage-rls.integration.test.ts`. Verif
 
 ## Summary
 
-| Feature               | Status      | Spec File                                | Tests     |
-| --------------------- | ----------- | ---------------------------------------- | --------- |
-| Auth                  | Implemented | `e2e/auth.spec.ts`                       | 7/7       |
-| Documents             | Implemented | `e2e/documents.spec.ts`                  | 6/6       |
-| Canvas Editor         | Implemented | `e2e/canvas-editor.spec.ts`              | 15/15     |
-| Text Editor Toolbar   | Implemented | `e2e/editor-toolbar.spec.ts`             | 12/12     |
-| LaTeX Math            | Implemented | `e2e/latex-math.spec.ts`                 | 5/5       |
-| Courses               | Implemented | `e2e/courses.spec.ts`                    | 5/6       |
-| Flat Course Page      | Implemented | `e2e/course-materials.spec.ts`           | 3/3       |
-| File Upload           | Implemented | `e2e/file-upload.spec.ts`                | 3/4       |
-| AI Chat               | Implemented | `e2e/ai-chat.spec.ts`                    | 6/6       |
-| AI Chat — Per-user    | Planned     | `e2e/ai-chat-per-user-materials.spec.ts` | 0/2       |
-| PDF Export            | Implemented | `e2e/export-pdf-*.spec.ts`               | 6/7       |
-| Real-time Sync        | Implemented | `e2e/realtime-sync.spec.ts`              | 3/3       |
-| Drawing Copy/Paste    | Implemented | `e2e/drawing-copy-paste.spec.ts`         | 8/8       |
-| Moodle Ext Gating     | Implemented | `e2e/moodle-touch-gating.spec.ts`        | 2/2       |
-| Extension Real Load   | Implemented | `e2e/extension-real.spec.ts`             | 3/3       |
-| Homework AI Context   | Implemented | `e2e/homework-ai-context.spec.ts`        | 1/1       |
-| Version History       | Planned     | `e2e/version-history.spec.ts`            | 0/5       |
-| PDF Visual Regression | Implemented | `e2e/pdf-visual-regression.spec.ts`      | 8/8       |
+| Feature               | Status      | Spec File                                | Tests      |
+| --------------------- | ----------- | ---------------------------------------- | ---------- |
+| Auth                  | Implemented | `e2e/auth.spec.ts`                       | 7/7        |
+| Documents             | Implemented | `e2e/documents.spec.ts`                  | 6/6        |
+| Canvas Editor         | Implemented | `e2e/canvas-editor.spec.ts`              | 15/15      |
+| Text Editor Toolbar   | Implemented | `e2e/editor-toolbar.spec.ts`             | 12/12      |
+| LaTeX Math            | Implemented | `e2e/latex-math.spec.ts`                 | 5/5        |
+| Courses               | Implemented | `e2e/courses.spec.ts`                    | 5/6        |
+| Flat Course Page      | Implemented | `e2e/course-materials.spec.ts`           | 3/3        |
+| File Upload           | Implemented | `e2e/file-upload.spec.ts`                | 3/4        |
+| AI Chat               | Implemented | `e2e/ai-chat.spec.ts`                    | 6/6        |
+| AI Chat — Per-user    | Planned     | `e2e/ai-chat-per-user-materials.spec.ts` | 0/2        |
+| PDF Export            | Implemented | `e2e/export-pdf-*.spec.ts`               | 6/7        |
+| Real-time Sync        | Implemented | `e2e/realtime-sync.spec.ts`              | 3/3        |
+| Drawing Copy/Paste    | Implemented | `e2e/drawing-copy-paste.spec.ts`         | 8/8        |
+| Moodle Ext Gating     | Implemented | `e2e/moodle-touch-gating.spec.ts`        | 2/2        |
+| Extension Real Load   | Implemented | `e2e/extension-real.spec.ts`             | 3/3        |
+| Homework AI Context   | Implemented | `e2e/homework-ai-context.spec.ts`        | 1/1        |
+| Version History       | Planned     | `e2e/version-history.spec.ts`            | 0/5        |
+| PDF Visual Regression | Implemented | `e2e/pdf-visual-regression.spec.ts`      | 8/8        |
 | **Total**             |             |                                          | **92/100** |
 
 ---
