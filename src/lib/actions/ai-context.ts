@@ -7,6 +7,7 @@ import { GoogleGenAI } from '@google/genai';
 import { chunkText, embedQuery, embedText } from '@/lib/ai/embeddings';
 import { extractDocxText } from '@/lib/ai/extraction/docx';
 import { extractPdfText } from '@/lib/ai/extraction/pdf';
+import { resolveHomeworkContext } from '@/lib/ai/homework-context';
 import { buildSystemPrompt } from '@/lib/ai/prompts';
 import {
   getContentHash,
@@ -555,6 +556,7 @@ export async function buildAiContext(params: QuestionParams): Promise<{
   contents: Array<{ role: string; parts: any[] }>;
   modelName: string;
   sources: QuestionResult['sources'];
+  homeworkContextUsed: boolean;
 }> {
   await getAuthUserId();
   const supabase = await createClient();
@@ -567,10 +569,21 @@ export async function buildAiContext(params: QuestionParams): Promise<{
     conversationHistory,
   } = params;
 
+  const admin = createAdminClient();
+
+  // Homework context (Tiers 1–2): resolved server-side from the open document,
+  // never trusting any client-supplied material list. null for normal docs.
+  const homework = params.documentId
+    ? await resolveHomeworkContext(supabase, admin, params.documentId)
+    : null;
+
   const hasDocumentContent = !!documentContent?.trim();
   const systemPrompt = buildSystemPrompt({
     courseName,
     hasDocumentContent,
+    isHomeworkMode: !!homework,
+    exerciseName: homework?.exerciseName,
+    pinnedMaterialNames: homework?.pinnedNames,
   });
 
   // Skip RAG search when there's no course (no materials to search)
@@ -618,7 +631,6 @@ export async function buildAiContext(params: QuestionParams): Promise<{
     .filter((s) => s.sourceType === 'personal_file')
     .map((s) => s.sourceId);
 
-  const admin = createAdminClient();
   const moodlePaths: Record<string, string> = {};
   const materialPaths: Record<string, string> = {};
   const personalPaths: Record<string, string> = {};
@@ -707,6 +719,42 @@ export async function buildAiContext(params: QuestionParams): Promise<{
     });
   }
 
+  // Tier 1 — exercise (always injected when present)
+  if (homework?.exerciseText) {
+    contents.push({
+      role: 'user',
+      parts: [
+        {
+          text: `Here is the EXERCISE the student is working on — "${homework.exerciseName}":\n\n${homework.exerciseText}\n\nThe student's questions refer to this.`,
+        },
+      ],
+    });
+    contents.push({
+      role: 'model',
+      parts: [{ text: 'I understand the exercise the student is working on.' }],
+    });
+  }
+
+  // Tier 2 — pinned materials (always injected when present)
+  const pinnedWithText = homework?.pinned.filter((p) => p.text) ?? [];
+  if (pinnedWithText.length > 0) {
+    const pinnedText = pinnedWithText
+      .map((p) => `--- ${p.name} ---\n${p.text}`)
+      .join('\n\n');
+    contents.push({
+      role: 'user',
+      parts: [
+        {
+          text: `These are the materials the student marked as most relevant:\n\n${pinnedText}\n\nPrioritize them, but you may also use other course materials.`,
+        },
+      ],
+    });
+    contents.push({
+      role: 'model',
+      parts: [{ text: 'I have reviewed the pinned materials.' }],
+    });
+  }
+
   if (contextTexts.length > 0) {
     const materialsText = contextTexts.join('\n\n');
     contents.push({
@@ -739,6 +787,12 @@ export async function buildAiContext(params: QuestionParams): Promise<{
     }
   }
 
+  const hasInjectedContext =
+    hasDocumentContent ||
+    contextTexts.length > 0 ||
+    !!homework?.exerciseText ||
+    pinnedWithText.length > 0;
+
   // Build the user's question parts (optionally with image)
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const questionParts: any[] = [];
@@ -751,7 +805,7 @@ export async function buildAiContext(params: QuestionParams): Promise<{
     questionParts.push({
       text: `The student has shared a screenshot from their course material. Analyze the visual content and reference it in your response.\n\n${question}`,
     });
-  } else if (contextTexts.length === 0 && !hasDocumentContent) {
+  } else if (!hasInjectedContext) {
     questionParts.push({
       text: `${question}\n\n(No course materials were loaded. Answer using your own knowledge but note that no materials were found.)`,
     });
@@ -760,7 +814,7 @@ export async function buildAiContext(params: QuestionParams): Promise<{
   }
 
   // Append question parts to contents (merging if last turn is also 'user')
-  if (params.imageData || (contextTexts.length === 0 && !hasDocumentContent)) {
+  if (params.imageData || !hasInjectedContext) {
     // Always create a new user turn for image queries or no-context queries
     contents.push({ role: 'user', parts: questionParts });
   } else {
@@ -774,7 +828,7 @@ export async function buildAiContext(params: QuestionParams): Promise<{
 
   const modelName = mode === 'deep' ? 'gemini-2.5-pro' : 'gemini-2.5-flash';
 
-  return { systemPrompt, contents, modelName, sources };
+  return { systemPrompt, contents, modelName, sources, homeworkContextUsed: !!homework };
 }
 
 // ---------------------------------------------------------------------------
