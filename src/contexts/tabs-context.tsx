@@ -61,21 +61,24 @@ function saveTabSession(session: TabSession) {
 export function TabsProvider({ children }: { children: React.ReactNode }) {
   const router = useRouter();
 
-  // Use lazy initializer to load from localStorage without an effect
-  const [tabs, setTabs] = useState<OpenTab[]>(() => loadTabSession().tabs);
-  const [activeTabId, setActiveTabId] = useState<string | null>(
-    () => loadTabSession().activeTabId,
-  );
+  // Start with empty state to avoid hydration mismatch (server has no localStorage)
+  const [tabs, setTabs] = useState<OpenTab[]>([]);
+  const [activeTabId, setActiveTabId] = useState<string | null>(null);
+  const [hydrated, setHydrated] = useState(false);
 
-  // Persist to localStorage whenever tabs/activeTabId change (skip first render)
-  const isFirstRender = useRef(true);
+  // Hydrate from localStorage after mount
   useEffect(() => {
-    if (isFirstRender.current) {
-      isFirstRender.current = false;
-      return;
-    }
+    const session = loadTabSession();
+    setTabs(session.tabs);
+    setActiveTabId(session.activeTabId);
+    setHydrated(true);
+  }, []);
+
+  // Persist to localStorage whenever tabs/activeTabId change (only after hydration)
+  useEffect(() => {
+    if (!hydrated) return;
     saveTabSession({ tabs, activeTabId });
-  }, [tabs, activeTabId]);
+  }, [tabs, activeTabId, hydrated]);
 
   const openTab = useCallback(
     (documentId: string, title: string) => {
