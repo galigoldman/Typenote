@@ -2,11 +2,10 @@
 
 import { revalidatePath } from 'next/cache';
 import { createClient } from '@/lib/supabase/server';
-import { createAdminClient } from '@/lib/supabase/admin';
 import { deleteEmbeddingsBySource } from '@/lib/queries/embeddings';
 
 export async function createCourseMaterial(data: {
-  week_id: string;
+  course_id: string;
   category: 'material' | 'homework';
   storage_path: string;
   file_name: string;
@@ -24,7 +23,7 @@ export async function createCourseMaterial(data: {
     .from('course_materials')
     .insert({
       user_id: user.id,
-      week_id: data.week_id,
+      course_id: data.course_id,
       category: data.category,
       storage_path: data.storage_path,
       file_name: data.file_name,
@@ -60,69 +59,6 @@ export async function updateCourseMaterial(
     .select()
     .single();
   if (error) throw new Error(error.message);
-  revalidatePath('/dashboard');
-  return material;
-}
-
-/**
- * Import a Moodle file into a course week as a course_material.
- * References the existing file in moodle-materials bucket — no copy needed.
- */
-export async function importMoodleFile(data: {
-  moodleFileId: string;
-  weekId: string;
-  courseId: string;
-  category: 'material' | 'homework';
-}) {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) throw new Error('Not authenticated');
-
-  const admin = createAdminClient();
-
-  // Fetch the Moodle file record
-  const { data: moodleFile, error: fetchError } = await admin
-    .from('moodle_files')
-    .select('id, file_name, storage_path, file_size, mime_type')
-    .eq('id', data.moodleFileId)
-    .single();
-
-  if (fetchError || !moodleFile) throw new Error('Moodle file not found');
-  if (!moodleFile.storage_path)
-    throw new Error('File not downloaded yet — sync first');
-
-  // Check if already imported to this week
-  const { data: existing } = await supabase
-    .from('course_materials')
-    .select('id')
-    .eq('week_id', data.weekId)
-    .eq('file_name', moodleFile.file_name)
-    .single();
-
-  if (existing) throw new Error('This file is already imported to this week');
-
-  // Create course_material record pointing to the moodle-materials storage
-  // Use a prefixed path so we know it's a moodle reference
-  const storagePath = `moodle:${moodleFile.storage_path}`;
-
-  const { data: material, error: insertError } = await supabase
-    .from('course_materials')
-    .insert({
-      user_id: user.id,
-      week_id: data.weekId,
-      category: data.category,
-      storage_path: storagePath,
-      file_name: moodleFile.file_name,
-      file_size: moodleFile.file_size ?? 0,
-      mime_type: moodleFile.mime_type ?? 'application/octet-stream',
-    })
-    .select()
-    .single();
-
-  if (insertError) throw new Error(insertError.message);
-
   revalidatePath('/dashboard');
   return material;
 }
