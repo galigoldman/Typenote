@@ -383,3 +383,62 @@ describe('buildAiContext attaches signedUrl to sources', () => {
     expect(sources[0].signedUrl).toMatch(/^https?:\/\//);
   });
 });
+
+vi.mock('@/lib/ai/homework-context', () => ({
+  resolveHomeworkContext: vi.fn(async () => null),
+  MAX_HOMEWORK_SOURCE_CHARS: 15000,
+  MAX_PINNED_MATERIALS: 5,
+  MAX_HOMEWORK_TOTAL_CHARS: 60000,
+}));
+
+import { resolveHomeworkContext } from '@/lib/ai/homework-context';
+// NOTE: this file ALREADY mocks '@/lib/ai/prompts' (buildSystemPrompt returns a
+// fixed string), so we must NOT assert on systemPrompt content here — that is
+// Task 3's job. Instead assert that buildAiContext asked buildSystemPrompt for
+// homework mode (call args) and that the homework text landed in `contents`.
+import { buildSystemPrompt } from '@/lib/ai/prompts';
+
+describe('buildAiContext — homework injection', () => {
+  it('injects the exercise + pins and flags homeworkContextUsed when documentId is a homework doc', async () => {
+    vi.mocked(resolveHomeworkContext).mockResolvedValueOnce({
+      exerciseName: 'Problem Set 1',
+      exerciseText: 'EXERCISE BODY TEXT',
+      pinned: [{ name: 'Lecture 1', text: 'PINNED BODY TEXT' }],
+      pinnedNames: ['Lecture 1'],
+    });
+
+    const { contents, homeworkContextUsed } = await buildAiContext({
+      question: 'what is q1?',
+      courseId: undefined, // skip RAG to isolate homework injection
+      documentId: 'hw-doc-1',
+      mode: 'quick',
+    });
+
+    expect(homeworkContextUsed).toBe(true);
+    // buildSystemPrompt is mocked in this file — assert the call args, not the
+    // returned string.
+    expect(vi.mocked(buildSystemPrompt)).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        isHomeworkMode: true,
+        exerciseName: 'Problem Set 1',
+        pinnedMaterialNames: ['Lecture 1'],
+      }),
+    );
+    const flat = JSON.stringify(contents);
+    expect(flat).toContain('EXERCISE BODY TEXT');
+    expect(flat).toContain('PINNED BODY TEXT');
+  });
+
+  it('does not inject homework context for a non-homework document', async () => {
+    vi.mocked(resolveHomeworkContext).mockResolvedValueOnce(null);
+    const { homeworkContextUsed } = await buildAiContext({
+      question: 'hi',
+      documentId: 'normal-doc',
+      mode: 'quick',
+    });
+    expect(homeworkContextUsed).toBe(false);
+    expect(vi.mocked(buildSystemPrompt)).toHaveBeenLastCalledWith(
+      expect.objectContaining({ isHomeworkMode: false }),
+    );
+  });
+});
