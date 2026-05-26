@@ -198,15 +198,11 @@ context-menu entry point works end-to-end.
 
 ---
 
-## Homework-focused AI context (Phase 2) (`e2e/homework-ai-context.spec.ts`) — IMPLEMENTED
+## ~~Homework-focused AI context (Phase 2)~~ — REMOVED
 
-Covers the Phase 2 feature that wires the persisted Homework object into the AI tutor.
-The seed (`supabase/seed.sql`) contains a complete homework session: working document `20000000-…-0011` linked to exercise "Problem Set 1: Variables" with pinned course material `lecture-1-slides.pdf`. The first test opens that document directly; the latter two drive the course page's **Start Homework dialog** via client-side navigation (`goToSeededCourse`) — the document-exercise path and the imported-file-exercise path. The Gemini call is mocked via `page.route('**/api/ai/ask')`, so the tests need no `GOOGLE_GENERATIVE_AI_API_KEY` (the test CI job has none) and are fully deterministic; the real context-building logic is also covered by unit + integration tests.
-
-- [x] Open the seeded homework document → the homework context chip (`data-testid="homework-context"`) is visible and names the exercise ("Problem Set 1: Variables") and the pinned material (`lecture-1-slides.pdf`)
-- [x] Open the AI Tutor panel → send a question → the mocked assistant response renders in the chat (quota and conversation-history endpoints are also mocked so the chat opens clean)
-- [x] Start Homework from the course page via **client-side nav** (`goToSeededCourse`) → pick the document exercise "Problem Set 1: Variables" → Start → navigates to the new homework doc and the context chip is visible (regression guard for the heavy-props soft-nav bug fixed in #199)
-- [x] Start Homework picking an **imported file** as the exercise (course material "Lecture 1: Intro to Programming") → Start → the context chip names the file by `file_name` (`lecture-1-slides.pdf`), proving the polymorphic exercise picker: a file (not just a typed note) can be the exercise, with its content covered by RAG rather than verbatim extraction
+The Start Homework feature (dialog, sessions, context chip, AI plumbing) has been removed
+and replaced by the Document Context Files feature. The spec file
+`e2e/homework-ai-context.spec.ts` and all associated source files have been deleted.
 
 ---
 
@@ -275,10 +271,10 @@ Test lives in `src/__tests__/integration/storage-rls.integration.test.ts`. Verif
 | Drawing Copy/Paste    | Implemented | `e2e/drawing-copy-paste.spec.ts`         | 8/8        |
 | Moodle Ext Gating     | Implemented | `e2e/moodle-touch-gating.spec.ts`        | 2/2        |
 | Extension Real Load   | Implemented | `e2e/extension-real.spec.ts`             | 3/3        |
-| Homework AI Context   | Implemented | `e2e/homework-ai-context.spec.ts`        | 3/3        |
+| Homework AI Context   | Removed     | (deleted)                                | —          |
 | Version History       | Planned     | `e2e/version-history.spec.ts`            | 0/5        |
 | PDF Visual Regression | Implemented | `e2e/pdf-visual-regression.spec.ts`      | 8/8        |
-| **Total**             |             |                                          | **92/100** |
+| **Total**             |             |                                          | **89/97**  |
 
 ---
 
