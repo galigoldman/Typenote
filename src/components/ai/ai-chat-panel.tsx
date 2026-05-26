@@ -622,13 +622,21 @@ export function AiChatPanel({
                                   key={j}
                                   type="button"
                                   data-testid="ai-citation"
-                                  onClick={() =>
-                                    onOpenSource?.(
-                                      src.sourceType as ContextFileType,
-                                      src.sourceId,
-                                      page,
-                                    )
-                                  }
+                                  onClick={() => {
+                                    if (onOpenSource) {
+                                      onOpenSource(
+                                        src.sourceType as ContextFileType,
+                                        src.sourceId,
+                                        page,
+                                      );
+                                    } else if (src.signedUrl) {
+                                      window.open(
+                                        src.signedUrl,
+                                        '_blank',
+                                        'noopener,noreferrer',
+                                      );
+                                    }
+                                  }}
                                   className="inline-flex items-center gap-1 rounded-full border bg-background px-2.5 py-0.5 text-[10px] text-muted-foreground hover:bg-accent hover:text-foreground transition-colors"
                                 >
                                   <BookOpen className="h-2.5 w-2.5" />
