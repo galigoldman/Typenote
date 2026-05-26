@@ -176,6 +176,7 @@ export interface AiConversation {
 
 export interface ChatSource {
   sourceType: string;
+  sourceId: string;
   sourceName: string;
   pageRange: string | null;
 }
@@ -190,41 +191,30 @@ export interface AiMessage {
   created_at: string;
 }
 
-export type HomeworkMaterialType =
-  | 'course_material'
-  | 'personal_file'
-  | 'document'
-  | 'moodle_file';
+export type ContextFileType = 'course_material' | 'personal_file' | 'moodle_file';
 
-export interface HomeworkSession {
+export interface DocumentContextFile {
   id: string;
   document_id: string;
-  // Polymorphic exercise: today always a document (exercise_document_id set),
-  // but migration 20260524144454 made it nullable and added exercise_type/id.
-  exercise_document_id: string | null;
-  exercise_type: string | null;
-  exercise_id: string | null;
-  course_id: string;
-  user_id: string;
+  file_type: ContextFileType;
+  file_id: string;
   created_at: string;
 }
 
-export interface HomeworkSessionMaterial {
-  id: string;
-  session_id: string;
-  material_type: HomeworkMaterialType;
-  material_id: string;
-  created_at: string;
+/** A file the user can attach (candidate in the add-picker). */
+export interface AttachableFile {
+  fileType: ContextFileType;
+  fileId: string;
+  name: string;
+  mimeType: string | null;
 }
 
-export interface HomeworkContext {
-  session: HomeworkSession;
-  exerciseDocument: { id: string; title: string };
-  materials: Array<{
-    type: HomeworkMaterialType;
-    id: string;
-    name: string;
-  }>;
+/** An attached file resolved for display in the panel. */
+export interface ResolvedContextFile {
+  fileType: ContextFileType;
+  fileId: string;
+  name: string;
+  mimeType: string | null;
 }
 
 export type VersionTrigger = 'idle' | 'periodic' | 'close' | 'before_restore';
