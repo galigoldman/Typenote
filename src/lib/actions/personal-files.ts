@@ -3,6 +3,7 @@
 import { revalidatePath } from 'next/cache';
 import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
+import { deleteEmbeddingsBySource } from '@/lib/queries/embeddings';
 
 export async function createPersonalFile(data: {
   courseId: string;
@@ -241,6 +242,9 @@ export async function deletePersonalFile(fileId: string) {
     .single();
 
   if (fetchError || !file) throw new Error('Personal file not found');
+
+  // Delete embeddings before removing storage/row so orphaned vectors are cleaned up
+  await deleteEmbeddingsBySource('personal_file', fileId);
 
   // Delete from storage
   const { error: storageError } = await supabase.storage
