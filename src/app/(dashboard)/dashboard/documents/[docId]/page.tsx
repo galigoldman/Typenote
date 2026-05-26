@@ -5,9 +5,7 @@ import { createClient } from '@/lib/supabase/server';
 import { AiChatWrapper } from '@/components/ai/ai-chat-wrapper';
 import { DocumentWithAi } from '@/components/ai/document-with-ai';
 import { TiptapEditorWithVersions } from '@/components/editor/tiptap-editor-with-versions';
-import { getHomeworkContext } from '@/lib/actions/homework';
-import { HomeworkContextChip } from '@/components/dashboard/homework-context-chip';
-import type { Course, Document, HomeworkContext } from '@/types/database';
+import type { Course, Document } from '@/types/database';
 
 interface DocumentPageProps {
   params: Promise<{ docId: string }>;
@@ -43,10 +41,6 @@ export default async function DocumentPage({ params }: DocumentPageProps) {
   // Text-only document (e.g. imported .docx) — use TipTap editor directly
   const isTextDocument = !typedDocument.pages && !typedDocument.material_id;
 
-  const homeworkContext: HomeworkContext | null = await getHomeworkContext({
-    documentId: docId,
-  });
-
   return (
     <div className="flex flex-1 min-h-0 flex-col overflow-hidden">
       {/* Course breadcrumb (desktop only) */}
@@ -61,8 +55,6 @@ export default async function DocumentPage({ params }: DocumentPageProps) {
           </Link>
         </div>
       )}
-
-      {homeworkContext && <HomeworkContextChip context={homeworkContext} />}
 
       {isTextDocument ? (
         <TiptapEditorWithVersions
