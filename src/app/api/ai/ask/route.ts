@@ -261,7 +261,7 @@ export async function POST(req: Request) {
         start(controller) {
           controller.enqueue(
             encoder.encode(
-              `data: ${JSON.stringify({ type: 'sources', sources: [], model: mode === 'deep' ? 'pro' : 'flash', homeworkContextUsed: false })}\n\n`,
+              `data: ${JSON.stringify({ type: 'sources', sources: [], model: mode === 'deep' ? 'pro' : 'flash', contextFilesUsed: false })}\n\n`,
             ),
           );
           if (activeConversationId) {
@@ -308,7 +308,7 @@ export async function POST(req: Request) {
     };
 
     // Build context (RAG search, prompt, etc.)
-    const { systemPrompt, contents, modelName, sources, homeworkContextUsed } =
+    const { systemPrompt, contents, modelName, sources, contextFilesUsed } =
       await buildAiContext(params);
 
     // Stream the response
@@ -333,7 +333,7 @@ export async function POST(req: Request) {
           // Send sources metadata first
           controller.enqueue(
             encoder.encode(
-              `data: ${JSON.stringify({ type: 'sources', sources, model: modelLabel, homeworkContextUsed })}\n\n`,
+              `data: ${JSON.stringify({ type: 'sources', sources, model: modelLabel, contextFilesUsed })}\n\n`,
             ),
           );
 
