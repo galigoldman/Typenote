@@ -1,7 +1,6 @@
 // Pure resolvers for document context files (the 3 imported file types).
 // Auth-free: callers pass a user-scoped `supabase` client (RLS-enforced) for
-// owned tables and an `admin` client for the shared Moodle registry. Mirrors
-// the (now-removed) homework-context resolvers, scoped to file types only.
+// owned tables and an `admin` client for the shared Moodle registry.
 
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { ContextFileType } from '@/types/database';

@@ -4,7 +4,6 @@ import { createClient } from '@/lib/supabase/server';
 import { AiChatWrapper } from '@/components/ai/ai-chat-wrapper';
 import { DocumentListWithMove } from '@/components/dashboard/document-list-with-move';
 import { CreateDocumentDialog } from '@/components/dashboard/create-document-dialog';
-import { StartHomeworkDialog } from '@/components/dashboard/start-homework-dialog';
 import { EmptyState } from '@/components/dashboard/empty-state';
 import { PersonalFileUpload } from '@/components/dashboard/personal-file-upload';
 import { PersonalFileItem } from '@/components/dashboard/personal-file-item';
@@ -140,26 +139,6 @@ export default async function CoursePage({
         </Breadcrumb>
         <div className="flex flex-wrap items-center gap-2">
           <AiChatWrapper courseId={courseId} courseName={typedCourse.name} />
-          <StartHomeworkDialog
-            courseId={courseId}
-            documents={typedDocuments.map((d) => ({
-              id: d.id,
-              title: d.title,
-            }))}
-            materials={courseMaterials.map((m) => ({
-              id: m.id,
-              label: m.label,
-              file_name: m.file_name,
-            }))}
-            personalFiles={personalFiles.map((f) => ({
-              id: f.id,
-              display_name: f.display_name,
-            }))}
-          >
-            <Button variant="outline" size="sm">
-              Start Homework
-            </Button>
-          </StartHomeworkDialog>
           <CreateDocumentDialog folderId={null} courseId={courseId}>
             <Button variant="outline" size="sm">
               New Document
