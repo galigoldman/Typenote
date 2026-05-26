@@ -4,6 +4,8 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { CanvasEditor } from '@/components/canvas/canvas-editor';
 import { VersionSidebar } from '@/components/version-history/version-sidebar';
+import { DocumentContextFiles, type ViewerTarget } from '@/components/dashboard/document-context-files';
+import { FileViewer } from '@/components/dashboard/file-viewer';
 import type { Document } from '@/types/database';
 import type { AiContextItem } from './ai-chat-panel';
 
@@ -27,6 +29,8 @@ export function DocumentWithAi({
   const getDocumentTextRef = useRef<(() => string) | null>(null);
   const [contextItems, setContextItems] = useState<AiContextItem[]>([]);
   const [isAiOpen, setIsAiOpen] = useState(false);
+  const [viewerTarget, setViewerTarget] = useState<ViewerTarget | null>(null);
+  const openViewer = useCallback((t: ViewerTarget) => setViewerTarget(t), []);
   const [isVersionHistoryOpen, setIsVersionHistoryOpen] = useState(() => {
     if (typeof window === 'undefined') return false;
     return (
@@ -96,6 +100,13 @@ export function DocumentWithAi({
         isOpen={isVersionHistoryOpen}
         onClose={() => setIsVersionHistoryOpen(false)}
       />
+      {courseId && (
+        <DocumentContextFiles
+          documentId={document.id}
+          courseId={courseId}
+          onOpenFile={openViewer}
+        />
+      )}
       <AiChatWrapper
         courseId={courseId}
         courseName={courseName}
@@ -107,7 +118,16 @@ export function DocumentWithAi({
         isOpen={isAiOpen}
         onToggle={() => setIsAiOpen((prev) => !prev)}
         onClose={() => setIsAiOpen(false)}
+        onOpenSource={(fileType, fileId, page) => openViewer({ fileType, fileId, page })}
       />
+      {viewerTarget && (
+        <FileViewer
+          fileType={viewerTarget.fileType}
+          fileId={viewerTarget.fileId}
+          initialPage={viewerTarget.page}
+          onClose={() => setViewerTarget(null)}
+        />
+      )}
     </div>
   );
 }
