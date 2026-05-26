@@ -48,7 +48,7 @@ type HomeworkExerciseType = HomeworkMaterialType;
   `type === 'document'`** (otherwise `null`). The legacy column is kept in sync
   for documents so any un-migrated reader and the unique/back-compat paths still
   work.
-- **Read** (both readers): compute an *effective* exercise ref with a fallback
+- **Read** (both readers): compute an _effective_ exercise ref with a fallback
   for pre-feature / seeded rows:
 
   ```ts
