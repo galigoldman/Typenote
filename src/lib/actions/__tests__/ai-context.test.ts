@@ -183,7 +183,9 @@ vi.mock('@/lib/ai/context-files', () => ({
 }));
 
 import { extractPdfText } from '@/lib/ai/extraction/pdf';
-import { getContentHash, upsertEmbeddings } from '@/lib/queries/embeddings';
+import { listContextFiles } from '@/lib/actions/context-files';
+import { resolveContextFileName } from '@/lib/ai/context-files';
+import { getContentHash, matchEmbeddings, upsertEmbeddings } from '@/lib/queries/embeddings';
 
 import {
   askQuestion,
@@ -367,7 +369,6 @@ describe('askQuestion', () => {
 
 describe('buildAiContext attaches signedUrl to sources', () => {
   it('returns a signed URL for each moodle_file source', async () => {
-    const { matchEmbeddings } = await import('@/lib/queries/embeddings');
     vi.mocked(matchEmbeddings).mockResolvedValueOnce([
       {
         id: 1,
@@ -391,6 +392,53 @@ describe('buildAiContext attaches signedUrl to sources', () => {
 
     expect(sources).toHaveLength(1);
     expect(sources[0].signedUrl).toMatch(/^https?:\/\//);
+  });
+});
+
+describe('buildAiContext attached-file focus pass', () => {
+  it('sets contextFilesUsed=true and surfaces the attached file in sources', async () => {
+    // Arrange: one attached context file
+    vi.mocked(listContextFiles).mockResolvedValueOnce([
+      {
+        id: 'r1',
+        document_id: 'doc1',
+        file_type: 'course_material',
+        file_id: 'fileA',
+        created_at: '',
+      },
+    ]);
+    vi.mocked(resolveContextFileName).mockResolvedValueOnce('HW3.pdf');
+
+    // Focus pass (searchContext with sourceIds=['fileA']) returns a matching chunk
+    const focusChunk = {
+      id: 10,
+      source_type: 'course_material',
+      source_id: 'fileA',
+      source_name: 'HW3.pdf',
+      segment_text: 'Relevant content from HW3',
+      page_start: null,
+      page_end: null,
+      course_id: 'course1',
+      mime_type: 'application/pdf',
+      similarity: 0.95,
+    };
+    vi.mocked(matchEmbeddings).mockResolvedValueOnce([focusChunk]);
+
+    // Course-wide pass returns empty (keeps focus chunk as the only source)
+    vi.mocked(matchEmbeddings).mockResolvedValueOnce([]);
+
+    // Act
+    const result = await buildAiContext({
+      question: 'q',
+      courseId: 'course1',
+      documentId: 'doc1',
+      mode: 'quick',
+    });
+
+    // Assert
+    expect(result.contextFilesUsed).toBe(true);
+    expect(result.sources.length).toBeGreaterThan(0);
+    expect(result.sources.some((s) => s.sourceId === 'fileA')).toBe(true);
   });
 });
 
