@@ -587,7 +587,9 @@ export async function buildAiContext(params: QuestionParams): Promise<{
     await Promise.all(
       attached
         .slice(0, 10)
-        .map((a) => resolveContextFileName(supabase, admin, a.file_type, a.file_id)),
+        .map((a) =>
+          resolveContextFileName(supabase, admin, a.file_type, a.file_id),
+        ),
     )
   ).filter((n): n is string => !!n);
 
@@ -603,7 +605,12 @@ export async function buildAiContext(params: QuestionParams): Promise<{
   // so attached files rank ahead of everything else.
   const focusResults =
     courseId && attachedIds.length > 0
-      ? await searchContext({ query: question, courseId, sourceIds: attachedIds, maxResults: 6 })
+      ? await searchContext({
+          query: question,
+          courseId,
+          sourceIds: attachedIds,
+          maxResults: 6,
+        })
       : [];
   const courseResults = courseId
     ? await searchContext({ query: question, courseId, maxResults: 8 })
@@ -632,7 +639,11 @@ export async function buildAiContext(params: QuestionParams): Promise<{
         pageRange,
         signedUrl: null,
       });
-      sourceIds.push({ sourceId: r.sourceId, sourceType: r.sourceType, idx: sources.length - 1 });
+      sourceIds.push({
+        sourceId: r.sourceId,
+        sourceType: r.sourceType,
+        idx: sources.length - 1,
+      });
     }
   }
 

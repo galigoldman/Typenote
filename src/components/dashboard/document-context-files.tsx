@@ -17,7 +17,11 @@ interface DocumentContextFilesProps {
   onOpenFile: (t: ViewerTarget) => void;
 }
 
-export function DocumentContextFiles({ documentId, courseId, onOpenFile }: DocumentContextFilesProps) {
+export function DocumentContextFiles({
+  documentId,
+  courseId,
+  onOpenFile,
+}: DocumentContextFilesProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [count, setCount] = useState(0);
 
@@ -45,7 +49,9 @@ export function DocumentContextFiles({ documentId, courseId, onOpenFile }: Docum
         isOpen={isOpen}
         onClose={() => setIsOpen(false)}
         onCountChange={setCount}
-        onOpenFile={(f) => onOpenFile({ fileType: f.fileType, fileId: f.fileId })}
+        onOpenFile={(f) =>
+          onOpenFile({ fileType: f.fileType, fileId: f.fileId })
+        }
       />
     </>
   );

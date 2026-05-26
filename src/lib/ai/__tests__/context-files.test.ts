@@ -1,5 +1,8 @@
 import { describe, expect, it, vi } from 'vitest';
-import { resolveContextFileName, resolveContextFileMeta } from '@/lib/ai/context-files';
+import {
+  resolveContextFileName,
+  resolveContextFileMeta,
+} from '@/lib/ai/context-files';
 
 function clientReturning(row: Record<string, unknown> | null) {
   return {
@@ -58,7 +61,11 @@ describe('resolveContextFileName', () => {
 describe('resolveContextFileMeta', () => {
   it('strips the moodle: prefix and switches bucket for course materials', async () => {
     const meta = await resolveContextFileMeta(
-      clientReturning({ file_name: 'hw.pdf', storage_path: 'moodle:abc/def.pdf', mime_type: 'application/pdf' }),
+      clientReturning({
+        file_name: 'hw.pdf',
+        storage_path: 'moodle:abc/def.pdf',
+        mime_type: 'application/pdf',
+      }),
       clientReturning(null),
       'course_material',
       'id-1',
@@ -73,7 +80,11 @@ describe('resolveContextFileMeta', () => {
 
   it('keeps the course-materials bucket for a normal course material', async () => {
     const meta = await resolveContextFileMeta(
-      clientReturning({ file_name: 'notes.pdf', storage_path: 'u/notes.pdf', mime_type: 'application/pdf' }),
+      clientReturning({
+        file_name: 'notes.pdf',
+        storage_path: 'u/notes.pdf',
+        mime_type: 'application/pdf',
+      }),
       clientReturning(null),
       'course_material',
       'id-2',
@@ -87,7 +98,12 @@ describe('resolveContextFileMeta', () => {
   });
 
   it('returns null when the row is missing', async () => {
-    const meta = await resolveContextFileMeta(clientReturning(null), clientReturning(null), 'personal_file', 'missing');
+    const meta = await resolveContextFileMeta(
+      clientReturning(null),
+      clientReturning(null),
+      'personal_file',
+      'missing',
+    );
     expect(meta).toBeNull();
   });
 });

@@ -191,7 +191,10 @@ export interface AiMessage {
   created_at: string;
 }
 
-export type ContextFileType = 'course_material' | 'personal_file' | 'moodle_file';
+export type ContextFileType =
+  | 'course_material'
+  | 'personal_file'
+  | 'moodle_file';
 
 export interface DocumentContextFile {
   id: string;
