@@ -4,7 +4,10 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { CanvasEditor } from '@/components/canvas/canvas-editor';
 import { VersionSidebar } from '@/components/version-history/version-sidebar';
-import { DocumentContextFiles, type ViewerTarget } from '@/components/dashboard/document-context-files';
+import {
+  DocumentContextFiles,
+  type ViewerTarget,
+} from '@/components/dashboard/document-context-files';
 import { FileViewer } from '@/components/dashboard/file-viewer';
 import type { Document } from '@/types/database';
 import type { AiContextItem } from './ai-chat-panel';
@@ -118,7 +121,9 @@ export function DocumentWithAi({
         isOpen={isAiOpen}
         onToggle={() => setIsAiOpen((prev) => !prev)}
         onClose={() => setIsAiOpen(false)}
-        onOpenSource={(fileType, fileId, page) => openViewer({ fileType, fileId, page })}
+        onOpenSource={(fileType, fileId, page) =>
+          openViewer({ fileType, fileId, page })
+        }
       />
       {viewerTarget && (
         <FileViewer

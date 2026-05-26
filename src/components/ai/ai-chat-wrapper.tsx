@@ -19,7 +19,11 @@ interface AiChatWrapperProps {
   isOpen?: boolean;
   onToggle?: () => void;
   onClose?: () => void;
-  onOpenSource?: (fileType: ContextFileType, fileId: string, page?: number) => void;
+  onOpenSource?: (
+    fileType: ContextFileType,
+    fileId: string,
+    page?: number,
+  ) => void;
 }
 
 export function AiChatWrapper({

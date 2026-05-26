@@ -5,7 +5,10 @@ import type { Document } from '@/types/database';
 import { TiptapEditor } from './tiptap-editor';
 import { VersionSidebar } from '@/components/version-history/version-sidebar';
 import { AiChatWrapper } from '@/components/ai/ai-chat-wrapper';
-import { DocumentContextFiles, type ViewerTarget } from '@/components/dashboard/document-context-files';
+import {
+  DocumentContextFiles,
+  type ViewerTarget,
+} from '@/components/dashboard/document-context-files';
 import { FileViewer } from '@/components/dashboard/file-viewer';
 
 interface TiptapEditorWithVersionsProps {
@@ -68,7 +71,9 @@ export function TiptapEditorWithVersions({
         courseId={courseId}
         courseName={courseName}
         documentId={document.id}
-        onOpenSource={(fileType, fileId, page) => openViewer({ fileType, fileId, page })}
+        onOpenSource={(fileType, fileId, page) =>
+          openViewer({ fileType, fileId, page })
+        }
       />
       {viewerTarget && (
         <FileViewer

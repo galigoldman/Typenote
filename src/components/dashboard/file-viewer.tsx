@@ -13,7 +13,12 @@ interface FileViewerProps {
   onClose: () => void;
 }
 
-export function FileViewer({ fileType, fileId, initialPage, onClose }: FileViewerProps) {
+export function FileViewer({
+  fileType,
+  fileId,
+  initialPage,
+  onClose,
+}: FileViewerProps) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [scale, setScale] = useState(1.2);
@@ -36,19 +41,31 @@ export function FileViewer({ fileType, fileId, initialPage, onClose }: FileViewe
         }
         const { pdfjsLib } = await import('@/lib/pdf/pdfjs-setup');
         const pdf = await pdfjsLib.getDocument(res.url).promise;
-        if (cancelled) { pdf.destroy(); return; }
+        if (cancelled) {
+          pdf.destroy();
+          return;
+        }
         pdfRef.current = pdf;
         await renderAll(pdf, scale);
         if (initialPage != null) {
-          document.getElementById(`ctx-pdf-page-${initialPage}`)?.scrollIntoView();
+          document
+            .getElementById(`ctx-pdf-page-${initialPage}`)
+            ?.scrollIntoView();
         }
         setLoading(false);
       } catch (e) {
-        if (!cancelled) { setError(e instanceof Error ? e.message : 'Failed to load'); setLoading(false); }
+        if (!cancelled) {
+          setError(e instanceof Error ? e.message : 'Failed to load');
+          setLoading(false);
+        }
       }
     }
     load();
-    return () => { cancelled = true; pdfRef.current?.destroy(); pdfRef.current = null; };
+    return () => {
+      cancelled = true;
+      pdfRef.current?.destroy();
+      pdfRef.current = null;
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [fileType, fileId]);
 
@@ -88,9 +105,27 @@ export function FileViewer({ fileType, fileId, initialPage, onClose }: FileViewe
       <div className="flex items-center justify-between border-b border-white/10 bg-background px-4 py-2">
         <span className="text-sm font-medium">Source viewer</span>
         <div className="flex items-center gap-2">
-          <button aria-label="Zoom out" onClick={() => setScale((s) => Math.max(0.5, s - 0.2))} className="rounded p-1 hover:bg-accent"><Minus className="h-4 w-4" /></button>
-          <button aria-label="Zoom in" onClick={() => setScale((s) => Math.min(3, s + 0.2))} className="rounded p-1 hover:bg-accent"><Plus className="h-4 w-4" /></button>
-          <button aria-label="Close viewer" onClick={onClose} className="rounded p-1 hover:bg-accent"><X className="h-5 w-5" /></button>
+          <button
+            aria-label="Zoom out"
+            onClick={() => setScale((s) => Math.max(0.5, s - 0.2))}
+            className="rounded p-1 hover:bg-accent"
+          >
+            <Minus className="h-4 w-4" />
+          </button>
+          <button
+            aria-label="Zoom in"
+            onClick={() => setScale((s) => Math.min(3, s + 0.2))}
+            className="rounded p-1 hover:bg-accent"
+          >
+            <Plus className="h-4 w-4" />
+          </button>
+          <button
+            aria-label="Close viewer"
+            onClick={onClose}
+            className="rounded p-1 hover:bg-accent"
+          >
+            <X className="h-5 w-5" />
+          </button>
         </div>
       </div>
       <div className="relative flex-1 overflow-auto bg-neutral-800 p-4">
@@ -102,7 +137,9 @@ export function FileViewer({ fileType, fileId, initialPage, onClose }: FileViewe
           </div>
         )}
         {error && (
-          <p className="absolute inset-x-0 top-4 text-center text-sm text-red-300">{error}</p>
+          <p className="absolute inset-x-0 top-4 text-center text-sm text-red-300">
+            {error}
+          </p>
         )}
       </div>
     </div>

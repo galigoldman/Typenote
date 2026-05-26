@@ -28,6 +28,7 @@
 ## File Structure
 
 **Create**
+
 - `supabase/migrations/20260526120000_document_context_files.sql` — table, RLS, `match_source_ids` param, migrate+drop homework tables.
 - `src/lib/ai/context-files.ts` — pure resolvers (name/meta of an attached file by type). Replaces the kept parts of `homework-context.ts`.
 - `src/lib/ai/__tests__/context-files.test.ts` — unit tests for the resolvers.
@@ -39,6 +40,7 @@
 - `e2e/document-context-files.spec.ts` — the 4 E2E scenarios.
 
 **Modify**
+
 - `src/types/database.ts` — remove homework types; add `ContextFileType`, `DocumentContextFile`, `AttachableFile`, `ResolvedContextFile`; add `sourceId` to `ChatSource`.
 - `src/lib/queries/embeddings.ts` — `matchEmbeddings` gains `sourceIds`.
 - `src/lib/actions/ai-context.ts` — `searchContext` gains `sourceIds`; `buildAiContext` drops homework tiers, adds focus pass + page ranges + `sourceId`; returns `contextFilesUsed`.
@@ -55,6 +57,7 @@
 - `e2e/TEST_REGISTRY.md` — add the new scenarios.
 
 **Delete**
+
 - `src/components/dashboard/start-homework-dialog.tsx`
 - `src/components/dashboard/homework-context-chip.tsx`
 - `src/components/dashboard/__tests__/homework-context-chip.test.tsx`
@@ -72,6 +75,7 @@
 ### Task 1: Migration — `document_context_files`, focus filter, drop homework tables
 
 **Files:**
+
 - Create: `supabase/migrations/20260526120000_document_context_files.sql`
 
 - [ ] **Step 1: Write the migration**
@@ -192,11 +196,13 @@ Expected: completes without error; the new migration runs after `20260525120000`
 - [ ] **Step 3: Verify the schema landed**
 
 Run:
+
 ```bash
 supabase db execute "select count(*) from public.document_context_files; \
   select proname, pronargs from pg_proc where proname='match_embeddings'; \
   select to_regclass('public.homework_sessions');"
 ```
+
 Expected: `document_context_files` exists (count 0), `match_embeddings` has 8 args, `homework_sessions` is NULL (dropped).
 
 - [ ] **Step 4: Commit**
@@ -211,6 +217,7 @@ git commit -m "feat(db): document_context_files table + match_source_ids focus f
 ### Task 2: Types — remove homework, add context-file types, extend ChatSource
 
 **Files:**
+
 - Modify: `src/types/database.ts`
 
 - [ ] **Step 1: Remove the homework type block**
@@ -220,6 +227,7 @@ Delete the entire block from `export type HomeworkMaterialType =` through the en
 - [ ] **Step 2: Add `sourceId` to `ChatSource`**
 
 Replace the current interface:
+
 ```ts
 export interface ChatSource {
   sourceType: string;
@@ -227,7 +235,9 @@ export interface ChatSource {
   pageRange: string | null;
 }
 ```
+
 with:
+
 ```ts
 export interface ChatSource {
   sourceType: string;
@@ -240,7 +250,10 @@ export interface ChatSource {
 - [ ] **Step 3: Add the new context-file types** (append near the end, before `VersionTrigger`)
 
 ```ts
-export type ContextFileType = 'course_material' | 'personal_file' | 'moodle_file';
+export type ContextFileType =
+  | 'course_material'
+  | 'personal_file'
+  | 'moodle_file';
 
 export interface DocumentContextFile {
   id: string;
@@ -286,6 +299,7 @@ git commit -m "feat(types): add context-file types + ChatSource.sourceId; remove
 ### Task 3: Pure context-file resolvers (`src/lib/ai/context-files.ts`)
 
 **Files:**
+
 - Create: `src/lib/ai/context-files.ts`
 - Test: `src/lib/ai/__tests__/context-files.test.ts`
 
@@ -380,11 +394,26 @@ export function fileSourceConfig(
 ): FileSourceConfig {
   switch (type) {
     case 'course_material':
-      return { table: 'course_materials', client: supabase, bucket: 'course-materials', nameCol: 'file_name' };
+      return {
+        table: 'course_materials',
+        client: supabase,
+        bucket: 'course-materials',
+        nameCol: 'file_name',
+      };
     case 'personal_file':
-      return { table: 'personal_files', client: supabase, bucket: 'personal-files', nameCol: 'display_name' };
+      return {
+        table: 'personal_files',
+        client: supabase,
+        bucket: 'personal-files',
+        nameCol: 'display_name',
+      };
     case 'moodle_file':
-      return { table: 'moodle_files', client: admin, bucket: 'moodle-materials', nameCol: 'file_name' };
+      return {
+        table: 'moodle_files',
+        client: admin,
+        bucket: 'moodle-materials',
+        nameCol: 'file_name',
+      };
   }
 }
 
@@ -416,7 +445,12 @@ export async function resolveContextFileMeta(
   admin: SupabaseClient,
   type: ContextFileType,
   id: string,
-): Promise<{ name: string; mimeType: string | null; bucket: string; storagePath: string | null } | null> {
+): Promise<{
+  name: string;
+  mimeType: string | null;
+  bucket: string;
+  storagePath: string | null;
+} | null> {
   try {
     const cfg = fileSourceConfig(type, supabase, admin);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -463,6 +497,7 @@ git commit -m "feat(ai): pure context-file resolvers"
 ### Task 4: `matchEmbeddings` + `searchContext` gain `sourceIds`
 
 **Files:**
+
 - Modify: `src/lib/queries/embeddings.ts:91-115`
 - Modify: `src/lib/actions/ai-context.ts` (`SearchParams` ~41-46, `searchContext` ~309-360)
 - Test: `src/lib/queries/__tests__/embeddings.test.ts` (create if absent)
@@ -513,6 +548,7 @@ Expected: FAIL — `match_source_ids` not passed.
 - [ ] **Step 3: Update `matchEmbeddings`**
 
 In `src/lib/queries/embeddings.ts`, add `sourceIds` to the params type and the rpc call:
+
 ```ts
 export async function matchEmbeddings(params: {
   queryEmbedding: number[];
@@ -543,6 +579,7 @@ export async function matchEmbeddings(params: {
 - [ ] **Step 4: Thread `sourceIds` through `searchContext`**
 
 In `src/lib/actions/ai-context.ts`, add to `SearchParams`:
+
 ```ts
 export type SearchParams = {
   query: string;
@@ -552,18 +589,21 @@ export type SearchParams = {
   sourceIds?: string[];
 };
 ```
+
 and in `searchContext`, pass it into the `matchEmbeddings({ ... })` call:
+
 ```ts
-  const matches: MatchResult[] = await matchEmbeddings({
-    queryEmbedding,
-    userId,
-    courseId: params.courseId,
-    moodleCourseId,
-    importedMoodleFileIds,
-    sourceIds: params.sourceIds ?? null,
-    matchCount: params.maxResults ?? 8,
-  });
+const matches: MatchResult[] = await matchEmbeddings({
+  queryEmbedding,
+  userId,
+  courseId: params.courseId,
+  moodleCourseId,
+  importedMoodleFileIds,
+  sourceIds: params.sourceIds ?? null,
+  matchCount: params.maxResults ?? 8,
+});
 ```
+
 (The `weekId` field on `SearchParams` is dead post-flatten; leave it untouched to avoid unrelated churn, but do not pass it to `matchEmbeddings`.)
 
 - [ ] **Step 5: Run tests**
@@ -583,12 +623,14 @@ git commit -m "feat(ai): match_source_ids focus filter through matchEmbeddings +
 ### Task 5: `buildSystemPrompt` — replace homework params with `contextFileNames`
 
 **Files:**
+
 - Modify: `src/lib/ai/prompts.ts:1-55`
 - Modify: `src/lib/ai/__tests__/prompts.test.ts` (update homework assertions)
 
 - [ ] **Step 1: Update the test** (replace the homework-mode cases)
 
 In `src/lib/ai/__tests__/prompts.test.ts`, remove any tests referencing `isHomeworkMode` / `exerciseName` / `pinnedMaterialNames` and add:
+
 ```ts
 import { describe, expect, it } from 'vitest';
 import { buildSystemPrompt } from '@/lib/ai/prompts';
@@ -606,7 +648,10 @@ describe('buildSystemPrompt context files', () => {
   });
 
   it('omits the section when there are no attached files', () => {
-    const out = buildSystemPrompt({ courseName: 'Algebra', hasDocumentContent: false });
+    const out = buildSystemPrompt({
+      courseName: 'Algebra',
+      hasDocumentContent: false,
+    });
     expect(out).not.toContain('ATTACHED CONTEXT FILES');
   });
 });
@@ -620,6 +665,7 @@ Expected: FAIL — `contextFileNames` not supported / `ATTACHED CONTEXT FILES` m
 - [ ] **Step 3: Rewrite the homework section of `buildSystemPrompt`**
 
 Replace the `SystemPromptContext` interface and the homework block:
+
 ```ts
 export interface SystemPromptContext {
   courseName?: string;
@@ -665,6 +711,7 @@ The student attached these files as the primary context for this note: ${context
 ${documentContext}${contextFilesSection}`;
 }
 ```
+
 Leave `LATEX_SYSTEM_PROMPT` and `buildLatexPrompt` untouched.
 
 - [ ] **Step 4: Run the test**
@@ -684,6 +731,7 @@ git commit -m "feat(ai): system prompt names attached context files (drops homew
 ### Task 6: `buildAiContext` — remove homework tiers, add the focus pass
 
 **Files:**
+
 - Modify: `src/lib/actions/ai-context.ts` (`buildAiContext` ~553-838; also `askQuestion` ~381-547 if it references homework — it does not, leave it)
 - Modify: `src/lib/actions/__tests__/ai-context.test.ts` (drop homework-context assertions; the focus-pass logic is covered by integration since it needs a DB)
 
@@ -692,130 +740,167 @@ This task rewrites the body of `buildAiContext`. Read the current function first
 - [ ] **Step 1: Remove the homework import**
 
 In `src/lib/actions/ai-context.ts`, delete the import of `resolveHomeworkContext` (from `@/lib/ai/homework-context`) and add:
+
 ```ts
 import { listContextFiles } from '@/lib/actions/context-files';
 import { resolveContextFileName } from '@/lib/ai/context-files';
 ```
+
 > Note: `listContextFiles` is defined in Task 8. If implementing strictly in order, define a thin inline loader here instead and replace it in Task 8 — but since both land before tests run, importing it is fine.
 
 - [ ] **Step 2: Replace the homework resolution + tier injection**
 
 Replace this block near the top of `buildAiContext`:
+
 ```ts
-  const admin = createAdminClient();
+const admin = createAdminClient();
 
-  // Homework context (Tiers 1–2) ...
-  const homework = params.documentId
-    ? await resolveHomeworkContext(supabase, admin, params.documentId)
-    : null;
+// Homework context (Tiers 1–2) ...
+const homework = params.documentId
+  ? await resolveHomeworkContext(supabase, admin, params.documentId)
+  : null;
 
-  const hasDocumentContent = !!documentContent?.trim();
-  const systemPrompt = buildSystemPrompt({
-    courseName,
-    hasDocumentContent,
-    isHomeworkMode: !!homework,
-    exerciseName: homework?.exerciseName,
-    pinnedMaterialNames: homework?.pinnedNames,
-  });
+const hasDocumentContent = !!documentContent?.trim();
+const systemPrompt = buildSystemPrompt({
+  courseName,
+  hasDocumentContent,
+  isHomeworkMode: !!homework,
+  exerciseName: homework?.exerciseName,
+  pinnedMaterialNames: homework?.pinnedNames,
+});
 
-  // Skip RAG search when there's no course (no materials to search)
-  const results = courseId
-    ? await searchContext({ query: question, courseId, maxResults: 8 })
-    : [];
+// Skip RAG search when there's no course (no materials to search)
+const results = courseId
+  ? await searchContext({ query: question, courseId, maxResults: 8 })
+  : [];
 ```
+
 with:
+
 ```ts
-  const admin = createAdminClient();
+const admin = createAdminClient();
 
-  // Attached context files (focus the AI). Names go in the prompt; ids drive
-  // a scoped "focus" retrieval so their chunks are guaranteed in context.
-  const attached =
-    params.documentId && courseId
-      ? await listContextFiles(supabase, params.documentId)
-      : [];
-  const attachedIds = attached.map((a) => a.file_id);
-  const contextFileNames = (
-    await Promise.all(
-      attached
-        .slice(0, 10)
-        .map((a) => resolveContextFileName(supabase, admin, a.file_type, a.file_id)),
-    )
-  ).filter((n): n is string => !!n);
-
-  const hasDocumentContent = !!documentContent?.trim();
-  const systemPrompt = buildSystemPrompt({
-    courseName,
-    hasDocumentContent,
-    contextFileNames,
-  });
-
-  // RAG: focus pass over attached files FIRST, then the normal course-wide search.
-  // The dedupe-by-sourceId loop below keeps the focus (first) hit per source,
-  // so attached files rank ahead of everything else.
-  const focusResults =
-    courseId && attachedIds.length > 0
-      ? await searchContext({ query: question, courseId, sourceIds: attachedIds, maxResults: 6 })
-      : [];
-  const courseResults = courseId
-    ? await searchContext({ query: question, courseId, maxResults: 8 })
+// Attached context files (focus the AI). Names go in the prompt; ids drive
+// a scoped "focus" retrieval so their chunks are guaranteed in context.
+const attached =
+  params.documentId && courseId
+    ? await listContextFiles(supabase, params.documentId)
     : [];
-  const results = [...focusResults, ...courseResults];
+const attachedIds = attached.map((a) => a.file_id);
+const contextFileNames = (
+  await Promise.all(
+    attached
+      .slice(0, 10)
+      .map((a) =>
+        resolveContextFileName(supabase, admin, a.file_type, a.file_id),
+      ),
+  )
+).filter((n): n is string => !!n);
+
+const hasDocumentContent = !!documentContent?.trim();
+const systemPrompt = buildSystemPrompt({
+  courseName,
+  hasDocumentContent,
+  contextFileNames,
+});
+
+// RAG: focus pass over attached files FIRST, then the normal course-wide search.
+// The dedupe-by-sourceId loop below keeps the focus (first) hit per source,
+// so attached files rank ahead of everything else.
+const focusResults =
+  courseId && attachedIds.length > 0
+    ? await searchContext({
+        query: question,
+        courseId,
+        sourceIds: attachedIds,
+        maxResults: 6,
+      })
+    : [];
+const courseResults = courseId
+  ? await searchContext({ query: question, courseId, maxResults: 8 })
+  : [];
+const results = [...focusResults, ...courseResults];
 ```
 
 - [ ] **Step 3: Add `sourceId` + page range to each source**
 
 In the loop that builds `sources`, change the push to include `sourceId` and a computed `pageRange`:
+
 ```ts
-  for (const r of results) {
-    if (r.segmentText && !seen.has(r.sourceId)) {
-      seen.add(r.sourceId);
-      contextTexts.push(`--- ${r.sourceName} ---\n${r.segmentText}`);
-      const pageRange =
-        r.pageStart != null
-          ? r.pageEnd != null && r.pageEnd !== r.pageStart
-            ? `p. ${r.pageStart + 1}–${r.pageEnd + 1}`
-            : `p. ${r.pageStart + 1}`
-          : null;
-      sources.push({
-        sourceType: r.sourceType,
-        sourceId: r.sourceId,
-        sourceName: r.sourceName,
-        pageRange,
-        signedUrl: null,
-      });
-      sourceIds.push({ sourceId: r.sourceId, sourceType: r.sourceType, idx: sources.length - 1 });
-    }
+for (const r of results) {
+  if (r.segmentText && !seen.has(r.sourceId)) {
+    seen.add(r.sourceId);
+    contextTexts.push(`--- ${r.sourceName} ---\n${r.segmentText}`);
+    const pageRange =
+      r.pageStart != null
+        ? r.pageEnd != null && r.pageEnd !== r.pageStart
+          ? `p. ${r.pageStart + 1}–${r.pageEnd + 1}`
+          : `p. ${r.pageStart + 1}`
+        : null;
+    sources.push({
+      sourceType: r.sourceType,
+      sourceId: r.sourceId,
+      sourceName: r.sourceName,
+      pageRange,
+      signedUrl: null,
+    });
+    sourceIds.push({
+      sourceId: r.sourceId,
+      sourceType: r.sourceType,
+      idx: sources.length - 1,
+    });
   }
+}
 ```
+
 > `QuestionResult['sources']` (defined ~75-86) must gain `sourceId: string`. Update that type:
+
 ```ts
-  sources: Array<{
-    sourceType: string;
-    sourceId: string;
-    sourceName: string;
-    pageRange: string | null;
-    signedUrl: string | null;
-  }>;
+sources: Array<{
+  sourceType: string;
+  sourceId: string;
+  sourceName: string;
+  pageRange: string | null;
+  signedUrl: string | null;
+}>;
 ```
+
 Also update the matching `sources.push` in `askQuestion` (~421) to include `sourceId: r.sourceId` and keep `pageRange: null` there (askQuestion is the non-streaming path; page range optional).
 
 - [ ] **Step 4: Delete the Tier-1 / Tier-2 injection blocks**
 
 Remove the two blocks that inject `homework?.exerciseText` (Tier 1) and `pinnedWithText` (Tier 2) — currently ~722-756. Then fix `hasInjectedContext` (~790-794) to drop the homework terms:
+
 ```ts
-  const hasInjectedContext = hasDocumentContent || contextTexts.length > 0;
+const hasInjectedContext = hasDocumentContent || contextTexts.length > 0;
 ```
 
 - [ ] **Step 5: Change the return value**
 
 Replace the return:
+
 ```ts
-  return { systemPrompt, contents, modelName, sources, homeworkContextUsed: !!homework };
+return {
+  systemPrompt,
+  contents,
+  modelName,
+  sources,
+  homeworkContextUsed: !!homework,
+};
 ```
+
 with:
+
 ```ts
-  return { systemPrompt, contents, modelName, sources, contextFilesUsed: attached.length > 0 };
+return {
+  systemPrompt,
+  contents,
+  modelName,
+  sources,
+  contextFilesUsed: attached.length > 0,
+};
 ```
+
 and update the function's return type annotation (`homeworkContextUsed: boolean` → `contextFilesUsed: boolean`).
 
 - [ ] **Step 6: Clean the unit test**
@@ -841,6 +926,7 @@ git commit -m "feat(ai): replace homework tiers with attached-file focus pass + 
 ### Task 7: Route + analytics rename (`homeworkContextUsed` → `contextFilesUsed`)
 
 **Files:**
+
 - Modify: `src/app/api/ai/ask/route.ts:264,311,336`
 - Modify: `src/lib/analytics/events.ts:43`
 - Modify: `src/lib/analytics/__tests__/events.test.ts`
@@ -854,12 +940,14 @@ git commit -m "feat(ai): replace homework tiers with attached-file focus pass + 
 - [ ] **Step 2: Rename the analytics event**
 
 In `src/lib/analytics/events.ts`, rename the `homework_context_used` entry (currently ~43) to:
+
 ```ts
-  context_files_used: {
-    course_id: string | null | undefined;
-    file_count: number;
-  };
+context_files_used: {
+  course_id: string | null | undefined;
+  file_count: number;
+}
 ```
+
 Update `src/lib/analytics/__tests__/events.test.ts` accordingly (rename the event + props in any assertion).
 
 - [ ] **Step 3: Run affected tests + typecheck**
@@ -879,6 +967,7 @@ git commit -m "feat(ai): rename homeworkContextUsed -> contextFilesUsed (route +
 ### Task 8: Context-file server actions
 
 **Files:**
+
 - Create: `src/lib/actions/context-files.ts`
 - Test: `src/lib/actions/context-files.integration.test.ts`
 
@@ -892,7 +981,10 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 
 import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
-import { resolveContextFileName, resolveContextFileMeta } from '@/lib/ai/context-files';
+import {
+  resolveContextFileName,
+  resolveContextFileMeta,
+} from '@/lib/ai/context-files';
 import type {
   AttachableFile,
   ContextFileType,
@@ -900,7 +992,11 @@ import type {
   ResolvedContextFile,
 } from '@/types/database';
 
-const FILE_TYPES: ContextFileType[] = ['course_material', 'personal_file', 'moodle_file'];
+const FILE_TYPES: ContextFileType[] = [
+  'course_material',
+  'personal_file',
+  'moodle_file',
+];
 
 /** Pure loader (testable): rows for a document. */
 export async function listContextFiles(
@@ -914,8 +1010,13 @@ export async function listContextFiles(
   return (data as DocumentContextFile[] | null) ?? [];
 }
 
-async function assertOwnsCourseDoc(supabase: SupabaseClient, documentId: string) {
-  const { data: { user } } = await supabase.auth.getUser();
+async function assertOwnsCourseDoc(
+  supabase: SupabaseClient,
+  documentId: string,
+) {
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
   if (!user) throw new Error('Not authenticated');
   const { data: doc } = await supabase
     .from('documents')
@@ -937,7 +1038,12 @@ export async function attachContextFile(data: {
   const admin = createAdminClient();
   await assertOwnsCourseDoc(supabase, data.documentId);
 
-  const meta = await resolveContextFileMeta(supabase, admin, data.fileType, data.fileId);
+  const meta = await resolveContextFileMeta(
+    supabase,
+    admin,
+    data.fileType,
+    data.fileId,
+  );
   if (!meta) throw new Error('File not found');
 
   const { error } = await supabase.from('document_context_files').insert({
@@ -949,7 +1055,12 @@ export async function attachContextFile(data: {
   if (error && error.code !== '23505') throw new Error(error.message);
 
   revalidatePath(`/dashboard/documents/${data.documentId}`);
-  return { fileType: data.fileType, fileId: data.fileId, name: meta.name, mimeType: meta.mimeType };
+  return {
+    fileType: data.fileType,
+    fileId: data.fileId,
+    name: meta.name,
+    mimeType: meta.mimeType,
+  };
 }
 
 export async function detachContextFile(data: {
@@ -970,15 +1081,27 @@ export async function detachContextFile(data: {
 }
 
 /** Attached files resolved for display in the panel. */
-export async function getContextFiles(documentId: string): Promise<ResolvedContextFile[]> {
+export async function getContextFiles(
+  documentId: string,
+): Promise<ResolvedContextFile[]> {
   const supabase = await createClient();
   const admin = createAdminClient();
   const rows = await listContextFiles(supabase, documentId);
   const resolved = await Promise.all(
     rows.map(async (r) => {
-      const meta = await resolveContextFileMeta(supabase, admin, r.file_type, r.file_id);
+      const meta = await resolveContextFileMeta(
+        supabase,
+        admin,
+        r.file_type,
+        r.file_id,
+      );
       return meta
-        ? { fileType: r.file_type, fileId: r.file_id, name: meta.name, mimeType: meta.mimeType }
+        ? {
+            fileType: r.file_type,
+            fileId: r.file_id,
+            name: meta.name,
+            mimeType: meta.mimeType,
+          }
         : null;
     }),
   );
@@ -992,10 +1115,17 @@ export async function getContextFileUrl(data: {
 }): Promise<{ url: string; mimeType: string | null } | null> {
   const supabase = await createClient();
   const admin = createAdminClient();
-  const meta = await resolveContextFileMeta(supabase, admin, data.fileType, data.fileId);
+  const meta = await resolveContextFileMeta(
+    supabase,
+    admin,
+    data.fileType,
+    data.fileId,
+  );
   if (!meta?.storagePath) return null;
   const client = meta.bucket === 'moodle-materials' ? admin : supabase;
-  const { data: signed } = await client.storage.from(meta.bucket).createSignedUrl(meta.storagePath, 3600);
+  const { data: signed } = await client.storage
+    .from(meta.bucket)
+    .createSignedUrl(meta.storagePath, 3600);
   if (!signed?.signedUrl) return null;
   return { url: signed.signedUrl, mimeType: meta.mimeType };
 }
@@ -1010,8 +1140,14 @@ export async function getAttachableFiles(courseId: string): Promise<{
   const admin = createAdminClient();
 
   const [{ data: cms }, { data: pfs }] = await Promise.all([
-    supabase.from('course_materials').select('id, file_name, mime_type').eq('course_id', courseId),
-    supabase.from('personal_files').select('id, display_name, mime_type').eq('course_id', courseId),
+    supabase
+      .from('course_materials')
+      .select('id, file_name, mime_type')
+      .eq('course_id', courseId),
+    supabase
+      .from('personal_files')
+      .select('id, display_name, mime_type')
+      .eq('course_id', courseId),
   ]);
 
   // Imported Moodle files for this course (mirror searchContext's resolution).
@@ -1027,7 +1163,9 @@ export async function getAttachableFiles(courseId: string): Promise<{
       .select('moodle_file_id')
       .eq('sync_id', sync.id)
       .eq('status', 'imported');
-    const ids = ((imports as { moodle_file_id: string }[] | null) ?? []).map((i) => i.moodle_file_id);
+    const ids = ((imports as { moodle_file_id: string }[] | null) ?? []).map(
+      (i) => i.moodle_file_id,
+    );
     if (ids.length) {
       const { data: mfs } = await admin
         .from('moodle_files')
@@ -1035,19 +1173,40 @@ export async function getAttachableFiles(courseId: string): Promise<{
         .in('id', ids)
         .eq('is_removed', false)
         .eq('type', 'file');
-      for (const m of (mfs as { id: string; file_name: string; mime_type: string | null }[] | null) ?? []) {
-        moodleFiles.push({ fileType: 'moodle_file', fileId: m.id, name: m.file_name, mimeType: m.mime_type });
+      for (const m of (mfs as
+        | { id: string; file_name: string; mime_type: string | null }[]
+        | null) ?? []) {
+        moodleFiles.push({
+          fileType: 'moodle_file',
+          fileId: m.id,
+          name: m.file_name,
+          mimeType: m.mime_type,
+        });
       }
     }
   }
 
   return {
-    courseMaterials: ((cms as { id: string; file_name: string; mime_type: string | null }[] | null) ?? []).map(
-      (m) => ({ fileType: 'course_material', fileId: m.id, name: m.file_name, mimeType: m.mime_type }),
-    ),
-    personalFiles: ((pfs as { id: string; display_name: string; mime_type: string | null }[] | null) ?? []).map(
-      (f) => ({ fileType: 'personal_file', fileId: f.id, name: f.display_name, mimeType: f.mime_type }),
-    ),
+    courseMaterials: (
+      (cms as
+        | { id: string; file_name: string; mime_type: string | null }[]
+        | null) ?? []
+    ).map((m) => ({
+      fileType: 'course_material',
+      fileId: m.id,
+      name: m.file_name,
+      mimeType: m.mime_type,
+    })),
+    personalFiles: (
+      (pfs as
+        | { id: string; display_name: string; mime_type: string | null }[]
+        | null) ?? []
+    ).map((f) => ({
+      fileType: 'personal_file',
+      fileId: f.id,
+      name: f.display_name,
+      mimeType: f.mime_type,
+    })),
     moodleFiles,
   };
 }
@@ -1073,37 +1232,71 @@ let documentId: string;
 let materialId: string;
 
 beforeAll(async () => {
-  const { data: profile } = await admin.from('profiles').select('id').limit(1).single();
+  const { data: profile } = await admin
+    .from('profiles')
+    .select('id')
+    .limit(1)
+    .single();
   userId = profile!.id;
   const { data: course } = await admin
     .from('courses')
     .insert({ user_id: userId, name: 'CTX Test', color: '#fff', position: 0 })
-    .select('id').single();
+    .select('id')
+    .single();
   courseId = course!.id;
   const { data: doc } = await admin
     .from('documents')
-    .insert({ user_id: userId, course_id: courseId, title: 'Doc', content: {}, subject: 'other', canvas_type: 'blank', position: 0 })
-    .select('id').single();
+    .insert({
+      user_id: userId,
+      course_id: courseId,
+      title: 'Doc',
+      content: {},
+      subject: 'other',
+      canvas_type: 'blank',
+      position: 0,
+    })
+    .select('id')
+    .single();
   documentId = doc!.id;
   const { data: mat } = await admin
     .from('course_materials')
-    .insert({ course_id: courseId, user_id: userId, category: 'material', storage_path: 'x/y.pdf', file_name: 'y.pdf', file_size: 1, mime_type: 'application/pdf' })
-    .select('id').single();
+    .insert({
+      course_id: courseId,
+      user_id: userId,
+      category: 'material',
+      storage_path: 'x/y.pdf',
+      file_name: 'y.pdf',
+      file_size: 1,
+      mime_type: 'application/pdf',
+    })
+    .select('id')
+    .single();
   materialId = mat!.id;
 });
 
 describe('document_context_files', () => {
   it('inserts, lists, dedupes, and detaches', async () => {
-    await admin.from('document_context_files').insert({ document_id: documentId, file_type: 'course_material', file_id: materialId });
+    await admin.from('document_context_files').insert({
+      document_id: documentId,
+      file_type: 'course_material',
+      file_id: materialId,
+    });
     // Duplicate violates unique constraint.
-    const dup = await admin.from('document_context_files').insert({ document_id: documentId, file_type: 'course_material', file_id: materialId });
+    const dup = await admin.from('document_context_files').insert({
+      document_id: documentId,
+      file_type: 'course_material',
+      file_id: materialId,
+    });
     expect(dup.error?.code).toBe('23505');
 
     const rows = await listContextFiles(admin as never, documentId);
     expect(rows).toHaveLength(1);
     expect(rows[0].file_id).toBe(materialId);
 
-    await admin.from('document_context_files').delete().eq('document_id', documentId);
+    await admin
+      .from('document_context_files')
+      .delete()
+      .eq('document_id', documentId);
     const after = await listContextFiles(admin as never, documentId);
     expect(after).toHaveLength(0);
   });
@@ -1127,15 +1320,18 @@ git commit -m "feat(actions): attach/detach/get context files + attachable-files
 ### Task 9: Clean up personal-file embeddings on delete
 
 **Files:**
+
 - Modify: `src/lib/actions/personal-files.ts` (`deletePersonalFile` ~219-249)
 
 - [ ] **Step 1: Add the embeddings cleanup**
 
 At the top of `deletePersonalFile`, after auth and before/after deleting storage, add the embeddings deletion (mirror `course-materials.ts`):
+
 ```ts
-  const { deleteEmbeddingsBySource } = await import('@/lib/queries/embeddings');
-  await deleteEmbeddingsBySource('personal_file', fileId);
+const { deleteEmbeddingsBySource } = await import('@/lib/queries/embeddings');
+await deleteEmbeddingsBySource('personal_file', fileId);
 ```
+
 Place it just before the `personal_files` row delete so the embeddings go regardless of storage outcome.
 
 - [ ] **Step 2: Typecheck**
@@ -1157,6 +1353,7 @@ git commit -m "fix(personal-files): delete embeddings when a personal file is de
 ### Task 10: `ContextFilesPanel` component
 
 **Files:**
+
 - Create: `src/components/dashboard/context-files-panel.tsx`
 
 This is a client component. It loads attached files via `getContextFiles`, shows them with remove buttons, an "Add files" picker fed by `getAttachableFiles`, and an empty state. Clicking a file calls `onOpenFile`.
@@ -1174,7 +1371,11 @@ import {
   getAttachableFiles,
   getContextFiles,
 } from '@/lib/actions/context-files';
-import type { AttachableFile, ContextFileType, ResolvedContextFile } from '@/types/database';
+import type {
+  AttachableFile,
+  ContextFileType,
+  ResolvedContextFile,
+} from '@/types/database';
 
 interface ContextFilesPanelProps {
   documentId: string;
@@ -1212,7 +1413,8 @@ export function ContextFilesPanel({
     setPicking(true);
     setLoadingPicker(true);
     try {
-      const { courseMaterials, personalFiles, moodleFiles } = await getAttachableFiles(courseId);
+      const { courseMaterials, personalFiles, moodleFiles } =
+        await getAttachableFiles(courseId);
       setCandidates([...moodleFiles, ...courseMaterials, ...personalFiles]);
     } finally {
       setLoadingPicker(false);
@@ -1223,12 +1425,20 @@ export function ContextFilesPanel({
     files.some((f) => f.fileType === c.fileType && f.fileId === c.fileId);
 
   const handleAttach = async (c: AttachableFile) => {
-    await attachContextFile({ documentId, fileType: c.fileType, fileId: c.fileId });
+    await attachContextFile({
+      documentId,
+      fileType: c.fileType,
+      fileId: c.fileId,
+    });
     await refresh();
   };
 
   const handleDetach = async (f: ResolvedContextFile) => {
-    await detachContextFile({ documentId, fileType: f.fileType, fileId: f.fileId });
+    await detachContextFile({
+      documentId,
+      fileType: f.fileType,
+      fileId: f.fileId,
+    });
     await refresh();
   };
 
@@ -1244,7 +1454,11 @@ export function ContextFilesPanel({
           <Paperclip className="h-4 w-4 text-muted-foreground" />
           <h2 className="text-sm font-semibold">Context files</h2>
         </div>
-        <button onClick={onClose} aria-label="Close context files" className="flex h-8 w-8 items-center justify-center rounded-md hover:bg-accent">
+        <button
+          onClick={onClose}
+          aria-label="Close context files"
+          className="flex h-8 w-8 items-center justify-center rounded-md hover:bg-accent"
+        >
           <X className="h-4 w-4" />
         </button>
       </div>
@@ -1252,21 +1466,31 @@ export function ContextFilesPanel({
       <div className="flex-1 overflow-y-auto p-2">
         {files.length === 0 ? (
           <p className="px-2 py-6 text-center text-xs text-muted-foreground">
-            No files attached — that&apos;s fine. The AI still answers using everything in this
-            course. Attach the exercise sheet or slides to give it focused context.
+            No files attached — that&apos;s fine. The AI still answers using
+            everything in this course. Attach the exercise sheet or slides to
+            give it focused context.
           </p>
         ) : (
           files.map((f) => (
-            <div key={`${f.fileType}:${f.fileId}`} className="group flex items-center gap-2 rounded px-2 py-1.5 text-sm hover:bg-accent">
+            <div
+              key={`${f.fileType}:${f.fileId}`}
+              className="group flex items-center gap-2 rounded px-2 py-1.5 text-sm hover:bg-accent"
+            >
               <button
-                onClick={() => onOpenFile({ fileType: f.fileType, fileId: f.fileId })}
+                onClick={() =>
+                  onOpenFile({ fileType: f.fileType, fileId: f.fileId })
+                }
                 className="flex min-w-0 flex-1 items-center gap-2 text-left"
                 data-testid="context-file-item"
               >
                 <FileText className="h-4 w-4 shrink-0 text-muted-foreground" />
                 <span className="truncate">{f.name}</span>
               </button>
-              <button onClick={() => handleDetach(f)} aria-label={`Remove ${f.name}`} className="shrink-0 rounded p-0.5 text-muted-foreground opacity-0 hover:bg-background group-hover:opacity-100">
+              <button
+                onClick={() => handleDetach(f)}
+                aria-label={`Remove ${f.name}`}
+                className="shrink-0 rounded p-0.5 text-muted-foreground opacity-0 hover:bg-background group-hover:opacity-100"
+              >
                 <X className="h-3.5 w-3.5" />
               </button>
             </div>
@@ -1286,9 +1510,13 @@ export function ContextFilesPanel({
         ) : (
           <div className="max-h-60 space-y-0.5 overflow-y-auto">
             {loadingPicker ? (
-              <p className="py-3 text-center text-xs text-muted-foreground">Loading…</p>
+              <p className="py-3 text-center text-xs text-muted-foreground">
+                Loading…
+              </p>
             ) : candidates.length === 0 ? (
-              <p className="py-3 text-center text-xs text-muted-foreground">No imported files in this course yet.</p>
+              <p className="py-3 text-center text-xs text-muted-foreground">
+                No imported files in this course yet.
+              </p>
             ) : (
               candidates.map((c) => (
                 <button
@@ -1299,11 +1527,20 @@ export function ContextFilesPanel({
                 >
                   <FileText className="h-4 w-4 shrink-0 text-muted-foreground" />
                   <span className="truncate">{c.name}</span>
-                  {isAttached(c) && <span className="ml-auto text-[10px] text-muted-foreground">added</span>}
+                  {isAttached(c) && (
+                    <span className="ml-auto text-[10px] text-muted-foreground">
+                      added
+                    </span>
+                  )}
                 </button>
               ))
             )}
-            <button onClick={() => setPicking(false)} className="mt-1 w-full rounded-md py-1.5 text-xs text-muted-foreground hover:bg-accent">Done</button>
+            <button
+              onClick={() => setPicking(false)}
+              className="mt-1 w-full rounded-md py-1.5 text-xs text-muted-foreground hover:bg-accent"
+            >
+              Done
+            </button>
           </div>
         )}
       </div>
@@ -1329,6 +1566,7 @@ git commit -m "feat(ui): ContextFilesPanel (list, add-picker, empty state)"
 ### Task 11: `DocumentContextFiles` host + wire into both editors + chat cue
 
 **Files:**
+
 - Create: `src/components/dashboard/document-context-files.tsx`
 - Modify: `src/components/ai/document-with-ai.tsx`
 - Modify: `src/components/editor/tiptap-editor-with-versions.tsx`
@@ -1396,7 +1634,9 @@ export function DocumentContextFiles({
         />
       )}
       {/* `count` is surfaced to the toolbar toggle in the editor wrappers. */}
-      <span className="sr-only" data-testid="context-files-count">{count}</span>
+      <span className="sr-only" data-testid="context-files-count">
+        {count}
+      </span>
       {/* Expose openViewer to siblings via a custom event on the document root. */}
       <ViewerBridge openViewer={openViewer} />
     </>
@@ -1405,7 +1645,11 @@ export function DocumentContextFiles({
 
 /** Bridges `open-context-viewer` window events → openViewer, so the AI chat
  *  (a separate subtree) can request the viewer without prop drilling. */
-function ViewerBridge({ openViewer }: { openViewer: (t: ViewerTarget) => void }) {
+function ViewerBridge({
+  openViewer,
+}: {
+  openViewer: (t: ViewerTarget) => void;
+}) {
   if (typeof window !== 'undefined') {
     window.__openContextViewer = openViewer;
   }
@@ -1425,50 +1669,63 @@ declare global {
 Add state and render. Add a toolbar toggle button (reuse the floating style). Pass an `onOpenSource` to `AiChatWrapper`.
 
 In `src/components/ai/document-with-ai.tsx`, add near the other state:
+
 ```tsx
-  const [isContextOpen, setIsContextOpen] = useState(false);
-  const [contextCount, setContextCount] = useState(0);
+const [isContextOpen, setIsContextOpen] = useState(false);
+const [contextCount, setContextCount] = useState(0);
 ```
+
 Add the import:
+
 ```tsx
-  import { DocumentContextFiles } from '@/components/dashboard/document-context-files';
-  import { Paperclip } from 'lucide-react';
-  import type { ContextFileType } from '@/types/database';
+import { DocumentContextFiles } from '@/components/dashboard/document-context-files';
+import { Paperclip } from 'lucide-react';
+import type { ContextFileType } from '@/types/database';
 ```
+
 Render (only when `courseId` is set) inside the root flex container, after `<VersionSidebar .../>`:
+
 ```tsx
-      {courseId && (
-        <DocumentContextFiles
-          documentId={document.id}
-          courseId={courseId}
-          count={contextCount}
-          onCountChange={setContextCount}
-          isPanelOpen={isContextOpen}
-          onTogglePanel={() => setIsContextOpen((p) => !p)}
-          onClosePanel={() => setIsContextOpen(false)}
-        />
-      )}
+{
+  courseId && (
+    <DocumentContextFiles
+      documentId={document.id}
+      courseId={courseId}
+      count={contextCount}
+      onCountChange={setContextCount}
+      isPanelOpen={isContextOpen}
+      onTogglePanel={() => setIsContextOpen((p) => !p)}
+      onClosePanel={() => setIsContextOpen(false)}
+    />
+  );
+}
 ```
+
 Add a floating toggle button (bottom-right, above the AI bubble) when `courseId`:
+
 ```tsx
-      {courseId && !isContextOpen && (
-        <button
-          onClick={() => setIsContextOpen(true)}
-          data-testid="context-files-toggle"
-          aria-label="Context files"
-          className="fixed z-40 flex items-center justify-center rounded-full bg-background border shadow-lg hover:bg-accent"
-          style={{ bottom: 72, right: 64, width: 44, height: 44 }}
-        >
-          <Paperclip className="h-5 w-5" />
-          {contextCount > 0 && (
-            <span className="absolute -right-1 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-primary px-1 text-[10px] text-primary-foreground">
-              {contextCount}
-            </span>
-          )}
-        </button>
+{
+  courseId && !isContextOpen && (
+    <button
+      onClick={() => setIsContextOpen(true)}
+      data-testid="context-files-toggle"
+      aria-label="Context files"
+      className="fixed z-40 flex items-center justify-center rounded-full bg-background border shadow-lg hover:bg-accent"
+      style={{ bottom: 72, right: 64, width: 44, height: 44 }}
+    >
+      <Paperclip className="h-5 w-5" />
+      {contextCount > 0 && (
+        <span className="absolute -right-1 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-primary px-1 text-[10px] text-primary-foreground">
+          {contextCount}
+        </span>
       )}
+    </button>
+  );
+}
 ```
+
 Pass `onOpenSource` to `AiChatWrapper` (added in Step 4):
+
 ```tsx
         onOpenSource={(fileType: ContextFileType, fileId: string, page?: number) =>
           window.__openContextViewer?.({ fileType, fileId, page })
@@ -1482,61 +1739,70 @@ Mirror Step 2 in `src/components/editor/tiptap-editor-with-versions.tsx`: same i
 - [ ] **Step 4: Thread `onOpenSource` through chat wrapper + panel**
 
 In `src/components/ai/ai-chat-wrapper.tsx`, add to props and pass through:
+
 ```tsx
   onOpenSource?: (fileType: ContextFileType, fileId: string, page?: number) => void;
 ```
+
 (import `ContextFileType` from `@/types/database`), and forward it to `<AiChatPanel ... onOpenSource={onOpenSource} />`.
 
 In `src/components/ai/ai-chat-panel.tsx`:
+
 - Add `sourceId: string;` to the local `ChatSource` interface (line ~23).
 - Add `onOpenSource?: (...)` to `AiChatPanelProps` and destructure it.
 - In the citation rendering (~613-641), replace the `<a href={signedUrl}>` / `<span>` branch with a button that calls `onOpenSource` for PDFs, falling back to the signed URL otherwise:
+
 ```tsx
-                            {msg.sources.map((src, j) => {
-                              const page = src.pageRange
-                                ? parseInt(src.pageRange.replace(/[^0-9]/g, ''), 10) - 1
-                                : undefined;
-                              const content = (
-                                <>
-                                  <BookOpen className="h-2.5 w-2.5" />
-                                  {src.sourceName}
-                                  {src.pageRange && ` (${src.pageRange})`}
-                                </>
-                              );
-                              const className =
-                                'inline-flex items-center gap-1 rounded-full border bg-background px-2.5 py-0.5 text-[10px] text-muted-foreground hover:bg-accent hover:text-foreground transition-colors';
-                              return (
-                                <button
-                                  key={j}
-                                  type="button"
-                                  data-testid="ai-citation"
-                                  onClick={() =>
-                                    onOpenSource?.(
-                                      src.sourceType as ContextFileType,
-                                      src.sourceId,
-                                      Number.isFinite(page) ? page : undefined,
-                                    )
-                                  }
-                                  className={className}
-                                >
-                                  {content}
-                                </button>
-                              );
-                            })}
+{
+  msg.sources.map((src, j) => {
+    const page = src.pageRange
+      ? parseInt(src.pageRange.replace(/[^0-9]/g, ''), 10) - 1
+      : undefined;
+    const content = (
+      <>
+        <BookOpen className="h-2.5 w-2.5" />
+        {src.sourceName}
+        {src.pageRange && ` (${src.pageRange})`}
+      </>
+    );
+    const className =
+      'inline-flex items-center gap-1 rounded-full border bg-background px-2.5 py-0.5 text-[10px] text-muted-foreground hover:bg-accent hover:text-foreground transition-colors';
+    return (
+      <button
+        key={j}
+        type="button"
+        data-testid="ai-citation"
+        onClick={() =>
+          onOpenSource?.(
+            src.sourceType as ContextFileType,
+            src.sourceId,
+            Number.isFinite(page) ? page : undefined,
+          )
+        }
+        className={className}
+      >
+        {content}
+      </button>
+    );
+  });
+}
 ```
+
 - Update the `homeworkContextUsed` SSE handler (~378) to the renamed event:
+
 ```tsx
-            if (event.type === 'sources') {
-              sources = event.sources ?? [];
-              model = event.model ?? 'flash';
-              if (event.contextFilesUsed) {
-                trackEvent('context_files_used', {
-                  course_id: courseId,
-                  file_count: (event.sources ?? []).length,
-                });
-              }
-            }
+if (event.type === 'sources') {
+  sources = event.sources ?? [];
+  model = event.model ?? 'flash';
+  if (event.contextFilesUsed) {
+    trackEvent('context_files_used', {
+      course_id: courseId,
+      file_count: (event.sources ?? []).length,
+    });
+  }
+}
 ```
+
 - Import `ContextFileType` from `@/types/database`.
 
 - [ ] **Step 5: Typecheck + run unit tests**
@@ -1558,6 +1824,7 @@ git commit -m "feat(ui): host context-files panel + toggle in both editors; cita
 ### Task 12: `FileViewer` component (pdf.js, read-only)
 
 **Files:**
+
 - Create: `src/components/dashboard/file-viewer.tsx`
 
 Renders an attached file in an overlay. PDFs render via pdfjs (reusing `@/lib/pdf/pdfjs-setup`), with zoom + jump-to-page. Non-PDF (e.g. DOCX) falls back to opening the signed URL in a new tab.
@@ -1580,7 +1847,12 @@ interface FileViewerProps {
   onClose: () => void;
 }
 
-export function FileViewer({ fileType, fileId, initialPage, onClose }: FileViewerProps) {
+export function FileViewer({
+  fileType,
+  fileId,
+  initialPage,
+  onClose,
+}: FileViewerProps) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [scale, setScale] = useState(1.2);
@@ -1603,19 +1875,31 @@ export function FileViewer({ fileType, fileId, initialPage, onClose }: FileViewe
         }
         const { pdfjsLib } = await import('@/lib/pdf/pdfjs-setup');
         const pdf = await pdfjsLib.getDocument(res.url).promise;
-        if (cancelled) { pdf.destroy(); return; }
+        if (cancelled) {
+          pdf.destroy();
+          return;
+        }
         pdfRef.current = pdf;
         await renderAll(pdf, scale);
         if (initialPage != null) {
-          document.getElementById(`ctx-pdf-page-${initialPage}`)?.scrollIntoView();
+          document
+            .getElementById(`ctx-pdf-page-${initialPage}`)
+            ?.scrollIntoView();
         }
         setLoading(false);
       } catch (e) {
-        if (!cancelled) { setError(e instanceof Error ? e.message : 'Failed to load'); setLoading(false); }
+        if (!cancelled) {
+          setError(e instanceof Error ? e.message : 'Failed to load');
+          setLoading(false);
+        }
       }
     }
     load();
-    return () => { cancelled = true; pdfRef.current?.destroy(); pdfRef.current = null; };
+    return () => {
+      cancelled = true;
+      pdfRef.current?.destroy();
+      pdfRef.current = null;
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [fileType, fileId]);
 
@@ -1655,14 +1939,37 @@ export function FileViewer({ fileType, fileId, initialPage, onClose }: FileViewe
       <div className="flex items-center justify-between border-b border-white/10 bg-background px-4 py-2">
         <span className="text-sm font-medium">Source viewer</span>
         <div className="flex items-center gap-2">
-          <button aria-label="Zoom out" onClick={() => setScale((s) => Math.max(0.5, s - 0.2))} className="rounded p-1 hover:bg-accent"><Minus className="h-4 w-4" /></button>
-          <button aria-label="Zoom in" onClick={() => setScale((s) => Math.min(3, s + 0.2))} className="rounded p-1 hover:bg-accent"><Plus className="h-4 w-4" /></button>
-          <button aria-label="Close viewer" onClick={onClose} className="rounded p-1 hover:bg-accent"><X className="h-5 w-5" /></button>
+          <button
+            aria-label="Zoom out"
+            onClick={() => setScale((s) => Math.max(0.5, s - 0.2))}
+            className="rounded p-1 hover:bg-accent"
+          >
+            <Minus className="h-4 w-4" />
+          </button>
+          <button
+            aria-label="Zoom in"
+            onClick={() => setScale((s) => Math.min(3, s + 0.2))}
+            className="rounded p-1 hover:bg-accent"
+          >
+            <Plus className="h-4 w-4" />
+          </button>
+          <button
+            aria-label="Close viewer"
+            onClick={onClose}
+            className="rounded p-1 hover:bg-accent"
+          >
+            <X className="h-5 w-5" />
+          </button>
         </div>
       </div>
-      <div ref={containerRef} className="flex-1 overflow-auto bg-neutral-800 p-4">
+      <div
+        ref={containerRef}
+        className="flex-1 overflow-auto bg-neutral-800 p-4"
+      >
         {loading && (
-          <div className="flex h-full items-center justify-center text-white"><Loader2 className="h-6 w-6 animate-spin" /></div>
+          <div className="flex h-full items-center justify-center text-white">
+            <Loader2 className="h-6 w-6 animate-spin" />
+          </div>
         )}
         {error && <p className="text-center text-sm text-red-300">{error}</p>}
       </div>
@@ -1688,18 +1995,27 @@ git commit -m "feat(ui): read-only pdf.js FileViewer (zoom, jump-to-page) for co
 ### Task 13: Remove the homework chip from the document page
 
 **Files:**
+
 - Modify: `src/app/(dashboard)/dashboard/documents/[docId]/page.tsx`
 
 - [ ] **Step 1: Strip homework wiring**
 
 Remove the imports of `getHomeworkContext`, `HomeworkContextChip`, and `HomeworkContext`. Remove:
+
 ```tsx
-  const homeworkContext: HomeworkContext | null = await getHomeworkContext({ documentId: docId });
+const homeworkContext: HomeworkContext | null = await getHomeworkContext({
+  documentId: docId,
+});
 ```
+
 and the render line:
+
 ```tsx
-      {homeworkContext && <HomeworkContextChip context={homeworkContext} />}
+{
+  homeworkContext && <HomeworkContextChip context={homeworkContext} />;
+}
 ```
+
 The editors already read context files via actions, so no new props are needed here.
 
 - [ ] **Step 2: Typecheck**
@@ -1721,12 +2037,14 @@ git commit -m "refactor: remove homework context chip from document page"
 ### Task 14: Delete the Start Homework feature
 
 **Files:**
+
 - Modify: `src/app/(dashboard)/dashboard/courses/[courseId]/page.tsx`
 - Delete: the 9 files listed in **File Structure → Delete**
 
 - [ ] **Step 1: Remove `StartHomeworkDialog` from the course page**
 
 In `src/app/(dashboard)/dashboard/courses/[courseId]/page.tsx`:
+
 - Delete the import line `import { StartHomeworkDialog } from '@/components/dashboard/start-homework-dialog';`.
 - Delete the entire `<StartHomeworkDialog ...> ... </StartHomeworkDialog>` block (currently lines 143–162), leaving `<AiChatWrapper>`, `<CreateDocumentDialog>` ("New Document"), and `<PersonalFileUpload>`.
 
@@ -1771,6 +2089,7 @@ git commit -m "feat: remove Start Homework flow (dialog, actions, homework-conte
 ### Task 15: E2E tests + TEST_REGISTRY
 
 **Files:**
+
 - Modify: `e2e/TEST_REGISTRY.md`
 - Create: `e2e/document-context-files.spec.ts`
 
@@ -1789,7 +2108,10 @@ import { login } from './helpers/auth';
 // Opens the first course, creates a fresh document, returns its URL.
 async function openNewCourseDocument(page: import('@playwright/test').Page) {
   await page.goto('/dashboard');
-  await page.getByRole('link', { name: /course/i }).first().click();
+  await page
+    .getByRole('link', { name: /course/i })
+    .first()
+    .click();
   await page.waitForURL('**/dashboard/courses/**');
   await page.getByRole('button', { name: 'New Document' }).click();
   await page.getByRole('button', { name: 'Create' }).click();
@@ -1797,13 +2119,22 @@ async function openNewCourseDocument(page: import('@playwright/test').Page) {
 }
 
 test.describe('Document context files', () => {
-  test('Start Homework entry point is gone; New Document is present', async ({ page }) => {
+  test('Start Homework entry point is gone; New Document is present', async ({
+    page,
+  }) => {
     await login(page);
     await page.goto('/dashboard');
-    await page.getByRole('link', { name: /course/i }).first().click();
+    await page
+      .getByRole('link', { name: /course/i })
+      .first()
+      .click();
     await page.waitForURL('**/dashboard/courses/**');
-    await expect(page.getByRole('button', { name: 'New Document' })).toBeVisible();
-    await expect(page.getByRole('button', { name: 'Start Homework' })).toHaveCount(0);
+    await expect(
+      page.getByRole('button', { name: 'New Document' }),
+    ).toBeVisible();
+    await expect(
+      page.getByRole('button', { name: 'Start Homework' }),
+    ).toHaveCount(0);
   });
 
   test('attach and detach a context file', async ({ page }) => {
@@ -1814,26 +2145,43 @@ test.describe('Document context files', () => {
     await expect(page.getByTestId('context-files-panel')).toBeVisible();
     await page.getByTestId('context-files-add').click();
 
-    const firstCandidate = page.getByTestId('context-files-panel').locator('button', { hasText: /\.|[A-Za-z]/ }).nth(0);
+    const firstCandidate = page
+      .getByTestId('context-files-panel')
+      .locator('button', { hasText: /\.|[A-Za-z]/ })
+      .nth(0);
     // Attach the first available candidate (test course must have ≥1 imported file).
-    const candidate = page.getByTestId('context-files-panel').locator('button:not([data-testid])').first();
+    const candidate = page
+      .getByTestId('context-files-panel')
+      .locator('button:not([data-testid])')
+      .first();
     if (await candidate.count()) {
       await candidate.click();
       await expect(page.getByTestId('context-file-item')).toHaveCount(1);
       // Detach
-      await page.getByRole('button', { name: /Remove/ }).first().click();
+      await page
+        .getByRole('button', { name: /Remove/ })
+        .first()
+        .click();
       await expect(page.getByTestId('context-file-item')).toHaveCount(0);
     }
     expect(firstCandidate).toBeTruthy();
   });
 
-  test('opening an attached PDF shows the read-only viewer', async ({ page }) => {
+  test('opening an attached PDF shows the read-only viewer', async ({
+    page,
+  }) => {
     await login(page);
     await openNewCourseDocument(page);
     await page.getByTestId('context-files-toggle').click();
     await page.getByTestId('context-files-add').click();
-    const candidate = page.getByTestId('context-files-panel').locator('button:not([data-testid])').first();
-    test.skip((await candidate.count()) === 0, 'No imported files in seeded course');
+    const candidate = page
+      .getByTestId('context-files-panel')
+      .locator('button:not([data-testid])')
+      .first();
+    test.skip(
+      (await candidate.count()) === 0,
+      'No imported files in seeded course',
+    );
     await candidate.click();
     await page.getByTestId('context-file-item').first().click();
     await expect(page.getByTestId('file-viewer')).toBeVisible();
@@ -1849,11 +2197,17 @@ test.describe('Document context files', () => {
         `data: ${JSON.stringify({ type: 'sources', sources: [{ sourceType: 'course_material', sourceId: '00000000-0000-0000-0000-000000000000', sourceName: 'HW3.pdf', pageRange: 'p. 2', signedUrl: null }], model: 'flash', contextFilesUsed: true })}\n\n` +
         `data: ${JSON.stringify({ type: 'text', text: 'Question 3 asks…' })}\n\n` +
         `data: ${JSON.stringify({ type: 'done' })}\n\n`;
-      await route.fulfill({ status: 200, headers: { 'Content-Type': 'text/event-stream' }, body: sse });
+      await route.fulfill({
+        status: 200,
+        headers: { 'Content-Type': 'text/event-stream' },
+        body: sse,
+      });
     });
     await openNewCourseDocument(page);
     await page.getByRole('button', { name: 'Open AI chat' }).click();
-    await page.getByPlaceholder(/Ask anything/).fill('what does question 3 mean?');
+    await page
+      .getByPlaceholder(/Ask anything/)
+      .fill('what does question 3 mean?');
     await page.getByRole('button').filter({ hasText: '' }).last().click(); // send
     await expect(page.getByTestId('ai-citation')).toBeVisible();
     // The mocked sourceId is not a real file, so the viewer opens then reports
@@ -1864,7 +2218,7 @@ test.describe('Document context files', () => {
 });
 ```
 
-> If the seeded local DB has no imported course files, the attach/open tests use `test.skip` guards on emptiness so the suite stays green without env-based skips of the *whole* test (which CLAUDE.md forbids). Prefer seeding one course material in `supabase/seed.sql` so these run unconditionally; if you add a seed file, drop the `test.skip` guards.
+> If the seeded local DB has no imported course files, the attach/open tests use `test.skip` guards on emptiness so the suite stays green without env-based skips of the _whole_ test (which CLAUDE.md forbids). Prefer seeding one course material in `supabase/seed.sql` so these run unconditionally; if you add a seed file, drop the `test.skip` guards.
 
 - [ ] **Step 3: Run E2E**
 

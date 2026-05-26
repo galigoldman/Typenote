@@ -19,11 +19,26 @@ export function fileSourceConfig(
 ): FileSourceConfig {
   switch (type) {
     case 'course_material':
-      return { table: 'course_materials', client: supabase, bucket: 'course-materials', nameCol: 'file_name' };
+      return {
+        table: 'course_materials',
+        client: supabase,
+        bucket: 'course-materials',
+        nameCol: 'file_name',
+      };
     case 'personal_file':
-      return { table: 'personal_files', client: supabase, bucket: 'personal-files', nameCol: 'display_name' };
+      return {
+        table: 'personal_files',
+        client: supabase,
+        bucket: 'personal-files',
+        nameCol: 'display_name',
+      };
     case 'moodle_file':
-      return { table: 'moodle_files', client: admin, bucket: 'moodle-materials', nameCol: 'file_name' };
+      return {
+        table: 'moodle_files',
+        client: admin,
+        bucket: 'moodle-materials',
+        nameCol: 'file_name',
+      };
   }
 }
 
@@ -55,7 +70,12 @@ export async function resolveContextFileMeta(
   admin: SupabaseClient,
   type: ContextFileType,
   id: string,
-): Promise<{ name: string; mimeType: string | null; bucket: string; storagePath: string | null } | null> {
+): Promise<{
+  name: string;
+  mimeType: string | null;
+  bucket: string;
+  storagePath: string | null;
+} | null> {
   try {
     const cfg = fileSourceConfig(type, supabase, admin);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any

@@ -24,10 +24,7 @@ const admin = createAdminClient();
 
 async function cleanupAll(): Promise<void> {
   // Delete leaves before roots to keep cleanup tidy.
-  await admin
-    .from('document_context_files')
-    .delete()
-    .eq('document_id', DOC_ID);
+  await admin.from('document_context_files').delete().eq('document_id', DOC_ID);
   await admin.from('course_materials').delete().eq('id', MATERIAL_ID);
   await admin.from('documents').delete().eq('id', DOC_ID);
   await admin.from('courses').delete().eq('id', COURSE_ID);
@@ -70,7 +67,8 @@ beforeAll(async () => {
     file_size: 1024,
     mime_type: 'application/pdf',
   });
-  if (matErr) throw new Error(`course_material insert failed: ${matErr.message}`);
+  if (matErr)
+    throw new Error(`course_material insert failed: ${matErr.message}`);
 });
 
 afterAll(cleanupAll);

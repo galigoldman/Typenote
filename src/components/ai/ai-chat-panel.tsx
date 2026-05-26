@@ -64,7 +64,11 @@ interface AiChatPanelProps {
   pendingContextItems: AiContextItem[];
   onRemoveContextItem?: (index: number) => void;
   onClearAllContext?: () => void;
-  onOpenSource?: (fileType: ContextFileType, fileId: string, page?: number) => void;
+  onOpenSource?: (
+    fileType: ContextFileType,
+    fileId: string,
+    page?: number,
+  ) => void;
 }
 
 export function AiChatPanel({
@@ -616,7 +620,9 @@ export function AiChatPanel({
                           <div className="mt-2 flex flex-wrap gap-1.5">
                             {msg.sources.map((src, j) => {
                               const m = src.pageRange?.match(/\d+/);
-                              const page = m ? parseInt(m[0], 10) - 1 : undefined;
+                              const page = m
+                                ? parseInt(m[0], 10) - 1
+                                : undefined;
                               return (
                                 <button
                                   key={j}

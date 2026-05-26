@@ -8,7 +8,11 @@ import {
   getAttachableFiles,
   getContextFiles,
 } from '@/lib/actions/context-files';
-import type { AttachableFile, ContextFileType, ResolvedContextFile } from '@/types/database';
+import type {
+  AttachableFile,
+  ContextFileType,
+  ResolvedContextFile,
+} from '@/types/database';
 
 interface ContextFilesPanelProps {
   documentId: string;
@@ -46,7 +50,8 @@ export function ContextFilesPanel({
     setPicking(true);
     setLoadingPicker(true);
     try {
-      const { courseMaterials, personalFiles, moodleFiles } = await getAttachableFiles(courseId);
+      const { courseMaterials, personalFiles, moodleFiles } =
+        await getAttachableFiles(courseId);
       setCandidates([...moodleFiles, ...courseMaterials, ...personalFiles]);
     } finally {
       setLoadingPicker(false);
@@ -57,12 +62,20 @@ export function ContextFilesPanel({
     files.some((f) => f.fileType === c.fileType && f.fileId === c.fileId);
 
   const handleAttach = async (c: AttachableFile) => {
-    await attachContextFile({ documentId, fileType: c.fileType, fileId: c.fileId });
+    await attachContextFile({
+      documentId,
+      fileType: c.fileType,
+      fileId: c.fileId,
+    });
     await refresh();
   };
 
   const handleDetach = async (f: ResolvedContextFile) => {
-    await detachContextFile({ documentId, fileType: f.fileType, fileId: f.fileId });
+    await detachContextFile({
+      documentId,
+      fileType: f.fileType,
+      fileId: f.fileId,
+    });
     await refresh();
   };
 
@@ -78,7 +91,11 @@ export function ContextFilesPanel({
           <Paperclip className="h-4 w-4 text-muted-foreground" />
           <h2 className="text-sm font-semibold">Context files</h2>
         </div>
-        <button onClick={onClose} aria-label="Close context files" className="flex h-8 w-8 items-center justify-center rounded-md hover:bg-accent">
+        <button
+          onClick={onClose}
+          aria-label="Close context files"
+          className="flex h-8 w-8 items-center justify-center rounded-md hover:bg-accent"
+        >
           <X className="h-4 w-4" />
         </button>
       </div>
@@ -86,21 +103,31 @@ export function ContextFilesPanel({
       <div className="flex-1 overflow-y-auto p-2">
         {files.length === 0 ? (
           <p className="px-2 py-6 text-center text-xs text-muted-foreground">
-            No files attached — that&apos;s fine. The AI still answers using everything in this
-            course. Attach the exercise sheet or slides to give it focused context.
+            No files attached — that&apos;s fine. The AI still answers using
+            everything in this course. Attach the exercise sheet or slides to
+            give it focused context.
           </p>
         ) : (
           files.map((f) => (
-            <div key={`${f.fileType}:${f.fileId}`} className="group flex items-center gap-2 rounded px-2 py-1.5 text-sm hover:bg-accent">
+            <div
+              key={`${f.fileType}:${f.fileId}`}
+              className="group flex items-center gap-2 rounded px-2 py-1.5 text-sm hover:bg-accent"
+            >
               <button
-                onClick={() => onOpenFile({ fileType: f.fileType, fileId: f.fileId })}
+                onClick={() =>
+                  onOpenFile({ fileType: f.fileType, fileId: f.fileId })
+                }
                 className="flex min-w-0 flex-1 items-center gap-2 text-left"
                 data-testid="context-file-item"
               >
                 <FileText className="h-4 w-4 shrink-0 text-muted-foreground" />
                 <span className="truncate">{f.name}</span>
               </button>
-              <button onClick={() => handleDetach(f)} aria-label={`Remove ${f.name}`} className="shrink-0 rounded p-0.5 text-muted-foreground opacity-0 hover:bg-background group-hover:opacity-100">
+              <button
+                onClick={() => handleDetach(f)}
+                aria-label={`Remove ${f.name}`}
+                className="shrink-0 rounded p-0.5 text-muted-foreground opacity-0 hover:bg-background group-hover:opacity-100"
+              >
                 <X className="h-3.5 w-3.5" />
               </button>
             </div>
@@ -120,9 +147,13 @@ export function ContextFilesPanel({
         ) : (
           <div className="max-h-60 space-y-0.5 overflow-y-auto">
             {loadingPicker ? (
-              <p className="py-3 text-center text-xs text-muted-foreground">Loading…</p>
+              <p className="py-3 text-center text-xs text-muted-foreground">
+                Loading…
+              </p>
             ) : candidates.length === 0 ? (
-              <p className="py-3 text-center text-xs text-muted-foreground">No imported files in this course yet.</p>
+              <p className="py-3 text-center text-xs text-muted-foreground">
+                No imported files in this course yet.
+              </p>
             ) : (
               candidates.map((c) => (
                 <button
@@ -133,11 +164,20 @@ export function ContextFilesPanel({
                 >
                   <FileText className="h-4 w-4 shrink-0 text-muted-foreground" />
                   <span className="truncate">{c.name}</span>
-                  {isAttached(c) && <span className="ml-auto text-[10px] text-muted-foreground">added</span>}
+                  {isAttached(c) && (
+                    <span className="ml-auto text-[10px] text-muted-foreground">
+                      added
+                    </span>
+                  )}
                 </button>
               ))
             )}
-            <button onClick={() => setPicking(false)} className="mt-1 w-full rounded-md py-1.5 text-xs text-muted-foreground hover:bg-accent">Done</button>
+            <button
+              onClick={() => setPicking(false)}
+              className="mt-1 w-full rounded-md py-1.5 text-xs text-muted-foreground hover:bg-accent"
+            >
+              Done
+            </button>
           </div>
         )}
       </div>

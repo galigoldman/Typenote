@@ -86,7 +86,10 @@ describe('buildSystemPrompt context files', () => {
   });
 
   it('omits the section when there are no attached files', () => {
-    const out = buildSystemPrompt({ courseName: 'Algebra', hasDocumentContent: false });
+    const out = buildSystemPrompt({
+      courseName: 'Algebra',
+      hasDocumentContent: false,
+    });
     expect(out).not.toContain('ATTACHED CONTEXT FILES');
   });
 });

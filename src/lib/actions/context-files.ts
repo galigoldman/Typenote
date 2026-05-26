@@ -5,7 +5,10 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 
 import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
-import { resolveContextFileName, resolveContextFileMeta } from '@/lib/ai/context-files';
+import {
+  resolveContextFileName,
+  resolveContextFileMeta,
+} from '@/lib/ai/context-files';
 import type {
   AttachableFile,
   ContextFileType,
@@ -13,7 +16,11 @@ import type {
   ResolvedContextFile,
 } from '@/types/database';
 
-const FILE_TYPES: ContextFileType[] = ['course_material', 'personal_file', 'moodle_file'];
+const FILE_TYPES: ContextFileType[] = [
+  'course_material',
+  'personal_file',
+  'moodle_file',
+];
 
 /** Pure loader (testable): rows for a document. */
 export async function listContextFiles(
@@ -27,8 +34,13 @@ export async function listContextFiles(
   return (data as DocumentContextFile[] | null) ?? [];
 }
 
-async function assertOwnsCourseDoc(supabase: SupabaseClient, documentId: string) {
-  const { data: { user } } = await supabase.auth.getUser();
+async function assertOwnsCourseDoc(
+  supabase: SupabaseClient,
+  documentId: string,
+) {
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
   if (!user) throw new Error('Not authenticated');
   const { data: doc } = await supabase
     .from('documents')
@@ -50,7 +62,12 @@ export async function attachContextFile(data: {
   const admin = createAdminClient();
   await assertOwnsCourseDoc(supabase, data.documentId);
 
-  const meta = await resolveContextFileMeta(supabase, admin, data.fileType, data.fileId);
+  const meta = await resolveContextFileMeta(
+    supabase,
+    admin,
+    data.fileType,
+    data.fileId,
+  );
   if (!meta) throw new Error('File not found');
 
   const { error } = await supabase.from('document_context_files').insert({
@@ -62,7 +79,12 @@ export async function attachContextFile(data: {
   if (error && error.code !== '23505') throw new Error(error.message);
 
   revalidatePath(`/dashboard/documents/${data.documentId}`);
-  return { fileType: data.fileType, fileId: data.fileId, name: meta.name, mimeType: meta.mimeType };
+  return {
+    fileType: data.fileType,
+    fileId: data.fileId,
+    name: meta.name,
+    mimeType: meta.mimeType,
+  };
 }
 
 export async function detachContextFile(data: {
@@ -83,15 +105,27 @@ export async function detachContextFile(data: {
 }
 
 /** Attached files resolved for display in the panel. */
-export async function getContextFiles(documentId: string): Promise<ResolvedContextFile[]> {
+export async function getContextFiles(
+  documentId: string,
+): Promise<ResolvedContextFile[]> {
   const supabase = await createClient();
   const admin = createAdminClient();
   const rows = await listContextFiles(supabase, documentId);
   const resolved = await Promise.all(
     rows.map(async (r) => {
-      const meta = await resolveContextFileMeta(supabase, admin, r.file_type, r.file_id);
+      const meta = await resolveContextFileMeta(
+        supabase,
+        admin,
+        r.file_type,
+        r.file_id,
+      );
       return meta
-        ? { fileType: r.file_type, fileId: r.file_id, name: meta.name, mimeType: meta.mimeType }
+        ? {
+            fileType: r.file_type,
+            fileId: r.file_id,
+            name: meta.name,
+            mimeType: meta.mimeType,
+          }
         : null;
     }),
   );
@@ -105,10 +139,17 @@ export async function getContextFileUrl(data: {
 }): Promise<{ url: string; mimeType: string | null } | null> {
   const supabase = await createClient();
   const admin = createAdminClient();
-  const meta = await resolveContextFileMeta(supabase, admin, data.fileType, data.fileId);
+  const meta = await resolveContextFileMeta(
+    supabase,
+    admin,
+    data.fileType,
+    data.fileId,
+  );
   if (!meta?.storagePath) return null;
   const client = meta.bucket === 'moodle-materials' ? admin : supabase;
-  const { data: signed } = await client.storage.from(meta.bucket).createSignedUrl(meta.storagePath, 3600);
+  const { data: signed } = await client.storage
+    .from(meta.bucket)
+    .createSignedUrl(meta.storagePath, 3600);
   if (!signed?.signedUrl) return null;
   return { url: signed.signedUrl, mimeType: meta.mimeType };
 }
@@ -123,8 +164,14 @@ export async function getAttachableFiles(courseId: string): Promise<{
   const admin = createAdminClient();
 
   const [{ data: cms }, { data: pfs }] = await Promise.all([
-    supabase.from('course_materials').select('id, file_name, mime_type').eq('course_id', courseId),
-    supabase.from('personal_files').select('id, display_name, mime_type').eq('course_id', courseId),
+    supabase
+      .from('course_materials')
+      .select('id, file_name, mime_type')
+      .eq('course_id', courseId),
+    supabase
+      .from('personal_files')
+      .select('id, display_name, mime_type')
+      .eq('course_id', courseId),
   ]);
 
   // Imported Moodle files for this course (mirror searchContext's resolution).
@@ -140,7 +187,9 @@ export async function getAttachableFiles(courseId: string): Promise<{
       .select('moodle_file_id')
       .eq('sync_id', sync.id)
       .eq('status', 'imported');
-    const ids = ((imports as { moodle_file_id: string }[] | null) ?? []).map((i) => i.moodle_file_id);
+    const ids = ((imports as { moodle_file_id: string }[] | null) ?? []).map(
+      (i) => i.moodle_file_id,
+    );
     if (ids.length) {
       const { data: mfs } = await admin
         .from('moodle_files')
@@ -148,19 +197,40 @@ export async function getAttachableFiles(courseId: string): Promise<{
         .in('id', ids)
         .eq('is_removed', false)
         .eq('type', 'file');
-      for (const m of (mfs as { id: string; file_name: string; mime_type: string | null }[] | null) ?? []) {
-        moodleFiles.push({ fileType: 'moodle_file', fileId: m.id, name: m.file_name, mimeType: m.mime_type });
+      for (const m of (mfs as
+        | { id: string; file_name: string; mime_type: string | null }[]
+        | null) ?? []) {
+        moodleFiles.push({
+          fileType: 'moodle_file',
+          fileId: m.id,
+          name: m.file_name,
+          mimeType: m.mime_type,
+        });
       }
     }
   }
 
   return {
-    courseMaterials: ((cms as { id: string; file_name: string; mime_type: string | null }[] | null) ?? []).map(
-      (m) => ({ fileType: 'course_material', fileId: m.id, name: m.file_name, mimeType: m.mime_type }),
-    ),
-    personalFiles: ((pfs as { id: string; display_name: string; mime_type: string | null }[] | null) ?? []).map(
-      (f) => ({ fileType: 'personal_file', fileId: f.id, name: f.display_name, mimeType: f.mime_type }),
-    ),
+    courseMaterials: (
+      (cms as
+        | { id: string; file_name: string; mime_type: string | null }[]
+        | null) ?? []
+    ).map((m) => ({
+      fileType: 'course_material',
+      fileId: m.id,
+      name: m.file_name,
+      mimeType: m.mime_type,
+    })),
+    personalFiles: (
+      (pfs as
+        | { id: string; display_name: string; mime_type: string | null }[]
+        | null) ?? []
+    ).map((f) => ({
+      fileType: 'personal_file',
+      fileId: f.id,
+      name: f.display_name,
+      mimeType: f.mime_type,
+    })),
     moodleFiles,
   };
 }

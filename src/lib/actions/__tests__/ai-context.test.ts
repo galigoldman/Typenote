@@ -185,7 +185,11 @@ vi.mock('@/lib/ai/context-files', () => ({
 import { extractPdfText } from '@/lib/ai/extraction/pdf';
 import { listContextFiles } from '@/lib/actions/context-files';
 import { resolveContextFileName } from '@/lib/ai/context-files';
-import { getContentHash, matchEmbeddings, upsertEmbeddings } from '@/lib/queries/embeddings';
+import {
+  getContentHash,
+  matchEmbeddings,
+  upsertEmbeddings,
+} from '@/lib/queries/embeddings';
 
 import {
   askQuestion,
@@ -441,4 +445,3 @@ describe('buildAiContext attached-file focus pass', () => {
     expect(result.sources.some((s) => s.sourceId === 'fileA')).toBe(true);
   });
 });
-
