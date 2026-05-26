@@ -56,6 +56,87 @@ function extractFileText(buffer: Buffer, mimeType: string): Promise<string> {
   return Promise.resolve('');
 }
 
+interface FileSourceConfig {
+  table: string;
+  client: SupabaseClient;
+  bucket: string;
+  nameCol: string;
+}
+
+/**
+ * Storage/table config for the three file-backed homework source types.
+ * `document` is intentionally excluded — it is not file-backed (its text comes
+ * from ProseMirror JSON, not Storage).
+ */
+function fileSourceConfig(
+  type: HomeworkMaterialType,
+  supabase: SupabaseClient,
+  admin: SupabaseClient,
+): FileSourceConfig | null {
+  switch (type) {
+    case 'course_material':
+      return {
+        table: 'course_materials',
+        client: supabase,
+        bucket: 'course-materials',
+        nameCol: 'file_name',
+      };
+    case 'personal_file':
+      return {
+        table: 'personal_files',
+        client: supabase,
+        bucket: 'personal-files',
+        nameCol: 'display_name',
+      };
+    case 'moodle_file':
+      return {
+        table: 'moodle_files',
+        client: admin,
+        bucket: 'moodle-materials',
+        nameCol: 'file_name',
+      };
+    default:
+      return null;
+  }
+}
+
+/**
+ * Resolve the display name of any homework source (exercise or material) by
+ * type — WITHOUT downloading file content. User-owned tables are read through
+ * the user-scoped `supabase` client (RLS enforces access, so a denied/missing
+ * row returns null); the shared Moodle registry is read through `admin`.
+ * Never throws — returns null on any failure.
+ */
+export async function resolveHomeworkSourceName(
+  supabase: SupabaseClient,
+  admin: SupabaseClient,
+  type: HomeworkMaterialType,
+  id: string,
+): Promise<string | null> {
+  try {
+    if (type === 'document') {
+      const { data } = await supabase
+        .from('documents')
+        .select('title')
+        .eq('id', id)
+        .maybeSingle();
+      return (data?.title as string | undefined) || null;
+    }
+    const cfg = fileSourceConfig(type, supabase, admin);
+    if (!cfg) return null;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { data } = (await (cfg.client as any)
+      .from(cfg.table)
+      .select(cfg.nameCol)
+      .eq('id', id)
+      .maybeSingle()) as { data: Record<string, unknown> | null };
+    if (!data) return null;
+    return String(data[cfg.nameCol] ?? '') || null;
+  } catch {
+    return null;
+  }
+}
+
 /** Resolve one pinned material to { name, text }. Never throws — degrades to ''. */
 async function resolvePinnedMaterial(
   supabase: SupabaseClient,
@@ -77,30 +158,7 @@ async function resolvePinnedMaterial(
       };
     }
 
-    // File-backed types: { table, client, bucket, nameCol }
-    const cfg =
-      type === 'course_material'
-        ? {
-            table: 'course_materials',
-            client: supabase,
-            bucket: 'course-materials',
-            nameCol: 'file_name',
-          }
-        : type === 'personal_file'
-          ? {
-              table: 'personal_files',
-              client: supabase,
-              bucket: 'personal-files',
-              nameCol: 'display_name',
-            }
-          : type === 'moodle_file'
-            ? {
-                table: 'moodle_files',
-                client: admin,
-                bucket: 'moodle-materials',
-                nameCol: 'file_name',
-              }
-            : null;
+    const cfg = fileSourceConfig(type, supabase, admin);
     if (!cfg) return null;
 
     // Select all columns; cast via unknown to escape Supabase's strict generic
@@ -146,23 +204,45 @@ export async function resolveHomeworkContext(
 ): Promise<HomeworkAiContext | null> {
   const { data: session } = await supabase
     .from('homework_sessions')
-    .select('id, exercise_document_id')
+    .select('id, exercise_document_id, exercise_type, exercise_id')
     .eq('document_id', documentId)
     .maybeSingle();
   if (!session) return null;
 
-  // Tier 1 — exercise (today always a document)
+  // Tier 1 — exercise. The exercise is polymorphic: prefer the typed columns
+  // and fall back to the legacy document FK for pre-feature / seeded rows.
   let exerciseName = 'Exercise';
   let exerciseText = '';
-  if (session.exercise_document_id) {
-    const { data: ex } = await supabase
-      .from('documents')
-      .select('title, content, pages')
-      .eq('id', session.exercise_document_id)
-      .maybeSingle();
-    if (ex) {
-      exerciseName = ex.title ?? 'Exercise';
-      exerciseText = cap(extractDocumentText(ex), MAX_HOMEWORK_SOURCE_CHARS);
+  const exerciseType = (session.exercise_type ??
+    (session.exercise_document_id
+      ? 'document'
+      : null)) as HomeworkMaterialType | null;
+  const exerciseId = (session.exercise_id ?? session.exercise_document_id) as
+    | string
+    | null;
+
+  if (exerciseType && exerciseId) {
+    if (exerciseType === 'document') {
+      // Typed notes are NOT RAG-indexed → inject their text verbatim (Tier 1).
+      const { data: ex } = await supabase
+        .from('documents')
+        .select('title, content, pages')
+        .eq('id', exerciseId)
+        .maybeSingle();
+      if (ex) {
+        exerciseName = ex.title ?? 'Exercise';
+        exerciseText = cap(extractDocumentText(ex), MAX_HOMEWORK_SOURCE_CHARS);
+      }
+    } else {
+      // Imported files are already embedded → reference by name only; their
+      // content reaches the model through Tier-3 RAG (no verbatim dump).
+      const name = await resolveHomeworkSourceName(
+        supabase,
+        admin,
+        exerciseType,
+        exerciseId,
+      );
+      if (name) exerciseName = name;
     }
   }
 

@@ -59,8 +59,6 @@ export function StartHomeworkDialog({
       .catch(() => setMoodleSections([]));
   }, [open, moodleLoaded, courseId]);
 
-  const hasDocuments = documents.length > 0;
-
   function toggleMaterial(key: string) {
     setSelectedMaterials((prev) => {
       const next = new Set(prev);
@@ -87,7 +85,7 @@ export function StartHomeworkDialog({
       const materialRefs = Array.from(selectedMaterials).map(parseMaterialKey);
       const result = await createHomeworkSession({
         courseId,
-        exerciseDocumentId: selectedExercise,
+        exercise: parseMaterialKey(selectedExercise),
         materialRefs,
       });
 
@@ -111,6 +109,47 @@ export function StartHomeworkDialog({
     setSelectedMaterials(new Set());
     setError(null);
   }
+
+  // All pickable sources, grouped for display. Step 1 (the exercise, single
+  // select) and Step 2 (pinned materials, multi-select) draw from the same
+  // list; keys are `${type}:${id}` and parsed by parseMaterialKey. Moodle
+  // files appear once they finish lazy-loading.
+  const sourceGroups = [
+    {
+      label: 'Documents',
+      items: documents.map((d) => ({ key: `document:${d.id}`, name: d.title })),
+    },
+    {
+      label: 'Course Materials',
+      items: materials.map((m) => ({
+        key: `course_material:${m.id}`,
+        name: m.label ?? m.file_name,
+      })),
+    },
+    {
+      label: 'Your Files',
+      items: personalFiles.map((f) => ({
+        key: `personal_file:${f.id}`,
+        name: f.display_name,
+      })),
+    },
+    {
+      label: 'Moodle Files',
+      items: moodleSections.flatMap((s) =>
+        s.files.map((f) => ({ key: `moodle_file:${f.id}`, name: f.file_name })),
+      ),
+    },
+  ].filter((g) => g.items.length > 0);
+
+  const hasSources = sourceGroups.length > 0;
+
+  // Step 2 lists every source except whichever one is chosen as the exercise.
+  const pinnableGroups = sourceGroups
+    .map((g) => ({
+      ...g,
+      items: g.items.filter((i) => i.key !== selectedExercise),
+    }))
+    .filter((g) => g.items.length > 0);
 
   return (
     <Dialog
@@ -143,32 +182,39 @@ export function StartHomeworkDialog({
             <p className="text-xs text-muted-foreground -mt-1">
               Pick the homework or problem set you want to work on.
             </p>
-            {hasDocuments ? (
-              <div className="max-h-40 space-y-1 overflow-y-auto rounded-md border p-2">
-                {documents.map((doc) => (
-                  <label
-                    key={doc.id}
-                    className={`flex cursor-pointer items-center gap-2 rounded px-2 py-1.5 text-sm transition-colors ${
-                      selectedExercise === doc.id
-                        ? 'bg-primary/10 text-primary'
-                        : 'hover:bg-accent'
-                    }`}
-                  >
-                    <input
-                      type="radio"
-                      name="exercise"
-                      value={doc.id}
-                      checked={selectedExercise === doc.id}
-                      onChange={() => setSelectedExercise(doc.id)}
-                      className="accent-primary"
-                    />
-                    <span className="truncate">{doc.title}</span>
-                  </label>
+            {hasSources ? (
+              <div className="max-h-44 space-y-2 overflow-y-auto rounded-md border p-2">
+                {sourceGroups.map((group) => (
+                  <div key={group.label}>
+                    <p className="mb-1 text-xs font-medium text-muted-foreground">
+                      {group.label}
+                    </p>
+                    {group.items.map((item) => (
+                      <label
+                        key={item.key}
+                        className={`flex cursor-pointer items-center gap-2 rounded px-2 py-1.5 text-sm transition-colors ${
+                          selectedExercise === item.key
+                            ? 'bg-primary/10 text-primary'
+                            : 'hover:bg-accent'
+                        }`}
+                      >
+                        <input
+                          type="radio"
+                          name="exercise"
+                          value={item.key}
+                          checked={selectedExercise === item.key}
+                          onChange={() => setSelectedExercise(item.key)}
+                          className="accent-primary"
+                        />
+                        <span className="truncate">{item.name}</span>
+                      </label>
+                    ))}
+                  </div>
                 ))}
               </div>
             ) : (
               <p className="rounded-md border border-dashed p-3 text-center text-sm text-muted-foreground">
-                Create a document first to use as the exercise.
+                Import a file or create a document first to use as the exercise.
               </p>
             )}
           </div>
@@ -192,115 +238,31 @@ export function StartHomeworkDialog({
               it what to focus on first.
             </p>
             <div className="max-h-48 space-y-2 overflow-y-auto rounded-md border p-2">
-              {/* Documents (excluding the selected exercise) */}
-              {documents.filter((d) => d.id !== selectedExercise).length >
-                0 && (
-                <div>
+              {pinnableGroups.map((group) => (
+                <div key={group.label}>
                   <p className="mb-1 text-xs font-medium text-muted-foreground">
-                    Documents
+                    {group.label}
                   </p>
-                  {documents
-                    .filter((d) => d.id !== selectedExercise)
-                    .map((doc) => {
-                      const key = `document:${doc.id}`;
-                      return (
-                        <label
-                          key={key}
-                          className="flex cursor-pointer items-center gap-2 rounded px-2 py-1 text-sm hover:bg-accent"
-                        >
-                          <input
-                            type="checkbox"
-                            checked={selectedMaterials.has(key)}
-                            onChange={() => toggleMaterial(key)}
-                            className="accent-primary"
-                          />
-                          <span className="truncate">{doc.title}</span>
-                        </label>
-                      );
-                    })}
+                  {group.items.map((item) => (
+                    <label
+                      key={item.key}
+                      className="flex cursor-pointer items-center gap-2 rounded px-2 py-1 text-sm hover:bg-accent"
+                    >
+                      <input
+                        type="checkbox"
+                        checked={selectedMaterials.has(item.key)}
+                        onChange={() => toggleMaterial(item.key)}
+                        className="accent-primary"
+                      />
+                      <span className="truncate">{item.name}</span>
+                    </label>
+                  ))}
                 </div>
-              )}
-
-              {/* Course materials — flat list */}
-              {materials.length > 0 && (
-                <div>
-                  <p className="mb-1 text-xs font-medium text-muted-foreground">
-                    Course Materials
-                  </p>
-                  {materials.map((mat) => {
-                    const key = `course_material:${mat.id}`;
-                    return (
-                      <label
-                        key={key}
-                        className="flex cursor-pointer items-center gap-2 rounded px-2 py-1 text-sm hover:bg-accent"
-                      >
-                        <input
-                          type="checkbox"
-                          checked={selectedMaterials.has(key)}
-                          onChange={() => toggleMaterial(key)}
-                          className="accent-primary"
-                        />
-                        <span className="truncate">
-                          {mat.label ?? mat.file_name}
-                        </span>
-                      </label>
-                    );
-                  })}
-                </div>
-              )}
-
-              {/* Personal files */}
-              {personalFiles.length > 0 && (
-                <div>
-                  <p className="mb-1 text-xs font-medium text-muted-foreground">
-                    Your Files
-                  </p>
-                  {personalFiles.map((pf) => {
-                    const key = `personal_file:${pf.id}`;
-                    return (
-                      <label
-                        key={key}
-                        className="flex cursor-pointer items-center gap-2 rounded px-2 py-1 text-sm hover:bg-accent"
-                      >
-                        <input
-                          type="checkbox"
-                          checked={selectedMaterials.has(key)}
-                          onChange={() => toggleMaterial(key)}
-                          className="accent-primary"
-                        />
-                        <span className="truncate">{pf.display_name}</span>
-                      </label>
-                    );
-                  })}
-                </div>
-              )}
-
-              {/* Moodle files (lazy-loaded) */}
-              {moodleSections.some((s) => s.files.length > 0) && (
-                <div>
-                  <p className="mb-1 text-xs font-medium text-muted-foreground">
-                    Moodle Files
-                  </p>
-                  {moodleSections.flatMap((s) =>
-                    s.files.map((f) => {
-                      const key = `moodle_file:${f.id}`;
-                      return (
-                        <label
-                          key={key}
-                          className="flex cursor-pointer items-center gap-2 rounded px-2 py-1 text-sm hover:bg-accent"
-                        >
-                          <input
-                            type="checkbox"
-                            checked={selectedMaterials.has(key)}
-                            onChange={() => toggleMaterial(key)}
-                            className="accent-primary"
-                          />
-                          <span className="truncate">{f.file_name}</span>
-                        </label>
-                      );
-                    }),
-                  )}
-                </div>
+              ))}
+              {pinnableGroups.length === 0 && (
+                <p className="px-2 py-1 text-xs text-muted-foreground">
+                  No other materials to pin.
+                </p>
               )}
             </div>
             {selectedMaterials.size > 0 && (

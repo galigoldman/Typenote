@@ -90,6 +90,59 @@ describe('resolveHomeworkContext', () => {
     expect(ctx?.pinned).toEqual([]);
   });
 
+  it('references a file exercise by name only — no text extraction (RAG covers it)', async () => {
+    const c = makeClient({
+      rows: {
+        homework_sessions: {
+          id: 's1',
+          exercise_document_id: null,
+          exercise_type: 'course_material',
+          exercise_id: 'cm1',
+        },
+        course_materials: {
+          file_name: 'homework-1.pdf',
+          storage_path: 'p/hw.pdf',
+          mime_type: 'application/pdf',
+        },
+      },
+      lists: { homework_session_materials: [] },
+    });
+    const ctx = await resolveHomeworkContext(c, c, 'hw1');
+    expect(ctx?.exerciseName).toBe('homework-1.pdf');
+    expect(ctx?.exerciseText).toBe(''); // file content reaches the model via RAG
+    expect(ctx?.pinned).toEqual([]);
+  });
+
+  it('falls back to exercise_document_id for legacy rows (no exercise_type)', async () => {
+    // A pre-feature / seeded row: only exercise_document_id is set.
+    const c = makeClient({
+      rows: {
+        homework_sessions: {
+          id: 's1',
+          exercise_document_id: 'ex1',
+          exercise_type: null,
+          exercise_id: null,
+        },
+        documents: {
+          title: 'Legacy PS',
+          content: {
+            type: 'doc',
+            content: [
+              {
+                type: 'paragraph',
+                content: [{ type: 'text', text: 'Legacy exercise body' }],
+              },
+            ],
+          },
+        },
+      },
+      lists: { homework_session_materials: [] },
+    });
+    const ctx = await resolveHomeworkContext(c, c, 'hw1');
+    expect(ctx?.exerciseName).toBe('Legacy PS');
+    expect(ctx?.exerciseText).toContain('Legacy exercise body');
+  });
+
   it('extracts a pinned course_material via download + pdf extractor', async () => {
     const c = makeClient({
       rows: {
