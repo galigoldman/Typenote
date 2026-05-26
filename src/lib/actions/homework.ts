@@ -4,6 +4,7 @@ import { revalidatePath } from 'next/cache';
 
 import { createAdminClient } from '@/lib/supabase/admin';
 import { createClient } from '@/lib/supabase/server';
+import { resolveHomeworkSourceName } from '@/lib/ai/homework-context';
 import type {
   HomeworkContext,
   HomeworkMaterialType,
@@ -17,10 +18,11 @@ import type {
 
 export async function createHomeworkSession(data: {
   courseId: string;
-  exerciseDocumentId: string;
+  exercise: { type: HomeworkMaterialType; id: string };
   materialRefs: Array<{ type: HomeworkMaterialType; id: string }>;
 }): Promise<{ documentId: string; sessionId: string }> {
   const supabase = await createClient();
+  const admin = createAdminClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
@@ -35,15 +37,16 @@ export async function createHomeworkSession(data: {
     .single();
   if (courseErr || !course) throw new Error('Course not found');
 
-  // Validate exercise document belongs to user and is in this course
-  const { data: exercise, error: exErr } = await supabase
-    .from('documents')
-    .select('id, title')
-    .eq('id', data.exerciseDocumentId)
-    .eq('user_id', user.id)
-    .eq('course_id', data.courseId)
-    .single();
-  if (exErr || !exercise) throw new Error('Exercise document not found');
+  // Validate + name the exercise. The user-scoped client means RLS returns
+  // null for anything the user can't read, so a null name doubles as the
+  // access check (Moodle files are read via admin — shared registry).
+  const exerciseName = await resolveHomeworkSourceName(
+    supabase,
+    admin,
+    data.exercise.type,
+    data.exercise.id,
+  );
+  if (!exerciseName) throw new Error('Exercise not found');
 
   // Create the homework document
   const { data: doc, error: docErr } = await supabase
@@ -52,7 +55,7 @@ export async function createHomeworkSession(data: {
       user_id: user.id,
       course_id: data.courseId,
       purpose: 'homework' as const,
-      title: `HW — ${exercise.title}`,
+      title: `HW — ${exerciseName}`,
       content: {},
       subject: 'other' as const,
       canvas_type: 'blank' as const,
@@ -62,12 +65,16 @@ export async function createHomeworkSession(data: {
   if (docErr || !doc)
     throw new Error(docErr?.message ?? 'Failed to create document');
 
-  // Create the homework session
+  // Create the homework session. The exercise is polymorphic; keep the legacy
+  // exercise_document_id in sync for documents so old readers still resolve.
   const { data: session, error: sessionErr } = await supabase
     .from('homework_sessions')
     .insert({
       document_id: doc.id,
-      exercise_document_id: data.exerciseDocumentId,
+      exercise_type: data.exercise.type,
+      exercise_id: data.exercise.id,
+      exercise_document_id:
+        data.exercise.type === 'document' ? data.exercise.id : null,
       course_id: data.courseId,
       user_id: user.id,
     })
@@ -115,13 +122,27 @@ export async function getHomeworkContext(data: {
   if (!session) return null;
 
   const typedSession = session as HomeworkSession;
+  // Moodle reads need the admin client (shared registry); resolveHomeworkSourceName
+  // only uses it for moodle_file, so it's safe to pass for every type.
+  const admin = createAdminClient();
 
-  // Fetch exercise document title
-  const { data: exerciseDoc } = await supabase
-    .from('documents')
-    .select('id, title')
-    .eq('id', typedSession.exercise_document_id)
-    .single();
+  // Resolve the polymorphic exercise name, falling back to the legacy document
+  // FK for pre-feature / seeded rows.
+  const exerciseType = (typedSession.exercise_type ??
+    (typedSession.exercise_document_id
+      ? 'document'
+      : null)) as HomeworkMaterialType | null;
+  const exerciseId =
+    typedSession.exercise_id ?? typedSession.exercise_document_id;
+  const exerciseName =
+    exerciseType && exerciseId
+      ? await resolveHomeworkSourceName(
+          supabase,
+          admin,
+          exerciseType,
+          exerciseId,
+        )
+      : null;
 
   // Fetch session materials
   const { data: materialsData } = await supabase
@@ -132,53 +153,25 @@ export async function getHomeworkContext(data: {
   const typedMaterials =
     (materialsData as HomeworkSessionMaterial[] | null) ?? [];
 
-  // Resolve display names for each material
+  // Resolve display names for each material (same per-type resolver as above).
   const materials: HomeworkContext['materials'] = [];
   for (const mat of typedMaterials) {
-    let name = 'Unknown material';
-    if (mat.material_type === 'course_material') {
-      const { data: cm } = await supabase
-        .from('course_materials')
-        .select('file_name')
-        .eq('id', mat.material_id)
-        .single();
-      if (cm) name = cm.file_name;
-    } else if (mat.material_type === 'personal_file') {
-      const { data: pf } = await supabase
-        .from('personal_files')
-        .select('display_name')
-        .eq('id', mat.material_id)
-        .single();
-      if (pf) name = pf.display_name;
-    } else if (mat.material_type === 'document') {
-      const { data: d } = await supabase
-        .from('documents')
-        .select('title')
-        .eq('id', mat.material_id)
-        .single();
-      if (d) name = d.title;
-    } else if (mat.material_type === 'moodle_file') {
-      // Moodle files are shared (user_id null on embeddings); read via admin
-      // so RLS on the shared registry never hides the display name.
-      const admin = createAdminClient();
-      const { data: mf } = await admin
-        .from('moodle_files')
-        .select('file_name')
-        .eq('id', mat.material_id)
-        .single();
-      if (mf) name = mf.file_name;
-    }
+    const name =
+      (await resolveHomeworkSourceName(
+        supabase,
+        admin,
+        mat.material_type,
+        mat.material_id,
+      )) ?? 'Unknown material';
     materials.push({ type: mat.material_type, id: mat.material_id, name });
   }
 
   return {
     session: typedSession,
-    exerciseDocument: exerciseDoc
-      ? { id: exerciseDoc.id, title: exerciseDoc.title }
-      : {
-          id: typedSession.exercise_document_id ?? '',
-          title: 'Exercise unavailable',
-        },
+    exerciseDocument: {
+      id: exerciseId ?? '',
+      title: exerciseName ?? 'Exercise unavailable',
+    },
     materials,
   };
 }

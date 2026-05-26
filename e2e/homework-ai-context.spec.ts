@@ -143,4 +143,36 @@ test.describe('Homework-focused AI context', () => {
       'Problem Set 1: Variables',
     );
   });
+
+  // The exercise is polymorphic: it can be any imported source, not just a
+  // typed note. Here we pick a course material (an imported file) as the
+  // exercise. The chip names it by file_name, proving a file became the
+  // exercise (its content is covered by RAG, not extracted verbatim).
+  test('start homework with an imported file as the exercise', async ({
+    page,
+  }) => {
+    test.setTimeout(60_000);
+
+    await goToSeededCourse(page); // client-side navigation
+
+    await page.getByRole('button', { name: /start homework/i }).click();
+    const dialog = page.getByRole('dialog');
+    await expect(dialog).toBeVisible({ timeout: 5_000 });
+
+    // Step 1 lists imported sources as radios; pick the course material
+    // (shown by its label). Target the radio so we don't hit the Step-2
+    // checkbox with the same name.
+    await dialog
+      .getByRole('radio', { name: 'Lecture 1: Intro to Programming' })
+      .check();
+
+    await page.getByRole('button', { name: /^start$/i }).click();
+
+    await expect(page).toHaveURL(/\/dashboard\/documents\//, {
+      timeout: 15_000,
+    });
+    const chip = page.getByTestId('homework-context');
+    await expect(chip).toBeVisible({ timeout: 10_000 });
+    await expect(chip).toContainText('lecture-1-slides.pdf');
+  });
 });
