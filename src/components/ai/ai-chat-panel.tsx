@@ -19,9 +19,11 @@ import { AiHeadIcon } from '@/components/icons/ai-head-icon';
 import { MarkdownResponse } from './markdown-response';
 import { ConversationList } from './conversation-list';
 import { trackEvent } from '@/lib/analytics/events';
+import type { ContextFileType } from '@/types/database';
 
 interface ChatSource {
   sourceType: string;
+  sourceId: string;
   sourceName: string;
   pageRange: string | null;
   signedUrl: string | null;
@@ -62,6 +64,7 @@ interface AiChatPanelProps {
   pendingContextItems: AiContextItem[];
   onRemoveContextItem?: (index: number) => void;
   onClearAllContext?: () => void;
+  onOpenSource?: (fileType: ContextFileType, fileId: string, page?: number) => void;
 }
 
 export function AiChatPanel({
@@ -74,6 +77,7 @@ export function AiChatPanel({
   pendingContextItems,
   onRemoveContextItem,
   onClearAllContext,
+  onOpenSource,
 }: AiChatPanelProps) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState('');
@@ -375,10 +379,10 @@ export function AiChatPanel({
             if (event.type === 'sources') {
               sources = event.sources ?? [];
               model = event.model ?? 'flash';
-              if (event.homeworkContextUsed) {
-                trackEvent('homework_context_used', {
+              if (event.contextFilesUsed) {
+                trackEvent('context_files_used', {
                   course_id: courseId,
-                  pinned_count: (event.sources ?? []).length,
+                  file_count: (event.sources ?? []).length,
                 });
               }
             } else if (event.type === 'conversation') {
@@ -611,32 +615,26 @@ export function AiChatPanel({
                         {msg.sources && msg.sources.length > 0 && (
                           <div className="mt-2 flex flex-wrap gap-1.5">
                             {msg.sources.map((src, j) => {
-                              const content = (
-                                <>
+                              const m = src.pageRange?.match(/\d+/);
+                              const page = m ? parseInt(m[0], 10) - 1 : undefined;
+                              return (
+                                <button
+                                  key={j}
+                                  type="button"
+                                  data-testid="ai-citation"
+                                  onClick={() =>
+                                    onOpenSource?.(
+                                      src.sourceType as ContextFileType,
+                                      src.sourceId,
+                                      page,
+                                    )
+                                  }
+                                  className="inline-flex items-center gap-1 rounded-full border bg-background px-2.5 py-0.5 text-[10px] text-muted-foreground hover:bg-accent hover:text-foreground transition-colors"
+                                >
                                   <BookOpen className="h-2.5 w-2.5" />
                                   {src.sourceName}
                                   {src.pageRange && ` (${src.pageRange})`}
-                                </>
-                              );
-                              const className =
-                                'inline-flex items-center gap-1 rounded-full border bg-background px-2.5 py-0.5 text-[10px] text-muted-foreground';
-                              return src.signedUrl ? (
-                                <a
-                                  key={j}
-                                  href={src.signedUrl}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  className={
-                                    className +
-                                    ' hover:bg-accent hover:text-foreground transition-colors'
-                                  }
-                                >
-                                  {content}
-                                </a>
-                              ) : (
-                                <span key={j} className={className}>
-                                  {content}
-                                </span>
+                                </button>
                               );
                             })}
                           </div>

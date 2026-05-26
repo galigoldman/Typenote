@@ -1,9 +1,10 @@
 'use client';
 
 import { useState } from 'react';
-import { MessageCircle, X } from 'lucide-react';
+import { MessageCircle } from 'lucide-react';
 
 import type { AiContextItem } from './ai-chat-panel';
+import type { ContextFileType } from '@/types/database';
 
 import { AiChatPanel } from './ai-chat-panel';
 
@@ -18,6 +19,7 @@ interface AiChatWrapperProps {
   isOpen?: boolean;
   onToggle?: () => void;
   onClose?: () => void;
+  onOpenSource?: (fileType: ContextFileType, fileId: string, page?: number) => void;
 }
 
 export function AiChatWrapper({
@@ -31,6 +33,7 @@ export function AiChatWrapper({
   isOpen: externalIsOpen,
   onToggle: externalOnToggle,
   onClose: externalOnClose,
+  onOpenSource,
 }: AiChatWrapperProps) {
   const [internalIsOpen, setInternalIsOpen] = useState(false);
 
@@ -67,6 +70,7 @@ export function AiChatWrapper({
         pendingContextItems={pendingContextItems}
         onRemoveContextItem={onRemoveContextItem}
         onClearAllContext={onClearAllContext}
+        onOpenSource={onOpenSource}
       />
     </>
   );

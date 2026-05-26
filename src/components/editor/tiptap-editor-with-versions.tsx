@@ -1,10 +1,12 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import type { Document } from '@/types/database';
 import { TiptapEditor } from './tiptap-editor';
 import { VersionSidebar } from '@/components/version-history/version-sidebar';
 import { AiChatWrapper } from '@/components/ai/ai-chat-wrapper';
+import { DocumentContextFiles, type ViewerTarget } from '@/components/dashboard/document-context-files';
+import { FileViewer } from '@/components/dashboard/file-viewer';
 
 interface TiptapEditorWithVersionsProps {
   document: Document;
@@ -17,6 +19,9 @@ export function TiptapEditorWithVersions({
   courseId,
   courseName,
 }: TiptapEditorWithVersionsProps) {
+  const [viewerTarget, setViewerTarget] = useState<ViewerTarget | null>(null);
+  const openViewer = useCallback((t: ViewerTarget) => setViewerTarget(t), []);
+
   const [isVersionHistoryOpen, setIsVersionHistoryOpen] = useState(() => {
     if (typeof window === 'undefined') return false;
     return (
@@ -52,11 +57,27 @@ export function TiptapEditorWithVersions({
         isOpen={isVersionHistoryOpen}
         onClose={() => setIsVersionHistoryOpen(false)}
       />
+      {courseId && (
+        <DocumentContextFiles
+          documentId={document.id}
+          courseId={courseId}
+          onOpenFile={openViewer}
+        />
+      )}
       <AiChatWrapper
         courseId={courseId}
         courseName={courseName}
         documentId={document.id}
+        onOpenSource={(fileType, fileId, page) => openViewer({ fileType, fileId, page })}
       />
+      {viewerTarget && (
+        <FileViewer
+          fileType={viewerTarget.fileType}
+          fileId={viewerTarget.fileId}
+          initialPage={viewerTarget.page}
+          onClose={() => setViewerTarget(null)}
+        />
+      )}
     </div>
   );
 }
