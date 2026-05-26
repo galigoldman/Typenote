@@ -39,6 +39,7 @@ export type SearchParams = {
   query: string;
   courseId: string;
   maxResults?: number;
+  sourceIds?: string[];
 };
 
 export type SearchResult = {
@@ -367,6 +368,7 @@ export async function searchContext(
     courseId: params.courseId,
     moodleCourseId,
     importedMoodleFileIds,
+    sourceIds: params.sourceIds ?? null,
     matchCount: params.maxResults ?? 8,
   });
 
