@@ -36,6 +36,39 @@ async function openNewCourseDocument(page: Parameters<typeof login>[0]) {
   await expect(page).toHaveURL(/\/dashboard\/documents\//, { timeout: 15_000 });
 }
 
+// Helper: open the Focus files panel from the editor toolbar button.
+async function openFocusFilesPanel(page: Parameters<typeof login>[0]) {
+  const toggle = page.getByTestId('focus-files-toggle');
+  await expect(toggle).toBeVisible({ timeout: 10_000 });
+  await toggle.click();
+  await expect(page.getByTestId('context-files-panel')).toBeVisible({
+    timeout: 5_000,
+  });
+}
+
+// Helper: from the open panel, attach the first available file via the dialog.
+async function attachFirstFileViaDialog(page: Parameters<typeof login>[0]) {
+  await page.getByTestId('context-files-add').click({ timeout: 5_000 });
+
+  // The Add files dialog opens with grouped candidates.
+  await expect(page.getByTestId('add-files-dialog')).toBeVisible({
+    timeout: 10_000,
+  });
+
+  const firstCandidate = page.getByTestId('context-files-candidate').first();
+  await expect(firstCandidate).toBeVisible({ timeout: 10_000 });
+  await firstCandidate.click(); // toggles the checkbox (does not attach yet)
+
+  // Confirm the selection — batch-attaches and closes the dialog.
+  await page
+    .getByRole('button', { name: /^Add 1 file$/ })
+    .click({ timeout: 5_000 });
+
+  await expect(page.getByTestId('add-files-dialog')).toHaveCount(0, {
+    timeout: 10_000,
+  });
+}
+
 // ──────────────────────────────────────────────────────────────────────────────
 // Test 1: "Start Homework" is gone from the course page
 // ──────────────────────────────────────────────────────────────────────────────
@@ -55,44 +88,29 @@ test('Start Homework button is not present on the course page', async ({
 });
 
 // ──────────────────────────────────────────────────────────────────────────────
-// Test 2: Attach and detach a context file
+// Test 2: Attach (via dialog) and detach a focus file
 // ──────────────────────────────────────────────────────────────────────────────
-test('attach and detach a context file on a course document', async ({
+test('attach and detach a focus file on a course document', async ({
   page,
 }) => {
   test.setTimeout(60_000);
   await login(page);
   await openNewCourseDocument(page);
 
-  // The floating context-files toggle button should be visible
-  const toggle = page.getByTestId('context-files-toggle');
-  await expect(toggle).toBeVisible({ timeout: 10_000 });
-  await toggle.click();
+  await openFocusFilesPanel(page);
+  await attachFirstFileViaDialog(page);
 
-  // Panel opens
-  await expect(page.getByTestId('context-files-panel')).toBeVisible({
-    timeout: 5_000,
-  });
-
-  // Click "Add files"
-  await page.getByTestId('context-files-add').click({ timeout: 5_000 });
-
-  // Picker candidates should appear (seeded course has course_materials)
-  const firstCandidate = page.getByTestId('context-files-candidate').first();
-  await expect(firstCandidate).toBeVisible({ timeout: 10_000 });
-  await firstCandidate.click();
-
-  // At least one attached file item should now appear
+  // At least one attached file item should now appear in the panel.
   await expect(page.getByTestId('context-file-item')).toHaveCount(1, {
     timeout: 10_000,
   });
 
-  // Remove the attached file — the button has aria-label="Remove <name>"
+  // Remove the attached file — the button has aria-label="Remove <name>".
   const removeBtn = page.getByRole('button', { name: /Remove/i }).first();
   // The remove button is only visible on hover; force the click.
   await removeBtn.click({ force: true, timeout: 5_000 });
 
-  // No more attached items
+  // No more attached items.
   await expect(page.getByTestId('context-file-item')).toHaveCount(0, {
     timeout: 10_000,
   });
@@ -101,36 +119,20 @@ test('attach and detach a context file on a course document', async ({
 // ──────────────────────────────────────────────────────────────────────────────
 // Test 3: Open an attached file in the viewer
 // ──────────────────────────────────────────────────────────────────────────────
-test('click an attached context file item opens the file viewer', async ({
+test('click an attached focus file item opens the file viewer', async ({
   page,
 }) => {
   test.setTimeout(60_000);
   await login(page);
   await openNewCourseDocument(page);
 
-  // Open the context files panel
-  const toggle = page.getByTestId('context-files-toggle');
-  await expect(toggle).toBeVisible({ timeout: 10_000 });
-  await toggle.click();
+  await openFocusFilesPanel(page);
+  await attachFirstFileViaDialog(page);
 
-  await expect(page.getByTestId('context-files-panel')).toBeVisible({
-    timeout: 5_000,
-  });
-
-  // Add a file
-  await page.getByTestId('context-files-add').click({ timeout: 5_000 });
-  const firstCandidate = page.getByTestId('context-files-candidate').first();
-  await expect(firstCandidate).toBeVisible({ timeout: 10_000 });
-  await firstCandidate.click();
-
-  // Close the picker first so the item is unobstructed
-  await page.getByRole('button', { name: 'Done' }).click({ timeout: 5_000 });
-
-  // Wait for the attached item to appear
+  // Wait for the attached item to appear, then click it to open the viewer.
   const attachedItem = page.getByTestId('context-file-item').first();
   await expect(attachedItem).toBeVisible({ timeout: 10_000 });
 
-  // Click the attached item to open the viewer.
   // dispatchEvent fires the React onClick directly, bypassing Playwright's strict
   // actionability check (the item can be just outside the visible area at the
   // default headless viewport). This is a test-runner workaround, not a UI bug:

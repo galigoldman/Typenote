@@ -5,10 +5,11 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { CanvasEditor } from '@/components/canvas/canvas-editor';
 import { VersionSidebar } from '@/components/version-history/version-sidebar';
 import {
-  DocumentContextFiles,
+  FocusFilesPanel,
   type ViewerTarget,
-} from '@/components/dashboard/document-context-files';
+} from '@/components/dashboard/focus-files-panel';
 import { FileViewer } from '@/components/dashboard/file-viewer';
+import { getContextFiles } from '@/lib/actions/context-files';
 import type { Document } from '@/types/database';
 import type { AiContextItem } from './ai-chat-panel';
 
@@ -34,6 +35,8 @@ export function DocumentWithAi({
   const [isAiOpen, setIsAiOpen] = useState(false);
   const [viewerTarget, setViewerTarget] = useState<ViewerTarget | null>(null);
   const openViewer = useCallback((t: ViewerTarget) => setViewerTarget(t), []);
+  const [isFocusFilesOpen, setIsFocusFilesOpen] = useState(false);
+  const [focusFilesCount, setFocusFilesCount] = useState(0);
   const [isVersionHistoryOpen, setIsVersionHistoryOpen] = useState(() => {
     if (typeof window === 'undefined') return false;
     return (
@@ -53,6 +56,20 @@ export function DocumentWithAi({
       window.history.replaceState({}, '', clean);
     }
   }, []);
+
+  // Load the focus-files count once so the toolbar badge is correct on load.
+  useEffect(() => {
+    if (!courseId) return;
+    let active = true;
+    getContextFiles(document.id)
+      .then((list) => {
+        if (active) setFocusFilesCount(list.length);
+      })
+      .catch(() => {});
+    return () => {
+      active = false;
+    };
+  }, [courseId, document.id]);
 
   const handleDocumentTextReady = useCallback((getter: () => string) => {
     getDocumentTextRef.current = getter;
@@ -96,6 +113,11 @@ export function DocumentWithAi({
           onToggleVersionHistory={() =>
             setIsVersionHistoryOpen((prev) => !prev)
           }
+          onToggleFocusFiles={
+            courseId ? () => setIsFocusFilesOpen((prev) => !prev) : undefined
+          }
+          focusFilesCount={focusFilesCount}
+          isFocusFilesOpen={isFocusFilesOpen}
         />
       </div>
       <VersionSidebar
@@ -104,9 +126,12 @@ export function DocumentWithAi({
         onClose={() => setIsVersionHistoryOpen(false)}
       />
       {courseId && (
-        <DocumentContextFiles
+        <FocusFilesPanel
           documentId={document.id}
           courseId={courseId}
+          isOpen={isFocusFilesOpen}
+          onClose={() => setIsFocusFilesOpen(false)}
+          onCountChange={setFocusFilesCount}
           onOpenFile={openViewer}
         />
       )}
