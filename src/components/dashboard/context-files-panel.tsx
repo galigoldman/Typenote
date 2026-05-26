@@ -160,6 +160,7 @@ export function ContextFilesPanel({
                   key={`${c.fileType}:${c.fileId}`}
                   disabled={isAttached(c)}
                   onClick={() => handleAttach(c)}
+                  data-testid="context-files-candidate"
                   className="flex w-full items-center gap-2 rounded px-2 py-1.5 text-left text-sm hover:bg-accent disabled:opacity-40"
                 >
                   <FileText className="h-4 w-4 shrink-0 text-muted-foreground" />

@@ -206,6 +206,20 @@ and replaced by the Document Context Files feature. The spec file
 
 ---
 
+## Document Context Files (`e2e/document-context-files.spec.ts`) — IMPLEMENTED
+
+Covers the floating Context Files toggle, attachment/detachment, the file viewer overlay,
+and AI citation → viewer flow. Uses `data-testid="context-files-candidate"` on picker
+candidates (added for testability). Mocks `/api/ai/ask` with an SSE stub for the citation
+test so no live Gemini key is required.
+
+- [x] "Start Homework" button is absent on the course page (regression gate for removal)
+- [x] Attach a context file from the picker; detach it with the Remove button
+- [x] Click an attached context-file item opens the file viewer (`file-viewer`); close it
+- [x] Mocked AI response with a source citation renders an `ai-citation` button that opens the viewer
+
+---
+
 ## Version History (`e2e/version-history.spec.ts`) — PLANNED
 
 - [ ] Open version history sidebar from canvas editor toolbar
@@ -254,27 +268,28 @@ Test lives in `src/__tests__/integration/storage-rls.integration.test.ts`. Verif
 
 ## Summary
 
-| Feature               | Status      | Spec File                                | Tests     |
-| --------------------- | ----------- | ---------------------------------------- | --------- |
-| Auth                  | Implemented | `e2e/auth.spec.ts`                       | 7/7       |
-| Documents             | Implemented | `e2e/documents.spec.ts`                  | 6/6       |
-| Canvas Editor         | Implemented | `e2e/canvas-editor.spec.ts`              | 15/15     |
-| Text Editor Toolbar   | Implemented | `e2e/editor-toolbar.spec.ts`             | 12/12     |
-| LaTeX Math            | Implemented | `e2e/latex-math.spec.ts`                 | 5/5       |
-| Courses               | Implemented | `e2e/courses.spec.ts`                    | 5/6       |
-| Flat Course Page      | Implemented | `e2e/course-materials.spec.ts`           | 3/3       |
-| File Upload           | Implemented | `e2e/file-upload.spec.ts`                | 3/4       |
-| AI Chat               | Implemented | `e2e/ai-chat.spec.ts`                    | 6/6       |
-| AI Chat — Per-user    | Planned     | `e2e/ai-chat-per-user-materials.spec.ts` | 0/2       |
-| PDF Export            | Implemented | `e2e/export-pdf-*.spec.ts`               | 6/7       |
-| Real-time Sync        | Implemented | `e2e/realtime-sync.spec.ts`              | 3/3       |
-| Drawing Copy/Paste    | Implemented | `e2e/drawing-copy-paste.spec.ts`         | 8/8       |
-| Moodle Ext Gating     | Implemented | `e2e/moodle-touch-gating.spec.ts`        | 2/2       |
-| Extension Real Load   | Implemented | `e2e/extension-real.spec.ts`             | 3/3       |
-| Homework AI Context   | Removed     | (deleted)                                | —         |
-| Version History       | Planned     | `e2e/version-history.spec.ts`            | 0/5       |
-| PDF Visual Regression | Implemented | `e2e/pdf-visual-regression.spec.ts`      | 8/8       |
-| **Total**             |             |                                          | **89/97** |
+| Feature                  | Status      | Spec File                                | Tests      |
+| ------------------------ | ----------- | ---------------------------------------- | ---------- |
+| Auth                     | Implemented | `e2e/auth.spec.ts`                       | 7/7        |
+| Documents                | Implemented | `e2e/documents.spec.ts`                  | 6/6        |
+| Canvas Editor            | Implemented | `e2e/canvas-editor.spec.ts`              | 15/15      |
+| Text Editor Toolbar      | Implemented | `e2e/editor-toolbar.spec.ts`             | 12/12      |
+| LaTeX Math               | Implemented | `e2e/latex-math.spec.ts`                 | 5/5        |
+| Courses                  | Implemented | `e2e/courses.spec.ts`                    | 5/6        |
+| Flat Course Page         | Implemented | `e2e/course-materials.spec.ts`           | 3/3        |
+| File Upload              | Implemented | `e2e/file-upload.spec.ts`                | 3/4        |
+| AI Chat                  | Implemented | `e2e/ai-chat.spec.ts`                    | 6/6        |
+| AI Chat — Per-user       | Planned     | `e2e/ai-chat-per-user-materials.spec.ts` | 0/2        |
+| PDF Export               | Implemented | `e2e/export-pdf-*.spec.ts`               | 6/7        |
+| Real-time Sync           | Implemented | `e2e/realtime-sync.spec.ts`              | 3/3        |
+| Drawing Copy/Paste       | Implemented | `e2e/drawing-copy-paste.spec.ts`         | 8/8        |
+| Moodle Ext Gating        | Implemented | `e2e/moodle-touch-gating.spec.ts`        | 2/2        |
+| Extension Real Load      | Implemented | `e2e/extension-real.spec.ts`             | 3/3        |
+| Document Context Files   | Implemented | `e2e/document-context-files.spec.ts`     | 4/4        |
+| Homework AI Context      | Removed     | (deleted)                                | —          |
+| Version History          | Planned     | `e2e/version-history.spec.ts`            | 0/5        |
+| PDF Visual Regression    | Implemented | `e2e/pdf-visual-regression.spec.ts`      | 8/8        |
+| **Total**                |             |                                          | **93/101** |
 
 ---
 
