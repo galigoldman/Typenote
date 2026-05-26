@@ -574,27 +574,6 @@ VALUES (
 ) ON CONFLICT (id) DO NOTHING;
 
 -- ============================================
--- HOMEWORK SESSIONS (test data)
--- ============================================
-
-INSERT INTO public.homework_sessions (id, document_id, exercise_document_id, course_id, user_id)
-VALUES (
-  'a0000000-0000-0000-0000-000000000001',
-  '20000000-0000-0000-0000-000000000011',
-  '20000000-0000-0000-0000-000000000010',
-  '30000000-0000-0000-0000-000000000001',
-  'ac3be77d-4566-406c-9ac0-7c410634ad41'
-) ON CONFLICT (id) DO NOTHING;
-
-INSERT INTO public.homework_session_materials (id, session_id, material_type, material_id)
-VALUES (
-  'a1000000-0000-0000-0000-000000000001',
-  'a0000000-0000-0000-0000-000000000001',
-  'course_material',
-  '50000000-0000-0000-0000-000000000001'
-) ON CONFLICT (id) DO NOTHING;
-
--- ============================================
 -- DOCUMENT VERSIONS (test data for version history)
 -- ============================================
 
