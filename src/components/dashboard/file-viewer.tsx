@@ -93,11 +93,17 @@ export function FileViewer({ fileType, fileId, initialPage, onClose }: FileViewe
           <button aria-label="Close viewer" onClick={onClose} className="rounded p-1 hover:bg-accent"><X className="h-5 w-5" /></button>
         </div>
       </div>
-      <div ref={containerRef} className="flex-1 overflow-auto bg-neutral-800 p-4">
+      <div className="relative flex-1 overflow-auto bg-neutral-800 p-4">
+        {/* PDF canvases are appended here imperatively; React never manages this node's children. */}
+        <div ref={containerRef} />
         {loading && (
-          <div className="flex h-full items-center justify-center text-white"><Loader2 className="h-6 w-6 animate-spin" /></div>
+          <div className="absolute inset-0 flex items-center justify-center text-white">
+            <Loader2 className="h-6 w-6 animate-spin" />
+          </div>
         )}
-        {error && <p className="text-center text-sm text-red-300">{error}</p>}
+        {error && (
+          <p className="absolute inset-x-0 top-4 text-center text-sm text-red-300">{error}</p>
+        )}
       </div>
     </div>
   );
