@@ -6,10 +6,11 @@ import { TiptapEditor } from './tiptap-editor';
 import { VersionSidebar } from '@/components/version-history/version-sidebar';
 import { AiChatWrapper } from '@/components/ai/ai-chat-wrapper';
 import {
-  DocumentContextFiles,
+  FocusFilesPanel,
   type ViewerTarget,
-} from '@/components/dashboard/document-context-files';
+} from '@/components/dashboard/focus-files-panel';
 import { FileViewer } from '@/components/dashboard/file-viewer';
+import { getContextFiles } from '@/lib/actions/context-files';
 
 interface TiptapEditorWithVersionsProps {
   document: Document;
@@ -24,6 +25,23 @@ export function TiptapEditorWithVersions({
 }: TiptapEditorWithVersionsProps) {
   const [viewerTarget, setViewerTarget] = useState<ViewerTarget | null>(null);
   const openViewer = useCallback((t: ViewerTarget) => setViewerTarget(t), []);
+
+  const [isFocusFilesOpen, setIsFocusFilesOpen] = useState(false);
+  const [focusFilesCount, setFocusFilesCount] = useState(0);
+
+  // Load the count once so the toolbar badge is correct before first open.
+  useEffect(() => {
+    if (!courseId) return;
+    let active = true;
+    getContextFiles(document.id)
+      .then((list) => {
+        if (active) setFocusFilesCount(list.length);
+      })
+      .catch(() => {});
+    return () => {
+      active = false;
+    };
+  }, [courseId, document.id]);
 
   const [isVersionHistoryOpen, setIsVersionHistoryOpen] = useState(() => {
     if (typeof window === 'undefined') return false;
@@ -53,6 +71,11 @@ export function TiptapEditorWithVersions({
           onToggleVersionHistory={() =>
             setIsVersionHistoryOpen((prev) => !prev)
           }
+          onToggleFocusFiles={
+            courseId ? () => setIsFocusFilesOpen((prev) => !prev) : undefined
+          }
+          focusFilesCount={focusFilesCount}
+          isFocusFilesOpen={isFocusFilesOpen}
         />
       </div>
       <VersionSidebar
@@ -61,9 +84,12 @@ export function TiptapEditorWithVersions({
         onClose={() => setIsVersionHistoryOpen(false)}
       />
       {courseId && (
-        <DocumentContextFiles
+        <FocusFilesPanel
           documentId={document.id}
           courseId={courseId}
+          isOpen={isFocusFilesOpen}
+          onClose={() => setIsFocusFilesOpen(false)}
+          onCountChange={setFocusFilesCount}
           onOpenFile={openViewer}
         />
       )}

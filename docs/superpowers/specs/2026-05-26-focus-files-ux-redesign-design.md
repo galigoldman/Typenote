@@ -14,7 +14,7 @@ The "context files" feature works, but two pieces of its UX are unclear (feedbac
 
 This redesign keeps the data model, server actions, and the AI focus-pass exactly as-is. It changes only presentation:
 
-- Rename the feature to **"Focus files"** everywhere in the UI (button, panel title, AI chat cue). The name conveys *"the files the AI focuses on for this note."*
+- Rename the feature to **"Focus files"** everywhere in the UI (button, panel title, AI chat cue). The name conveys _"the files the AI focuses on for this note."_
 - Move the entry point from a floating icon to a **labeled button in the shared editor toolbar**, next to History.
 - Replace the inline picker with a **grouped, multi-select, searchable dialog**.
 - Sharpen the panel's purpose copy and empty state.
@@ -63,9 +63,9 @@ This redesign keeps the data model, server actions, and the AI focus-pass exactl
 ### 4.2 Panel — rename `ContextFilesPanel` → `FocusFilesPanel`
 
 - Header: 📎 **"Focus files"** + close button (unchanged layout/responsive behavior: static 300px sidebar on `lg`, full-screen on mobile).
-- Purpose line under the header: *"The AI focuses on these when answering. Click any file to open it here."*
+- Purpose line under the header: _"The AI focuses on these when answering. Click any file to open it here."_
 - Attached list: unchanged (open-in-viewer button = `context-file-item`; remove button `aria-label="Remove <name>"`).
-- Empty state: *"No focus files yet — the AI still uses everything in this course. Add the exercise sheet or slides to focus it."*
+- Empty state: _"No focus files yet — the AI still uses everything in this course. Add the exercise sheet or slides to focus it."_
 - Footer **"＋ Add files"** button (`focus-files-add`) now **opens `AddFilesDialog`** (sets local `dialogOpen` state) instead of toggling the inline picker. The inline `picking` UI is removed.
 - On dialog close (after a successful batch attach), the panel refreshes its list and reports the new count via `onCountChange`.
 
@@ -73,7 +73,7 @@ This redesign keeps the data model, server actions, and the AI focus-pass exactl
 
 - Built on shadcn `Dialog`. Props: `{ open, onOpenChange, courseId, alreadyAttached: {fileType,fileId}[], onConfirm(selected: AttachableFile[]) }`.
 - On open: loads candidates via `getAttachableFiles(courseId)` (already returns `{ courseMaterials, personalFiles, moodleFiles }`). Loading + empty states shown.
-- Title **"Add focus files"**; subtitle *"Pick imported files for the AI to focus on for this note. You can open them here too."*
+- Title **"Add focus files"**; subtitle _"Pick imported files for the AI to focus on for this note. You can open them here too."_
 - **Search input** filters candidates client-side by name (case-insensitive).
 - Candidates grouped under labels **"From Moodle" / "Course materials" / "Personal uploads"**; each row is a checkbox + file icon + name (`focus-files-candidate`). Files already attached render checked + disabled with an "added" hint.
 - Footer: **"Cancel"** + primary **"Add N files"** (disabled when N = 0). Confirm calls `onConfirm` with the selected set.
