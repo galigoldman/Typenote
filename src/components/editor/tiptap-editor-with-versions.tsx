@@ -72,6 +72,7 @@ export function TiptapEditorWithVersions({
       />
       {viewerTarget && (
         <FileViewer
+          key={`${viewerTarget.fileType}:${viewerTarget.fileId}`}
           fileType={viewerTarget.fileType}
           fileId={viewerTarget.fileId}
           initialPage={viewerTarget.page}
