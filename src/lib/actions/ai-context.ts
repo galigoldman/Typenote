@@ -7,8 +7,9 @@ import { GoogleGenAI } from '@google/genai';
 import { chunkText, embedQuery, embedText } from '@/lib/ai/embeddings';
 import { extractDocxText } from '@/lib/ai/extraction/docx';
 import { extractPdfText } from '@/lib/ai/extraction/pdf';
-import { resolveHomeworkContext } from '@/lib/ai/homework-context';
 import { buildSystemPrompt } from '@/lib/ai/prompts';
+import { listContextFiles } from '@/lib/actions/context-files';
+import { resolveContextFileName } from '@/lib/ai/context-files';
 import {
   getContentHash,
   matchEmbeddings,
@@ -70,6 +71,7 @@ export type QuestionResult = {
   answer: string;
   sources: Array<{
     sourceType: string;
+    sourceId: string;
     sourceName: string;
     pageRange: string | null;
     signedUrl: string | null;
@@ -430,6 +432,7 @@ export async function askQuestion(
       contextTexts.push(`--- ${r.sourceName} ---\n${r.segmentText}`);
       sourcesUsed.push({
         sourceType: r.sourceType,
+        sourceId: r.sourceId,
         sourceName: r.sourceName,
         pageRange: null,
         signedUrl: null,
@@ -558,7 +561,7 @@ export async function buildAiContext(params: QuestionParams): Promise<{
   contents: Array<{ role: string; parts: any[] }>;
   modelName: string;
   sources: QuestionResult['sources'];
-  homeworkContextUsed: boolean;
+  contextFilesUsed: boolean;
 }> {
   await getAuthUserId();
   const supabase = await createClient();
@@ -573,29 +576,39 @@ export async function buildAiContext(params: QuestionParams): Promise<{
 
   const admin = createAdminClient();
 
-  // Homework context (Tiers 1–2): resolved server-side from the open document,
-  // never trusting any client-supplied material list. null for normal docs.
-  const homework = params.documentId
-    ? await resolveHomeworkContext(supabase, admin, params.documentId)
-    : null;
+  // Attached context files (focus the AI). Names go in the prompt; ids drive
+  // a scoped "focus" retrieval so their chunks are guaranteed in context.
+  const attached =
+    params.documentId && courseId
+      ? await listContextFiles(supabase, params.documentId)
+      : [];
+  const attachedIds = attached.map((a) => a.file_id);
+  const contextFileNames = (
+    await Promise.all(
+      attached
+        .slice(0, 10)
+        .map((a) => resolveContextFileName(supabase, admin, a.file_type, a.file_id)),
+    )
+  ).filter((n): n is string => !!n);
 
   const hasDocumentContent = !!documentContent?.trim();
   const systemPrompt = buildSystemPrompt({
     courseName,
     hasDocumentContent,
-    isHomeworkMode: !!homework,
-    exerciseName: homework?.exerciseName,
-    pinnedMaterialNames: homework?.pinnedNames,
+    contextFileNames,
   });
 
-  // Skip RAG search when there's no course (no materials to search)
-  const results = courseId
-    ? await searchContext({
-        query: question,
-        courseId,
-        maxResults: 8,
-      })
+  // RAG: focus pass over attached files FIRST, then the normal course-wide search.
+  // The dedupe-by-sourceId loop below keeps the focus (first) hit per source,
+  // so attached files rank ahead of everything else.
+  const focusResults =
+    courseId && attachedIds.length > 0
+      ? await searchContext({ query: question, courseId, sourceIds: attachedIds, maxResults: 6 })
+      : [];
+  const courseResults = courseId
+    ? await searchContext({ query: question, courseId, maxResults: 8 })
     : [];
+  const results = [...focusResults, ...courseResults];
 
   const contextTexts: string[] = [];
   const sources: QuestionResult['sources'] = [];
@@ -606,17 +619,20 @@ export async function buildAiContext(params: QuestionParams): Promise<{
     if (r.segmentText && !seen.has(r.sourceId)) {
       seen.add(r.sourceId);
       contextTexts.push(`--- ${r.sourceName} ---\n${r.segmentText}`);
+      const pageRange =
+        r.pageStart != null
+          ? r.pageEnd != null && r.pageEnd !== r.pageStart
+            ? `p. ${r.pageStart + 1}–${r.pageEnd + 1}`
+            : `p. ${r.pageStart + 1}`
+          : null;
       sources.push({
         sourceType: r.sourceType,
-        sourceName: r.sourceName,
-        pageRange: null,
-        signedUrl: null, // populated by the URL-attach block below
-      });
-      sourceIds.push({
         sourceId: r.sourceId,
-        sourceType: r.sourceType,
-        idx: sources.length - 1,
+        sourceName: r.sourceName,
+        pageRange,
+        signedUrl: null,
       });
+      sourceIds.push({ sourceId: r.sourceId, sourceType: r.sourceType, idx: sources.length - 1 });
     }
   }
 
@@ -721,42 +737,6 @@ export async function buildAiContext(params: QuestionParams): Promise<{
     });
   }
 
-  // Tier 1 — exercise (always injected when present)
-  if (homework?.exerciseText) {
-    contents.push({
-      role: 'user',
-      parts: [
-        {
-          text: `Here is the EXERCISE the student is working on — "${homework.exerciseName}":\n\n${homework.exerciseText}\n\nThe student's questions refer to this.`,
-        },
-      ],
-    });
-    contents.push({
-      role: 'model',
-      parts: [{ text: 'I understand the exercise the student is working on.' }],
-    });
-  }
-
-  // Tier 2 — pinned materials (always injected when present)
-  const pinnedWithText = homework?.pinned.filter((p) => p.text) ?? [];
-  if (pinnedWithText.length > 0) {
-    const pinnedText = pinnedWithText
-      .map((p) => `--- ${p.name} ---\n${p.text}`)
-      .join('\n\n');
-    contents.push({
-      role: 'user',
-      parts: [
-        {
-          text: `These are the materials the student marked as most relevant:\n\n${pinnedText}\n\nPrioritize them, but you may also use other course materials.`,
-        },
-      ],
-    });
-    contents.push({
-      role: 'model',
-      parts: [{ text: 'I have reviewed the pinned materials.' }],
-    });
-  }
-
   if (contextTexts.length > 0) {
     const materialsText = contextTexts.join('\n\n');
     contents.push({
@@ -789,11 +769,7 @@ export async function buildAiContext(params: QuestionParams): Promise<{
     }
   }
 
-  const hasInjectedContext =
-    hasDocumentContent ||
-    contextTexts.length > 0 ||
-    !!homework?.exerciseText ||
-    pinnedWithText.length > 0;
+  const hasInjectedContext = hasDocumentContent || contextTexts.length > 0;
 
   // Build the user's question parts (optionally with image)
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -835,7 +811,7 @@ export async function buildAiContext(params: QuestionParams): Promise<{
     contents,
     modelName,
     sources,
-    homeworkContextUsed: !!homework,
+    contextFilesUsed: attached.length > 0,
   };
 }
 
