@@ -73,41 +73,20 @@ describe('buildLatexPrompt', () => {
   });
 });
 
-describe('buildSystemPrompt — homework mode', () => {
-  it('omits homework section when not in homework mode', () => {
-    const p = buildSystemPrompt({
-      courseName: 'CS101',
+describe('buildSystemPrompt context files', () => {
+  it('adds an attached-files section when names are present', () => {
+    const out = buildSystemPrompt({
+      courseName: 'Algebra',
       hasDocumentContent: false,
+      contextFileNames: ['HW3.pdf', 'Lecture 5'],
     });
-    expect(p).not.toMatch(/HOMEWORK SESSION/);
+    expect(out).toContain('ATTACHED CONTEXT FILES');
+    expect(out).toContain('HW3.pdf');
+    expect(out).toContain('Lecture 5');
   });
 
-  it('includes exercise name and pinned materials when in homework mode', () => {
-    const p = buildSystemPrompt({
-      courseName: 'CS101',
-      hasDocumentContent: true,
-      isHomeworkMode: true,
-      exerciseName: 'Problem Set 1',
-      pinnedMaterialNames: ['Lecture 1', 'Notes'],
-    });
-    expect(p).toMatch(/HOMEWORK SESSION/);
-    expect(p).toMatch(/Problem Set 1/);
-    expect(p).toMatch(/Lecture 1/);
-    expect(p).toMatch(/Notes/);
-    // prioritize, don't restrict
-    expect(p).toMatch(/not restricted|freely use/i);
-    // tutoring stance
-    expect(p).toMatch(/hint|guide|rather than/i);
-  });
-
-  it('handles homework mode with no pinned materials', () => {
-    const p = buildSystemPrompt({
-      hasDocumentContent: false,
-      isHomeworkMode: true,
-      exerciseName: 'PS2',
-      pinnedMaterialNames: [],
-    });
-    expect(p).toMatch(/PS2/);
-    expect(p).not.toMatch(/marked as most relevant/);
+  it('omits the section when there are no attached files', () => {
+    const out = buildSystemPrompt({ courseName: 'Algebra', hasDocumentContent: false });
+    expect(out).not.toContain('ATTACHED CONTEXT FILES');
   });
 });
