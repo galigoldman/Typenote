@@ -85,6 +85,18 @@ describe('trackEvent', () => {
     });
   });
 
+  it('captures context_files_used with course_id and file_count', () => {
+    trackEvent('context_files_used', {
+      course_id: 'course-abc',
+      file_count: 3,
+    });
+
+    expect(posthog.capture).toHaveBeenCalledWith('context_files_used', {
+      course_id: 'course-abc',
+      file_count: 3,
+    });
+  });
+
   describe('graceful degradation', () => {
     it('does not throw when posthog.capture is undefined', () => {
       const originalCapture = posthog.capture;
