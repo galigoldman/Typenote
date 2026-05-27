@@ -10,7 +10,7 @@ import {
 } from '@/components/dashboard/focus-files-panel';
 import { FileViewer } from '@/components/dashboard/file-viewer';
 import { getContextFiles } from '@/lib/actions/context-files';
-import type { Document } from '@/types/database';
+import type { Document, ResolvedContextFile } from '@/types/database';
 import type { AiContextItem } from './ai-chat-panel';
 
 import { AiChatWrapper } from './ai-chat-wrapper';
@@ -36,7 +36,12 @@ export function DocumentWithAi({
   const [viewerTarget, setViewerTarget] = useState<ViewerTarget | null>(null);
   const openViewer = useCallback((t: ViewerTarget) => setViewerTarget(t), []);
   const [isFocusFilesOpen, setIsFocusFilesOpen] = useState(false);
-  const [focusFilesCount, setFocusFilesCount] = useState(0);
+  const [focusFiles, setFocusFiles] = useState<ResolvedContextFile[]>([]);
+  const refreshFocusFiles = useCallback(async () => {
+    if (!courseId) return;
+    const list = await getContextFiles(document.id);
+    setFocusFiles(list);
+  }, [courseId, document.id]);
   const [isVersionHistoryOpen, setIsVersionHistoryOpen] = useState(() => {
     if (typeof window === 'undefined') return false;
     return (
@@ -57,13 +62,13 @@ export function DocumentWithAi({
     }
   }, []);
 
-  // Load the focus-files count once so the toolbar badge is correct on load.
+  // Load once so the toolbar badge + chat are correct on load.
   useEffect(() => {
     if (!courseId) return;
     let active = true;
     getContextFiles(document.id)
       .then((list) => {
-        if (active) setFocusFilesCount(list.length);
+        if (active) setFocusFiles(list);
       })
       .catch(() => {});
     return () => {
@@ -116,7 +121,7 @@ export function DocumentWithAi({
           onToggleFocusFiles={
             courseId ? () => setIsFocusFilesOpen((prev) => !prev) : undefined
           }
-          focusFilesCount={focusFilesCount}
+          focusFilesCount={focusFiles.length}
           isFocusFilesOpen={isFocusFilesOpen}
         />
       </div>
@@ -131,7 +136,8 @@ export function DocumentWithAi({
           courseId={courseId}
           isOpen={isFocusFilesOpen}
           onClose={() => setIsFocusFilesOpen(false)}
-          onCountChange={setFocusFilesCount}
+          files={focusFiles}
+          onChanged={refreshFocusFiles}
           onOpenFile={openViewer}
         />
       )}
@@ -149,6 +155,8 @@ export function DocumentWithAi({
         onOpenSource={(fileType, fileId, page) =>
           openViewer({ fileType, fileId, page })
         }
+        focusFiles={focusFiles}
+        onFocusFilesChanged={refreshFocusFiles}
       />
       {viewerTarget && (
         <FileViewer

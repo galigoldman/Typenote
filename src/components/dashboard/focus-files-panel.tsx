@@ -1,11 +1,10 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useState } from 'react';
 import { FileText, Paperclip, Plus, X } from 'lucide-react';
 import {
   attachContextFile,
   detachContextFile,
-  getContextFiles,
 } from '@/lib/actions/context-files';
 import type {
   AttachableFile,
@@ -26,7 +25,10 @@ interface FocusFilesPanelProps {
   courseId: string;
   isOpen: boolean;
   onClose: () => void;
-  onCountChange?: (count: number) => void;
+  /** The attached files — owned by the host so the panel and chat stay in sync. */
+  files: ResolvedContextFile[];
+  /** Called after an attach/detach so the host can reload the shared list. */
+  onChanged: () => void | Promise<void>;
   onOpenFile: (file: { fileType: ContextFileType; fileId: string }) => void;
 }
 
@@ -35,32 +37,11 @@ export function FocusFilesPanel({
   courseId,
   isOpen,
   onClose,
-  onCountChange,
+  files,
+  onChanged,
   onOpenFile,
 }: FocusFilesPanelProps) {
-  const [files, setFiles] = useState<ResolvedContextFile[]>([]);
   const [dialogOpen, setDialogOpen] = useState(false);
-
-  const refresh = useCallback(async () => {
-    const list = await getContextFiles(documentId);
-    setFiles(list);
-    onCountChange?.(list.length);
-  }, [documentId, onCountChange]);
-
-  // Load the attached files when the panel opens. setState lives in the
-  // promise callback (not the synchronous effect body) by design.
-  useEffect(() => {
-    if (!isOpen) return;
-    let active = true;
-    void getContextFiles(documentId).then((list) => {
-      if (!active) return;
-      setFiles(list);
-      onCountChange?.(list.length);
-    });
-    return () => {
-      active = false;
-    };
-  }, [isOpen, documentId, onCountChange]);
 
   const handleDetach = async (f: ResolvedContextFile) => {
     await detachContextFile({
@@ -68,32 +49,29 @@ export function FocusFilesPanel({
       fileType: f.fileType,
       fileId: f.fileId,
     });
-    await refresh();
+    await onChanged();
   };
 
   // Attach the chosen files sequentially so a failure can name the file.
   // Always refresh so successful attachments stick even if a later one fails.
-  const handleConfirm = useCallback(
-    async (selected: AttachableFile[]) => {
-      const failed: string[] = [];
-      for (const c of selected) {
-        try {
-          await attachContextFile({
-            documentId,
-            fileType: c.fileType,
-            fileId: c.fileId,
-          });
-        } catch {
-          failed.push(c.name);
-        }
+  const handleConfirm = async (selected: AttachableFile[]) => {
+    const failed: string[] = [];
+    for (const c of selected) {
+      try {
+        await attachContextFile({
+          documentId,
+          fileType: c.fileType,
+          fileId: c.fileId,
+        });
+      } catch {
+        failed.push(c.name);
       }
-      await refresh();
-      if (failed.length > 0) {
-        throw new Error(`Couldn't add: ${failed.join(', ')}`);
-      }
-    },
-    [documentId, refresh],
-  );
+    }
+    await onChanged();
+    if (failed.length > 0) {
+      throw new Error(`Couldn't add: ${failed.join(', ')}`);
+    }
+  };
 
   if (!isOpen) return null;
 

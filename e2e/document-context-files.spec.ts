@@ -232,3 +232,42 @@ test('AI citation button opens the file viewer (mocked AI response)', async ({
     timeout: 10_000,
   });
 });
+
+// ──────────────────────────────────────────────────────────────────────────────
+// Test 5: Focus files can be managed from inside the AI chat
+// ──────────────────────────────────────────────────────────────────────────────
+test('focus files can be added from inside the AI chat', async ({ page }) => {
+  test.setTimeout(60_000);
+  await login(page);
+  await openNewCourseDocument(page);
+
+  // Open AI chat
+  const aiButton = page.getByRole('button', { name: 'Open AI chat' });
+  await expect(aiButton).toBeVisible({ timeout: 10_000 });
+  await aiButton.click();
+
+  // The chat focus-files control is visible, with an add affordance.
+  await expect(page.getByTestId('chat-focus-files')).toBeVisible({
+    timeout: 10_000,
+  });
+  await page.getByTestId('chat-focus-add').first().click({ timeout: 5_000 });
+
+  // Add dialog opens; pick a file and confirm.
+  await expect(page.getByTestId('add-files-dialog')).toBeVisible({
+    timeout: 10_000,
+  });
+  const firstCandidate = page.getByTestId('context-files-candidate').first();
+  await expect(firstCandidate).toBeVisible({ timeout: 10_000 });
+  await firstCandidate.click();
+  await page
+    .getByRole('button', { name: /^Add 1 file$/ })
+    .click({ timeout: 5_000 });
+  await expect(page.getByTestId('add-files-dialog')).toHaveCount(0, {
+    timeout: 10_000,
+  });
+
+  // A focus chip now appears in the chat.
+  await expect(page.getByTestId('chat-focus-chip').first()).toBeVisible({
+    timeout: 10_000,
+  });
+});

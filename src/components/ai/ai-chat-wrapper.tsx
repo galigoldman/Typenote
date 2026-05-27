@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { MessageCircle } from 'lucide-react';
 
 import type { AiContextItem } from './ai-chat-panel';
-import type { ContextFileType } from '@/types/database';
+import type { ContextFileType, ResolvedContextFile } from '@/types/database';
 
 import { AiChatPanel } from './ai-chat-panel';
 
@@ -24,6 +24,9 @@ interface AiChatWrapperProps {
     fileId: string,
     page?: number,
   ) => void;
+  /** Per-document focus files (owned by the host) + a reload callback. */
+  focusFiles?: ResolvedContextFile[];
+  onFocusFilesChanged?: () => void | Promise<void>;
 }
 
 export function AiChatWrapper({
@@ -38,6 +41,8 @@ export function AiChatWrapper({
   onToggle: externalOnToggle,
   onClose: externalOnClose,
   onOpenSource,
+  focusFiles,
+  onFocusFilesChanged,
 }: AiChatWrapperProps) {
   const [internalIsOpen, setInternalIsOpen] = useState(false);
 
@@ -75,6 +80,8 @@ export function AiChatWrapper({
         onRemoveContextItem={onRemoveContextItem}
         onClearAllContext={onClearAllContext}
         onOpenSource={onOpenSource}
+        focusFiles={focusFiles}
+        onFocusFilesChanged={onFocusFilesChanged}
       />
     </>
   );
