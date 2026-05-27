@@ -9,17 +9,17 @@
 
 ## Key Files to Understand
 
-| File | What It Does |
-|---|---|
+| File                                                       | What It Does                                           |
+| ---------------------------------------------------------- | ------------------------------------------------------ |
 | `src/app/(dashboard)/dashboard/documents/[docId]/page.tsx` | Server component — fetches document and renders editor |
-| `src/components/editor/tiptap-editor-with-versions.tsx` | Text editor wrapper (TipTap + version sidebar) |
-| `src/components/canvas/canvas-editor.tsx` | Canvas/drawing editor |
-| `src/components/ai/document-with-ai.tsx` | Canvas editor + AI chat wrapper |
-| `src/components/dashboard/sidebar-layout.tsx` | Dashboard layout with collapsible sidebar |
-| `src/components/dashboard/document-card.tsx` | Document link card on dashboard |
-| `src/components/dashboard/sidebar-folder-tree.tsx` | Sidebar navigation tree |
-| `src/hooks/use-document-sync.ts` | Document save/sync orchestrator hook |
-| `src/lib/actions/documents.ts` | Server actions for document CRUD |
+| `src/components/editor/tiptap-editor-with-versions.tsx`    | Text editor wrapper (TipTap + version sidebar)         |
+| `src/components/canvas/canvas-editor.tsx`                  | Canvas/drawing editor                                  |
+| `src/components/ai/document-with-ai.tsx`                   | Canvas editor + AI chat wrapper                        |
+| `src/components/dashboard/sidebar-layout.tsx`              | Dashboard layout with collapsible sidebar              |
+| `src/components/dashboard/document-card.tsx`               | Document link card on dashboard                        |
+| `src/components/dashboard/sidebar-folder-tree.tsx`         | Sidebar navigation tree                                |
+| `src/hooks/use-document-sync.ts`                           | Document save/sync orchestrator hook                   |
+| `src/lib/actions/documents.ts`                             | Server actions for document CRUD                       |
 
 ## Development Workflow
 

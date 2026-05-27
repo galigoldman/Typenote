@@ -5,3 +5,4 @@ public/pdf.worker.min.mjs
 .chrome-debug
 .chrome-debug-moodle
 .claude/worktrees
+extension/dist

@@ -158,9 +158,7 @@ export function WeekSection({
                 {homeworkDocs.map((doc) => (
                   <button
                     key={doc.id}
-                    onClick={() =>
-                      openTab(doc.id, doc.title)
-                    }
+                    onClick={() => openTab(doc.id, doc.title)}
                     className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-muted"
                   >
                     <FileText className="size-3.5 text-muted-foreground" />
