@@ -31,9 +31,14 @@ This design fixes that at the source:
 The citation UI is already done: `FileViewer` accepts `initialPage` and the chat panel turns
 `pageRange` into a jump-to-page click. They simply start receiving real page numbers.
 
-Secondary benefits: this **fixes a correctness bug** (today the embedder silently truncates
-everything past ~2 048 tokens, so most of every large file is unsearchable) and **reduces
-per-query cost** (small relevant chunks instead of giant blobs in the prompt).
+Secondary benefits: **sharper retrieval** (one vector for a ~6k-token multi-topic blob is a
+mushy average; small focused chunks discriminate better) and **lower per-query cost** (small
+relevant chunks instead of giant blobs in the prompt). ⚠️ Note: an earlier draft justified
+this as fixing an embedder *truncation* bug — that was based on the old `gemini-embedding-001`
+2 048-token cap. The live model `gemini-embedding-2-preview` allows **8 192 tokens**, so
+today's ~6 250-token chunks are **not** truncated (a dense Hebrew chunk near the 25k-char
+limit is the only edge case). The justification is dilution + page location + prompt cost, not
+truncation.
 
 ## 2. Background / current state (verified against `dev`)
 
@@ -41,11 +46,15 @@ per-query cost** (small relevant chunks instead of giant blobs in the prompt).
   `chunkText` only splits files *above* that limit; in practice each file → **one chunk**.
 - **Embedding:** `embedText`/`embedQuery` use `gemini-embedding-2-preview`, 1 536 dims,
   asymmetric task types (`RETRIEVAL_DOCUMENT` / `RETRIEVAL_QUERY`) — keep this.
-  - **Input cap:** the Gemini embedding family caps input at **~2 048 tokens and silently
-    truncates** overflow ([docs](https://ai.google.dev/gemini-api/docs/models/gemini-embedding-001)).
-    A ~6 000-token chunk therefore embeds only its first third; the rest is stored as
-    `segment_text` but **absent from the vector** → unsearchable. (Confirm the exact cap for
-    `-2-preview` during implementation; design stays well under it.)
+  - **Input cap:** `gemini-embedding-2-preview` allows **8 192 input tokens**
+    ([docs](https://ai.google.dev/gemini-api/docs/models/gemini-embedding-2-preview)), 4× the
+    old `gemini-embedding-001` (2 048). Today's ≤25 000-char chunks (~6 250 tokens) are
+    therefore **not truncated** — correcting an earlier draft assumption. The only edge case is
+    very dense non-Latin text (Hebrew/CJK ≈1–2 chars/token) near the 25k limit, which can
+    approach/exceed 8 192. Smaller chunks keep us comfortably clear regardless.
+  - **Multimodal:** this model is **natively multimodal** (text/image/video/audio, ≤6
+    images/request). We use it in text mode; this leaves the door open to image-based options
+    (see §13 Alternatives).
 - **Extraction:** `src/lib/ai/extraction/pdf.ts` sends the whole PDF to `gemini-2.5-flash`
   multimodal and returns **one flat string** — no page structure. The prompt explicitly asks
   to preserve LaTeX and handle Hebrew (`pdf.ts:29`); it is this multimodal step that also
@@ -320,8 +329,9 @@ Verified pricing (May 2026): Flash $0.30/1M in · Pro $1.25/1M in · Embedding $
   per file; embeddings are ~100× cheaper/token than generation, so absolute cost is negligible.
   Structured extraction adds some output tokens. Main concern is rate-limit pressure → throttle.
 - **Honest framing:** absolute savings are modest at low volume; the primary justification is
-  the **correctness fix** (un-truncating search; indexing course materials at all) and
-  **enabling the feature**, with cost as a favorable side effect that scales with usage.
+  **enabling the feature** (page-accurate evidence), plus **sharper retrieval** (less vector
+  dilution) and **indexing course materials at all** — with cost as a favorable side effect
+  that scales with usage. (Not truncation — see §1/§2.)
 
 ## 8. Tunable parameters (single source of truth)
 
@@ -398,8 +408,8 @@ Verified pricing (May 2026): Flash $0.30/1M in · Pro $1.25/1M in · Embedding $
 - ⚠️ **Decision: course-material indexing scope.** Recommended to fix it here (small — one
   `indexContent` call + backfill), otherwise course-material citations/evidence remain
   impossible. Confirm with the user.
-- **Embedder cap for `-2-preview`** — confirm exact input token limit; keep `CHUNK_CHAR_BUDGET`
-  well under it (1600 chars is safe even for Hebrew at a 2 048 cap).
+- **Embedder cap** — `gemini-embedding-2-preview` = 8 192 tokens (verified); `CHUNK_CHAR_BUDGET`
+  of 1600 chars is far under it for any language.
 - ⚠️ **Server-side page counting** — the repo's pdf.js is browser-only; need a Node-safe count
   (`pdf-lib`/legacy `pdfjs-dist`). New dependency surface.
 - ⚠️ **Large-PDF extraction** — single structured call can hit output limits and drop trailing
@@ -437,3 +447,31 @@ Folded in after a subagent review verified against the code:
 - §4.0 (new): **images & handwriting today-vs-proposed contrast** (no regressions); reverted the
   accidental "describe figures" change — **default faithful text-only**, image pages get a page
   citation with no quote.
+- §1/§2/§7/§11: **corrected the truncation claim** — `gemini-embedding-2-preview` allows 8 192
+  tokens (not 2 048), so current chunks aren't truncated; justification reframed to dilution +
+  page location + prompt cost. Added §13 (multimodal/image-embedding alternatives).
+
+## 13. Alternatives considered — multimodal / image embeddings
+
+**Could we embed PDF pages as images (to capture diagrams) instead of extracting text?**
+Yes — `gemini-embedding-2-preview` is natively multimodal (≤6 images/request), so a rendered
+page image can be embedded as a single 1536-dim vector in the same space as text queries,
+working in pgvector unchanged. **Not chosen as the primary path because:**
+
+- **Evidence quotes require text.** An image embedding finds the right page but yields no
+  quotable sentence; the feature's core ("show the exact sentence") still needs extracted
+  text. So image embedding is *additive*, not a replacement → more cost, two pipelines.
+- **Text-heavy slides** retrieve at least as well from extracted text; image embedding's unique
+  win is pure-figure pages (the minority for lecture decks).
+- **Cost/complexity:** server-side page rasterization (Hebrew/math fonts) + higher
+  image-embedding rates + keeping the text pipeline.
+- **ColPali-style multi-vector visual retrieval** is SOTA for visual docs but needs ~1000× the
+  vectors and late-interaction (MaxSim) scoring pgvector doesn't do natively — out of scope.
+
+**Kept as future options (clean because the model is already multimodal):**
+
+1. **Answer-time grounding (cheap, recommended next):** for a figure-heavy cited page, attach
+   that page's image to the *generation* call via the existing `imageData` path so the model
+   can see the diagram — no retrieval changes.
+2. **Per-page image embedding as a 2nd vector** (later, only if diagram *retrieval* proves
+   weak): store an image-modality row per page alongside the text chunks; same table/pgvector.
