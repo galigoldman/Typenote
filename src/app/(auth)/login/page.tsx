@@ -4,6 +4,7 @@ import { Suspense, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { createClient } from '@/lib/supabase/client';
+import { signInWithGoogle } from '@/lib/supabase/oauth';
 import { sanitizeAuthError } from '@/lib/auth-errors';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -28,6 +29,18 @@ function LoginForm() {
   const showResetSuccess =
     searchParams.get('message') === 'password-reset-success';
 
+  const oauthError = searchParams.get('error');
+  const oauthErrorMessage =
+    oauthError === 'session_exchange_failed'
+      ? 'Sign-in failed. Please try again. If this keeps happening, try clearing your browser cookies.'
+      : oauthError === 'no_code'
+        ? 'Sign-in was interrupted. Please try again.'
+        : oauthError === 'oauth_init_failed'
+          ? 'Could not start Google sign-in. Please try again.'
+          : oauthError === 'auth_failed'
+            ? 'Sign-in failed. Please try again.'
+            : null;
+
   async function handleEmailLogin(e: React.FormEvent) {
     e.preventDefault();
     setError('');
@@ -49,14 +62,8 @@ function LoginForm() {
     router.refresh();
   }
 
-  async function handleGoogleLogin() {
-    const supabase = createClient();
-    await supabase.auth.signInWithOAuth({
-      provider: 'google',
-      options: {
-        redirectTo: `${window.location.origin}/auth/callback`,
-      },
-    });
+  function handleGoogleLogin() {
+    signInWithGoogle();
   }
 
   return (
@@ -71,6 +78,14 @@ function LoginForm() {
         {showResetSuccess && (
           <p className="mb-4 rounded-md bg-green-50 p-3 text-sm text-green-800 dark:bg-green-950 dark:text-green-200">
             Password reset successfully. Please sign in with your new password.
+          </p>
+        )}
+        {oauthErrorMessage && (
+          <p
+            className="mb-4 rounded-md bg-destructive/10 p-3 text-sm text-destructive"
+            role="alert"
+          >
+            {oauthErrorMessage}
           </p>
         )}
         <form onSubmit={handleEmailLogin} className="space-y-4">

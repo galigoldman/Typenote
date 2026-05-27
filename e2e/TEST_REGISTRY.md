@@ -21,6 +21,8 @@ When adding or modifying a feature, update this registry and write the correspon
 - [x] Unauthenticated user is redirected to login
 - [x] Login page still shows both email/password and Google options
 - [x] Privacy policy (`/privacy`) is publicly reachable while logged out (required for Chrome Web Store review)
+- [x] OAuth callback without code redirects to login with error message
+- [x] Login page shows error message when redirected with session_exchange_failed error
 
 ---
 
@@ -236,7 +238,7 @@ Test lives in `src/__tests__/integration/storage-rls.integration.test.ts`. Verif
 
 | Feature               | Status      | Spec File                                | Tests     |
 | --------------------- | ----------- | ---------------------------------------- | --------- |
-| Auth                  | Implemented | `e2e/auth.spec.ts`                       | 7/7       |
+| Auth                  | Implemented | `e2e/auth.spec.ts`                       | 9/9       |
 | Documents             | Implemented | `e2e/documents.spec.ts`                  | 6/6       |
 | Canvas Editor         | Implemented | `e2e/canvas-editor.spec.ts`              | 15/15     |
 | Text Editor Toolbar   | Implemented | `e2e/editor-toolbar.spec.ts`             | 12/12     |
@@ -252,7 +254,7 @@ Test lives in `src/__tests__/integration/storage-rls.integration.test.ts`. Verif
 | Extension Real Load   | Implemented | `e2e/extension-real.spec.ts`             | 3/3       |
 | Version History       | Planned     | `e2e/version-history.spec.ts`            | 0/5       |
 | PDF Visual Regression | Implemented | `e2e/pdf-visual-regression.spec.ts`      | 8/8       |
-| **Total**             |             |                                          | **88/96** |
+| **Total**             |             |                                          | **90/98** |
 
 ---
 
