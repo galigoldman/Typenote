@@ -105,7 +105,7 @@ test.describe('Auth', () => {
   }) => {
     await page.goto('/login?error=session_exchange_failed');
 
-    const alert = page.locator('[role="alert"]');
+    const alert = page.locator('p[role="alert"]');
     await expect(alert).toBeVisible();
     await expect(alert).toContainText(/sign-in failed/i);
     await expect(alert).toContainText(/clearing your browser cookies/i);
