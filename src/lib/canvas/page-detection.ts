@@ -32,7 +32,10 @@ export function findClosestPage(
 
   // Primary: exact intersection
   for (const page of pages) {
-    if (page.top <= viewportCenterY && page.top + page.height >= viewportCenterY) {
+    if (
+      page.top <= viewportCenterY &&
+      page.top + page.height >= viewportCenterY
+    ) {
       return {
         pageId: page.id,
         pageRelativeY: viewportCenterY - page.top,
@@ -53,7 +56,10 @@ export function findClosestPage(
   }
 
   // Clamp the relative Y to be within the page bounds
-  const relY = Math.max(0, Math.min(closest.height, viewportCenterY - closest.top));
+  const relY = Math.max(
+    0,
+    Math.min(closest.height, viewportCenterY - closest.top),
+  );
   return {
     pageId: closest.id,
     pageRelativeY: relY,

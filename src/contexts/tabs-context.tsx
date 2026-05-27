@@ -96,7 +96,11 @@ if (typeof window !== 'undefined') {
 
 export function TabsProvider({ children }: { children: React.ReactNode }) {
   const router = useRouter();
-  const session = useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot);
+  const session = useSyncExternalStore(
+    subscribe,
+    getSnapshot,
+    getServerSnapshot,
+  );
 
   const tabs = session.tabs;
   const activeTabId = session.activeTabId;

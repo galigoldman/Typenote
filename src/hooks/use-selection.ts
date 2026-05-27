@@ -1042,12 +1042,20 @@ export function useSelection({
                       ...stroke,
                       points: stroke.points.map(
                         ([px, py, pressure]) =>
-                          [px + dx, py + adjustedDy, pressure] as Stroke['points'][0],
+                          [
+                            px + dx,
+                            py + adjustedDy,
+                            pressure,
+                          ] as Stroke['points'][0],
                       ),
                       bbox: computeBBox(
                         stroke.points.map(
                           ([px, py, pressure]) =>
-                            [px + dx, py + adjustedDy, pressure] as Stroke['points'][0],
+                            [
+                              px + dx,
+                              py + adjustedDy,
+                              pressure,
+                            ] as Stroke['points'][0],
                         ),
                       ),
                     }),
@@ -1060,53 +1068,53 @@ export function useSelection({
           }
 
           if (!crossedPage) {
-          // Move strokes
-          if (selectedStrokesRef.current.length > 0) {
-            const movedStrokes = selectedStrokesRef.current.map((stroke) => {
-              const newPoints = stroke.points.map(
-                ([px, py, pressure]) =>
-                  [px + dx, py + dy, pressure] as Stroke['points'][0],
-              );
-              return {
-                id: stroke.id,
-                points: newPoints,
-                bbox: computeBBox(newPoints),
-              };
-            });
-            onStrokesMove(targetPageId, movedStrokes);
-
-            // Update cached strokes
-            selectedStrokesRef.current = selectedStrokesRef.current.map(
-              (stroke) => ({
-                ...stroke,
-                points: stroke.points.map(
+            // Move strokes
+            if (selectedStrokesRef.current.length > 0) {
+              const movedStrokes = selectedStrokesRef.current.map((stroke) => {
+                const newPoints = stroke.points.map(
                   ([px, py, pressure]) =>
                     [px + dx, py + dy, pressure] as Stroke['points'][0],
-                ),
-                bbox: computeBBox(
-                  stroke.points.map(
+                );
+                return {
+                  id: stroke.id,
+                  points: newPoints,
+                  bbox: computeBBox(newPoints),
+                };
+              });
+              onStrokesMove(targetPageId, movedStrokes);
+
+              // Update cached strokes
+              selectedStrokesRef.current = selectedStrokesRef.current.map(
+                (stroke) => ({
+                  ...stroke,
+                  points: stroke.points.map(
                     ([px, py, pressure]) =>
                       [px + dx, py + dy, pressure] as Stroke['points'][0],
                   ),
-                ),
-              }),
-            );
-          }
+                  bbox: computeBBox(
+                    stroke.points.map(
+                      ([px, py, pressure]) =>
+                        [px + dx, py + dy, pressure] as Stroke['points'][0],
+                    ),
+                  ),
+                }),
+              );
+            }
 
-          // Move text boxes
-          for (const tbId of selectedTextBoxIdsRef.current) {
-            onTextBoxMove?.(targetPageId, tbId, dx, dy);
-          }
+            // Move text boxes
+            for (const tbId of selectedTextBoxIdsRef.current) {
+              onTextBoxMove?.(targetPageId, tbId, dx, dy);
+            }
 
-          // Move images
-          if (selectedImageIdsRef.current.size > 0) {
-            onImagesMove?.(
-              targetPageId,
-              Array.from(selectedImageIdsRef.current),
-              dx,
-              dy,
-            );
-          }
+            // Move images
+            if (selectedImageIdsRef.current.size > 0) {
+              onImagesMove?.(
+                targetPageId,
+                Array.from(selectedImageIdsRef.current),
+                dx,
+                dy,
+              );
+            }
           } // end if (!crossedPage)
 
           if (crossedPage) {

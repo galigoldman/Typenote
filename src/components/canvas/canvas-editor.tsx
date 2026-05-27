@@ -1202,8 +1202,9 @@ export function CanvasEditor({
 
       if (nextPage) {
         // Capture dest content before merge for undo cleanup
-        const destEditor = editorsRef.current.get(nextPage.id)
-          ?? textBoxEditorsRef.current.get(`${nextPage.id}-ftb`);
+        const destEditor =
+          editorsRef.current.get(nextPage.id) ??
+          textBoxEditorsRef.current.get(`${nextPage.id}-ftb`);
         const destContentBefore = destEditor
           ? (destEditor.getJSON() as Record<string, unknown>)
           : null;
@@ -2062,8 +2063,9 @@ export function CanvasEditor({
         }, 200);
 
         // Restore the dest page to its pre-overflow content
-        const destEditor = editorsRef.current.get(overflow.destPageId)
-          ?? textBoxEditorsRef.current.get(`${overflow.destPageId}-ftb`);
+        const destEditor =
+          editorsRef.current.get(overflow.destPageId) ??
+          textBoxEditorsRef.current.get(`${overflow.destPageId}-ftb`);
         if (destEditor) {
           if (overflow.destContentBefore) {
             destEditor
@@ -2076,9 +2078,11 @@ export function CanvasEditor({
               .run();
           } else {
             // New page was created — remove it
-            setPages((prev) => prev
-              .filter((p) => p.id !== overflow.destPageId)
-              .map((p, i) => ({ ...p, order: i })));
+            setPages((prev) =>
+              prev
+                .filter((p) => p.id !== overflow.destPageId)
+                .map((p, i) => ({ ...p, order: i })),
+            );
           }
         }
 
@@ -2242,9 +2246,7 @@ export function CanvasEditor({
                 ...p,
                 strokes: p.strokes.filter((s) => !strokeIds.has(s.id)),
                 textBoxes: p.textBoxes.filter((tb) => !tbIds.has(tb.id)),
-                images: (p.images ?? []).filter(
-                  (img) => !imgIds.has(img.id),
-                ),
+                images: (p.images ?? []).filter((img) => !imgIds.has(img.id)),
               };
             }
             if (p.id === action.fromPageId) {
@@ -2424,9 +2426,7 @@ export function CanvasEditor({
                 ...p,
                 strokes: p.strokes.filter((s) => !strokeIds.has(s.id)),
                 textBoxes: p.textBoxes.filter((tb) => !tbIds.has(tb.id)),
-                images: (p.images ?? []).filter(
-                  (img) => !imgIds.has(img.id),
-                ),
+                images: (p.images ?? []).filter((img) => !imgIds.has(img.id)),
               };
             }
             if (p.id === action.toPageId) {
@@ -2438,7 +2438,11 @@ export function CanvasEditor({
                     ...s,
                     points: s.points.map(
                       ([px, py, pr]) =>
-                        [px + action.dx, py + action.dy, pr] as Stroke['points'][0],
+                        [
+                          px + action.dx,
+                          py + action.dy,
+                          pr,
+                        ] as Stroke['points'][0],
                     ),
                     bbox: {
                       minX: s.bbox.minX + action.dx,
@@ -2606,7 +2610,10 @@ export function CanvasEditor({
                   });
                 }
               }
-              const closest = findClosestPage(pageRects, scrollTop + centerClientY);
+              const closest = findClosestPage(
+                pageRects,
+                scrollTop + centerClientY,
+              );
               if (closest) {
                 for (const pageEl of pageEls) {
                   if (pageEl.getAttribute('data-page-id') === closest.pageId) {
@@ -2614,7 +2621,8 @@ export function CanvasEditor({
                     const scaleX = PAGE_WIDTH / rect.width;
                     const scaleY = PAGE_HEIGHT / rect.height;
                     const x =
-                      (centerClientX - (rect.left - containerRect.left)) * scaleX;
+                      (centerClientX - (rect.left - containerRect.left)) *
+                      scaleX;
                     const y =
                       (centerClientY - (rect.top - containerRect.top)) * scaleY;
                     pasteAtPosition(
@@ -2725,7 +2733,8 @@ export function CanvasEditor({
                 const scaleX = PAGE_WIDTH / rect.width;
                 const scaleY = PAGE_HEIGHT / rect.height;
                 pageX = (viewW / 2 - (rect.left - containerRect.left)) * scaleX;
-                pageY = (centerClientY - (rect.top - containerRect.top)) * scaleY;
+                pageY =
+                  (centerClientY - (rect.top - containerRect.top)) * scaleY;
                 break;
               }
             }
