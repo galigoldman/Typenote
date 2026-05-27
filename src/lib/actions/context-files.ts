@@ -174,39 +174,34 @@ export async function getAttachableFiles(courseId: string): Promise<{
       .eq('course_id', courseId),
   ]);
 
-  // Imported Moodle files for this course (mirror searchContext's resolution).
+  // Imported Moodle files for this course. Resolve via the course_moodle_view
+  // RPC (mirrors searchContext + getMoodleMaterialsForCourse) so that a member
+  // of a SHARED course sees the OWNER's imported Moodle files — not just their
+  // own syncs. The RPC enforces is_course_member() and returns nulls for
+  // non-members. This keeps Moodle imports at parity with course_materials and
+  // personal uploads as attachable focus files.
   const moodleFiles: AttachableFile[] = [];
-  const { data: sync } = await supabase
-    .from('user_course_syncs')
-    .select('id, moodle_course_id')
-    .eq('course_id', courseId)
-    .maybeSingle();
-  if (sync?.id) {
-    const { data: imports } = await supabase
-      .from('user_file_imports')
-      .select('moodle_file_id')
-      .eq('sync_id', sync.id)
-      .eq('status', 'imported');
-    const ids = ((imports as { moodle_file_id: string }[] | null) ?? []).map(
-      (i) => i.moodle_file_id,
-    );
-    if (ids.length) {
-      const { data: mfs } = await admin
-        .from('moodle_files')
-        .select('id, file_name, mime_type')
-        .in('id', ids)
-        .eq('is_removed', false)
-        .eq('type', 'file');
-      for (const m of (mfs as
-        | { id: string; file_name: string; mime_type: string | null }[]
-        | null) ?? []) {
-        moodleFiles.push({
-          fileType: 'moodle_file',
-          fileId: m.id,
-          name: m.file_name,
-          mimeType: m.mime_type,
-        });
-      }
+  const { data: viewRows } = await supabase.rpc('course_moodle_view', {
+    p_course_id: courseId,
+  });
+  const view = Array.isArray(viewRows) ? viewRows[0] : viewRows;
+  const importedIds: string[] = view?.imported_file_ids ?? [];
+  if (importedIds.length) {
+    const { data: mfs } = await admin
+      .from('moodle_files')
+      .select('id, file_name, mime_type')
+      .in('id', importedIds)
+      .eq('is_removed', false)
+      .eq('type', 'file');
+    for (const m of (mfs as
+      | { id: string; file_name: string; mime_type: string | null }[]
+      | null) ?? []) {
+      moodleFiles.push({
+        fileType: 'moodle_file',
+        fileId: m.id,
+        name: m.file_name,
+        mimeType: m.mime_type,
+      });
     }
   }
 

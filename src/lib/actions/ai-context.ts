@@ -329,39 +329,17 @@ export async function searchContext(
   const queryEmbedding = await embedQuery(params.query);
 
   // Resolve Typenote course -> canonical moodle_courses.id (if synced).
-  // RLS restricts user_course_syncs to the caller, so no user_id filter
-  // needed here.
+  // Uses course_moodle_view RPC so members see the OWNER's Moodle imports,
+  // not just their own syncs. The RPC enforces is_course_member() internally.
   let moodleCourseId: string | null = null;
   let importedMoodleFileIds: string[] | null = null;
   if (params.courseId) {
-    const { data: sync } = await supabase
-      .from('user_course_syncs')
-      .select('id, moodle_course_id')
-      .eq('course_id', params.courseId)
-      .maybeSingle();
-    const syncRow = sync as {
-      id: string;
-      moodle_course_id: string | null;
-    } | null;
-    moodleCourseId = syncRow?.moodle_course_id ?? null;
-    const syncId = syncRow?.id ?? null;
-
-    if (moodleCourseId && syncId) {
-      // Fetch the user's notebook for THIS course — files they imported
-      // into the current sync, not every file they ever imported across
-      // every course. The SQL function also re-filters by
-      // ce.course_id = match_moodle_course_id, but scoping here keeps
-      // the allowlist tight and avoids dragging unrelated file ids
-      // across the wire.
-      const { data: imports } = await supabase
-        .from('user_file_imports')
-        .select('moodle_file_id')
-        .eq('sync_id', syncId)
-        .eq('status', 'imported');
-      importedMoodleFileIds = (
-        (imports as { moodle_file_id: string }[] | null) ?? []
-      ).map((i) => i.moodle_file_id);
-    }
+    const { data: viewRows } = await supabase.rpc('course_moodle_view', {
+      p_course_id: params.courseId,
+    });
+    const view = Array.isArray(viewRows) ? viewRows[0] : viewRows;
+    moodleCourseId = view?.moodle_course_id ?? null;
+    importedMoodleFileIds = view?.imported_file_ids ?? [];
   }
 
   const matches: MatchResult[] = await matchEmbeddings({

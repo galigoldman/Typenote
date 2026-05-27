@@ -232,3 +232,23 @@ export interface DocumentVersion {
   trigger: VersionTrigger;
   created_at: string;
 }
+
+// Course sharing
+export type CourseRole = 'viewer' | 'contributor';
+
+export interface CourseMember {
+  id: string;
+  course_id: string;
+  user_id: string;
+  role: CourseRole;
+  created_at: string;
+}
+
+export interface CourseShareLink {
+  id: string;
+  course_id: string;
+  token: string;
+  role: CourseRole;
+  is_active: boolean;
+  created_at: string;
+}

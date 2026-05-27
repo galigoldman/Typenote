@@ -14,6 +14,8 @@ import type { PersonalFile } from '@/types/database';
 
 interface PersonalFileItemProps {
   file: PersonalFile;
+  currentUserId?: string;
+  isOwner?: boolean;
 }
 
 function formatFileSize(bytes: number): string {
@@ -30,10 +32,17 @@ async function getPdfPageCount(signedUrl: string): Promise<number> {
   return count;
 }
 
-export function PersonalFileItem({ file }: PersonalFileItemProps) {
+export function PersonalFileItem({
+  file,
+  currentUserId,
+  isOwner = false,
+}: PersonalFileItemProps) {
   const router = useRouter();
   const [opening, setOpening] = useState(false);
   const [deleting, setDeleting] = useState(false);
+
+  const canDelete =
+    isOwner || currentUserId === undefined || file.user_id === currentUserId;
 
   const isPdf = file.mime_type === 'application/pdf';
   const isDocx = file.mime_type.includes('wordprocessingml');
@@ -117,15 +126,18 @@ export function PersonalFileItem({ file }: PersonalFileItemProps) {
           {formatFileSize(file.file_size)}
         </span>
       </button>
-      <Button
-        variant="ghost"
-        size="icon-xs"
-        onClick={handleDelete}
-        disabled={deleting}
-        className="shrink-0 opacity-0 group-hover:opacity-100 hover:opacity-100"
-      >
-        <Trash2 className="size-3.5 text-muted-foreground" />
-      </Button>
+      {canDelete && (
+        <Button
+          variant="ghost"
+          size="icon-xs"
+          onClick={handleDelete}
+          disabled={deleting}
+          aria-label="Delete file"
+          className="shrink-0 opacity-0 group-hover:opacity-100 hover:opacity-100"
+        >
+          <Trash2 className="size-3.5 text-muted-foreground" />
+        </Button>
+      )}
     </div>
   );
 }

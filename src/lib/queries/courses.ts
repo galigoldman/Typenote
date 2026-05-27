@@ -3,7 +3,19 @@ import type { Course, Folder } from '@/types/database';
 
 export async function getCoursesByFolder(folderId: string | null) {
   const supabase = await createClient();
-  const query = supabase.from('courses').select('*').order('position');
+
+  // Derive the current user so we can scope the query to owner-only courses.
+  // This prevents shared courses (visible via the is_course_member RLS policy)
+  // from leaking into the owner's own dashboard sections.
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  const query = supabase
+    .from('courses')
+    .select('*')
+    .eq('user_id', user?.id)
+    .order('position');
 
   if (folderId) {
     query.eq('folder_id', folderId);

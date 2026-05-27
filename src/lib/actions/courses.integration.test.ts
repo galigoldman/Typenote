@@ -6,11 +6,11 @@
  *   - `courses.folder_id` references `folders(id) ON DELETE SET NULL`.
  *     Deleting a folder must NOT delete courses inside it; they move to root.
  *
- *   - `documents.course_id` references `courses(id) ON DELETE CASCADE`.
- *     This is the OPPOSITE of `documents.folder_id` (SET NULL). Deleting a
- *     course deletes every document inside it — by design — because a course
- *     deletion is destructive, not a re-organization. This test pins that
- *     contract so it can't silently change.
+ *   - `documents.course_id` references `courses(id) ON DELETE SET NULL`
+ *     (changed by the course-sharing feature, migration 20260526130000 —
+ *     was ON DELETE CASCADE). Deleting a course now UNFILES its documents
+ *     (course_id → null) so a member's/owner's private notes are never
+ *     destroyed by a course deletion. Same semantics as documents.folder_id.
  *
  *   - Cascade to course_materials: deleting a course must also delete its
  *     course_materials (course_materials.course_id FK ON DELETE CASCADE).
@@ -159,7 +159,11 @@ describe('courses — schema behavior backing courses.ts server actions', () => 
     expect(materials ?? []).toHaveLength(0);
   });
 
-  it('deleting a course CASCADES to its documents (course_id ON DELETE CASCADE — destructive by design)', async () => {
+  it('deleting a course UNFILES its documents (course_id ON DELETE SET NULL — notes survive)', async () => {
+    // Behavior changed by the course-sharing feature (migration 20260526130000):
+    // documents.course_id is now ON DELETE SET NULL so a member's (and the
+    // owner's) private notes are never destroyed when a shared course is
+    // deleted — they become unfiled root documents instead.
     await admin.from('courses').insert({
       id: COURSE_ID,
       user_id: TEST_USER_ID,
@@ -181,11 +185,13 @@ describe('courses — schema behavior backing courses.ts server actions', () => 
 
     const { data } = await admin
       .from('documents')
-      .select('id')
-      .eq('id', DOC_IN_COURSE_ID);
-    // CASCADE: doc is gone. Contrast with deleting a *folder*, which
-    // sets folder_id NULL instead.
-    expect(data ?? []).toHaveLength(0);
+      .select('id, course_id')
+      .eq('id', DOC_IN_COURSE_ID)
+      .maybeSingle();
+    // SET NULL: the doc survives, unfiled (course_id = null) — like deleting
+    // a *folder* sets folder_id NULL.
+    expect(data).not.toBeNull();
+    expect(data!.course_id).toBeNull();
   });
 
   it('deleting a folder leaves the course intact with folder_id = null (ON DELETE SET NULL)', async () => {

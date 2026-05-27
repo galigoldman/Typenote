@@ -29,25 +29,8 @@ vi.mock('@/lib/supabase/server', () => ({
       file_name: 'lecture.pdf',
       mime_type: 'application/pdf',
     };
-    const syncRow = { id: 'sync-1', moodle_course_id: 'moodle-course-1' };
-    const importsRows = [
-      { moodle_file_id: 'imported-file-a' },
-      { moodle_file_id: 'imported-file-b' },
-    ];
 
     const from = vi.fn((table: string) => {
-      if (table === 'user_file_imports') {
-        // Awaitable directly (no .single/.maybeSingle in our usage)
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const chain: any = {
-          select: vi.fn(() => chain),
-          eq: vi.fn(() => chain),
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          then: (resolve: (value: any) => any) =>
-            resolve({ data: importsRows, error: null }),
-        };
-        return chain;
-      }
       if (table === 'course_materials') {
         const rows = [{ id: 'mat-1', storage_path: 'materials/mat-1.pdf' }];
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -69,13 +52,12 @@ vi.mock('@/lib/supabase/server', () => ({
         };
         return chain;
       }
-      const data = table === 'user_course_syncs' ? syncRow : null;
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const chain: any = {
         select: vi.fn(() => chain),
         eq: vi.fn(() => chain),
-        maybeSingle: vi.fn(async () => ({ data, error: null })),
-        single: vi.fn(async () => ({ data, error: null })),
+        maybeSingle: vi.fn(async () => ({ data: null, error: null })),
+        single: vi.fn(async () => ({ data: null, error: null })),
       };
       return chain;
     });
@@ -88,6 +70,18 @@ vi.mock('@/lib/supabase/server', () => ({
         })),
       },
       from,
+      // course_moodle_view RPC — replaces the old user_course_syncs +
+      // user_file_imports queries in searchContext. Returns the owner's
+      // moodle course id and imported file ids.
+      rpc: vi.fn(async (_name: string, _args: unknown) => ({
+        data: [
+          {
+            moodle_course_id: 'moodle-course-1',
+            imported_file_ids: ['imported-file-a', 'imported-file-b'],
+          },
+        ],
+        error: null,
+      })),
       storage: {
         from: vi.fn(() => ({
           download: vi.fn(async () => ({

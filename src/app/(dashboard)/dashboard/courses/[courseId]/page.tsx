@@ -9,6 +9,7 @@ import { PersonalFileUpload } from '@/components/dashboard/personal-file-upload'
 import { PersonalFileItem } from '@/components/dashboard/personal-file-item';
 import { MaterialItem } from '@/components/dashboard/material-item';
 import { MoodleMaterialsSection } from '@/components/dashboard/moodle-materials-section';
+import { ShareCourseButton } from '@/components/dashboard/share-course-button';
 import { Button } from '@/components/ui/button';
 import { ChevronLeft } from 'lucide-react';
 import {
@@ -51,6 +52,31 @@ export default async function CoursePage({
   }
 
   const typedCourse = course as Course;
+
+  // Determine role/ownership for the current user
+  const isOwner = typedCourse.user_id === user?.id;
+  let role: 'owner' | 'viewer' | 'contributor' = 'owner';
+  if (!isOwner && user) {
+    const { data: membership } = await supabase
+      .from('course_members')
+      .select('role')
+      .eq('course_id', courseId)
+      .eq('user_id', user.id)
+      .maybeSingle();
+    role = (membership?.role as 'viewer' | 'contributor') ?? 'viewer';
+  }
+  const canContribute = isOwner || role === 'contributor';
+
+  // Fetch owner display name for members (profiles RLS only exposes own row; null is acceptable)
+  let ownerName: string | null = null;
+  if (!isOwner) {
+    const { data: prof } = await supabase
+      .from('profiles')
+      .select('display_name')
+      .eq('id', typedCourse.user_id)
+      .maybeSingle();
+    ownerName = prof?.display_name ?? null;
+  }
 
   // Parallel fetch: documents, course_materials, personal_files, and folder breadcrumb
   const [documentsResult, materialsResult, personalFilesResult, folderResult] =
@@ -144,12 +170,15 @@ export default async function CoursePage({
               New Document
             </Button>
           </CreateDocumentDialog>
-          <PersonalFileUpload
-            courseId={courseId}
-            userId={user?.id ?? ''}
-            category="material"
-            label="Import File"
-          />
+          {canContribute && (
+            <PersonalFileUpload
+              courseId={courseId}
+              userId={user?.id ?? ''}
+              category="material"
+              label="Import File"
+            />
+          )}
+          {isOwner && <ShareCourseButton courseId={courseId} />}
         </div>
       </div>
 
@@ -158,6 +187,11 @@ export default async function CoursePage({
         <div className="flex items-center gap-3">
           <h1 className="text-2xl font-bold">{typedCourse.name}</h1>
         </div>
+        {!isOwner && (
+          <p className="text-sm text-muted-foreground">
+            Shared by {ownerName ?? 'another user'}
+          </p>
+        )}
       </div>
 
       {isEmpty ? (
@@ -187,10 +221,20 @@ export default async function CoursePage({
               </h2>
               <div className="space-y-0.5">
                 {courseMaterials.map((m) => (
-                  <MaterialItem key={m.id} material={m} />
+                  <MaterialItem
+                    key={m.id}
+                    material={m}
+                    currentUserId={user?.id}
+                    isOwner={isOwner}
+                  />
                 ))}
                 {personalFiles.map((f) => (
-                  <PersonalFileItem key={f.id} file={f} />
+                  <PersonalFileItem
+                    key={f.id}
+                    file={f}
+                    currentUserId={user?.id}
+                    isOwner={isOwner}
+                  />
                 ))}
               </div>
             </div>

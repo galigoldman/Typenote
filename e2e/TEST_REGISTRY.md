@@ -268,6 +268,16 @@ Test lives in `src/__tests__/integration/storage-rls.integration.test.ts`. Verif
 
 ---
 
+## Course Sharing (`e2e/sharing.spec.ts`) — IMPLEMENTED
+
+- [x] Contributor link: member joins, sees materials, uploads a file, owner sees it
+- [x] Viewer link: member cannot see upload controls
+- [x] Leave: member removes course from list; course persists for owner
+- [ ] Privacy: member's note in a shared course is invisible to the owner (covered by integration tests; E2E optional)
+- [ ] AI: member's chat cites an owner-uploaded file (needs Gemini key; covered by integration + manual)
+
+---
+
 ## Summary
 
 | Feature               | Status      | Spec File                                | Tests      |
@@ -291,7 +301,8 @@ Test lives in `src/__tests__/integration/storage-rls.integration.test.ts`. Verif
 | Homework AI Context   | Removed     | (deleted)                                | —          |
 | Version History       | Planned     | `e2e/version-history.spec.ts`            | 0/5        |
 | PDF Visual Regression | Implemented | `e2e/pdf-visual-regression.spec.ts`      | 8/8        |
-| **Total**             |             |                                          | **93/101** |
+| Course Sharing        | Implemented | `e2e/sharing.spec.ts`                    | 3/5        |
+| **Total**             |             |                                          | **96/106** |
 
 ---
 

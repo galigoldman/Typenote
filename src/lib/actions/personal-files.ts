@@ -74,7 +74,10 @@ export async function openPersonalFileAsDocument(data: {
     .single();
 
   if (fileError || !file) throw new Error('Personal file not found');
-  if (file.user_id !== user.id) throw new Error('Personal file not found');
+  const { data: isMember } = await supabase.rpc('is_course_member', {
+    p_course_id: file.course_id,
+  });
+  if (!isMember) throw new Error('Personal file not found');
 
   // Check for existing document linked to this personal file
   const { data: existing } = await supabase

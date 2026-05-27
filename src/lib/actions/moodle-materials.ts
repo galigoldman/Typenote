@@ -25,19 +25,26 @@ export async function getMoodleMaterialsForCourse(
   } = await supabase.auth.getUser();
   if (!user) return [];
   const admin = createAdminClient();
-  const { data: sync } = await admin
-    .from('user_course_syncs')
-    .select('moodle_course_id')
-    .eq('user_id', user.id)
-    .eq('course_id', courseId)
-    .maybeSingle();
-  if (!sync?.moodle_course_id) return [];
+
+  // Use course_moodle_view RPC so members see the OWNER's Moodle imports.
+  // The RPC enforces is_course_member() internally and returns nulls if the
+  // caller is not a member (or there is no owner sync).
+  const { data: viewRows } = await supabase.rpc('course_moodle_view', {
+    p_course_id: courseId,
+  });
+  const view = Array.isArray(viewRows) ? viewRows[0] : viewRows;
+  const moodleCourseId: string | null = view?.moodle_course_id ?? null;
+  const importedIds: string[] = view?.imported_file_ids ?? [];
+  if (!moodleCourseId || importedIds.length === 0) return [];
+
+  const importedSet = new Set<string>(importedIds);
+
   const { data: sections } = await admin
     .from('moodle_sections')
     .select(
       'id, title, position, moodle_files(id, file_name, type, moodle_url, storage_path, mime_type, file_size, position)',
     )
-    .eq('course_id', sync.moodle_course_id)
+    .eq('course_id', moodleCourseId)
     .order('position');
   type FileRow = {
     id: string;
@@ -55,30 +62,20 @@ export async function getMoodleMaterialsForCourse(
     position: number;
     moodle_files: FileRow[];
   };
-  const allFileIds = (sections ?? [])
-    .flatMap((s) => (s as Sec).moodle_files)
-    .filter((f) => f.storage_path)
-    .map((f) => f.id);
-  let importedIds = new Set<string>();
-  if (allFileIds.length > 0) {
-    const { data: imports } = await admin
-      .from('user_file_imports')
-      .select('moodle_file_id')
-      .eq('user_id', user.id)
-      .eq('status', 'imported')
-      .in('moodle_file_id', allFileIds);
-    importedIds = new Set(
-      (imports ?? []).map((i: { moodle_file_id: string }) => i.moodle_file_id),
-    );
-  }
+
+  // Show the owner's imported files that have been downloaded to storage.
+  // This preserves the original display behavior (only stored files appear);
+  // the ONLY change from before is the SOURCE of the imported set — now the
+  // course owner's imports (via course_moodle_view) instead of the caller's.
   const visible = ((sections ?? []) as Sec[])
     .map((s) => ({
       ...s,
       moodle_files: s.moodle_files.filter(
-        (f) => f.storage_path && importedIds.has(f.id),
+        (f) => f.storage_path && importedSet.has(f.id),
       ),
     }))
     .filter((s) => s.moodle_files.length > 0);
+
   const signed = new Map<string, string>();
   await Promise.all(
     visible

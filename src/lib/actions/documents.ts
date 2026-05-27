@@ -205,7 +205,10 @@ export async function openMaterialAsDocument(
     .single();
 
   if (matError || !material) throw new Error('Material not found');
-  if (material.user_id !== user.id) throw new Error('Material not found');
+  const { data: isMember } = await supabase.rpc('is_course_member', {
+    p_course_id: material.course_id,
+  });
+  if (!isMember) throw new Error('Material not found');
   if (pageCount < 1 || pageCount > 500) throw new Error('Invalid page count');
 
   // Check for existing document linked to this material
