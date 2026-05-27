@@ -10,7 +10,6 @@ import { trackEvent } from '@/lib/analytics/events';
 
 interface PersonalFileUploadProps {
   courseId: string;
-  weekId?: string;
   userId: string;
   category: 'material' | 'homework';
   label?: string;
@@ -18,7 +17,6 @@ interface PersonalFileUploadProps {
 
 export function PersonalFileUpload({
   courseId,
-  weekId,
   userId,
   category,
   label,
@@ -33,15 +31,12 @@ export function PersonalFileUpload({
   );
 
   async function handleFile(file: File) {
-    const path = weekId
-      ? `${userId}/${courseId}/${weekId}/${file.name}`
-      : `${userId}/${courseId}/${file.name}`;
+    const path = `${userId}/${courseId}/${file.name}`;
 
     try {
       await upload(file, path);
       await createPersonalFile({
         courseId,
-        weekId,
         category,
         fileName: file.name,
         mimeType: file.type,

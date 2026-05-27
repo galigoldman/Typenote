@@ -18,6 +18,7 @@ import { Indent } from '@/lib/editor/indent-extension';
 import { MathExpression } from '@/lib/editor/math-extension';
 import { MathInputBox } from '@/lib/editor/math-input-box';
 import { EditorToolbar } from './editor-toolbar';
+import { FocusFilesButton } from '@/components/dashboard/focus-files-button';
 import { Clock } from 'lucide-react';
 import { toast } from 'sonner';
 import 'katex/dist/katex.min.css';
@@ -26,6 +27,9 @@ interface TiptapEditorProps {
   document: Document;
   courseName?: string;
   onToggleVersionHistory?: () => void;
+  onToggleFocusFiles?: () => void;
+  focusFilesCount?: number;
+  isFocusFilesOpen?: boolean;
 }
 
 const CANVAS_CLASSES: Record<string, string> = {
@@ -90,6 +94,9 @@ export function TiptapEditor({
   document,
   courseName,
   onToggleVersionHistory,
+  onToggleFocusFiles,
+  focusFilesCount = 0,
+  isFocusFilesOpen = false,
 }: TiptapEditorProps) {
   const [title, setTitle] = useState(document.title);
   const [mathInputPosition, setMathInputPosition] = useState<{
@@ -236,6 +243,13 @@ export function TiptapEditor({
           placeholder="Untitled"
         />
         <div className="flex items-center gap-3">
+          {onToggleFocusFiles && (
+            <FocusFilesButton
+              count={focusFilesCount}
+              isOpen={isFocusFilesOpen}
+              onClick={onToggleFocusFiles}
+            />
+          )}
           {onToggleVersionHistory && (
             <button
               onClick={onToggleVersionHistory}

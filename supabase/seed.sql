@@ -253,36 +253,19 @@ VALUES ('30000000-0000-0000-0000-000000000002', 'ac3be77d-4566-406c-9ac0-7c41063
 ON CONFLICT (id) DO NOTHING;
 
 -- ============================================
--- COURSE WEEKS
--- ============================================
-
--- CS101 weeks
-INSERT INTO public.course_weeks (id, course_id, user_id, week_number, topic, start_date, end_date)
-VALUES ('40000000-0000-0000-0000-000000000001', '30000000-0000-0000-0000-000000000001', 'ac3be77d-4566-406c-9ac0-7c410634ad41', 1, 'Variables and Data Types', '2026-01-12', '2026-01-18')
-ON CONFLICT (id) DO NOTHING;
-
-INSERT INTO public.course_weeks (id, course_id, user_id, week_number, topic, start_date, end_date)
-VALUES ('40000000-0000-0000-0000-000000000002', '30000000-0000-0000-0000-000000000001', 'ac3be77d-4566-406c-9ac0-7c410634ad41', 2, 'Control Flow', '2026-01-19', '2026-01-25')
-ON CONFLICT (id) DO NOTHING;
-
-INSERT INTO public.course_weeks (id, course_id, user_id, week_number, topic, start_date, end_date)
-VALUES ('40000000-0000-0000-0000-000000000003', '30000000-0000-0000-0000-000000000001', 'ac3be77d-4566-406c-9ac0-7c410634ad41', 3, 'Functions and Scope', '2026-01-26', '2026-02-01')
-ON CONFLICT (id) DO NOTHING;
-
--- ============================================
 -- COURSE MATERIALS (no actual files, just DB references for testing)
 -- ============================================
 
-INSERT INTO public.course_materials (id, week_id, user_id, category, storage_path, file_name, label, file_size, mime_type)
-VALUES ('50000000-0000-0000-0000-000000000001', '40000000-0000-0000-0000-000000000001', 'ac3be77d-4566-406c-9ac0-7c410634ad41', 'material', 'ac3be77d-4566-406c-9ac0-7c410634ad41/30000000-0000-0000-0000-000000000001/40000000-0000-0000-0000-000000000001/lecture-1-slides.pdf', 'lecture-1-slides.pdf', 'Lecture 1: Intro to Programming', 2048000, 'application/pdf')
+INSERT INTO public.course_materials (id, course_id, user_id, category, storage_path, file_name, label, file_size, mime_type)
+VALUES ('50000000-0000-0000-0000-000000000001', '30000000-0000-0000-0000-000000000001', 'ac3be77d-4566-406c-9ac0-7c410634ad41', 'material', 'ac3be77d-4566-406c-9ac0-7c410634ad41/30000000-0000-0000-0000-000000000001/lecture-1-slides.pdf', 'lecture-1-slides.pdf', 'Lecture 1: Intro to Programming', 2048000, 'application/pdf')
 ON CONFLICT (id) DO NOTHING;
 
-INSERT INTO public.course_materials (id, week_id, user_id, category, storage_path, file_name, label, file_size, mime_type)
-VALUES ('50000000-0000-0000-0000-000000000002', '40000000-0000-0000-0000-000000000001', 'ac3be77d-4566-406c-9ac0-7c410634ad41', 'homework', 'ac3be77d-4566-406c-9ac0-7c410634ad41/30000000-0000-0000-0000-000000000001/40000000-0000-0000-0000-000000000001/homework-1.pdf', 'homework-1.pdf', 'Problem Set 1', 512000, 'application/pdf')
+INSERT INTO public.course_materials (id, course_id, user_id, category, storage_path, file_name, label, file_size, mime_type)
+VALUES ('50000000-0000-0000-0000-000000000002', '30000000-0000-0000-0000-000000000001', 'ac3be77d-4566-406c-9ac0-7c410634ad41', 'homework', 'ac3be77d-4566-406c-9ac0-7c410634ad41/30000000-0000-0000-0000-000000000001/homework-1.pdf', 'homework-1.pdf', 'Problem Set 1', 512000, 'application/pdf')
 ON CONFLICT (id) DO NOTHING;
 
-INSERT INTO public.course_materials (id, week_id, user_id, category, storage_path, file_name, label, file_size, mime_type)
-VALUES ('50000000-0000-0000-0000-000000000003', '40000000-0000-0000-0000-000000000002', 'ac3be77d-4566-406c-9ac0-7c410634ad41', 'material', 'ac3be77d-4566-406c-9ac0-7c410634ad41/30000000-0000-0000-0000-000000000001/40000000-0000-0000-0000-000000000002/lecture-2-slides.pdf', 'lecture-2-slides.pdf', 'Lecture 2: If/Else and Loops', 3072000, 'application/pdf')
+INSERT INTO public.course_materials (id, course_id, user_id, category, storage_path, file_name, label, file_size, mime_type)
+VALUES ('50000000-0000-0000-0000-000000000003', '30000000-0000-0000-0000-000000000001', 'ac3be77d-4566-406c-9ac0-7c410634ad41', 'material', 'ac3be77d-4566-406c-9ac0-7c410634ad41/30000000-0000-0000-0000-000000000001/lecture-2-slides.pdf', 'lecture-2-slides.pdf', 'Lecture 2: If/Else and Loops', 3072000, 'application/pdf')
 ON CONFLICT (id) DO NOTHING;
 
 -- ============================================
@@ -441,7 +424,7 @@ VALUES (
   '70000000-0000-0000-0000-000000000001',
   'assistant',
   'A variable is a named container that stores a value in your program''s memory. Think of it like a labeled box — you give it a name and put data inside.\n\nIn most languages, you declare a variable and assign it a value:\n```python\nage = 25\nname = "Alice"\n```\n\nThe key concepts are:\n1. **Declaration** — telling the program a variable exists\n2. **Assignment** — putting a value into the variable\n3. **Type** — what kind of data the variable holds (number, string, etc.)',
-  '[{"sourceType":"course_material","sourceName":"lecture-1-slides.pdf","weekId":"40000000-0000-0000-0000-000000000001","pageRange":"5-8"}]',
+  '[{"sourceType":"course_material","sourceName":"lecture-1-slides.pdf","pageRange":"5-8"}]',
   'flash',
   '2026-03-10 10:00:05+00'
 ) ON CONFLICT (id) DO NOTHING;
@@ -486,7 +469,7 @@ VALUES (
   '70000000-0000-0000-0000-000000000002',
   'assistant',
   'Great question! Both are loops, but they serve different purposes:\n\n**For loop** — use when you know how many times to iterate:\n```python\nfor i in range(5):\n    print(i)  # prints 0, 1, 2, 3, 4\n```\n\n**While loop** — use when the number of iterations depends on a condition:\n```python\ncount = 0\nwhile count < 5:\n    print(count)\n    count += 1\n```\n\nThe key difference: `for` iterates over a sequence, `while` continues until a condition is false.',
-  '[{"sourceType":"course_material","sourceName":"lecture-2-slides.pdf","weekId":"40000000-0000-0000-0000-000000000002","pageRange":"12-15"}]',
+  '[{"sourceType":"course_material","sourceName":"lecture-2-slides.pdf","pageRange":"12-15"}]',
   'flash',
   '2026-03-12 14:00:08+00'
 ) ON CONFLICT (id) DO NOTHING;
@@ -563,12 +546,11 @@ VALUES (
 -- ============================================
 
 -- Exercise document in CS101 (the homework questions)
-INSERT INTO public.documents (id, user_id, course_id, week_id, purpose, title, content, subject, canvas_type, position)
+INSERT INTO public.documents (id, user_id, course_id, purpose, title, content, subject, canvas_type, position)
 VALUES (
   '20000000-0000-0000-0000-000000000010',
   'ac3be77d-4566-406c-9ac0-7c410634ad41',
   '30000000-0000-0000-0000-000000000001',
-  '40000000-0000-0000-0000-000000000001',
   'homework',
   'Problem Set 1: Variables',
   '{"type":"doc","content":[{"type":"heading","attrs":{"level":1,"textAlign":null},"content":[{"type":"text","text":"Problem Set 1: Variables and Data Types"}]},{"type":"heading","attrs":{"level":2,"textAlign":null},"content":[{"type":"text","text":"Question 1"}]},{"type":"paragraph","content":[{"type":"text","text":"Explain the difference between mutable and immutable data types in Python. Give two examples of each."}]},{"type":"heading","attrs":{"level":2,"textAlign":null},"content":[{"type":"text","text":"Question 2"}]},{"type":"paragraph","content":[{"type":"text","text":"What is the output of the following code? Explain why."}]},{"type":"codeBlock","content":[{"type":"text","text":"x = [1, 2, 3]\\ny = x\\ny.append(4)\\nprint(x)"}]},{"type":"heading","attrs":{"level":2,"textAlign":null},"content":[{"type":"text","text":"Question 3"}]},{"type":"paragraph","content":[{"type":"text","text":"Write a function that takes a list of integers and returns a dictionary mapping each integer to its square."}]}]}',
@@ -578,39 +560,17 @@ VALUES (
 ) ON CONFLICT (id) DO NOTHING;
 
 -- Homework document (the student's work on the exercise)
-INSERT INTO public.documents (id, user_id, course_id, week_id, purpose, title, content, subject, canvas_type, position)
+INSERT INTO public.documents (id, user_id, course_id, purpose, title, content, subject, canvas_type, position)
 VALUES (
   '20000000-0000-0000-0000-000000000011',
   'ac3be77d-4566-406c-9ac0-7c410634ad41',
   '30000000-0000-0000-0000-000000000001',
-  '40000000-0000-0000-0000-000000000001',
   'homework',
   'HW — Problem Set 1: Variables',
   '{"type":"doc","content":[{"type":"paragraph","content":[{"type":"text","text":"My solutions for Problem Set 1..."}]}]}',
   'data_structures',
   'blank',
   1
-) ON CONFLICT (id) DO NOTHING;
-
--- ============================================
--- HOMEWORK SESSIONS (test data)
--- ============================================
-
-INSERT INTO public.homework_sessions (id, document_id, exercise_document_id, course_id, user_id)
-VALUES (
-  'a0000000-0000-0000-0000-000000000001',
-  '20000000-0000-0000-0000-000000000011',
-  '20000000-0000-0000-0000-000000000010',
-  '30000000-0000-0000-0000-000000000001',
-  'ac3be77d-4566-406c-9ac0-7c410634ad41'
-) ON CONFLICT (id) DO NOTHING;
-
-INSERT INTO public.homework_session_materials (id, session_id, material_type, material_id)
-VALUES (
-  'a1000000-0000-0000-0000-000000000001',
-  'a0000000-0000-0000-0000-000000000001',
-  'course_material',
-  '50000000-0000-0000-0000-000000000001'
 ) ON CONFLICT (id) DO NOTHING;
 
 -- ============================================

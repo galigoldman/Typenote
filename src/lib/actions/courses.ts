@@ -2,6 +2,7 @@
 
 import { revalidatePath } from 'next/cache';
 import { createClient } from '@/lib/supabase/server';
+import { createAdminClient } from '@/lib/supabase/admin';
 import { deleteEmbeddingsBySource } from '@/lib/queries/embeddings';
 
 export async function createCourse(data: {
@@ -66,48 +67,47 @@ export async function deleteCourse(id: string) {
   } = await supabase.auth.getUser();
   if (!user) throw new Error('Not authenticated');
 
-  // Step a: Get all weeks for this course
-  const { data: weeks, error: weeksError } = await supabase
-    .from('course_weeks')
-    .select('id')
-    .eq('course_id', id)
-    .eq('user_id', user.id);
-  if (weeksError) throw new Error(weeksError.message);
-
-  // Step b: Get all materials for those weeks
-  if (weeks && weeks.length > 0) {
-    const weekIds = weeks.map((w) => w.id);
-    const { data: materials, error: materialsError } = await supabase
-      .from('course_materials')
-      .select('id, storage_path')
-      .in('week_id', weekIds)
-      .eq('user_id', user.id);
-    if (materialsError) throw new Error(materialsError.message);
-
-    // Step b2: Delete embeddings for each material
-    for (const material of materials ?? []) {
-      await deleteEmbeddingsBySource('course_material', material.id);
-    }
-
-    // Step c: Remove files from storage
-    if (materials && materials.length > 0) {
-      const paths = materials.map((m) => m.storage_path);
-      const { error: storageError } = await supabase.storage
-        .from('course-materials')
-        .remove(paths);
-      if (storageError) throw new Error(storageError.message);
-    }
+  // Authorize: only the owner may delete.
+  const { data: course } = await supabase
+    .from('courses')
+    .select('user_id')
+    .eq('id', id)
+    .maybeSingle();
+  if (!course || course.user_id !== user.id) {
+    throw new Error('Only the course owner can delete this course');
   }
 
-  // Step d: Delete course record (DB cascade handles weeks and materials)
-  const { error } = await supabase
-    .from('courses')
-    .delete()
-    .eq('id', id)
-    .eq('user_id', user.id);
+  // Admin client: contributors' files/objects live under their own user
+  // prefix, unreachable via the owner's per-user storage RLS.
+  const admin = createAdminClient();
+
+  const [{ data: materials }, { data: files }] = await Promise.all([
+    admin
+      .from('course_materials')
+      .select('id, storage_path')
+      .eq('course_id', id),
+    admin.from('personal_files').select('id, storage_path').eq('course_id', id),
+  ]);
+
+  // Embeddings do not cascade (content_embeddings.course_id FK was dropped).
+  for (const m of materials ?? [])
+    await deleteEmbeddingsBySource('course_material', m.id);
+  for (const f of files ?? [])
+    await deleteEmbeddingsBySource('personal_file', f.id);
+
+  const matPaths = (materials ?? []).map((m) => m.storage_path);
+  const pfPaths = (files ?? []).map((f) => f.storage_path);
+  if (matPaths.length)
+    await admin.storage.from('course-materials').remove(matPaths);
+  if (pfPaths.length)
+    await admin.storage.from('personal-files').remove(pfPaths);
+
+  // Delete the course row. DB cascades members, share links, materials,
+  // personal_files, homework_sessions, ai_conversations; documents.course_id
+  // is set null (members' notes survive as unfiled).
+  const { error } = await admin.from('courses').delete().eq('id', id);
   if (error) throw new Error(error.message);
 
-  // Step e: Revalidate
   revalidatePath('/dashboard');
 }
 

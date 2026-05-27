@@ -18,12 +18,14 @@ import { Button } from '@/components/ui/button';
 import { AiHeadIcon } from '@/components/icons/ai-head-icon';
 import { MarkdownResponse } from './markdown-response';
 import { ConversationList } from './conversation-list';
+import { ChatFocusFiles } from './chat-focus-files';
 import { trackEvent } from '@/lib/analytics/events';
+import type { ContextFileType, ResolvedContextFile } from '@/types/database';
 
 interface ChatSource {
   sourceType: string;
+  sourceId: string;
   sourceName: string;
-  weekId: string | null;
   pageRange: string | null;
   signedUrl: string | null;
 }
@@ -55,28 +57,36 @@ export type AiContextItem =
 
 interface AiChatPanelProps {
   courseId?: string;
-  weekId?: string;
   courseName?: string;
-  weekLabel?: string;
+  documentId?: string;
   getDocumentContent?: () => string;
   isOpen: boolean;
   onClose: () => void;
   pendingContextItems: AiContextItem[];
   onRemoveContextItem?: (index: number) => void;
   onClearAllContext?: () => void;
+  onOpenSource?: (
+    fileType: ContextFileType,
+    fileId: string,
+    page?: number,
+  ) => void;
+  focusFiles?: ResolvedContextFile[];
+  onFocusFilesChanged?: () => void | Promise<void>;
 }
 
 export function AiChatPanel({
   courseId,
-  weekId,
   courseName,
-  weekLabel,
+  documentId,
   getDocumentContent,
   isOpen,
   onClose,
   pendingContextItems,
   onRemoveContextItem,
   onClearAllContext,
+  onOpenSource,
+  focusFiles,
+  onFocusFilesChanged,
 }: AiChatPanelProps) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState('');
@@ -314,10 +324,9 @@ export function AiChatPanel({
         body: JSON.stringify({
           question: fullQuestion,
           courseId,
-          weekId,
+          documentId,
           mode,
           courseName,
-          weekLabel,
           documentContent,
           // Server loads conversation history from DB if conversationId is set
           conversationId: currentConversationId || undefined,
@@ -379,6 +388,12 @@ export function AiChatPanel({
             if (event.type === 'sources') {
               sources = event.sources ?? [];
               model = event.model ?? 'flash';
+              if (event.contextFilesUsed) {
+                trackEvent('context_files_used', {
+                  course_id: courseId,
+                  file_count: (event.sources ?? []).length,
+                });
+              }
             } else if (event.type === 'conversation') {
               // Server created or confirmed the conversation
               if (event.conversationId) {
@@ -474,11 +489,6 @@ export function AiChatPanel({
               title={messages[0]?.content?.slice(0, 50)}
             >
               {messages[0]?.content?.slice(0, 30)}...
-            </span>
-          )}
-          {weekLabel && (
-            <span className="truncate rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground">
-              {weekLabel}
             </span>
           )}
         </div>
@@ -582,9 +592,7 @@ export function AiChatPanel({
                         : 'Ask anything about your course materials'}
                     </p>
                     <p className="mt-1 text-xs text-muted-foreground/60">
-                      {weekLabel
-                        ? `I can see all materials for ${weekLabel}`
-                        : "I'll search across all weeks"}
+                      {"I'll search across all course materials"}
                     </p>
                   </div>
                 )}
@@ -616,32 +624,36 @@ export function AiChatPanel({
                         {msg.sources && msg.sources.length > 0 && (
                           <div className="mt-2 flex flex-wrap gap-1.5">
                             {msg.sources.map((src, j) => {
-                              const content = (
-                                <>
+                              const m = src.pageRange?.match(/\d+/);
+                              const page = m
+                                ? parseInt(m[0], 10) - 1
+                                : undefined;
+                              return (
+                                <button
+                                  key={j}
+                                  type="button"
+                                  data-testid="ai-citation"
+                                  onClick={() => {
+                                    if (onOpenSource) {
+                                      onOpenSource(
+                                        src.sourceType as ContextFileType,
+                                        src.sourceId,
+                                        page,
+                                      );
+                                    } else if (src.signedUrl) {
+                                      window.open(
+                                        src.signedUrl,
+                                        '_blank',
+                                        'noopener,noreferrer',
+                                      );
+                                    }
+                                  }}
+                                  className="inline-flex items-center gap-1 rounded-full border bg-background px-2.5 py-0.5 text-[10px] text-muted-foreground hover:bg-accent hover:text-foreground transition-colors"
+                                >
                                   <BookOpen className="h-2.5 w-2.5" />
                                   {src.sourceName}
                                   {src.pageRange && ` (${src.pageRange})`}
-                                </>
-                              );
-                              const className =
-                                'inline-flex items-center gap-1 rounded-full border bg-background px-2.5 py-0.5 text-[10px] text-muted-foreground';
-                              return src.signedUrl ? (
-                                <a
-                                  key={j}
-                                  href={src.signedUrl}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  className={
-                                    className +
-                                    ' hover:bg-accent hover:text-foreground transition-colors'
-                                  }
-                                >
-                                  {content}
-                                </a>
-                              ) : (
-                                <span key={j} className={className}>
-                                  {content}
-                                </span>
+                                </button>
                               );
                             })}
                           </div>
@@ -717,6 +729,20 @@ export function AiChatPanel({
                   remaining
                 </p>
               </div>
+            )}
+            {/* Focus files for this document — pick what the AI focuses on */}
+            {documentId && courseId && focusFiles && onFocusFilesChanged && (
+              <ChatFocusFiles
+                documentId={documentId}
+                courseId={courseId}
+                files={focusFiles}
+                onChanged={onFocusFilesChanged}
+                onOpenFile={
+                  onOpenSource
+                    ? (f) => onOpenSource(f.fileType, f.fileId)
+                    : undefined
+                }
+              />
             )}
             {/* Pending context items (accumulated) */}
             {pendingContextItems.length > 0 && (

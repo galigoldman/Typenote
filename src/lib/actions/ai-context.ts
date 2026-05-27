@@ -8,6 +8,8 @@ import { chunkText, embedQuery, embedText } from '@/lib/ai/embeddings';
 import { extractDocxText } from '@/lib/ai/extraction/docx';
 import { extractPdfText } from '@/lib/ai/extraction/pdf';
 import { buildSystemPrompt } from '@/lib/ai/prompts';
+import { listContextFiles } from '@/lib/actions/context-files';
+import { resolveContextFileName } from '@/lib/ai/context-files';
 import {
   getContentHash,
   matchEmbeddings,
@@ -23,13 +25,9 @@ import { createClient } from '@/lib/supabase/server';
 // ---------------------------------------------------------------------------
 
 export type IndexSource =
-  | { type: 'moodle_file'; fileId: string; courseId: string; weekId?: string }
-  | {
-      type: 'course_material';
-      materialId: string;
-      courseId: string;
-      weekId: string;
-    };
+  | { type: 'moodle_file'; fileId: string; courseId: string }
+  | { type: 'course_material'; materialId: string; courseId: string }
+  | { type: 'personal_file'; fileId: string; courseId: string };
 
 export type IndexResult = {
   success: boolean;
@@ -41,8 +39,8 @@ export type IndexResult = {
 export type SearchParams = {
   query: string;
   courseId: string;
-  weekId?: string;
   maxResults?: number;
+  sourceIds?: string[];
 };
 
 export type SearchResult = {
@@ -54,7 +52,6 @@ export type SearchResult = {
   pageStart: number | null;
   pageEnd: number | null;
   courseId: string;
-  weekId: string | null;
   mimeType: string | null;
   similarity: number;
 };
@@ -62,11 +59,9 @@ export type SearchResult = {
 export type QuestionParams = {
   question: string;
   courseId?: string;
-  weekId?: string;
   documentId?: string;
   mode: 'quick' | 'deep';
   courseName?: string;
-  weekLabel?: string;
   documentContent?: string;
   conversationHistory?: Array<{ role: 'user' | 'assistant'; content: string }>;
   imageData?: string;
@@ -76,8 +71,8 @@ export type QuestionResult = {
   answer: string;
   sources: Array<{
     sourceType: string;
+    sourceId: string;
     sourceName: string;
-    weekId: string | null;
     pageRange: string | null;
     signedUrl: string | null;
   }>;
@@ -118,7 +113,6 @@ export async function indexContent(source: IndexSource): Promise<IndexResult> {
     let sourceId = '';
     let userId: string | null = null;
     let courseId: string | null = null;
-    let weekId: string | null = null;
     let mimeType = 'application/octet-stream';
     let storageBucket = '';
 
@@ -127,7 +121,6 @@ export async function indexContent(source: IndexSource): Promise<IndexResult> {
       sourceType = 'moodle_file';
       sourceId = source.fileId;
       courseId = source.courseId;
-      weekId = source.weekId ?? null;
       userId = null;
 
       const { data: fileRow, error: fileErr } = await admin
@@ -182,46 +175,69 @@ export async function indexContent(source: IndexSource): Promise<IndexResult> {
       }
 
       fileBuffer = Buffer.from(await fileData.arrayBuffer());
-    } else {
+    } else if (source.type === 'course_material') {
       const supabase = await createClient();
       userId = await getAuthUserId();
       sourceType = 'course_material';
       sourceId = source.materialId;
       courseId = source.courseId;
-      weekId = source.weekId;
-
       const { data: matRow, error: matErr } = await supabase
         .from('course_materials')
         .select('storage_path, file_name, mime_type')
         .eq('id', source.materialId)
         .single();
-
-      if (matErr || !matRow) {
+      if (matErr || !matRow)
         return {
           success: false,
           segmentsIndexed: 0,
           skipped: false,
           error: 'Course material not found',
         };
-      }
-
       sourceName = matRow.file_name;
       mimeType = matRow.mime_type ?? 'application/octet-stream';
       storageBucket = 'course-materials';
-
       const { data: fileData, error: dlErr } = await supabase.storage
         .from(storageBucket)
         .download(matRow.storage_path);
-
-      if (dlErr || !fileData) {
+      if (dlErr || !fileData)
         return {
           success: false,
           segmentsIndexed: 0,
           skipped: false,
           error: 'Failed to download course material',
         };
-      }
-
+      fileBuffer = Buffer.from(await fileData.arrayBuffer());
+    } else {
+      const supabase = await createClient();
+      userId = await getAuthUserId();
+      sourceType = 'personal_file';
+      sourceId = source.fileId;
+      courseId = source.courseId;
+      const { data: fileRow, error: fileErr } = await supabase
+        .from('personal_files')
+        .select('storage_path, file_name, mime_type')
+        .eq('id', source.fileId)
+        .single();
+      if (fileErr || !fileRow)
+        return {
+          success: false,
+          segmentsIndexed: 0,
+          skipped: false,
+          error: 'Personal file not found',
+        };
+      sourceName = fileRow.file_name;
+      mimeType = fileRow.mime_type ?? 'application/octet-stream';
+      storageBucket = 'personal-files';
+      const { data: fileData, error: dlErr } = await supabase.storage
+        .from(storageBucket)
+        .download(fileRow.storage_path);
+      if (dlErr || !fileData)
+        return {
+          success: false,
+          segmentsIndexed: 0,
+          skipped: false,
+          error: 'Failed to download personal file',
+        };
       fileBuffer = Buffer.from(await fileData.arrayBuffer());
     }
 
@@ -276,7 +292,6 @@ export async function indexContent(source: IndexSource): Promise<IndexResult> {
         embedding,
         user_id: userId,
         course_id: courseId,
-        week_id: weekId,
         source_name: sourceName,
         mime_type: mimeType,
         content_hash: hash,
@@ -314,39 +329,17 @@ export async function searchContext(
   const queryEmbedding = await embedQuery(params.query);
 
   // Resolve Typenote course -> canonical moodle_courses.id (if synced).
-  // RLS restricts user_course_syncs to the caller, so no user_id filter
-  // needed here.
+  // Uses course_moodle_view RPC so members see the OWNER's Moodle imports,
+  // not just their own syncs. The RPC enforces is_course_member() internally.
   let moodleCourseId: string | null = null;
   let importedMoodleFileIds: string[] | null = null;
   if (params.courseId) {
-    const { data: sync } = await supabase
-      .from('user_course_syncs')
-      .select('id, moodle_course_id')
-      .eq('course_id', params.courseId)
-      .maybeSingle();
-    const syncRow = sync as {
-      id: string;
-      moodle_course_id: string | null;
-    } | null;
-    moodleCourseId = syncRow?.moodle_course_id ?? null;
-    const syncId = syncRow?.id ?? null;
-
-    if (moodleCourseId && syncId) {
-      // Fetch the user's notebook for THIS course — files they imported
-      // into the current sync, not every file they ever imported across
-      // every course. The SQL function also re-filters by
-      // ce.course_id = match_moodle_course_id, but scoping here keeps
-      // the allowlist tight and avoids dragging unrelated file ids
-      // across the wire.
-      const { data: imports } = await supabase
-        .from('user_file_imports')
-        .select('moodle_file_id')
-        .eq('sync_id', syncId)
-        .eq('status', 'imported');
-      importedMoodleFileIds = (
-        (imports as { moodle_file_id: string }[] | null) ?? []
-      ).map((i) => i.moodle_file_id);
-    }
+    const { data: viewRows } = await supabase.rpc('course_moodle_view', {
+      p_course_id: params.courseId,
+    });
+    const view = Array.isArray(viewRows) ? viewRows[0] : viewRows;
+    moodleCourseId = view?.moodle_course_id ?? null;
+    importedMoodleFileIds = view?.imported_file_ids ?? [];
   }
 
   const matches: MatchResult[] = await matchEmbeddings({
@@ -355,7 +348,7 @@ export async function searchContext(
     courseId: params.courseId,
     moodleCourseId,
     importedMoodleFileIds,
-    weekId: params.weekId ?? null,
+    sourceIds: params.sourceIds ?? null,
     matchCount: params.maxResults ?? 8,
   });
 
@@ -368,7 +361,6 @@ export async function searchContext(
     pageStart: m.page_start,
     pageEnd: m.page_end,
     courseId: params.courseId ?? '',
-    weekId: m.week_id,
     mimeType: m.mime_type,
     similarity: m.similarity,
   }));
@@ -387,16 +379,14 @@ export async function askQuestion(
     courseId,
     mode,
     courseName,
-    weekLabel,
     documentContent,
     conversationHistory,
   } = params;
 
-  // Build dynamic system prompt with course/week context
+  // Build dynamic system prompt with course context
   const hasDocumentContent = !!documentContent?.trim();
   const systemPrompt = buildSystemPrompt({
     courseName,
-    weekLabel,
     hasDocumentContent,
   });
 
@@ -420,8 +410,8 @@ export async function askQuestion(
       contextTexts.push(`--- ${r.sourceName} ---\n${r.segmentText}`);
       sourcesUsed.push({
         sourceType: r.sourceType,
+        sourceId: r.sourceId,
         sourceName: r.sourceName,
-        weekId: r.weekId,
         pageRange: null,
         signedUrl: null,
       });
@@ -549,6 +539,7 @@ export async function buildAiContext(params: QuestionParams): Promise<{
   contents: Array<{ role: string; parts: any[] }>;
   modelName: string;
   sources: QuestionResult['sources'];
+  contextFilesUsed: boolean;
 }> {
   await getAuthUserId();
   const supabase = await createClient();
@@ -557,26 +548,52 @@ export async function buildAiContext(params: QuestionParams): Promise<{
     courseId,
     mode,
     courseName,
-    weekLabel,
     documentContent,
     conversationHistory,
   } = params;
 
+  const admin = createAdminClient();
+
+  // Attached context files (focus the AI). Names go in the prompt; ids drive
+  // a scoped "focus" retrieval so their chunks are guaranteed in context.
+  const attached =
+    params.documentId && courseId
+      ? await listContextFiles(supabase, params.documentId)
+      : [];
+  const attachedIds = attached.map((a) => a.file_id);
+  const contextFileNames = (
+    await Promise.all(
+      attached
+        .slice(0, 10)
+        .map((a) =>
+          resolveContextFileName(supabase, admin, a.file_type, a.file_id),
+        ),
+    )
+  ).filter((n): n is string => !!n);
+
   const hasDocumentContent = !!documentContent?.trim();
   const systemPrompt = buildSystemPrompt({
     courseName,
-    weekLabel,
     hasDocumentContent,
+    contextFileNames,
   });
 
-  // Skip RAG search when there's no course (no materials to search)
-  const results = courseId
-    ? await searchContext({
-        query: question,
-        courseId,
-        maxResults: 8,
-      })
+  // RAG: focus pass over attached files FIRST, then the normal course-wide search.
+  // The dedupe-by-sourceId loop below keeps the focus (first) hit per source,
+  // so attached files rank ahead of everything else.
+  const focusResults =
+    courseId && attachedIds.length > 0
+      ? await searchContext({
+          query: question,
+          courseId,
+          sourceIds: attachedIds,
+          maxResults: 6,
+        })
+      : [];
+  const courseResults = courseId
+    ? await searchContext({ query: question, courseId, maxResults: 8 })
     : [];
+  const results = [...focusResults, ...courseResults];
 
   const contextTexts: string[] = [];
   const sources: QuestionResult['sources'] = [];
@@ -587,12 +604,18 @@ export async function buildAiContext(params: QuestionParams): Promise<{
     if (r.segmentText && !seen.has(r.sourceId)) {
       seen.add(r.sourceId);
       contextTexts.push(`--- ${r.sourceName} ---\n${r.segmentText}`);
+      const pageRange =
+        r.pageStart != null
+          ? r.pageEnd != null && r.pageEnd !== r.pageStart
+            ? `p. ${r.pageStart + 1}–${r.pageEnd + 1}`
+            : `p. ${r.pageStart + 1}`
+          : null;
       sources.push({
         sourceType: r.sourceType,
+        sourceId: r.sourceId,
         sourceName: r.sourceName,
-        weekId: r.weekId,
-        pageRange: null,
-        signedUrl: null, // populated by the URL-attach block below
+        pageRange,
+        signedUrl: null,
       });
       sourceIds.push({
         sourceId: r.sourceId,
@@ -611,10 +634,13 @@ export async function buildAiContext(params: QuestionParams): Promise<{
   const materialIds = sourceIds
     .filter((s) => s.sourceType === 'course_material')
     .map((s) => s.sourceId);
+  const personalIds = sourceIds
+    .filter((s) => s.sourceType === 'personal_file')
+    .map((s) => s.sourceId);
 
-  const admin = createAdminClient();
   const moodlePaths: Record<string, string> = {};
   const materialPaths: Record<string, string> = {};
+  const personalPaths: Record<string, string> = {};
 
   if (moodleIds.length > 0) {
     const { data } = await admin
@@ -637,6 +663,14 @@ export async function buildAiContext(params: QuestionParams): Promise<{
       materialPaths[row.id] = row.storage_path;
     }
   }
+  if (personalIds.length > 0) {
+    const { data } = await supabase
+      .from('personal_files')
+      .select('id, storage_path')
+      .in('id', personalIds);
+    for (const row of (data ?? []) as { id: string; storage_path: string }[])
+      personalPaths[row.id] = row.storage_path;
+  }
 
   await Promise.all(
     sourceIds.map(async ({ sourceId, sourceType, idx }) => {
@@ -645,13 +679,17 @@ export async function buildAiContext(params: QuestionParams): Promise<{
           ? 'moodle-materials'
           : sourceType === 'course_material'
             ? 'course-materials'
-            : null;
+            : sourceType === 'personal_file'
+              ? 'personal-files'
+              : null;
       const path =
         sourceType === 'moodle_file'
           ? moodlePaths[sourceId]
           : sourceType === 'course_material'
             ? materialPaths[sourceId]
-            : null;
+            : sourceType === 'personal_file'
+              ? personalPaths[sourceId]
+              : null;
       if (!bucket || !path) return;
       const client = bucket === 'moodle-materials' ? admin : supabase;
       const { data } = await client.storage
@@ -720,6 +758,8 @@ export async function buildAiContext(params: QuestionParams): Promise<{
     }
   }
 
+  const hasInjectedContext = hasDocumentContent || contextTexts.length > 0;
+
   // Build the user's question parts (optionally with image)
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const questionParts: any[] = [];
@@ -732,7 +772,7 @@ export async function buildAiContext(params: QuestionParams): Promise<{
     questionParts.push({
       text: `The student has shared a screenshot from their course material. Analyze the visual content and reference it in your response.\n\n${question}`,
     });
-  } else if (contextTexts.length === 0 && !hasDocumentContent) {
+  } else if (!hasInjectedContext) {
     questionParts.push({
       text: `${question}\n\n(No course materials were loaded. Answer using your own knowledge but note that no materials were found.)`,
     });
@@ -741,7 +781,7 @@ export async function buildAiContext(params: QuestionParams): Promise<{
   }
 
   // Append question parts to contents (merging if last turn is also 'user')
-  if (params.imageData || (contextTexts.length === 0 && !hasDocumentContent)) {
+  if (params.imageData || !hasInjectedContext) {
     // Always create a new user turn for image queries or no-context queries
     contents.push({ role: 'user', parts: questionParts });
   } else {
@@ -755,7 +795,13 @@ export async function buildAiContext(params: QuestionParams): Promise<{
 
   const modelName = mode === 'deep' ? 'gemini-2.5-pro' : 'gemini-2.5-flash';
 
-  return { systemPrompt, contents, modelName, sources };
+  return {
+    systemPrompt,
+    contents,
+    modelName,
+    sources,
+    contextFilesUsed: attached.length > 0,
+  };
 }
 
 // ---------------------------------------------------------------------------

@@ -3,10 +3,10 @@
 import { revalidatePath } from 'next/cache';
 import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
+import { deleteEmbeddingsBySource } from '@/lib/queries/embeddings';
 
 export async function createPersonalFile(data: {
   courseId: string;
-  weekId?: string;
   category: 'material' | 'homework';
   fileName: string;
   mimeType: string;
@@ -27,7 +27,6 @@ export async function createPersonalFile(data: {
     .insert({
       user_id: user.id,
       course_id: data.courseId,
-      week_id: data.weekId ?? null,
       category: data.category,
       file_name: data.fileName,
       display_name: displayName,
@@ -39,6 +38,20 @@ export async function createPersonalFile(data: {
     .single();
 
   if (error) throw new Error(error.message);
+
+  const embeddable =
+    data.mimeType === 'application/pdf' ||
+    data.mimeType.includes('wordprocessingml') ||
+    data.mimeType.includes('presentationml');
+  if (embeddable) {
+    const { indexContent } = await import('@/lib/actions/ai-context');
+    void indexContent({
+      type: 'personal_file',
+      fileId: file.id,
+      courseId: data.courseId,
+    });
+  }
+
   revalidatePath('/dashboard');
   return { id: file.id };
 }
@@ -61,7 +74,10 @@ export async function openPersonalFileAsDocument(data: {
     .single();
 
   if (fileError || !file) throw new Error('Personal file not found');
-  if (file.user_id !== user.id) throw new Error('Personal file not found');
+  const { data: isMember } = await supabase.rpc('is_course_member', {
+    p_course_id: file.course_id,
+  });
+  if (!isMember) throw new Error('Personal file not found');
 
   // Check for existing document linked to this personal file
   const { data: existing } = await supabase
@@ -132,7 +148,6 @@ export async function openPersonalFileAsDocument(data: {
         canvas_type: 'blank',
         folder_id: null,
         course_id: file.course_id,
-        week_id: file.week_id ?? null,
         purpose,
         personal_file_id: data.fileId,
         position: 0,
@@ -189,7 +204,6 @@ export async function openPersonalFileAsDocument(data: {
         canvas_type: 'blank',
         folder_id: null,
         course_id: file.course_id,
-        week_id: file.week_id ?? null,
         purpose,
         personal_file_id: data.fileId,
         position: 0,
@@ -231,6 +245,9 @@ export async function deletePersonalFile(fileId: string) {
     .single();
 
   if (fetchError || !file) throw new Error('Personal file not found');
+
+  // Delete embeddings before removing storage/row so orphaned vectors are cleaned up
+  await deleteEmbeddingsBySource('personal_file', fileId);
 
   // Delete from storage
   const { error: storageError } = await supabase.storage

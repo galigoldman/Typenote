@@ -17,7 +17,6 @@ type AnalyticsEventMap = {
   file_uploaded: {
     file_size: number;
     mime_type: string;
-    week_id: string;
   };
   ai_chat_message_sent: {
     course_id: string | undefined;
@@ -40,6 +39,10 @@ type AnalyticsEventMap = {
   personal_file_deleted: {
     file_id: string;
     course_id: string;
+  };
+  context_files_used: {
+    course_id: string | null | undefined;
+    file_count: number;
   };
 };
 

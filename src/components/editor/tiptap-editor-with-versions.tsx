@@ -1,26 +1,54 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-import type { Document } from '@/types/database';
+import { useCallback, useEffect, useState } from 'react';
+import type { Document, ResolvedContextFile } from '@/types/database';
 import { TiptapEditor } from './tiptap-editor';
 import { VersionSidebar } from '@/components/version-history/version-sidebar';
 import { AiChatWrapper } from '@/components/ai/ai-chat-wrapper';
+import {
+  FocusFilesPanel,
+  type ViewerTarget,
+} from '@/components/dashboard/focus-files-panel';
+import { FileViewer } from '@/components/dashboard/file-viewer';
+import { getContextFiles } from '@/lib/actions/context-files';
 
 interface TiptapEditorWithVersionsProps {
   document: Document;
   courseId?: string;
   courseName?: string;
-  weekId?: string;
-  weekLabel?: string;
 }
 
 export function TiptapEditorWithVersions({
   document,
   courseId,
   courseName,
-  weekId,
-  weekLabel,
 }: TiptapEditorWithVersionsProps) {
+  const [viewerTarget, setViewerTarget] = useState<ViewerTarget | null>(null);
+  const openViewer = useCallback((t: ViewerTarget) => setViewerTarget(t), []);
+
+  const [isFocusFilesOpen, setIsFocusFilesOpen] = useState(false);
+  const [focusFiles, setFocusFiles] = useState<ResolvedContextFile[]>([]);
+
+  const refreshFocusFiles = useCallback(async () => {
+    if (!courseId) return;
+    const list = await getContextFiles(document.id);
+    setFocusFiles(list);
+  }, [courseId, document.id]);
+
+  // Load once so the toolbar badge + chat are correct before first open.
+  useEffect(() => {
+    if (!courseId) return;
+    let active = true;
+    getContextFiles(document.id)
+      .then((list) => {
+        if (active) setFocusFiles(list);
+      })
+      .catch(() => {});
+    return () => {
+      active = false;
+    };
+  }, [courseId, document.id]);
+
   const [isVersionHistoryOpen, setIsVersionHistoryOpen] = useState(() => {
     if (typeof window === 'undefined') return false;
     return (
@@ -49,6 +77,11 @@ export function TiptapEditorWithVersions({
           onToggleVersionHistory={() =>
             setIsVersionHistoryOpen((prev) => !prev)
           }
+          onToggleFocusFiles={
+            courseId ? () => setIsFocusFilesOpen((prev) => !prev) : undefined
+          }
+          focusFilesCount={focusFiles.length}
+          isFocusFilesOpen={isFocusFilesOpen}
         />
       </div>
       <VersionSidebar
@@ -56,12 +89,36 @@ export function TiptapEditorWithVersions({
         isOpen={isVersionHistoryOpen}
         onClose={() => setIsVersionHistoryOpen(false)}
       />
+      {courseId && (
+        <FocusFilesPanel
+          documentId={document.id}
+          courseId={courseId}
+          isOpen={isFocusFilesOpen}
+          onClose={() => setIsFocusFilesOpen(false)}
+          files={focusFiles}
+          onChanged={refreshFocusFiles}
+          onOpenFile={openViewer}
+        />
+      )}
       <AiChatWrapper
         courseId={courseId}
         courseName={courseName}
-        weekId={weekId}
-        weekLabel={weekLabel}
+        documentId={document.id}
+        onOpenSource={(fileType, fileId, page) =>
+          openViewer({ fileType, fileId, page })
+        }
+        focusFiles={focusFiles}
+        onFocusFilesChanged={refreshFocusFiles}
       />
+      {viewerTarget && (
+        <FileViewer
+          key={`${viewerTarget.fileType}:${viewerTarget.fileId}`}
+          fileType={viewerTarget.fileType}
+          fileId={viewerTarget.fileId}
+          initialPage={viewerTarget.page}
+          onClose={() => setViewerTarget(null)}
+        />
+      )}
     </div>
   );
 }

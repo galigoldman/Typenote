@@ -8,6 +8,7 @@ import { CreateDocumentDialog } from '@/components/dashboard/create-document-dia
 import { EmptyState } from '@/components/dashboard/empty-state';
 import { MoodleSyncPromptWrapper } from '@/components/dashboard/moodle-sync-prompt-wrapper';
 import { getUserMoodleConnection } from '@/lib/queries/moodle';
+import { getSharedWithMe } from '@/lib/queries/shared-courses';
 import { Button } from '@/components/ui/button';
 import {
   Breadcrumb,
@@ -50,6 +51,7 @@ export default async function DashboardPage() {
   const { data: courses } = await supabase
     .from('courses')
     .select('*')
+    .eq('user_id', user?.id)
     .is('folder_id', null)
     .order('position', { ascending: true });
 
@@ -59,13 +61,16 @@ export default async function DashboardPage() {
     .is('folder_id', null)
     .order('position', { ascending: true });
 
+  const sharedCourses = user ? await getSharedWithMe(supabase, user.id) : [];
+
   const typedFolders = (folders as Folder[] | null) ?? [];
   const typedCourses = (courses as Course[] | null) ?? [];
   const typedDocuments = (documents as Document[] | null) ?? [];
   const isEmpty =
     typedFolders.length === 0 &&
     typedCourses.length === 0 &&
-    typedDocuments.length === 0;
+    typedDocuments.length === 0 &&
+    sharedCourses.length === 0;
 
   return (
     <div className="p-6">
@@ -111,6 +116,22 @@ export default async function DashboardPage() {
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
                 {typedCourses.map((course) => (
                   <CourseCard key={course.id} course={course} />
+                ))}
+              </div>
+            </div>
+          )}
+
+          {sharedCourses.length > 0 && (
+            <div className="mt-8">
+              <h2 className="mb-4 text-lg font-semibold">Shared with me</h2>
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
+                {sharedCourses.map((c) => (
+                  <CourseCard
+                    key={c.id}
+                    course={c}
+                    shared
+                    ownerName={c.owner_name}
+                  />
                 ))}
               </div>
             </div>

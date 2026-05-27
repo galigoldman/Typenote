@@ -11,14 +11,21 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { CourseDialog } from '@/components/dashboard/course-dialog';
+import { LeaveCourseMenuItem } from '@/components/dashboard/leave-course-button';
 import { deleteCourse } from '@/lib/actions/courses';
 import type { Course } from '@/types/database';
 
 interface CourseCardProps {
   course: Course;
+  shared?: boolean;
+  ownerName?: string | null;
 }
 
-export function CourseCard({ course }: CourseCardProps) {
+export function CourseCard({
+  course,
+  shared = false,
+  ownerName,
+}: CourseCardProps) {
   const router = useRouter();
   const [editOpen, setEditOpen] = useState(false);
   const [deleting, setDeleting] = useState(false);
@@ -37,6 +44,7 @@ export function CourseCard({ course }: CourseCardProps) {
       <div
         role="button"
         tabIndex={0}
+        data-testid="course-card"
         onClick={() => router.push(`/dashboard/courses/${course.id}`)}
         onKeyDown={(e) => {
           if (e.key === 'Enter' || e.key === ' ') {
@@ -52,8 +60,19 @@ export function CourseCard({ course }: CourseCardProps) {
           <GraduationCap className="size-5" style={{ color: course.color }} />
         </div>
         <div className="min-w-0 flex-1">
-          <p className="truncate font-medium">{course.name}</p>
-          <p className="text-sm text-muted-foreground">Course</p>
+          <div className="flex items-center gap-1.5">
+            <p className="truncate font-medium">{course.name}</p>
+            {shared && (
+              <span className="rounded bg-muted px-1.5 py-0.5 text-xs text-muted-foreground">
+                Shared
+              </span>
+            )}
+          </div>
+          {shared && ownerName ? (
+            <p className="text-xs text-muted-foreground">by {ownerName}</p>
+          ) : (
+            <p className="text-sm text-muted-foreground">Course</p>
+          )}
         </div>
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
@@ -63,32 +82,41 @@ export function CourseCard({ course }: CourseCardProps) {
               className="shrink-0 opacity-0 group-hover:opacity-100"
               onClick={(e) => e.stopPropagation()}
               aria-label="Course actions"
+              data-testid="course-menu-trigger"
             >
               <MoreHorizontal className="size-4" />
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}>
-            <DropdownMenuItem onClick={() => setEditOpen(true)}>
-              <Pencil className="size-4" />
-              Edit
-            </DropdownMenuItem>
-            <DropdownMenuItem
-              onClick={handleDelete}
-              disabled={deleting}
-              className="text-destructive focus:text-destructive"
-            >
-              <Trash2 className="size-4" />
-              Delete
-            </DropdownMenuItem>
+            {shared ? (
+              <LeaveCourseMenuItem courseId={course.id} />
+            ) : (
+              <>
+                <DropdownMenuItem onClick={() => setEditOpen(true)}>
+                  <Pencil className="size-4" />
+                  Edit
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onClick={handleDelete}
+                  disabled={deleting}
+                  className="text-destructive focus:text-destructive"
+                >
+                  <Trash2 className="size-4" />
+                  Delete
+                </DropdownMenuItem>
+              </>
+            )}
           </DropdownMenuContent>
         </DropdownMenu>
       </div>
-      <CourseDialog
-        folderId={course.folder_id}
-        course={course}
-        open={editOpen}
-        onOpenChange={setEditOpen}
-      />
+      {!shared && (
+        <CourseDialog
+          folderId={course.folder_id}
+          course={course}
+          open={editOpen}
+          onOpenChange={setEditOpen}
+        />
+      )}
     </>
   );
 }

@@ -29,19 +29,24 @@ test.describe('Courses', () => {
     });
   });
 
-  test('view course with weeks', async ({ page }) => {
+  test('view course shows documents and materials (flat model)', async ({
+    page,
+  }) => {
     await goToSeededCourse(page);
 
-    // The course page should show the course title
+    // The course page shows the course title (asserted by the helper too).
     await expect(
       page.getByRole('heading', { name: 'Introduction to CS' }),
     ).toBeVisible({ timeout: 10_000 });
 
-    // Weeks section should be visible with seeded week topics
-    await expect(page.getByText('Weeks')).toBeVisible({ timeout: 10_000 });
-    await expect(page.getByText('Variables and Data Types')).toBeVisible({
+    // Flat model: there are no weeks. Materials are listed directly under a
+    // "Materials" heading, and seeded course materials show by name.
+    await expect(page.getByRole('heading', { name: 'Materials' })).toBeVisible({
       timeout: 10_000,
     });
+    await expect(page.getByText('Lecture 1: Intro to Programming')).toBeVisible(
+      { timeout: 10_000 },
+    );
   });
 
   test('create document inside course', async ({ page }) => {
@@ -89,35 +94,26 @@ test.describe('Courses', () => {
     });
   });
 
-  test('view course material opens in canvas editor', async ({ page }) => {
+  test('opening a course document loads the canvas editor', async ({
+    page,
+  }) => {
     test.setTimeout(30_000);
 
     await goToSeededCourse(page);
 
-    // Expand the first week to see materials
-    const weekButton = page.locator('button', { hasText: /Week \d/ }).first();
-    await expect(weekButton).toBeVisible({ timeout: 10_000 });
+    // Open a seeded document. (Course materials open the same way, but the
+    // seed only inserts their DB rows — not storage objects — so opening a
+    // material would fail on the signed-URL fetch. Documents carry their
+    // content in the DB and open reliably.)
+    await page.getByText('Problem Set 1: Variables').first().click();
 
-    // Look for a material item (seeded course has materials)
-    // Materials show as clickable items with file names
-    const materialItem = page.locator('button', { hasText: /\.pdf/i }).first();
+    await expect(page).toHaveURL(/\/dashboard\/documents\//, {
+      timeout: 15_000,
+    });
 
-    if (await materialItem.isVisible({ timeout: 5_000 }).catch(() => false)) {
-      await materialItem.click();
-
-      // Should navigate to a document page (material opens as canvas doc)
-      await expect(page).toHaveURL(/\/dashboard\/documents\//, {
-        timeout: 15_000,
-      });
-
-      // Canvas editor should load (page container with data-page-id)
-      await expect(page.locator('[data-page-id]').first()).toBeVisible({
-        timeout: 15_000,
-      });
-    } else {
-      // No materials visible — seeded materials might not have actual files
-      // in storage, so the button might not render. Skip gracefully.
-      test.skip(true, 'No material items visible in seeded course');
-    }
+    // The canvas editor renders at least one page container.
+    await expect(page.locator('[data-page-id]').first()).toBeVisible({
+      timeout: 15_000,
+    });
   });
 });

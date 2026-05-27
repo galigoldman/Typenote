@@ -2,7 +2,7 @@
  * Input-validation tests for GET /api/ai/search.
  *
  * The route is the RAG entry point — callers pass `query` and `courseId`
- * (plus optional `weekId`, `maxResults`). Bad inputs must return 4xx
+ * (plus optional `maxResults`). Bad inputs must return 4xx
  * BEFORE touching `searchContext`, otherwise a malformed call could
  * trigger a costly embedding lookup or DB scan on every request.
  *
@@ -78,25 +78,22 @@ describe('GET /api/ai/search — input validation', () => {
     expect(mockSearchContext).toHaveBeenCalledWith({
       query: 'derivative',
       courseId: 'c1',
-      weekId: undefined,
       maxResults: undefined,
     });
   });
 
-  it('forwards weekId and maxResults when provided', async () => {
+  it('forwards maxResults when provided', async () => {
     mockSearchContext.mockResolvedValue([]);
     await GET(
       makeReq({
         query: 'q',
         courseId: 'c1',
-        weekId: 'w1',
         maxResults: '5',
       }),
     );
     expect(mockSearchContext).toHaveBeenCalledWith({
       query: 'q',
       courseId: 'c1',
-      weekId: 'w1',
       maxResults: 5,
     });
   });

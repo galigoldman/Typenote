@@ -166,7 +166,6 @@ describe('Add messages', () => {
       {
         sourceType: 'course_material',
         sourceName: 'lecture-1.pdf',
-        weekId: '40000000-0000-0000-0000-000000000001',
         pageRange: '1-5',
       },
     ];

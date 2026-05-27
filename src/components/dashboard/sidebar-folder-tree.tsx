@@ -142,9 +142,15 @@ export function SidebarFolderTree() {
         setFolders(data as FolderType[]);
       }
 
+      // Scope to OWN courses: the course-sharing member-SELECT RLS policy would
+      // otherwise surface courses shared with the user in the owner sidebar.
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
       const { data: courseData } = await supabase
         .from('courses')
         .select('*')
+        .eq('user_id', user?.id ?? '')
         .order('position', { ascending: true });
 
       if (courseData) {

@@ -7,7 +7,6 @@ describe('buildSystemPrompt', () => {
     const prompt = buildSystemPrompt({ hasDocumentContent: false });
     expect(prompt).toContain('You are a course tutor.');
     expect(prompt).not.toContain('tutor for **');
-    expect(prompt).not.toContain('working on **Week');
     expect(prompt).not.toContain("STUDENT'S DOCUMENT");
   });
 
@@ -17,23 +16,11 @@ describe('buildSystemPrompt', () => {
       hasDocumentContent: false,
     });
     expect(prompt).toContain('tutor for **Linear Algebra**');
-    expect(prompt).not.toContain('working on **Week');
-  });
-
-  it('includes course name and week label when both provided', () => {
-    const prompt = buildSystemPrompt({
-      courseName: 'Linear Algebra',
-      weekLabel: 'Week 5',
-      hasDocumentContent: false,
-    });
-    expect(prompt).toContain('tutor for **Linear Algebra**');
-    expect(prompt).toContain('working on **Week 5**');
   });
 
   it('includes document awareness section when hasDocumentContent is true', () => {
     const prompt = buildSystemPrompt({
       courseName: 'Calculus I',
-      weekLabel: 'Week 3',
       hasDocumentContent: true,
     });
     expect(prompt).toContain("STUDENT'S DOCUMENT");
@@ -48,23 +35,21 @@ describe('buildSystemPrompt', () => {
     expect(prompt).not.toContain("STUDENT'S DOCUMENT");
   });
 
-  it('handles week label without course name', () => {
-    const prompt = buildSystemPrompt({
-      weekLabel: 'Week 7',
-      hasDocumentContent: false,
-    });
-    expect(prompt).toContain('You are a course tutor.');
-    expect(prompt).toContain('working on **Week 7**');
-  });
-
   it('always includes core guidelines', () => {
     const prompt = buildSystemPrompt({ hasDocumentContent: false });
-    expect(prompt).toContain('Never fabricate citations');
+    expect(prompt).toContain('never fabricate citations');
     expect(prompt).toContain('match the language of the question');
     expect(prompt).toContain('Use LaTeX for math');
     expect(prompt).toContain('[Sources]');
     expect(prompt).toContain('primary source');
     expect(prompt).toContain('smart AI');
+  });
+
+  it('cites materials with name-colon format', () => {
+    const prompt = buildSystemPrompt({ hasDocumentContent: false });
+    expect(prompt).toContain(
+      '- Material Name: brief description of what was referenced',
+    );
   });
 });
 
@@ -85,5 +70,26 @@ describe('buildLatexPrompt', () => {
     expect(prompt).toContain('LaTeX conversion assistant');
     expect(prompt).toContain('student is in the course: Linear Algebra');
     expect(prompt).toContain('notation conventions');
+  });
+});
+
+describe('buildSystemPrompt context files', () => {
+  it('adds an attached-files section when names are present', () => {
+    const out = buildSystemPrompt({
+      courseName: 'Algebra',
+      hasDocumentContent: false,
+      contextFileNames: ['HW3.pdf', 'Lecture 5'],
+    });
+    expect(out).toContain('ATTACHED CONTEXT FILES');
+    expect(out).toContain('HW3.pdf');
+    expect(out).toContain('Lecture 5');
+  });
+
+  it('omits the section when there are no attached files', () => {
+    const out = buildSystemPrompt({
+      courseName: 'Algebra',
+      hasDocumentContent: false,
+    });
+    expect(out).not.toContain('ATTACHED CONTEXT FILES');
   });
 });
