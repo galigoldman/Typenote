@@ -3,6 +3,11 @@
 - **Date:** 2026-05-27
 - **Status:** Approved — **revised 2026-05-27 after subagent review** (corrections folded in;
   see the ⚠️ markers and §12 changelog)
+- **Decisions locked (2026-05-27):** (1) **text-only embeddings for v1** — multimodal/image
+  embedding deferred to §13 (clean later add since the model is already multimodal);
+  (2) **course-material indexing is in scope** (close the dead-branch gap); (3) **faithful
+  text extraction** — no model-generated figure descriptions (image-only pages → page citation,
+  no quote).
 - **Branch:** `feat/evidence-citations` (off latest `dev`)
 - **Builds on:** the merged **document-context-files / focus-files** feature (citation
   delivery plumbing already exists — see §2)
@@ -405,9 +410,8 @@ Verified pricing (May 2026): Flash $0.30/1M in · Pro $1.25/1M in · Embedding $
 
 ## 11. Risks / open items
 
-- ⚠️ **Decision: course-material indexing scope.** Recommended to fix it here (small — one
-  `indexContent` call + backfill), otherwise course-material citations/evidence remain
-  impossible. Confirm with the user.
+- ✅ **Decided: course-material indexing is in scope** (one `indexContent` call + backfill).
+  Was previously unindexed (dead branch), so course-material citations were impossible.
 - **Embedder cap** — `gemini-embedding-2-preview` = 8 192 tokens (verified); `CHUNK_CHAR_BUDGET`
   of 1600 chars is far under it for any language.
 - ⚠️ **Server-side page counting** — the repo's pdf.js is browser-only; need a Node-safe count
