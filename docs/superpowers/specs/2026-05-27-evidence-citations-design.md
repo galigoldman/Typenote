@@ -17,8 +17,9 @@ is stored as one ~25 000-character chunk, and `page_start`/`page_end` are hardco
 
 This design fixes that at the source:
 
-1. **Per-page extraction** — ask Gemini for structured per-page text instead of one blob
-   (keeping the explicit LaTeX / Hebrew / "describe figures" instructions).
+1. **Per-page extraction** — ask Gemini for structured per-page text instead of one blob,
+   keeping today's **faithful, text-only** instruction (LaTeX + Hebrew preserved; *no*
+   invented figure descriptions — see §4.0).
 2. **Small, page-tagged, math-aware chunks** — replace the 25 000-char "one chunk per file"
    with a ~1 600-char budget, each chunk tagged with the page(s) it covers, **never splitting
    through a LaTeX expression.**
@@ -125,12 +126,34 @@ per-query cost** (small relevant chunks instead of giant blobs in the prompt).
 
 ## 4. Design
 
+### 4.0 Images & handwriting — today vs proposed (no regressions)
+
+The design **reuses the existing multimodal Gemini extraction** (we are *not* switching to a
+pdf.js text layer), so nothing the AI can "see" today gets lost. Concretely:
+
+| Content | Today | Proposed |
+|---|---|---|
+| Strokes/handwriting in the student's **own note** | Invisible (`documentContent` = text+math via `extractNodeText`) | **Unchanged — invisible** (non-goal, §3) |
+| Pasted **images in the student's own note** | Invisible (only the explicit `imageData` screenshot path sends an image) | **Unchanged — invisible** |
+| **Text** in course PDFs (incl. handwriting OCR'd from scans) | Extracted, but truncated past ~2048 tok, one chunk, no page | **Fully extracted, per-page, locatable** (improvement) |
+| **Figures/diagrams** (image-only) in course PDFs | Not captured — prompt is "text as written, no commentary" | **Decision (§4.1): default text-only (unchanged); page citation, no quote** |
+
+⚠️ **Decision — figure descriptions.** Today's extractor is deliberately faithful ("extract
+text exactly as written… no commentary", `pdf.ts:29`). Adding model-generated figure
+descriptions would improve coverage of diagram-heavy slides **but** produces prose the source
+never literally contained — which an *evidence/quote* feature must not present as verbatim.
+**Default: keep faithful text-only.** Image-only pages therefore get a **page citation with no
+blockquote** (consistent with §4.5's quote-optional rule). Revisit only if diagram retrieval
+proves necessary, and then label such content as a paraphrase, never a quote.
+
 ### 4.1 Per-page extraction (`extraction/pdf.ts`)
 
 Change `extractPdfText` to request **structured per-page output** from Gemini using a response
 schema, returning `Array<{ page: number; text: string }>` (Gemini's `page` is 1-indexed, in
-document order). The prompt must **explicitly retain**: extract all text, **preserve math as
-`$...$`/`$$...$$` LaTeX**, handle **Hebrew**, and **describe figures/diagrams** in words.
+document order). The prompt must **explicitly retain** today's faithful behavior: extract all text **exactly
+as written**, **preserve math as `$...$`/`$$...$$` LaTeX**, handle **Hebrew** — and **no
+invented figure descriptions / commentary** (per the §4.0 decision). Handwriting in scanned
+pages is still OCR'd to text by the multimodal model, exactly as today.
 
 - New exported `extractPdfPages(buffer): Promise<PageText[]>`; keep a thin `extractPdfText`
   wrapper (`pages.map(p => p.text).join('\n\n')`) for any flat-text caller.
@@ -319,8 +342,8 @@ Verified pricing (May 2026): Flash $0.30/1M in · Pro $1.25/1M in · Embedding $
   correctness, and ⚠️ **boundary never lands inside `$...$`/`$$...$$`/`\[...\]`** + over-budget
   math span kept whole.
 - Extraction: structured pages parsed in order; page-count validation guard triggers flat
-  fallback on mismatch; LaTeX + Hebrew + figure-description instructions present; ⚠️ a
-  **Hebrew sample** survives the JSON round-trip; large-PDF batching path.
+  fallback on mismatch; LaTeX + Hebrew + **faithful "no figure commentary"** instructions
+  present; ⚠️ a **Hebrew sample** survives the JSON round-trip; large-PDF batching path.
 - `buildAiContext`: multiple chunks per source retained (cap respected), per-`(source,page)`
   citations built, signed-URL fetch **deduped by `sourceId`**, focus-first ordering preserved,
   `pageRange` formatted ("p. N", "p. N–M"), context size bounded.
@@ -411,3 +434,6 @@ Folded in after a subagent review verified against the code:
 - §2 corrections: `00007` is `documents.pages` (not embeddings); live `match_embeddings` is in
   `20260526120000_document_context_files.sql`.
 - §3: added non-goal — **handwriting/strokes in the student's own note are invisible to the AI.**
+- §4.0 (new): **images & handwriting today-vs-proposed contrast** (no regressions); reverted the
+  accidental "describe figures" change — **default faithful text-only**, image pages get a page
+  citation with no quote.
