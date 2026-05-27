@@ -3,7 +3,7 @@
 import { Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
-import { createClient } from '@/lib/supabase/client';
+import { signInWithGoogle } from '@/lib/supabase/oauth';
 import { Button } from '@/components/ui/button';
 import {
   Card,
@@ -18,14 +18,17 @@ function SignupForm() {
   const searchParams = useSearchParams();
   const error = searchParams.get('error');
 
-  async function handleGoogleSignup() {
-    const supabase = createClient();
-    await supabase.auth.signInWithOAuth({
-      provider: 'google',
-      options: {
-        redirectTo: `${window.location.origin}/auth/callback`,
-      },
-    });
+  const errorMessage =
+    error === 'session_exchange_failed'
+      ? 'Sign-up failed. Please try again. If this keeps happening, try clearing your browser cookies.'
+      : error === 'oauth_init_failed'
+        ? 'Could not start Google sign-up. Please try again.'
+        : error
+          ? 'Sign-up failed. Please try again.'
+          : null;
+
+  function handleGoogleSignup() {
+    signInWithGoogle();
   }
 
   return (
@@ -35,12 +38,12 @@ function SignupForm() {
         <CardDescription>Sign up to start taking notes</CardDescription>
       </CardHeader>
       <CardContent>
-        {error && (
+        {errorMessage && (
           <p
             className="mb-4 rounded-md bg-destructive/10 p-3 text-sm text-destructive"
             role="alert"
           >
-            Sign-up failed. Please try again.
+            {errorMessage}
           </p>
         )}
         <Button className="w-full" onClick={handleGoogleSignup} type="button">

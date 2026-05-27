@@ -81,17 +81,17 @@ describe('GET /auth/callback', () => {
     );
   });
 
-  it('redirects to /login with error when no code provided', async () => {
+  it('redirects to /login with no_code error when no code provided', async () => {
     const request = new Request('http://localhost:3000/auth/callback');
     const response = await GET(request);
 
     expect(response.status).toBe(307);
     const url = new URL(response.headers.get('location')!);
     expect(url.pathname).toBe('/login');
-    expect(url.searchParams.get('error')).toBe('auth_failed');
+    expect(url.searchParams.get('error')).toBe('no_code');
   });
 
-  it('redirects to /login with error when code exchange fails', async () => {
+  it('redirects to /login with session_exchange_failed when code exchange fails', async () => {
     mockExchangeCodeForSession.mockResolvedValueOnce({
       error: { message: 'Invalid code' },
     });
@@ -104,6 +104,6 @@ describe('GET /auth/callback', () => {
     expect(response.status).toBe(307);
     const url = new URL(response.headers.get('location')!);
     expect(url.pathname).toBe('/login');
-    expect(url.searchParams.get('error')).toBe('auth_failed');
+    expect(url.searchParams.get('error')).toBe('session_exchange_failed');
   });
 });
