@@ -1,5 +1,6 @@
 'use client';
 
+import { createPortal } from 'react-dom';
 import { useRef, useEffect, useCallback, useState } from 'react';
 import { useEditor, EditorContent } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
@@ -768,7 +769,7 @@ export function CanvasPage({
       {/* Layer 4: Text content layer — only interactive in text mode */}
       <div
         ref={textLayerRef}
-        className="absolute inset-0 overflow-hidden"
+        className="absolute inset-0 overflow-visible"
         style={{
           pointerEvents:
             isInteractionMode ||
@@ -1027,46 +1028,50 @@ export function CanvasPage({
         </div>
       )}
 
-      {/* Layer 5.8: Floating action bar for Read mode text selection */}
-      {activeTool === 'read' && textSelectionRect && (
-        <div
-          className="fixed z-[100] flex items-center gap-1 rounded-full border bg-white px-2 py-1 shadow-lg"
-          style={{
-            left: textSelectionRect.left + textSelectionRect.width / 2,
-            top: textSelectionRect.top - 40,
-            transform: 'translateX(-50%)',
-            pointerEvents: 'auto',
-          }}
-        >
-          <button
-            onMouseDown={(e) => {
-              e.preventDefault();
-              e.stopPropagation();
-              const text = selectedTextRef.current;
-              if (text && onAskAiWithText) {
-                onAskAiWithText(text);
-              }
+      {/* Layer 5.8: Floating action bar for Read mode text selection
+           Rendered via Portal to escape CSS transform container so position: fixed works correctly */}
+      {activeTool === 'read' &&
+        textSelectionRect &&
+        createPortal(
+          <div
+            className="fixed z-[100] flex items-center gap-1 rounded-full border bg-white px-2 py-1 shadow-lg"
+            style={{
+              left: textSelectionRect.left + textSelectionRect.width / 2,
+              top: textSelectionRect.top - 40,
+              transform: 'translateX(-50%)',
+              pointerEvents: 'auto',
             }}
-            className="flex items-center gap-1.5 rounded-full px-3 py-1 text-sm font-medium text-purple-700 transition-colors hover:bg-purple-50"
           >
-            <Sparkles className="h-3.5 w-3.5" />
-            Ask AI
-          </button>
-          <button
-            onMouseDown={(e) => {
-              e.preventDefault();
-              e.stopPropagation();
-              selectedTextRef.current = '';
-              selectedRectRef.current = null;
-              setTextSelectionRect(null);
-            }}
-            className="flex items-center justify-center rounded-full p-1 text-zinc-400 transition-colors hover:bg-zinc-100 hover:text-zinc-600"
-            aria-label="Dismiss"
-          >
-            <X className="h-3.5 w-3.5" />
-          </button>
-        </div>
-      )}
+            <button
+              onMouseDown={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                const text = selectedTextRef.current;
+                if (text && onAskAiWithText) {
+                  onAskAiWithText(text);
+                }
+              }}
+              className="flex items-center gap-1.5 rounded-full px-3 py-1 text-sm font-medium text-purple-700 transition-colors hover:bg-purple-50"
+            >
+              <Sparkles className="h-3.5 w-3.5" />
+              Ask AI
+            </button>
+            <button
+              onMouseDown={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                selectedTextRef.current = '';
+                selectedRectRef.current = null;
+                setTextSelectionRect(null);
+              }}
+              className="flex items-center justify-center rounded-full p-1 text-zinc-400 transition-colors hover:bg-zinc-100 hover:text-zinc-600"
+              aria-label="Dismiss"
+            >
+              <X className="h-3.5 w-3.5" />
+            </button>
+          </div>,
+          document.body,
+        )}
 
       {/* Layer 6: Interaction layer — ALWAYS present
           In draw/erase mode: captures all events (pointer-events: auto, touch-action: none)
