@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
-import type { Document } from '@/types/database';
+import type { Document, ResolvedContextFile } from '@/types/database';
 import { TiptapEditor } from './tiptap-editor';
 import { VersionSidebar } from '@/components/version-history/version-sidebar';
 import { AiChatWrapper } from '@/components/ai/ai-chat-wrapper';
@@ -27,15 +27,21 @@ export function TiptapEditorWithVersions({
   const openViewer = useCallback((t: ViewerTarget) => setViewerTarget(t), []);
 
   const [isFocusFilesOpen, setIsFocusFilesOpen] = useState(false);
-  const [focusFilesCount, setFocusFilesCount] = useState(0);
+  const [focusFiles, setFocusFiles] = useState<ResolvedContextFile[]>([]);
 
-  // Load the count once so the toolbar badge is correct before first open.
+  const refreshFocusFiles = useCallback(async () => {
+    if (!courseId) return;
+    const list = await getContextFiles(document.id);
+    setFocusFiles(list);
+  }, [courseId, document.id]);
+
+  // Load once so the toolbar badge + chat are correct before first open.
   useEffect(() => {
     if (!courseId) return;
     let active = true;
     getContextFiles(document.id)
       .then((list) => {
-        if (active) setFocusFilesCount(list.length);
+        if (active) setFocusFiles(list);
       })
       .catch(() => {});
     return () => {
@@ -74,7 +80,7 @@ export function TiptapEditorWithVersions({
           onToggleFocusFiles={
             courseId ? () => setIsFocusFilesOpen((prev) => !prev) : undefined
           }
-          focusFilesCount={focusFilesCount}
+          focusFilesCount={focusFiles.length}
           isFocusFilesOpen={isFocusFilesOpen}
         />
       </div>
@@ -89,7 +95,8 @@ export function TiptapEditorWithVersions({
           courseId={courseId}
           isOpen={isFocusFilesOpen}
           onClose={() => setIsFocusFilesOpen(false)}
-          onCountChange={setFocusFilesCount}
+          files={focusFiles}
+          onChanged={refreshFocusFiles}
           onOpenFile={openViewer}
         />
       )}
@@ -100,6 +107,8 @@ export function TiptapEditorWithVersions({
         onOpenSource={(fileType, fileId, page) =>
           openViewer({ fileType, fileId, page })
         }
+        focusFiles={focusFiles}
+        onFocusFilesChanged={refreshFocusFiles}
       />
       {viewerTarget && (
         <FileViewer

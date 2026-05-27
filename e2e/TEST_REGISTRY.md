@@ -218,6 +218,7 @@ live Gemini key is required.
 - [x] Open the panel from the toolbar button → add a file via the dialog (tick candidate → "Add 1 file") → detach it with the Remove button
 - [x] Click an attached focus-file item opens the file viewer (`file-viewer`); close it
 - [x] Mocked AI response with a source citation renders an `ai-citation` button that opens the viewer
+- [x] Focus files can be added from inside the AI chat (`chat-focus-files` control → `chat-focus-add` → dialog → chip appears as `chat-focus-chip`)
 
 ---
 
@@ -286,7 +287,7 @@ Test lives in `src/__tests__/integration/storage-rls.integration.test.ts`. Verif
 | Drawing Copy/Paste    | Implemented | `e2e/drawing-copy-paste.spec.ts`         | 8/8        |
 | Moodle Ext Gating     | Implemented | `e2e/moodle-touch-gating.spec.ts`        | 2/2        |
 | Extension Real Load   | Implemented | `e2e/extension-real.spec.ts`             | 3/3        |
-| Document Focus Files  | Implemented | `e2e/document-context-files.spec.ts`     | 4/4        |
+| Document Focus Files  | Implemented | `e2e/document-context-files.spec.ts`     | 5/5        |
 | Homework AI Context   | Removed     | (deleted)                                | —          |
 | Version History       | Planned     | `e2e/version-history.spec.ts`            | 0/5        |
 | PDF Visual Regression | Implemented | `e2e/pdf-visual-regression.spec.ts`      | 8/8        |

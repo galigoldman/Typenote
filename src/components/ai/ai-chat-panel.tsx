@@ -18,8 +18,9 @@ import { Button } from '@/components/ui/button';
 import { AiHeadIcon } from '@/components/icons/ai-head-icon';
 import { MarkdownResponse } from './markdown-response';
 import { ConversationList } from './conversation-list';
+import { ChatFocusFiles } from './chat-focus-files';
 import { trackEvent } from '@/lib/analytics/events';
-import type { ContextFileType } from '@/types/database';
+import type { ContextFileType, ResolvedContextFile } from '@/types/database';
 
 interface ChatSource {
   sourceType: string;
@@ -69,6 +70,8 @@ interface AiChatPanelProps {
     fileId: string,
     page?: number,
   ) => void;
+  focusFiles?: ResolvedContextFile[];
+  onFocusFilesChanged?: () => void | Promise<void>;
 }
 
 export function AiChatPanel({
@@ -82,6 +85,8 @@ export function AiChatPanel({
   onRemoveContextItem,
   onClearAllContext,
   onOpenSource,
+  focusFiles,
+  onFocusFilesChanged,
 }: AiChatPanelProps) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState('');
@@ -724,6 +729,20 @@ export function AiChatPanel({
                   remaining
                 </p>
               </div>
+            )}
+            {/* Focus files for this document — pick what the AI focuses on */}
+            {documentId && courseId && focusFiles && onFocusFilesChanged && (
+              <ChatFocusFiles
+                documentId={documentId}
+                courseId={courseId}
+                files={focusFiles}
+                onChanged={onFocusFilesChanged}
+                onOpenFile={
+                  onOpenSource
+                    ? (f) => onOpenSource(f.fileType, f.fileId)
+                    : undefined
+                }
+              />
             )}
             {/* Pending context items (accumulated) */}
             {pendingContextItems.length > 0 && (
