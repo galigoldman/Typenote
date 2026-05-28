@@ -235,4 +235,44 @@ describe('POST /api/moodle/import-existing', () => {
     const res = await POST(makeRequest(body) as never);
     expect(res.status).toBe(401);
   });
+
+  it('awaits indexing before returning the response', async () => {
+    const admin = buildAdmin({
+      file: {
+        id: 'file-1',
+        storage_path: 'm.org/c1/abc.pdf',
+        content_hash: 'abc',
+        file_size: 12345, // must match body.observedSize so the route indexes
+        mime_type: 'application/pdf',
+      },
+    });
+    setupAuth(admin);
+
+    let resolveIndex!: () => void;
+    const gate = new Promise<{ success: boolean; skipped: boolean }>((resolve) => {
+      resolveIndex = () => resolve({ success: true, skipped: false });
+    });
+    vi.mocked(indexContent).mockReturnValueOnce(gate as never);
+
+    const respPromise = POST(makeRequest(body) as never);
+
+    // Let microtasks run: indexContent should have been dispatched...
+    await new Promise((r) => setImmediate(r));
+    let settled = false;
+    void respPromise.then(() => {
+      settled = true;
+    });
+    await new Promise((r) => setImmediate(r));
+    // ...but the response must NOT have resolved yet (proves we await).
+    expect(settled).toBe(false);
+
+    resolveIndex();
+    const res = await respPromise;
+    expect(res.status).toBe(200);
+    expect(indexContent).toHaveBeenCalledWith({
+      type: 'moodle_file',
+      fileId: 'file-1',
+      courseId: 'tn-course-1',
+    });
+  });
 });
