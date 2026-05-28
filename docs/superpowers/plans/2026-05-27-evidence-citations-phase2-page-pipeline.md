@@ -4,9 +4,9 @@
 
 **Goal:** Produce real page numbers for every PDF/slide chunk so the AI's citations jump to the exact page, by switching to per-page extraction, small math-aware page-tagged chunks, multi-chunk-per-file retrieval, and indexing course materials (a dead branch today) — plus a backfill driver.
 
-**Architecture:** Extraction returns structured per-page text (`extractPdfPages`); a math-aware chunker (`chunkPages`/`chunkFlatText`) packs pages into ~1600-char chunks tagged with **0-indexed** page ranges; `indexContent` stores those pages (with a page-count validation guard) and now runs for `course_material` too; `buildAiContext` keeps several chunks per file and emits one citation per `(source, page)` with de-duplicated signed URLs. The viewer/citation UI is unchanged — it already jumps to `initialPage`.
+**Architecture:** Extraction returns structured per-page text (`extractPdfPages`); a math-aware chunker (`chunkPages`/`chunkFlatText`) packs pages into ~1600-char chunks tagged with **0-indexed** page ranges; `indexContent` stores those pages (trusting Gemini's reported 1-based page numbers — it sees the real PDF) and now runs for `course_material` too; `buildAiContext` keeps several chunks per file and emits one citation per `(source, page)` with de-duplicated signed URLs. The viewer/citation UI is unchanged — it already jumps to `initialPage`.
 
-**Tech Stack:** TypeScript, Next.js 16, `@google/genai` (structured output via `responseSchema`), `pdf-lib` (NEW — server-side page count), Supabase, Vitest, Playwright.
+**Tech Stack:** TypeScript, Next.js 16, `@google/genai` (structured output via `responseSchema`), Supabase, Vitest, Playwright.
 
 **Spec:** `docs/superpowers/specs/2026-05-27-evidence-citations-design.md` (§4.1–§4.6, §6, §8–§11).
 
@@ -16,97 +16,20 @@
 
 ## File structure
 
-- `package.json` — ADD dependency `pdf-lib`.
 - `src/lib/ai/extraction/pdf.ts` — MODIFY: add `PageText` + `extractPdfPages`; keep `extractPdfText` as a wrapper.
-- `src/lib/ai/extraction/pdf-page-count.ts` — CREATE: `getPdfPageCount` (pdf-lib).
 - `src/lib/ai/embeddings.ts` — MODIFY: add `PageChunk`, `chunkPages`, `chunkFlatText`, math-aware split helpers, constants.
 - `src/lib/actions/ai-context.ts` — MODIFY: `indexContent` (pages + guard + course_material), `buildAiContext` (multi-chunk + per-(source,page) citations + signed-URL dedupe), add `reindexAllContent`; DELETE dead `askQuestion`.
 - `src/lib/actions/course-materials.ts` — MODIFY: `createCourseMaterial` awaits `indexContent`.
 - `src/app/api/moodle/{upload,upload-finalize,import-existing}/route.ts` — MODIFY: await `indexContent` (was fire-and-forget — dropped on serverless freeze).
 - `src/lib/actions/personal-files.ts` — MODIFY: `addPersonalFile` awaits `indexContent` (was `void`).
 - `src/app/api/ai/reindex/route.ts` — MODIFY: call `reindexAllContent` instead of blanket delete.
-- Tests: `src/lib/ai/extraction/__tests__/pdf-page-count.test.ts` (new), `src/lib/ai/extraction/__tests__/pdf.test.ts` (new), `src/lib/ai/__tests__/embeddings.test.ts` (extend), `src/lib/actions/__tests__/ai-context.test.ts` (extend), `src/lib/actions/__tests__/course-materials.test.ts` (new), `e2e/evidence-citations.spec.ts` (new), `e2e/TEST_REGISTRY.md` (update).
+- Tests: `src/lib/ai/extraction/__tests__/pdf.test.ts` (new), `src/lib/ai/__tests__/embeddings.test.ts` (extend), `src/lib/actions/__tests__/ai-context.test.ts` (extend), `src/lib/actions/__tests__/course-materials.test.ts` (new), `e2e/evidence-citations.spec.ts` (new), `e2e/TEST_REGISTRY.md` (update).
 
 ---
 
-### Task 1: Add `pdf-lib` and the server-side page-count helper
+### Task 1: REMOVED — no page-count guard (trust Gemini's page numbers)
 
-**Files:**
-- Modify: `package.json`
-- Create: `src/lib/ai/extraction/pdf-page-count.ts`
-- Test: `src/lib/ai/extraction/__tests__/pdf-page-count.test.ts`
-
-- [ ] **Step 1: Install pdf-lib**
-
-Run: `pnpm add pdf-lib`
-Expected: `pdf-lib` appears under `dependencies` in `package.json`.
-
-- [ ] **Step 2: Write the failing test**
-
-Create `src/lib/ai/extraction/__tests__/pdf-page-count.test.ts`:
-
-```ts
-import { describe, it, expect } from 'vitest';
-import { PDFDocument } from 'pdf-lib';
-import { getPdfPageCount } from '../pdf-page-count';
-
-async function makePdf(pages: number): Promise<Buffer> {
-  const doc = await PDFDocument.create();
-  for (let i = 0; i < pages; i++) doc.addPage([200, 200]);
-  return Buffer.from(await doc.save());
-}
-
-describe('getPdfPageCount', () => {
-  it('returns the number of pages in a PDF', async () => {
-    expect(await getPdfPageCount(await makePdf(3))).toBe(3);
-    expect(await getPdfPageCount(await makePdf(1))).toBe(1);
-  });
-
-  it('throws for a non-PDF buffer', async () => {
-    await expect(
-      getPdfPageCount(Buffer.from('not a pdf')),
-    ).rejects.toBeTruthy();
-  });
-});
-```
-
-- [ ] **Step 3: Run the test to verify it fails**
-
-Run: `pnpm test -- src/lib/ai/extraction/__tests__/pdf-page-count.test.ts`
-Expected: FAIL ("Cannot find module '../pdf-page-count'").
-
-- [ ] **Step 4: Implement `pdf-page-count.ts`**
-
-Create `src/lib/ai/extraction/pdf-page-count.ts`:
-
-```ts
-import { PDFDocument } from 'pdf-lib';
-
-/**
- * Count pages of a PDF server-side. pdf-lib is pure-JS (no worker/canvas), so
- * unlike the browser pdf.js setup it runs safely inside server actions.
- * Throws for non-PDF / unreadable input — callers should treat that as
- * "no reliable page count" and fall back to page-less indexing.
- */
-export async function getPdfPageCount(buffer: Buffer): Promise<number> {
-  const doc = await PDFDocument.load(buffer, { updateMetadata: false });
-  return doc.getPageCount();
-}
-```
-
-- [ ] **Step 5: Run the test to verify it passes**
-
-Run: `pnpm test -- src/lib/ai/extraction/__tests__/pdf-page-count.test.ts`
-Expected: PASS (2 tests).
-
-- [ ] **Step 6: Commit**
-
-```bash
-git add package.json pnpm-lock.yaml src/lib/ai/extraction/pdf-page-count.ts src/lib/ai/extraction/__tests__/pdf-page-count.test.ts
-git commit -m "feat(ai): server-side PDF page count via pdf-lib
-
-Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>"
-```
+This task originally added `pdf-lib` + `getPdfPageCount` to cross-check Gemini's structured page count against the real PDF page count, falling back to page-less chunking on mismatch. **Dropped** because: (a) it would add a brand-new dependency; (b) the strict count-equality guard is counterproductive — Gemini correctly omits text-less image slides while keeping the *right* page numbers for the rest, so a deck with image slides returns fewer page-objects than the real count and the guard would wrongly downgrade the whole deck to page-less; (c) Gemini sees the actual PDF, so gross misnumbering is rare and the worst realistic case (off-by-one) is recoverable and still better than today's no-page. `extractPdfPages` already validates each `page` is an integer and sorts — that pure-code check is sufficient for v1. A range/monotonicity guard can be added later if misnumbering is observed in practice. **Start execution at Task 2.**
 
 ---
 
@@ -572,15 +495,7 @@ vi.mock('@/lib/ai/extraction/pdf', () => ({
 }));
 ```
 
-(c) Add the page-count mock (after the pdf mock):
-
-```ts
-vi.mock('@/lib/ai/extraction/pdf-page-count', () => ({
-  getPdfPageCount: vi.fn(async () => 2), // matches the 2 mocked pages
-}));
-```
-
-(d) Replace the first `indexContent` test body ("extracts text from PDF and embeds as text") with:
+(c) Replace the first `indexContent` test body ("extracts text from PDF and embeds as text") with:
 
 ```ts
   it('extracts per-page text and stores 0-indexed page numbers', async () => {
@@ -630,7 +545,6 @@ import {
   type PageChunk,
 } from '@/lib/ai/embeddings';
 import { extractPdfPages } from '@/lib/ai/extraction/pdf';
-import { getPdfPageCount } from '@/lib/ai/extraction/pdf-page-count';
 ```
 
 (remove the old `chunkText`/`embedText` import line and the old `extractPdfText` import).
@@ -650,20 +564,10 @@ import { getPdfPageCount } from '@/lib/ai/extraction/pdf-page-count';
 
     if (isPdfLike) {
       const pages = await extractPdfPages(fileBuffer);
-      // Validation guard: the structured page count must match the real PDF
-      // page count, or we don't trust the page numbers and fall back to
-      // page-less chunking (degrade, never emit wrong pages).
-      let realCount = pages.length;
-      try {
-        realCount = await getPdfPageCount(fileBuffer);
-      } catch {
-        // PPTX or unreadable by pdf-lib: trust the extraction's own count.
-      }
-      if (pages.length > 0 && pages.length === realCount) {
-        chunks = chunkPages(pages);
-      } else {
-        chunks = chunkFlatText(pages.map((p) => p.text).join('\n\n'));
-      }
+      // Trust Gemini's reported 1-based page numbers (it reads the real PDF).
+      // extractPdfPages already drops non-integer pages and sorts; an empty
+      // result means nothing extractable, so produce no chunks.
+      chunks = pages.length > 0 ? chunkPages(pages) : [];
     } else if (isDocx) {
       const text = await extractDocxText(fileBuffer);
       chunks = chunkFlatText(text);
@@ -1483,9 +1387,6 @@ vi.mock('@/lib/ai/extraction/pdf', () => ({
   ]),
   extractPdfText: vi.fn(async () => 'Integration page one\n\nIntegration page two'),
 }));
-vi.mock('@/lib/ai/extraction/pdf-page-count', () => ({
-  getPdfPageCount: vi.fn(async () => 2),
-}));
 
 // NOTE: This test needs a seeded course_material row + its storage object in
 // local Supabase. Follow the seeding helper used by the existing
@@ -1670,9 +1571,9 @@ After deploying, trigger `POST /api/ai/reindex` as an authenticated admin to re-
 
 ## Self-review notes
 
-- **Spec coverage:** §4.1 extraction + guard + server-side count → Task 1–2, 4; §4.2 math-aware page-tagged chunks → Task 3; §4.3 indexing 0-indexed pages + course_material → Task 4–5; serverless-safe indexing of Moodle + personal files (so they actually get embedded) → Task 5b; §4.4 multi-chunk + per-(source,page) + signed-URL dedupe → Task 6; §4.6 viewer (already built, exercised) → Task 10; §6 course-material indexing + backfill → Task 5, 8; testing → Task 9–11. §4.5 (prompt/render) is **Phase 1**.
+- **Spec coverage:** §4.1 structured per-page extraction → Task 2, 4 (no page-count guard — Task 1 removed; we trust Gemini's page numbers); §4.2 math-aware page-tagged chunks → Task 3; §4.3 indexing 0-indexed pages + course_material → Task 4–5; serverless-safe indexing of Moodle + personal files (so they actually get embedded) → Task 5b; §4.4 multi-chunk + per-(source,page) + signed-URL dedupe → Task 6; §4.6 viewer (already built, exercised) → Task 10; §6 course-material indexing + backfill → Task 5, 8; testing → Task 9–11. §4.5 (prompt/render) is **Phase 1**.
 - **Moodle findability (Task 5b):** fixes the *future-uploads* half of "the AI can't find Moodle files" (embedding was silently dropped at upload time); Task 8's backfill re-embeds *existing* files that were dropped; Task 6's multi-chunk retrieval + Task 3's smaller chunks fix the *retrieval-quality* half. All three together close the issue.
-- **Type consistency:** `PageText` (defined in `pdf.ts`, imported by `embeddings.ts` and the `indexContent` flow), `PageChunk` (embeddings.ts), `chunkPages`/`chunkFlatText`, `getPdfPageCount`, `reindexAllContent`, `MAX_CHUNKS_PER_SOURCE`, `CHUNK_CHAR_BUDGET` — all referenced consistently across tasks.
+- **Type consistency:** `PageText` (defined in `pdf.ts`, imported by `embeddings.ts` and the `indexContent` flow), `PageChunk` (embeddings.ts), `chunkPages`/`chunkFlatText`, `reindexAllContent`, `MAX_CHUNKS_PER_SOURCE`, `CHUNK_CHAR_BUDGET` — all referenced consistently across tasks.
 - **0-indexed contract:** stored `page_start/page_end` are 0-indexed (chunkPages subtracts 1); `pageRangeOf` adds 1 for display ("p. N"); the chat badge subtracts 1 again for `FileViewer.initialPage`. Verified end-to-end in Task 6 + Task 10.
-- **Known limitations (documented, accepted for v1):** cross-user historical backfill of course_material/personal_file is RLS-bound (Task 8 note); pure-image pages produce no chunk (not retrievable in text-only v1 — §13 future); large PDFs that overflow the model's output limit fall back to page-less (Task 4 guard) — batched extraction for >50-page PDFs is a follow-up if it bites.
+- **Known limitations (documented, accepted for v1):** cross-user historical backfill of course_material/personal_file is RLS-bound (Task 8 note); pure-image pages produce no chunk (not retrievable in text-only v1 — §13 future); very large PDFs that overflow the extraction model's output limit may return partial/truncated pages (we trust whatever pages come back) — batched extraction for >50-page PDFs is a follow-up if it bites.
 - **Open follow-up (not blocking):** admin-client variant of `indexContent` for a complete cross-user backfill; per-span LTR isolation of citations in Hebrew prose; batched extraction for very large PDFs.
