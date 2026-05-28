@@ -97,7 +97,7 @@ test.describe('Auth', () => {
 
     // Should redirect to /login with an error parameter
     await expect(page).toHaveURL(/\/login\?error=no_code/, { timeout: 10_000 });
-    await expect(page.locator('[role="alert"]')).toBeVisible();
+    await expect(page.locator('p[role="alert"]')).toBeVisible();
   });
 
   test('login page shows error message when redirected with session_exchange_failed error', async ({
