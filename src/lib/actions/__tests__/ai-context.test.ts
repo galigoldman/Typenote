@@ -1,7 +1,17 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('@/lib/ai/embeddings', () => ({
-  chunkText: vi.fn((text: string) => [{ text, chunkIndex: 0 }]),
+  chunkPages: vi.fn((pages: { page: number; text: string }[]) =>
+    pages.map((p, i) => ({
+      text: p.text,
+      chunkIndex: i,
+      pageStart: p.page - 1,
+      pageEnd: p.page - 1,
+    })),
+  ),
+  chunkFlatText: vi.fn((text: string) => [
+    { text, chunkIndex: 0, pageStart: null, pageEnd: null },
+  ]),
   embedText: vi.fn(async () => Array.from({ length: 1536 }, () => 0.1)),
   embedQuery: vi.fn(async () => Array.from({ length: 1536 }, () => 0.1)),
 }));
@@ -11,7 +21,11 @@ vi.mock('@/lib/ai/extraction/docx', () => ({
 }));
 
 vi.mock('@/lib/ai/extraction/pdf', () => ({
-  extractPdfText: vi.fn(async () => 'PDF extracted text with $x^2$ math'),
+  extractPdfPages: vi.fn(async () => [
+    { page: 1, text: 'PDF page one with $x^2$ math' },
+    { page: 2, text: 'PDF page two' },
+  ]),
+  extractPdfText: vi.fn(async () => 'PDF page one with $x^2$ math\n\nPDF page two'),
 }));
 
 vi.mock('@/lib/queries/embeddings', () => ({
@@ -176,7 +190,8 @@ vi.mock('@/lib/ai/context-files', () => ({
   fileSourceConfig: vi.fn(),
 }));
 
-import { extractPdfText } from '@/lib/ai/extraction/pdf';
+import { embedText } from '@/lib/ai/embeddings';
+import { extractPdfPages } from '@/lib/ai/extraction/pdf';
 import { listContextFiles } from '@/lib/actions/context-files';
 import { resolveContextFileName } from '@/lib/ai/context-files';
 import {
@@ -197,7 +212,7 @@ afterEach(() => {
 });
 
 describe('indexContent', () => {
-  it('extracts text from PDF and embeds as text', async () => {
+  it('extracts per-page text and stores 0-indexed page numbers', async () => {
     const result = await indexContent({
       type: 'course_material',
       materialId: 'mat-1',
@@ -205,17 +220,41 @@ describe('indexContent', () => {
     });
 
     expect(result.success).toBe(true);
-    expect(result.skipped).toBe(false);
-    expect(result.segmentsIndexed).toBe(1);
-    expect(extractPdfText).toHaveBeenCalledWith(expect.any(Buffer));
+    expect(result.segmentsIndexed).toBe(2);
+    expect(extractPdfPages).toHaveBeenCalled();
     expect(upsertEmbeddings).toHaveBeenCalledWith(
       expect.arrayContaining([
         expect.objectContaining({
           source_type: 'course_material',
-          segment_text: 'PDF extracted text with $x^2$ math',
+          segment_text: 'PDF page one with $x^2$ math',
+          page_start: 0,
+          page_end: 0,
+        }),
+        expect.objectContaining({
+          segment_text: 'PDF page two',
+          page_start: 1,
+          page_end: 1,
         }),
       ]),
     );
+  });
+
+  it('fails (not skips) when every chunk embedding fails', async () => {
+    // Both pages' embeddings come back empty (malformed API response). The file
+    // has chunks, so this is an embedding failure, not a blank file — it must
+    // surface as success:false, never a silent skip that hides the outage.
+    vi.mocked(embedText).mockResolvedValueOnce([]).mockResolvedValueOnce([]);
+
+    const result = await indexContent({
+      type: 'course_material',
+      materialId: 'mat-1',
+      courseId: 'course-1',
+    });
+
+    expect(result.success).toBe(false);
+    expect(result.skipped).toBe(false);
+    expect(result.segmentsIndexed).toBe(0);
+    expect(upsertEmbeddings).not.toHaveBeenCalled();
   });
 
   it('skips indexing when content hash matches', async () => {
