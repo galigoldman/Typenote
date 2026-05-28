@@ -25,7 +25,6 @@ vi.mock('@/lib/ai/extraction/pdf', () => ({
     { page: 1, text: 'PDF page one with $x^2$ math' },
     { page: 2, text: 'PDF page two' },
   ]),
-  extractPdfText: vi.fn(async () => 'PDF page one with $x^2$ math\n\nPDF page two'),
 }));
 
 vi.mock('@/lib/queries/embeddings', () => ({
@@ -201,7 +200,6 @@ import {
 } from '@/lib/queries/embeddings';
 
 import {
-  askQuestion,
   buildAiContext,
   indexContent,
   searchContext,
@@ -332,73 +330,6 @@ describe('searchContext', () => {
         courseId: 'callers-typenote-course',
         moodleCourseId: 'moodle-course-1',
         importedMoodleFileIds: ['imported-file-a', 'imported-file-b'],
-      }),
-    );
-  });
-});
-
-describe('askQuestion', () => {
-  it('generates an answer using flash model in quick mode', async () => {
-    const result = await askQuestion({
-      question: 'What is an integral?',
-      courseId: 'course-1',
-      mode: 'quick',
-    });
-
-    expect(result.answer).toContain('AI answer');
-    expect(result.model).toBe('flash');
-    expect(mockGenerateContent).toHaveBeenCalledWith(
-      expect.objectContaining({
-        model: 'gemini-2.5-flash',
-        config: expect.objectContaining({
-          systemInstruction: expect.any(String),
-        }),
-      }),
-    );
-  });
-
-  it('sends matched text as context instead of downloading files', async () => {
-    const { matchEmbeddings } = await import('@/lib/queries/embeddings');
-    vi.mocked(matchEmbeddings).mockResolvedValueOnce([
-      {
-        id: 1,
-        source_type: 'moodle_file',
-        source_id: 'file-1',
-        source_name: 'Lecture.pdf',
-        segment_text: 'This is the lecture content about integrals.',
-        page_start: null,
-        page_end: null,
-        course_id: 'course-1',
-        mime_type: 'application/pdf',
-        similarity: 0.85,
-      },
-    ]);
-
-    await askQuestion({
-      question: 'What is an integral?',
-      courseId: 'course-1',
-      mode: 'quick',
-    });
-
-    const call = mockGenerateContent.mock.calls[0][0];
-    // Should have text context, not file inlineData
-    const firstUserPart = call.contents[0].parts[0];
-    expect(firstUserPart.text).toContain('Lecture.pdf');
-    expect(firstUserPart.text).toContain('integrals');
-    // Should NOT have inlineData
-    expect(firstUserPart.inlineData).toBeUndefined();
-  });
-
-  it('uses pro model in deep mode', async () => {
-    await askQuestion({
-      question: 'Explain eigenvalues',
-      courseId: 'course-1',
-      mode: 'deep',
-    });
-
-    expect(mockGenerateContent).toHaveBeenCalledWith(
-      expect.objectContaining({
-        model: 'gemini-2.5-pro',
       }),
     );
   });
