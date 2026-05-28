@@ -1,6 +1,5 @@
 import { NextResponse } from 'next/server';
 
-import { createAdminClient } from '@/lib/supabase/admin';
 import { createClient } from '@/lib/supabase/server';
 
 export async function POST() {
@@ -15,25 +14,12 @@ export async function POST() {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    // Delete all embeddings — they'll be recreated on next sync with correct taskType
-    const admin = createAdminClient();
-    const { data, error: deleteError } = await admin
-      .from('content_embeddings')
-      .delete()
-      .neq('id', 0) // delete all rows
-      .select('id');
-
-    if (deleteError) {
-      return NextResponse.json(
-        { error: `Delete failed: ${deleteError.message}` },
-        { status: 500 },
-      );
-    }
-
+    const { reindexAllContent } = await import('@/lib/actions/ai-context');
+    const { processed, failed } = await reindexAllContent();
     return NextResponse.json({
-      deleted: data?.length ?? 0,
-      message:
-        'All embeddings deleted. Re-sync your courses to rebuild with correct embeddings.',
+      processed,
+      failed,
+      message: `Re-indexed ${processed} sources (${failed} failed).`,
     });
   } catch (err) {
     console.error('Reindex error:', err);

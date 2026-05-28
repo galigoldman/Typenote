@@ -718,3 +718,78 @@ export async function reindexCourse(
   if (error) throw new Error(`Failed to clear hashes: ${error.message}`);
   return { cleared: data?.length ?? 0 };
 }
+
+// ---------------------------------------------------------------------------
+// reindexAllContent — one-time backfill driver
+// ---------------------------------------------------------------------------
+
+/**
+ * One-time backfill: re-extract + re-embed all indexed sources (so they pick up
+ * per-page chunking) and index any course materials that were never indexed.
+ * Throttled with a small concurrency pool to respect embedding rate limits.
+ *
+ * Limitation: course_material/personal_file indexing runs under the caller's
+ * RLS; Moodle files use the admin client. Run as an authenticated admin.
+ */
+export async function reindexAllContent(): Promise<{
+  processed: number;
+  failed: number;
+}> {
+  await getAuthUserId();
+  const admin = createAdminClient();
+
+  const { data: indexed } = await admin
+    .from('content_embeddings')
+    .select('source_type, source_id, course_id');
+  const { data: materials } = await admin
+    .from('course_materials')
+    .select('id, course_id');
+
+  const jobs: IndexSource[] = [];
+  const seen = new Set<string>();
+  // The hash-clear below is global, while this loop only creates jobs for the
+  // three known source_type values. That's safe because content_embeddings has
+  // a CHECK constraint limiting source_type to exactly those three — any other
+  // value would have its hash cleared but never re-indexed. If that constraint
+  // ever loosens, add an explicit job for the new type here.
+  for (const r of (indexed ?? []) as {
+    source_type: string;
+    source_id: string;
+    course_id: string;
+  }[]) {
+    const key = `${r.source_type}:${r.source_id}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    if (r.source_type === 'moodle_file')
+      jobs.push({ type: 'moodle_file', fileId: r.source_id, courseId: r.course_id });
+    else if (r.source_type === 'course_material')
+      jobs.push({ type: 'course_material', materialId: r.source_id, courseId: r.course_id });
+    else if (r.source_type === 'personal_file')
+      jobs.push({ type: 'personal_file', fileId: r.source_id, courseId: r.course_id });
+  }
+  for (const m of (materials ?? []) as { id: string; course_id: string }[]) {
+    const key = `course_material:${m.id}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    jobs.push({ type: 'course_material', materialId: m.id, courseId: m.course_id });
+  }
+
+  // Force re-extraction: clear content hashes so indexContent won't skip.
+  await admin
+    .from('content_embeddings')
+    .update({ content_hash: null })
+    .not('content_hash', 'is', null);
+
+  const CONCURRENCY = 3;
+  let processed = 0;
+  let failed = 0;
+  for (let i = 0; i < jobs.length; i += CONCURRENCY) {
+    const batch = jobs.slice(i, i + CONCURRENCY);
+    const results = await Promise.allSettled(batch.map((j) => indexContent(j)));
+    for (const res of results) {
+      if (res.status === 'fulfilled' && res.value.success) processed++;
+      else failed++;
+    }
+  }
+  return { processed, failed };
+}

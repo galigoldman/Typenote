@@ -140,6 +140,34 @@ vi.mock('@/lib/supabase/admin', () => {
           };
           return chain;
         }
+        if (table === 'content_embeddings') {
+          const rows = [
+            { source_type: 'moodle_file', source_id: 'file-1', course_id: 'mc-1' },
+          ];
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const chain: any = {
+            select: vi.fn(() => chain),
+            update: vi.fn(() => chain),
+            // .update(...).not(...) resolves (clearing hashes)
+            not: vi.fn(async () => ({ data: null, error: null })),
+            // await admin.from('content_embeddings').select(...) resolves here
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            then: (resolve: (value: any) => any) =>
+              resolve({ data: rows, error: null }),
+          };
+          return chain;
+        }
+        if (table === 'course_materials') {
+          const rows = [{ id: 'mat-2', course_id: 'course-2' }];
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const chain: any = {
+            select: vi.fn(() => chain),
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            then: (resolve: (value: any) => any) =>
+              resolve({ data: rows, error: null }),
+          };
+          return chain;
+        }
         const data = table === 'moodle_sections' ? moodleSectionRow : null;
         return {
           select: vi.fn(() => ({
@@ -202,6 +230,7 @@ import {
 import {
   buildAiContext,
   indexContent,
+  reindexAllContent,
   searchContext,
 } from '../ai-context';
 
@@ -434,6 +463,17 @@ describe('buildAiContext multi-chunk retrieval + page citations', () => {
       'p. 3',
       'p. 5',
     ]);
+  });
+});
+
+describe('reindexAllContent', () => {
+  it('enumerates indexed sources + unindexed course materials and indexes each', async () => {
+    const res = await reindexAllContent();
+    // 1 indexed moodle_file (file-1) + 1 unindexed course_material (mat-2) = 2 jobs,
+    // both of which index successfully against the mocks — assert the success
+    // path, not just that jobs were attempted.
+    expect(res.processed).toBe(2);
+    expect(res.failed).toBe(0);
   });
 });
 
