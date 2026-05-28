@@ -8,33 +8,10 @@ vi.mock('@google/genai', () => ({
   },
 }));
 
-import { chunkFlatText, chunkPages, chunkText, embedQuery, embedText } from '../embeddings';
+import { chunkFlatText, chunkPages, embedQuery, embedText } from '../embeddings';
 
 afterEach(() => {
   vi.clearAllMocks();
-});
-
-describe('chunkText', () => {
-  it('returns single chunk for short text', () => {
-    const result = chunkText('Hello world');
-    expect(result).toHaveLength(1);
-    expect(result[0].text).toBe('Hello world');
-    expect(result[0].chunkIndex).toBe(0);
-  });
-
-  it('splits long text at paragraph boundaries', () => {
-    // Create text longer than 25000 chars
-    const paragraph = 'A'.repeat(13000);
-    const longText = `${paragraph}\n\n${paragraph}\n\n${paragraph}`;
-
-    const result = chunkText(longText);
-    expect(result.length).toBeGreaterThan(1);
-    expect(result[0].chunkIndex).toBe(0);
-    expect(result[1].chunkIndex).toBe(1);
-    // All text should be preserved
-    const totalLength = result.reduce((sum, c) => sum + c.text.length, 0);
-    expect(totalLength).toBeGreaterThan(0);
-  });
 });
 
 describe('embedText', () => {

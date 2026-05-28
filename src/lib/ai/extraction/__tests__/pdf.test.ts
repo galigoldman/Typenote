@@ -14,7 +14,7 @@ vi.mock('@google/genai', () => ({
   },
 }));
 
-import { extractPdfPages, extractPdfText } from '../pdf';
+import { extractPdfPages } from '../pdf';
 
 afterEach(() => vi.clearAllMocks());
 
@@ -66,14 +66,3 @@ describe('extractPdfPages', () => {
   });
 });
 
-describe('extractPdfText (wrapper)', () => {
-  it('joins page texts with blank lines', async () => {
-    mockGenerateContent.mockResolvedValueOnce({
-      text: JSON.stringify([
-        { page: 1, text: 'A' },
-        { page: 2, text: 'B' },
-      ]),
-    });
-    expect(await extractPdfText(Buffer.from('pdf'))).toBe('A\n\nB');
-  });
-});

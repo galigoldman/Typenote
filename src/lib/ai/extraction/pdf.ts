@@ -76,11 +76,3 @@ export async function extractPdfPages(buffer: Buffer): Promise<PageText[]> {
     .sort((a, b) => a.page - b.page);
 }
 
-/**
- * Flat-text wrapper for callers that don't need page structure (and the
- * page-less fallback path).
- */
-export async function extractPdfText(buffer: Buffer): Promise<string> {
-  const pages = await extractPdfPages(buffer);
-  return pages.map((p) => p.text).join('\n\n');
-}
