@@ -147,3 +147,20 @@ describe('MarkdownResponse — XSS safety', () => {
     expect(link!.getAttribute('href')).toBe('https://example.com');
   });
 });
+
+describe('MarkdownResponse — resilience & RTL', () => {
+  it('does not throw on a malformed/unterminated LaTeX fragment', () => {
+    // A broken quote fragment a chunk boundary could produce.
+    const content = 'Here is the proof:\n\n$$\n\\frac{-b \\pm \\sqrt{b^2\n$$\n\nend';
+    expect(() =>
+      render(<MarkdownResponse content={content} />),
+    ).not.toThrow();
+  });
+
+  it('sets dir="auto" so Hebrew renders right-to-left', () => {
+    const { container } = render(
+      <MarkdownResponse content="זוהי תשובה בעברית (Notes.pdf)" />,
+    );
+    expect(container.firstChild).toHaveAttribute('dir', 'auto');
+  });
+});

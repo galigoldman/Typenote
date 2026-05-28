@@ -15,8 +15,14 @@ export function MarkdownResponse({ content }: MarkdownResponseProps) {
   }
 
   return (
-    <div className="prose prose-sm dark:prose-invert max-w-none leading-relaxed [&>*:first-child]:mt-0 [&>*:last-child]:mb-0">
-      <Markdown remarkPlugins={[remarkMath]} rehypePlugins={[rehypeKatex]}>
+    <div
+      dir="auto"
+      className="prose prose-sm dark:prose-invert max-w-none leading-relaxed [&>*:first-child]:mt-0 [&>*:last-child]:mb-0"
+    >
+      <Markdown
+        remarkPlugins={[remarkMath]}
+        rehypePlugins={[[rehypeKatex, { throwOnError: false, strict: false }]]}
+      >
         {content}
       </Markdown>
     </div>
