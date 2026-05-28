@@ -115,12 +115,15 @@ async function seed() {
   //    download call in indexContent must succeed.
   const { error: uploadErr } = await admin.storage
     .from('moodle-materials')
-    .upload(STORAGE_PATH, Buffer.from('%PDF-1.4 fake pdf for page-indexing test'), {
-      contentType: 'application/pdf',
-      upsert: true,
-    });
-  if (uploadErr)
-    throw new Error(`seed storage upload: ${uploadErr.message}`);
+    .upload(
+      STORAGE_PATH,
+      Buffer.from('%PDF-1.4 fake pdf for page-indexing test'),
+      {
+        contentType: 'application/pdf',
+        upsert: true,
+      },
+    );
+  if (uploadErr) throw new Error(`seed storage upload: ${uploadErr.message}`);
 }
 
 async function cleanup() {

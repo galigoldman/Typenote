@@ -142,7 +142,11 @@ vi.mock('@/lib/supabase/admin', () => {
         }
         if (table === 'content_embeddings') {
           const rows = [
-            { source_type: 'moodle_file', source_id: 'file-1', course_id: 'mc-1' },
+            {
+              source_type: 'moodle_file',
+              source_id: 'file-1',
+              course_id: 'mc-1',
+            },
           ];
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           const chain: any = {

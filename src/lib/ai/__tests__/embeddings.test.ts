@@ -8,7 +8,12 @@ vi.mock('@google/genai', () => ({
   },
 }));
 
-import { chunkFlatText, chunkPages, embedQuery, embedText } from '../embeddings';
+import {
+  chunkFlatText,
+  chunkPages,
+  embedQuery,
+  embedText,
+} from '../embeddings';
 
 afterEach(() => {
   vi.clearAllMocks();

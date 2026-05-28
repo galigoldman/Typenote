@@ -24,6 +24,7 @@
 ### Task 1: Evidence-quote + citation instruction in the system prompt
 
 **Files:**
+
 - Modify: `src/lib/ai/prompts.ts` (function `buildSystemPrompt`, the `## RESPONSE GUIDELINES` block)
 - Test: `src/lib/ai/__tests__/prompts.test.ts` (create if missing)
 
@@ -108,6 +109,7 @@ Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>"
 ### Task 2: Harden `MarkdownResponse` (KaTeX errors + RTL)
 
 **Files:**
+
 - Modify: `src/components/ai/markdown-response.tsx`
 - Test: `src/components/ai/__tests__/markdown-response.test.tsx`
 
@@ -119,10 +121,9 @@ Append to `src/components/ai/__tests__/markdown-response.test.tsx` (before the f
 describe('MarkdownResponse — resilience & RTL', () => {
   it('does not throw on a malformed/unterminated LaTeX fragment', () => {
     // A broken quote fragment a chunk boundary could produce.
-    const content = 'Here is the proof:\n\n$$\n\\frac{-b \\pm \\sqrt{b^2\n$$\n\nend';
-    expect(() =>
-      render(<MarkdownResponse content={content} />),
-    ).not.toThrow();
+    const content =
+      'Here is the proof:\n\n$$\n\\frac{-b \\pm \\sqrt{b^2\n$$\n\nend';
+    expect(() => render(<MarkdownResponse content={content} />)).not.toThrow();
   });
 
   it('sets dir="auto" so Hebrew renders right-to-left', () => {
@@ -144,19 +145,19 @@ Expected: FAIL — the malformed-math test throws (KaTeX default `throwOnError:t
 Replace the body of the component (the `return (...)`) in `src/components/ai/markdown-response.tsx` with:
 
 ```tsx
-  return (
-    <div
-      dir="auto"
-      className="prose prose-sm dark:prose-invert max-w-none leading-relaxed [&>*:first-child]:mt-0 [&>*:last-child]:mb-0"
+return (
+  <div
+    dir="auto"
+    className="prose prose-sm dark:prose-invert max-w-none leading-relaxed [&>*:first-child]:mt-0 [&>*:last-child]:mb-0"
+  >
+    <Markdown
+      remarkPlugins={[remarkMath]}
+      rehypePlugins={[[rehypeKatex, { throwOnError: false, strict: false }]]}
     >
-      <Markdown
-        remarkPlugins={[remarkMath]}
-        rehypePlugins={[[rehypeKatex, { throwOnError: false, strict: false }]]}
-      >
-        {content}
-      </Markdown>
-    </div>
-  );
+      {content}
+    </Markdown>
+  </div>
+);
 ```
 
 - [ ] **Step 4: Run the tests to verify they pass**
