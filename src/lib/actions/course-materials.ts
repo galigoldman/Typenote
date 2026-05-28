@@ -34,6 +34,28 @@ export async function createCourseMaterial(data: {
     .select()
     .single();
   if (error) throw new Error(error.message);
+
+  // Index for AI search so the material is searchable and citable.
+  // Awaited (not fire-and-forget): serverless freezes drop detached promises.
+  const embeddable =
+    data.mime_type === 'application/pdf' ||
+    data.mime_type.includes('wordprocessingml') ||
+    data.mime_type === 'application/msword' ||
+    data.mime_type.includes('presentationml') ||
+    data.mime_type.includes('powerpoint');
+  if (embeddable) {
+    const { indexContent } = await import('./ai-context');
+    try {
+      await indexContent({
+        type: 'course_material',
+        materialId: material.id,
+        courseId: data.course_id,
+      });
+    } catch (err) {
+      console.error('Course material indexing failed:', err);
+    }
+  }
+
   revalidatePath('/dashboard');
   return material;
 }
