@@ -278,6 +278,18 @@ Test lives in `src/__tests__/integration/storage-rls.integration.test.ts`. Verif
 
 ---
 
+## Evidence Citations (`e2e/evidence-citations.spec.ts`) — IMPLEMENTED
+
+Covers the **evidence-quote + jump-to-page citation** flow introduced in the
+evidence-citations feature (Phase 2). The AI endpoint is mocked with an SSE stub
+so no live Gemini key is required and the test runs unconditionally in CI.
+
+- [x] Mocked AI response with a blockquote renders a `<blockquote>` element containing the quoted text
+- [x] Citation badge (`data-testid="ai-citation"`) displays the source file name (`lecture-1-slides.pdf`) and page reference (`p. 7`)
+- [x] Clicking the citation badge opens the file viewer (`data-testid="file-viewer"`)
+
+---
+
 ## Summary
 
 | Feature               | Status      | Spec File                                | Tests      |
@@ -298,11 +310,12 @@ Test lives in `src/__tests__/integration/storage-rls.integration.test.ts`. Verif
 | Moodle Ext Gating     | Implemented | `e2e/moodle-touch-gating.spec.ts`        | 2/2        |
 | Extension Real Load   | Implemented | `e2e/extension-real.spec.ts`             | 3/3        |
 | Document Focus Files  | Implemented | `e2e/document-context-files.spec.ts`     | 5/5        |
+| Evidence Citations    | Implemented | `e2e/evidence-citations.spec.ts`         | 1/1        |
 | Homework AI Context   | Removed     | (deleted)                                | —          |
 | Version History       | Planned     | `e2e/version-history.spec.ts`            | 0/5        |
 | PDF Visual Regression | Implemented | `e2e/pdf-visual-regression.spec.ts`      | 8/8        |
 | Course Sharing        | Implemented | `e2e/sharing.spec.ts`                    | 3/5        |
-| **Total**             |             |                                          | **96/106** |
+| **Total**             |             |                                          | **97/107** |
 
 ---
 
