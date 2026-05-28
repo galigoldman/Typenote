@@ -12,7 +12,10 @@ vi.mock('next/cache', () => ({ revalidatePath: vi.fn() }));
 vi.mock('@/lib/supabase/server', () => ({
   createClient: vi.fn(async () => ({
     auth: {
-      getUser: vi.fn(async () => ({ data: { user: { id: 'u1' } }, error: null })),
+      getUser: vi.fn(async () => ({
+        data: { user: { id: 'u1' } },
+        error: null,
+      })),
     },
     from: vi.fn(() => ({
       insert: vi.fn(() => ({

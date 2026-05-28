@@ -29,13 +29,14 @@
 
 ### Task 1: REMOVED — no page-count guard (trust Gemini's page numbers)
 
-This task originally added `pdf-lib` + `getPdfPageCount` to cross-check Gemini's structured page count against the real PDF page count, falling back to page-less chunking on mismatch. **Dropped** because: (a) it would add a brand-new dependency; (b) the strict count-equality guard is counterproductive — Gemini correctly omits text-less image slides while keeping the *right* page numbers for the rest, so a deck with image slides returns fewer page-objects than the real count and the guard would wrongly downgrade the whole deck to page-less; (c) Gemini sees the actual PDF, so gross misnumbering is rare and the worst realistic case (off-by-one) is recoverable and still better than today's no-page. `extractPdfPages` already validates each `page` is an integer and sorts — that pure-code check is sufficient for v1. A range/monotonicity guard can be added later if misnumbering is observed in practice. **Start execution at Task 2.**
+This task originally added `pdf-lib` + `getPdfPageCount` to cross-check Gemini's structured page count against the real PDF page count, falling back to page-less chunking on mismatch. **Dropped** because: (a) it would add a brand-new dependency; (b) the strict count-equality guard is counterproductive — Gemini correctly omits text-less image slides while keeping the _right_ page numbers for the rest, so a deck with image slides returns fewer page-objects than the real count and the guard would wrongly downgrade the whole deck to page-less; (c) Gemini sees the actual PDF, so gross misnumbering is rare and the worst realistic case (off-by-one) is recoverable and still better than today's no-page. `extractPdfPages` already validates each `page` is an integer and sorts — that pure-code check is sufficient for v1. A range/monotonicity guard can be added later if misnumbering is observed in practice. **Start execution at Task 2.**
 
 ---
 
 ### Task 2: Structured per-page extraction (`extractPdfPages`)
 
 **Files:**
+
 - Modify: `src/lib/ai/extraction/pdf.ts`
 - Test: `src/lib/ai/extraction/__tests__/pdf.test.ts`
 
@@ -218,6 +219,7 @@ Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>"
 ### Task 3: Math-aware, page-tagged chunker
 
 **Files:**
+
 - Modify: `src/lib/ai/embeddings.ts`
 - Test: `src/lib/ai/__tests__/embeddings.test.ts`
 
@@ -374,7 +376,9 @@ function splitText(text: string): string[] {
   while (start < t.length) {
     const hardEnd = Math.min(start + CHUNK_CHAR_BUDGET, t.length);
     const end =
-      hardEnd >= t.length ? t.length : findSafeBoundary(t, spans, start, hardEnd);
+      hardEnd >= t.length
+        ? t.length
+        : findSafeBoundary(t, spans, start, hardEnd);
     const piece = t.slice(start, end).trim();
     if (piece) out.push(piece);
     if (end >= t.length) break;
@@ -396,7 +400,12 @@ export function chunkPages(pages: PageText[]): PageChunk[] {
   const flush = () => {
     const t = buf.trim();
     if (t) {
-      chunks.push({ text: t, chunkIndex: idx++, pageStart: bufStart, pageEnd: bufEnd });
+      chunks.push({
+        text: t,
+        chunkIndex: idx++,
+        pageStart: bufStart,
+        pageEnd: bufEnd,
+      });
     }
     buf = '';
     bufStart = null;
@@ -411,7 +420,12 @@ export function chunkPages(pages: PageText[]): PageChunk[] {
     if (text.length > CHUNK_CHAR_BUDGET) {
       flush();
       for (const part of splitText(text)) {
-        chunks.push({ text: part, chunkIndex: idx++, pageStart: page0, pageEnd: page0 });
+        chunks.push({
+          text: part,
+          chunkIndex: idx++,
+          pageStart: page0,
+          pageEnd: page0,
+        });
       }
       continue;
     }
@@ -455,6 +469,7 @@ Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>"
 ### Task 4: Wire pages through `indexContent` (+ validation guard)
 
 **Files:**
+
 - Modify: `src/lib/actions/ai-context.ts` (function `indexContent`, the extract→chunk→embed block, ~lines 251-307)
 - Test: `src/lib/actions/__tests__/ai-context.test.ts`
 
@@ -491,38 +506,40 @@ vi.mock('@/lib/ai/extraction/pdf', () => ({
     { page: 1, text: 'PDF page one with $x^2$ math' },
     { page: 2, text: 'PDF page two' },
   ]),
-  extractPdfText: vi.fn(async () => 'PDF page one with $x^2$ math\n\nPDF page two'),
+  extractPdfText: vi.fn(
+    async () => 'PDF page one with $x^2$ math\n\nPDF page two',
+  ),
 }));
 ```
 
 (c) Replace the first `indexContent` test body ("extracts text from PDF and embeds as text") with:
 
 ```ts
-  it('extracts per-page text and stores 0-indexed page numbers', async () => {
-    const result = await indexContent({
-      type: 'course_material',
-      materialId: 'mat-1',
-      courseId: 'course-1',
-    });
-
-    expect(result.success).toBe(true);
-    expect(result.segmentsIndexed).toBe(2);
-    expect(upsertEmbeddings).toHaveBeenCalledWith(
-      expect.arrayContaining([
-        expect.objectContaining({
-          source_type: 'course_material',
-          segment_text: 'PDF page one with $x^2$ math',
-          page_start: 0,
-          page_end: 0,
-        }),
-        expect.objectContaining({
-          segment_text: 'PDF page two',
-          page_start: 1,
-          page_end: 1,
-        }),
-      ]),
-    );
+it('extracts per-page text and stores 0-indexed page numbers', async () => {
+  const result = await indexContent({
+    type: 'course_material',
+    materialId: 'mat-1',
+    courseId: 'course-1',
   });
+
+  expect(result.success).toBe(true);
+  expect(result.segmentsIndexed).toBe(2);
+  expect(upsertEmbeddings).toHaveBeenCalledWith(
+    expect.arrayContaining([
+      expect.objectContaining({
+        source_type: 'course_material',
+        segment_text: 'PDF page one with $x^2$ math',
+        page_start: 0,
+        page_end: 0,
+      }),
+      expect.objectContaining({
+        segment_text: 'PDF page two',
+        page_start: 1,
+        page_end: 1,
+      }),
+    ]),
+  );
+});
 ```
 
 Also update the import line `import { extractPdfText } from '@/lib/ai/extraction/pdf';` to `import { extractPdfPages } from '@/lib/ai/extraction/pdf';` and remove any now-unused `extractPdfText` assertions.
@@ -552,58 +569,58 @@ import { extractPdfPages } from '@/lib/ai/extraction/pdf';
 (b) Replace the extraction+chunking block (from `// Extract text from file` through the `const chunks = chunkText(text);` and the row-building `for` loop) with:
 
 ```ts
-    // Extract + chunk with page tags.
-    const isPdfLike =
-      mimeType === 'application/pdf' ||
-      mimeType.includes('presentationml') ||
-      mimeType.includes('powerpoint');
-    const isDocx =
-      mimeType.includes('wordprocessingml') || mimeType === 'application/msword';
+// Extract + chunk with page tags.
+const isPdfLike =
+  mimeType === 'application/pdf' ||
+  mimeType.includes('presentationml') ||
+  mimeType.includes('powerpoint');
+const isDocx =
+  mimeType.includes('wordprocessingml') || mimeType === 'application/msword';
 
-    let chunks: PageChunk[] = [];
+let chunks: PageChunk[] = [];
 
-    if (isPdfLike) {
-      const pages = await extractPdfPages(fileBuffer);
-      // Trust Gemini's reported 1-based page numbers (it reads the real PDF).
-      // extractPdfPages already drops non-integer pages and sorts; an empty
-      // result means nothing extractable, so produce no chunks.
-      chunks = pages.length > 0 ? chunkPages(pages) : [];
-    } else if (isDocx) {
-      const text = await extractDocxText(fileBuffer);
-      chunks = chunkFlatText(text);
-    } else {
-      return {
-        success: false,
-        segmentsIndexed: 0,
-        skipped: false,
-        error: `Unsupported mime type: ${mimeType}`,
-      };
-    }
+if (isPdfLike) {
+  const pages = await extractPdfPages(fileBuffer);
+  // Trust Gemini's reported 1-based page numbers (it reads the real PDF).
+  // extractPdfPages already drops non-integer pages and sorts; an empty
+  // result means nothing extractable, so produce no chunks.
+  chunks = pages.length > 0 ? chunkPages(pages) : [];
+} else if (isDocx) {
+  const text = await extractDocxText(fileBuffer);
+  chunks = chunkFlatText(text);
+} else {
+  return {
+    success: false,
+    segmentsIndexed: 0,
+    skipped: false,
+    error: `Unsupported mime type: ${mimeType}`,
+  };
+}
 
-    if (chunks.length === 0) {
-      return { success: true, segmentsIndexed: 0, skipped: true };
-    }
+if (chunks.length === 0) {
+  return { success: true, segmentsIndexed: 0, skipped: true };
+}
 
-    const rows: EmbeddingRow[] = [];
-    for (const chunk of chunks) {
-      const embedding = await embedText(chunk.text);
-      if (!embedding.length) continue;
+const rows: EmbeddingRow[] = [];
+for (const chunk of chunks) {
+  const embedding = await embedText(chunk.text);
+  if (!embedding.length) continue;
 
-      rows.push({
-        source_type: sourceType,
-        source_id: sourceId,
-        segment_index: chunk.chunkIndex,
-        page_start: chunk.pageStart,
-        page_end: chunk.pageEnd,
-        segment_text: chunk.text,
-        embedding,
-        user_id: userId,
-        course_id: courseId,
-        source_name: sourceName,
-        mime_type: mimeType,
-        content_hash: hash,
-      });
-    }
+  rows.push({
+    source_type: sourceType,
+    source_id: sourceId,
+    segment_index: chunk.chunkIndex,
+    page_start: chunk.pageStart,
+    page_end: chunk.pageEnd,
+    segment_text: chunk.text,
+    embedding,
+    user_id: userId,
+    course_id: courseId,
+    source_name: sourceName,
+    mime_type: mimeType,
+    content_hash: hash,
+  });
+}
 ```
 
 (Leave the surrounding code — the `if (!rows.length)` skip, `upsertEmbeddings(rows)`, and the success return — unchanged.)
@@ -627,6 +644,7 @@ Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>"
 ### Task 5: Index course materials on upload (await — serverless-safe)
 
 **Files:**
+
 - Modify: `src/lib/actions/course-materials.ts` (function `createCourseMaterial`)
 - Test: `src/lib/actions/__tests__/course-materials.test.ts` (create)
 
@@ -651,7 +669,10 @@ vi.mock('next/cache', () => ({ revalidatePath: vi.fn() }));
 vi.mock('@/lib/supabase/server', () => ({
   createClient: vi.fn(async () => ({
     auth: {
-      getUser: vi.fn(async () => ({ data: { user: { id: 'u1' } }, error: null })),
+      getUser: vi.fn(async () => ({
+        data: { user: { id: 'u1' } },
+        error: null,
+      })),
     },
     from: vi.fn(() => ({
       insert: vi.fn(() => ({
@@ -711,31 +732,31 @@ Expected: FAIL (`indexContent` is never called today).
 In `src/lib/actions/course-materials.ts`, replace the tail of `createCourseMaterial` (from `if (error) throw new Error(error.message);` to `return material;`) with:
 
 ```ts
-  if (error) throw new Error(error.message);
+if (error) throw new Error(error.message);
 
-  // Index for AI search so the material is searchable and citable.
-  // Awaited (not fire-and-forget): serverless freezes drop detached promises.
-  const embeddable =
-    data.mime_type === 'application/pdf' ||
-    data.mime_type.includes('wordprocessingml') ||
-    data.mime_type === 'application/msword' ||
-    data.mime_type.includes('presentationml') ||
-    data.mime_type.includes('powerpoint');
-  if (embeddable) {
-    const { indexContent } = await import('./ai-context');
-    try {
-      await indexContent({
-        type: 'course_material',
-        materialId: material.id,
-        courseId: data.course_id,
-      });
-    } catch (err) {
-      console.error('Course material indexing failed:', err);
-    }
+// Index for AI search so the material is searchable and citable.
+// Awaited (not fire-and-forget): serverless freezes drop detached promises.
+const embeddable =
+  data.mime_type === 'application/pdf' ||
+  data.mime_type.includes('wordprocessingml') ||
+  data.mime_type === 'application/msword' ||
+  data.mime_type.includes('presentationml') ||
+  data.mime_type.includes('powerpoint');
+if (embeddable) {
+  const { indexContent } = await import('./ai-context');
+  try {
+    await indexContent({
+      type: 'course_material',
+      materialId: material.id,
+      courseId: data.course_id,
+    });
+  } catch (err) {
+    console.error('Course material indexing failed:', err);
   }
+}
 
-  revalidatePath('/dashboard');
-  return material;
+revalidatePath('/dashboard');
+return material;
 ```
 
 > Note: the test mocks `../ai-context` statically, so the dynamic `import('./ai-context')` resolves to the mock. If the test runner can't intercept the dynamic import in your setup, change the implementation to a top-level `import { indexContent } from './ai-context';` — `course-materials.ts` and `ai-context.ts` don't import each other, so there's no cycle.
@@ -761,6 +782,7 @@ Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>"
 **Why this task exists:** The three Moodle routes and `addPersonalFile` currently fire `indexContent(...)` **without awaiting** and return the HTTP response immediately. On Vercel the function can freeze after responding, dropping the in-flight Gemini extraction+embedding — so the file lands in storage but **never gets a vector**, and the AI literally cannot find it. This is a primary cause of "Moodle files aren't embedded / the AI can't find them." Fix: await the call (logging, not failing, on error) exactly like Task 5 does for course materials.
 
 **Files:**
+
 - Modify: `src/app/api/moodle/upload/route.ts` (2 call sites)
 - Modify: `src/app/api/moodle/upload-finalize/route.ts` (2 call sites)
 - Modify: `src/app/api/moodle/import-existing/route.ts` (1 call site)
@@ -774,42 +796,45 @@ Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>"
 In `src/app/api/moodle/import-existing/route.test.ts`, add this test inside the main `describe` (it uses a deferred promise to prove the response does not resolve until `indexContent` settles):
 
 ```ts
-  it('awaits indexing before returning the response', async () => {
-    const admin = buildAdmin({
-      file: {
-        id: 'file-1',
-        storage_path: 'm.org/c1/abc.pdf',
-        content_hash: 'h',
-        file_size: 1,
-        mime_type: 'application/pdf',
-      },
-    });
-    setupAuth(admin);
-
-    let resolveIndex!: () => void;
-    const gate = new Promise<{ success: boolean; segmentsIndexed: number; skipped: boolean }>(
-      (resolve) => {
-        resolveIndex = () => resolve({ success: true, segmentsIndexed: 1, skipped: false });
-      },
-    );
-    vi.mocked(indexContent).mockReturnValueOnce(gate);
-
-    const respPromise = POST(makeRequest(body) as never);
-
-    // Let microtasks run: indexContent should have been dispatched...
-    await new Promise((r) => setImmediate(r));
-    let settled = false;
-    void respPromise.then(() => {
-      settled = true;
-    });
-    await new Promise((r) => setImmediate(r));
-    // ...but the response must NOT have resolved yet (proves we await).
-    expect(settled).toBe(false);
-
-    resolveIndex();
-    const res = await respPromise;
-    expect(res.status).toBe(200);
+it('awaits indexing before returning the response', async () => {
+  const admin = buildAdmin({
+    file: {
+      id: 'file-1',
+      storage_path: 'm.org/c1/abc.pdf',
+      content_hash: 'h',
+      file_size: 1,
+      mime_type: 'application/pdf',
+    },
   });
+  setupAuth(admin);
+
+  let resolveIndex!: () => void;
+  const gate = new Promise<{
+    success: boolean;
+    segmentsIndexed: number;
+    skipped: boolean;
+  }>((resolve) => {
+    resolveIndex = () =>
+      resolve({ success: true, segmentsIndexed: 1, skipped: false });
+  });
+  vi.mocked(indexContent).mockReturnValueOnce(gate);
+
+  const respPromise = POST(makeRequest(body) as never);
+
+  // Let microtasks run: indexContent should have been dispatched...
+  await new Promise((r) => setImmediate(r));
+  let settled = false;
+  void respPromise.then(() => {
+    settled = true;
+  });
+  await new Promise((r) => setImmediate(r));
+  // ...but the response must NOT have resolved yet (proves we await).
+  expect(settled).toBe(false);
+
+  resolveIndex();
+  const res = await respPromise;
+  expect(res.status).toBe(200);
+});
 ```
 
 > If `buildAdmin`/`setupAuth`/`makeRequest`/`body` differ in the existing file, reuse that file's exact helpers — do not invent new ones. The key assertion is `settled === false` before `resolveIndex()`.
@@ -824,35 +849,35 @@ Expected: FAIL — today the route fires `indexContent(...).catch(...)` and retu
 Replace this block:
 
 ```ts
-    if (appCourseId) {
-      // Fire-and-forget. indexContent itself short-circuits on a content
-      // hash match, so re-imports don't re-embed.
-      indexContent({
-        type: 'moodle_file',
-        fileId: file.id,
-        courseId: appCourseId,
-      }).catch((err) => console.error('Index failed:', err));
-    }
+if (appCourseId) {
+  // Fire-and-forget. indexContent itself short-circuits on a content
+  // hash match, so re-imports don't re-embed.
+  indexContent({
+    type: 'moodle_file',
+    fileId: file.id,
+    courseId: appCourseId,
+  }).catch((err) => console.error('Index failed:', err));
+}
 ```
 
 with:
 
 ```ts
-    if (appCourseId) {
-      // Awaited (not fire-and-forget): a detached promise is dropped when the
-      // serverless function freezes after responding, leaving the file
-      // un-embedded and unfindable. indexContent short-circuits on a content
-      // hash match, so re-imports stay cheap. Failure is logged, not fatal.
-      try {
-        await indexContent({
-          type: 'moodle_file',
-          fileId: file.id,
-          courseId: appCourseId,
-        });
-      } catch (err) {
-        console.error('Index failed:', err);
-      }
-    }
+if (appCourseId) {
+  // Awaited (not fire-and-forget): a detached promise is dropped when the
+  // serverless function freezes after responding, leaving the file
+  // un-embedded and unfindable. indexContent short-circuits on a content
+  // hash match, so re-imports stay cheap. Failure is logged, not fatal.
+  try {
+    await indexContent({
+      type: 'moodle_file',
+      fileId: file.id,
+      courseId: appCourseId,
+    });
+  } catch (err) {
+    console.error('Index failed:', err);
+  }
+}
 ```
 
 - [ ] **Step 4: Implement — `src/app/api/moodle/upload/route.ts` (both sites)**
@@ -860,32 +885,32 @@ with:
 There are two identical fire-and-forget blocks (one for the updated `fileRecord`, one for the inserted `newRecord`). Replace each:
 
 ```ts
-      // Index for AI search (fire-and-forget)
-      if (appCourseId) {
-        indexContent({
-          type: 'moodle_file',
-          fileId: fileRecord.id,
-          courseId: appCourseId,
-        }).catch((err) => console.error('Index failed:', err));
-      }
+// Index for AI search (fire-and-forget)
+if (appCourseId) {
+  indexContent({
+    type: 'moodle_file',
+    fileId: fileRecord.id,
+    courseId: appCourseId,
+  }).catch((err) => console.error('Index failed:', err));
+}
 ```
 
 with (await + try/catch; the second site uses `newRecord.id` — change `fileRecord.id` accordingly):
 
 ```ts
-      // Index for AI search. Awaited (not fire-and-forget): detached promises
-      // are dropped on serverless freeze, leaving the file unfindable.
-      if (appCourseId) {
-        try {
-          await indexContent({
-            type: 'moodle_file',
-            fileId: fileRecord.id,
-            courseId: appCourseId,
-          });
-        } catch (err) {
-          console.error('Index failed:', err);
-        }
-      }
+// Index for AI search. Awaited (not fire-and-forget): detached promises
+// are dropped on serverless freeze, leaving the file unfindable.
+if (appCourseId) {
+  try {
+    await indexContent({
+      type: 'moodle_file',
+      fileId: fileRecord.id,
+      courseId: appCourseId,
+    });
+  } catch (err) {
+    console.error('Index failed:', err);
+  }
+}
 ```
 
 - [ ] **Step 5: Implement — `src/app/api/moodle/upload-finalize/route.ts` (both sites)**
@@ -893,17 +918,17 @@ with (await + try/catch; the second site uses `newRecord.id` — change `fileRec
 Identical change to the two blocks there (one uses `fileRecord.id`, the other `newRecord.id`):
 
 ```ts
-      if (appCourseId) {
-        try {
-          await indexContent({
-            type: 'moodle_file',
-            fileId: fileRecord.id,
-            courseId: appCourseId,
-          });
-        } catch (err) {
-          console.error('Index failed:', err);
-        }
-      }
+if (appCourseId) {
+  try {
+    await indexContent({
+      type: 'moodle_file',
+      fileId: fileRecord.id,
+      courseId: appCourseId,
+    });
+  } catch (err) {
+    console.error('Index failed:', err);
+  }
+}
 ```
 
 - [ ] **Step 6: Implement — `src/lib/actions/personal-files.ts` (`addPersonalFile`)**
@@ -911,33 +936,33 @@ Identical change to the two blocks there (one uses `fileRecord.id`, the other `n
 Replace:
 
 ```ts
-  if (embeddable) {
-    const { indexContent } = await import('@/lib/actions/ai-context');
-    void indexContent({
-      type: 'personal_file',
-      fileId: file.id,
-      courseId: data.courseId,
-    });
-  }
+if (embeddable) {
+  const { indexContent } = await import('@/lib/actions/ai-context');
+  void indexContent({
+    type: 'personal_file',
+    fileId: file.id,
+    courseId: data.courseId,
+  });
+}
 ```
 
 with:
 
 ```ts
-  if (embeddable) {
-    // Awaited (not fire-and-forget): detached promises are dropped on
-    // serverless freeze, leaving the file un-embedded and unfindable.
-    const { indexContent } = await import('@/lib/actions/ai-context');
-    try {
-      await indexContent({
-        type: 'personal_file',
-        fileId: file.id,
-        courseId: data.courseId,
-      });
-    } catch (err) {
-      console.error('Personal file indexing failed:', err);
-    }
+if (embeddable) {
+  // Awaited (not fire-and-forget): detached promises are dropped on
+  // serverless freeze, leaving the file un-embedded and unfindable.
+  const { indexContent } = await import('@/lib/actions/ai-context');
+  try {
+    await indexContent({
+      type: 'personal_file',
+      fileId: file.id,
+      courseId: data.courseId,
+    });
+  } catch (err) {
+    console.error('Personal file indexing failed:', err);
   }
+}
 ```
 
 - [ ] **Step 7: Verify no fire-and-forget indexing remains**
@@ -968,6 +993,7 @@ Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>"
 ### Task 6: Retrieval — multiple chunks per file + per-(source,page) citations
 
 **Files:**
+
 - Modify: `src/lib/actions/ai-context.ts` (`buildAiContext`: the dedupe loop + signed-URL fetch, ~lines 581-700; bump `match_count`)
 - Test: `src/lib/actions/__tests__/ai-context.test.ts`
 
@@ -1029,143 +1055,145 @@ const MAX_CHUNKS_PER_SOURCE = 3;
 Bump the course-wide retrieval to 12 — change the `courseResults` call:
 
 ```ts
-  const courseResults = courseId
-    ? await searchContext({ query: question, courseId, maxResults: 12 })
-    : [];
+const courseResults = courseId
+  ? await searchContext({ query: question, courseId, maxResults: 12 })
+  : [];
 ```
 
 Replace the entire block from `const contextTexts: string[] = [];` (the `seen` dedupe loop) **through** the end of the `await Promise.all(sourceIds.map(...))` signed-URL block with:
 
 ```ts
-  const contextTexts: string[] = [];
-  const sources: QuestionResult['sources'] = [];
-  const perSourceCount = new Map<string, number>();
-  const seenChunk = new Set<string>();
-  const seenCitation = new Set<string>();
-  // sourceId -> { sourceType, idxs: indices in `sources` that share this file's URL }
-  const citationsBySource = new Map<
-    string,
-    { sourceType: string; idxs: number[] }
-  >();
+const contextTexts: string[] = [];
+const sources: QuestionResult['sources'] = [];
+const perSourceCount = new Map<string, number>();
+const seenChunk = new Set<string>();
+const seenCitation = new Set<string>();
+// sourceId -> { sourceType, idxs: indices in `sources` that share this file's URL }
+const citationsBySource = new Map<
+  string,
+  { sourceType: string; idxs: number[] }
+>();
 
-  const pageRangeOf = (r: SearchResult): string | null =>
-    r.pageStart != null
-      ? r.pageEnd != null && r.pageEnd !== r.pageStart
-        ? `p. ${r.pageStart + 1}–${r.pageEnd + 1}`
-        : `p. ${r.pageStart + 1}`
-      : null;
+const pageRangeOf = (r: SearchResult): string | null =>
+  r.pageStart != null
+    ? r.pageEnd != null && r.pageEnd !== r.pageStart
+      ? `p. ${r.pageStart + 1}–${r.pageEnd + 1}`
+      : `p. ${r.pageStart + 1}`
+    : null;
 
-  for (const r of results) {
-    if (!r.segmentText) continue;
-    const chunkKey = String(r.id);
-    if (seenChunk.has(chunkKey)) continue;
-    const count = perSourceCount.get(r.sourceId) ?? 0;
-    if (count >= MAX_CHUNKS_PER_SOURCE) continue;
-    seenChunk.add(chunkKey);
-    perSourceCount.set(r.sourceId, count + 1);
+for (const r of results) {
+  if (!r.segmentText) continue;
+  const chunkKey = String(r.id);
+  if (seenChunk.has(chunkKey)) continue;
+  const count = perSourceCount.get(r.sourceId) ?? 0;
+  if (count >= MAX_CHUNKS_PER_SOURCE) continue;
+  seenChunk.add(chunkKey);
+  perSourceCount.set(r.sourceId, count + 1);
 
-    const pageRange = pageRangeOf(r);
-    const header = pageRange
-      ? `--- ${r.sourceName} (${pageRange}) ---`
-      : `--- ${r.sourceName} ---`;
-    contextTexts.push(`${header}\n${r.segmentText}`);
+  const pageRange = pageRangeOf(r);
+  const header = pageRange
+    ? `--- ${r.sourceName} (${pageRange}) ---`
+    : `--- ${r.sourceName} ---`;
+  contextTexts.push(`${header}\n${r.segmentText}`);
 
-    const citationKey = `${r.sourceId}|${pageRange ?? ''}`;
-    if (!seenCitation.has(citationKey)) {
-      seenCitation.add(citationKey);
-      sources.push({
-        sourceType: r.sourceType,
-        sourceId: r.sourceId,
-        sourceName: r.sourceName,
-        pageRange,
-        signedUrl: null,
-      });
-      const idx = sources.length - 1;
-      const entry = citationsBySource.get(r.sourceId) ?? {
-        sourceType: r.sourceType,
-        idxs: [],
-      };
-      entry.idxs.push(idx);
-      citationsBySource.set(r.sourceId, entry);
-    }
+  const citationKey = `${r.sourceId}|${pageRange ?? ''}`;
+  if (!seenCitation.has(citationKey)) {
+    seenCitation.add(citationKey);
+    sources.push({
+      sourceType: r.sourceType,
+      sourceId: r.sourceId,
+      sourceName: r.sourceName,
+      pageRange,
+      signedUrl: null,
+    });
+    const idx = sources.length - 1;
+    const entry = citationsBySource.get(r.sourceId) ?? {
+      sourceType: r.sourceType,
+      idxs: [],
+    };
+    entry.idxs.push(idx);
+    citationsBySource.set(r.sourceId, entry);
   }
+}
 
-  // One signed URL per distinct file, fanned out to all its (page) citations.
-  const distinct = [...citationsBySource.entries()].map(
-    ([sourceId, v]) => ({ sourceId, sourceType: v.sourceType, idxs: v.idxs }),
-  );
-  const moodleIds = distinct
-    .filter((s) => s.sourceType === 'moodle_file')
-    .map((s) => s.sourceId);
-  const materialIds = distinct
-    .filter((s) => s.sourceType === 'course_material')
-    .map((s) => s.sourceId);
-  const personalIds = distinct
-    .filter((s) => s.sourceType === 'personal_file')
-    .map((s) => s.sourceId);
+// One signed URL per distinct file, fanned out to all its (page) citations.
+const distinct = [...citationsBySource.entries()].map(([sourceId, v]) => ({
+  sourceId,
+  sourceType: v.sourceType,
+  idxs: v.idxs,
+}));
+const moodleIds = distinct
+  .filter((s) => s.sourceType === 'moodle_file')
+  .map((s) => s.sourceId);
+const materialIds = distinct
+  .filter((s) => s.sourceType === 'course_material')
+  .map((s) => s.sourceId);
+const personalIds = distinct
+  .filter((s) => s.sourceType === 'personal_file')
+  .map((s) => s.sourceId);
 
-  const moodlePaths: Record<string, string> = {};
-  const materialPaths: Record<string, string> = {};
-  const personalPaths: Record<string, string> = {};
+const moodlePaths: Record<string, string> = {};
+const materialPaths: Record<string, string> = {};
+const personalPaths: Record<string, string> = {};
 
-  if (moodleIds.length > 0) {
-    const { data } = await admin
-      .from('moodle_files')
-      .select('id, storage_path')
-      .in('id', moodleIds);
-    for (const row of (data ?? []) as {
-      id: string;
-      storage_path: string | null;
-    }[]) {
-      if (row.storage_path) moodlePaths[row.id] = row.storage_path;
-    }
+if (moodleIds.length > 0) {
+  const { data } = await admin
+    .from('moodle_files')
+    .select('id, storage_path')
+    .in('id', moodleIds);
+  for (const row of (data ?? []) as {
+    id: string;
+    storage_path: string | null;
+  }[]) {
+    if (row.storage_path) moodlePaths[row.id] = row.storage_path;
   }
-  if (materialIds.length > 0) {
-    const { data } = await supabase
-      .from('course_materials')
-      .select('id, storage_path')
-      .in('id', materialIds);
-    for (const row of (data ?? []) as { id: string; storage_path: string }[]) {
-      materialPaths[row.id] = row.storage_path;
-    }
+}
+if (materialIds.length > 0) {
+  const { data } = await supabase
+    .from('course_materials')
+    .select('id, storage_path')
+    .in('id', materialIds);
+  for (const row of (data ?? []) as { id: string; storage_path: string }[]) {
+    materialPaths[row.id] = row.storage_path;
   }
-  if (personalIds.length > 0) {
-    const { data } = await supabase
-      .from('personal_files')
-      .select('id, storage_path')
-      .in('id', personalIds);
-    for (const row of (data ?? []) as { id: string; storage_path: string }[]) {
-      personalPaths[row.id] = row.storage_path;
-    }
+}
+if (personalIds.length > 0) {
+  const { data } = await supabase
+    .from('personal_files')
+    .select('id, storage_path')
+    .in('id', personalIds);
+  for (const row of (data ?? []) as { id: string; storage_path: string }[]) {
+    personalPaths[row.id] = row.storage_path;
   }
+}
 
-  await Promise.all(
-    distinct.map(async ({ sourceId, sourceType, idxs }) => {
-      const bucket =
-        sourceType === 'moodle_file'
-          ? 'moodle-materials'
-          : sourceType === 'course_material'
-            ? 'course-materials'
-            : sourceType === 'personal_file'
-              ? 'personal-files'
-              : null;
-      const path =
-        sourceType === 'moodle_file'
-          ? moodlePaths[sourceId]
-          : sourceType === 'course_material'
-            ? materialPaths[sourceId]
-            : sourceType === 'personal_file'
-              ? personalPaths[sourceId]
-              : null;
-      if (!bucket || !path) return;
-      const client = bucket === 'moodle-materials' ? admin : supabase;
-      const { data } = await client.storage
-        .from(bucket)
-        .createSignedUrl(path, 3600);
-      const url = data?.signedUrl ?? null;
-      for (const idx of idxs) sources[idx].signedUrl = url;
-    }),
-  );
+await Promise.all(
+  distinct.map(async ({ sourceId, sourceType, idxs }) => {
+    const bucket =
+      sourceType === 'moodle_file'
+        ? 'moodle-materials'
+        : sourceType === 'course_material'
+          ? 'course-materials'
+          : sourceType === 'personal_file'
+            ? 'personal-files'
+            : null;
+    const path =
+      sourceType === 'moodle_file'
+        ? moodlePaths[sourceId]
+        : sourceType === 'course_material'
+          ? materialPaths[sourceId]
+          : sourceType === 'personal_file'
+            ? personalPaths[sourceId]
+            : null;
+    if (!bucket || !path) return;
+    const client = bucket === 'moodle-materials' ? admin : supabase;
+    const { data } = await client.storage
+      .from(bucket)
+      .createSignedUrl(path, 3600);
+    const url = data?.signedUrl ?? null;
+    for (const idx of idxs) sources[idx].signedUrl = url;
+  }),
+);
 ```
 
 - [ ] **Step 4: Run the tests to verify they pass**
@@ -1187,6 +1215,7 @@ Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>"
 ### Task 7: Delete the dead `askQuestion` builder
 
 **Files:**
+
 - Modify: `src/lib/actions/ai-context.ts` (remove `askQuestion`)
 - Modify: `src/lib/actions/__tests__/ai-context.test.ts` (remove its tests)
 
@@ -1222,6 +1251,7 @@ Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>"
 ### Task 8: Backfill driver (`reindexAllContent`) + wire the reindex route
 
 **Files:**
+
 - Modify: `src/lib/actions/ai-context.ts` (add `reindexAllContent`)
 - Modify: `src/app/api/ai/reindex/route.ts`
 - Test: `src/lib/actions/__tests__/ai-context.test.ts`
@@ -1292,17 +1322,33 @@ export async function reindexAllContent(): Promise<{
     if (seen.has(key)) continue;
     seen.add(key);
     if (r.source_type === 'moodle_file')
-      jobs.push({ type: 'moodle_file', fileId: r.source_id, courseId: r.course_id });
+      jobs.push({
+        type: 'moodle_file',
+        fileId: r.source_id,
+        courseId: r.course_id,
+      });
     else if (r.source_type === 'course_material')
-      jobs.push({ type: 'course_material', materialId: r.source_id, courseId: r.course_id });
+      jobs.push({
+        type: 'course_material',
+        materialId: r.source_id,
+        courseId: r.course_id,
+      });
     else if (r.source_type === 'personal_file')
-      jobs.push({ type: 'personal_file', fileId: r.source_id, courseId: r.course_id });
+      jobs.push({
+        type: 'personal_file',
+        fileId: r.source_id,
+        courseId: r.course_id,
+      });
   }
   for (const m of (materials ?? []) as { id: string; course_id: string }[]) {
     const key = `course_material:${m.id}`;
     if (seen.has(key)) continue;
     seen.add(key);
-    jobs.push({ type: 'course_material', materialId: m.id, courseId: m.course_id });
+    jobs.push({
+      type: 'course_material',
+      materialId: m.id,
+      courseId: m.course_id,
+    });
   }
 
   // Force re-extraction: clear content hashes so indexContent won't skip.
@@ -1331,13 +1377,13 @@ export async function reindexAllContent(): Promise<{
 Replace the blanket-delete body of `POST` in `src/app/api/ai/reindex/route.ts` (keep the auth check) with:
 
 ```ts
-    const { reindexAllContent } = await import('@/lib/actions/ai-context');
-    const { processed, failed } = await reindexAllContent();
-    return NextResponse.json({
-      processed,
-      failed,
-      message: `Re-indexed ${processed} sources (${failed} failed).`,
-    });
+const { reindexAllContent } = await import('@/lib/actions/ai-context');
+const { processed, failed } = await reindexAllContent();
+return NextResponse.json({
+  processed,
+  failed,
+  message: `Re-indexed ${processed} sources (${failed} failed).`,
+});
 ```
 
 (Remove the now-unused `createAdminClient` import if it's no longer referenced in the route.)
@@ -1361,6 +1407,7 @@ Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>"
 ### Task 9: Integration test — real per-page indexing into local Supabase
 
 **Files:**
+
 - Test: `src/lib/actions/__tests__/page-indexing.integration.test.ts` (create)
 
 > Uses the local seeded Supabase (see memory `running-tests-locally`). Extraction is mocked (no Gemini key locally/CI per memory `ai-e2e-no-gemini-key-in-ci`); embeddings are mocked to deterministic vectors. The point is to verify real rows land with non-null 0-indexed pages and that re-indexing replaces them.
@@ -1385,7 +1432,9 @@ vi.mock('@/lib/ai/extraction/pdf', () => ({
     { page: 1, text: 'Integration page one' },
     { page: 2, text: 'Integration page two' },
   ]),
-  extractPdfText: vi.fn(async () => 'Integration page one\n\nIntegration page two'),
+  extractPdfText: vi.fn(
+    async () => 'Integration page one\n\nIntegration page two',
+  ),
 }));
 
 // NOTE: This test needs a seeded course_material row + its storage object in
@@ -1404,7 +1453,11 @@ describe('per-page indexing (integration)', () => {
     // ---- arrange materialId/courseId via the shared seeding helper ----
     // const { materialId, courseId } = await seedCourseMaterial(admin, 'small.pdf');
 
-    const r1 = await indexContent({ type: 'course_material', materialId, courseId });
+    const r1 = await indexContent({
+      type: 'course_material',
+      materialId,
+      courseId,
+    });
     expect(r1.success).toBe(true);
     expect(r1.segmentsIndexed).toBe(2);
 
@@ -1421,7 +1474,11 @@ describe('per-page indexing (integration)', () => {
     expect(data!.every((row) => row.page_start !== null)).toBe(true);
 
     // Re-index replaces (delete-then-insert in upsertEmbeddings).
-    const r2 = await indexContent({ type: 'course_material', materialId, courseId });
+    const r2 = await indexContent({
+      type: 'course_material',
+      materialId,
+      courseId,
+    });
     expect(r2.segmentsIndexed).toBe(2);
   });
 });
@@ -1448,6 +1505,7 @@ Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>"
 ### Task 10: E2E — evidence quote + jump-to-page (mocked AI)
 
 **Files:**
+
 - Create: `e2e/evidence-citations.spec.ts`
 - Modify: `e2e/TEST_REGISTRY.md`
 
@@ -1459,6 +1517,7 @@ In `e2e/TEST_REGISTRY.md`, add a section:
 
 ```markdown
 ### Evidence citations & page-accurate sources (`e2e/evidence-citations.spec.ts`)
+
 - AI answer renders a verbatim blockquote + inline `(file, p. N)` citation.
 - Clicking a source badge with a page opens the FileViewer scrolled to that page.
 - Two citations to the same file at different pages render as two badges, each jumping to its own page.
@@ -1572,7 +1631,7 @@ After deploying, trigger `POST /api/ai/reindex` as an authenticated admin to re-
 ## Self-review notes
 
 - **Spec coverage:** §4.1 structured per-page extraction → Task 2, 4 (no page-count guard — Task 1 removed; we trust Gemini's page numbers); §4.2 math-aware page-tagged chunks → Task 3; §4.3 indexing 0-indexed pages + course_material → Task 4–5; serverless-safe indexing of Moodle + personal files (so they actually get embedded) → Task 5b; §4.4 multi-chunk + per-(source,page) + signed-URL dedupe → Task 6; §4.6 viewer (already built, exercised) → Task 10; §6 course-material indexing + backfill → Task 5, 8; testing → Task 9–11. §4.5 (prompt/render) is **Phase 1**.
-- **Moodle findability (Task 5b):** fixes the *future-uploads* half of "the AI can't find Moodle files" (embedding was silently dropped at upload time); Task 8's backfill re-embeds *existing* files that were dropped; Task 6's multi-chunk retrieval + Task 3's smaller chunks fix the *retrieval-quality* half. All three together close the issue.
+- **Moodle findability (Task 5b):** fixes the _future-uploads_ half of "the AI can't find Moodle files" (embedding was silently dropped at upload time); Task 8's backfill re-embeds _existing_ files that were dropped; Task 6's multi-chunk retrieval + Task 3's smaller chunks fix the _retrieval-quality_ half. All three together close the issue.
 - **Type consistency:** `PageText` (defined in `pdf.ts`, imported by `embeddings.ts` and the `indexContent` flow), `PageChunk` (embeddings.ts), `chunkPages`/`chunkFlatText`, `reindexAllContent`, `MAX_CHUNKS_PER_SOURCE`, `CHUNK_CHAR_BUDGET` — all referenced consistently across tasks.
 - **0-indexed contract:** stored `page_start/page_end` are 0-indexed (chunkPages subtracts 1); `pageRangeOf` adds 1 for display ("p. N"); the chat badge subtracts 1 again for `FileViewer.initialPage`. Verified end-to-end in Task 6 + Task 10.
 - **Known limitations (documented, accepted for v1):** cross-user historical backfill of course_material/personal_file is RLS-bound (Task 8 note); pure-image pages produce no chunk (not retrievable in text-only v1 — §13 future); very large PDFs that overflow the extraction model's output limit may return partial/truncated pages (we trust whatever pages come back) — batched extraction for >50-page PDFs is a follow-up if it bites.

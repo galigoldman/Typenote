@@ -155,7 +155,8 @@ describe('MarkdownResponse — resilience & RTL', () => {
     // .katex-error span), so a render that threw would simply fail this test.
     // Assert a .katex/.katex-error node IS produced, so the test also guards
     // against the KaTeX plugin tuple being dropped or misconfigured.
-    const content = 'Here is the proof:\n\n$$\n\\frac{-b \\pm \\sqrt{b^2\n$$\n\nend';
+    const content =
+      'Here is the proof:\n\n$$\n\\frac{-b \\pm \\sqrt{b^2\n$$\n\nend';
     const { container } = render(<MarkdownResponse content={content} />);
     expect(container.querySelector('.katex, .katex-error')).toBeInTheDocument();
   });

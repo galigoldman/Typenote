@@ -135,7 +135,9 @@ function splitText(text: string): string[] {
   while (start < t.length) {
     const hardEnd = Math.min(start + CHUNK_CHAR_BUDGET, t.length);
     const end =
-      hardEnd >= t.length ? t.length : findSafeBoundary(t, spans, start, hardEnd);
+      hardEnd >= t.length
+        ? t.length
+        : findSafeBoundary(t, spans, start, hardEnd);
     const piece = t.slice(start, end).trim();
     if (piece) out.push(piece);
     if (end >= t.length) break;
@@ -157,7 +159,12 @@ export function chunkPages(pages: PageText[]): PageChunk[] {
   const flush = () => {
     const t = buf.trim();
     if (t) {
-      chunks.push({ text: t, chunkIndex: idx++, pageStart: bufStart, pageEnd: bufEnd });
+      chunks.push({
+        text: t,
+        chunkIndex: idx++,
+        pageStart: bufStart,
+        pageEnd: bufEnd,
+      });
     }
     buf = '';
     bufStart = null;
@@ -172,7 +179,12 @@ export function chunkPages(pages: PageText[]): PageChunk[] {
     if (text.length > CHUNK_CHAR_BUDGET) {
       flush();
       for (const part of splitText(text)) {
-        chunks.push({ text: part, chunkIndex: idx++, pageStart: page0, pageEnd: page0 });
+        chunks.push({
+          text: part,
+          chunkIndex: idx++,
+          pageStart: page0,
+          pageEnd: page0,
+        });
       }
       continue;
     }

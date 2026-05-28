@@ -249,9 +249,11 @@ describe('POST /api/moodle/import-existing', () => {
     setupAuth(admin);
 
     let resolveIndex!: () => void;
-    const gate = new Promise<{ success: boolean; skipped: boolean }>((resolve) => {
-      resolveIndex = () => resolve({ success: true, skipped: false });
-    });
+    const gate = new Promise<{ success: boolean; skipped: boolean }>(
+      (resolve) => {
+        resolveIndex = () => resolve({ success: true, skipped: false });
+      },
+    );
     vi.mocked(indexContent).mockReturnValueOnce(gate as never);
 
     const respPromise = POST(makeRequest(body) as never);
