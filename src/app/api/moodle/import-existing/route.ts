@@ -106,13 +106,19 @@ export async function POST(request: NextRequest) {
     }
 
     if (appCourseId) {
-      // Fire-and-forget. indexContent itself short-circuits on a content
-      // hash match, so re-imports don't re-embed.
-      indexContent({
-        type: 'moodle_file',
-        fileId: file.id,
-        courseId: appCourseId,
-      }).catch((err) => console.error('Index failed:', err));
+      // Awaited (not fire-and-forget): a detached promise is dropped when the
+      // serverless function freezes after responding, leaving the file
+      // un-embedded and unfindable. indexContent short-circuits on a content
+      // hash match, so re-imports stay cheap. Failure is logged, not fatal.
+      try {
+        await indexContent({
+          type: 'moodle_file',
+          fileId: file.id,
+          courseId: appCourseId,
+        });
+      } catch (err) {
+        console.error('Index failed:', err);
+      }
     }
 
     return NextResponse.json({

@@ -42,14 +42,22 @@ export async function createPersonalFile(data: {
   const embeddable =
     data.mimeType === 'application/pdf' ||
     data.mimeType.includes('wordprocessingml') ||
-    data.mimeType.includes('presentationml');
+    data.mimeType === 'application/msword' ||
+    data.mimeType.includes('presentationml') ||
+    data.mimeType.includes('powerpoint');
   if (embeddable) {
+    // Awaited (not fire-and-forget): detached promises are dropped on
+    // serverless freeze, leaving the file un-embedded and unfindable.
     const { indexContent } = await import('@/lib/actions/ai-context');
-    void indexContent({
-      type: 'personal_file',
-      fileId: file.id,
-      courseId: data.courseId,
-    });
+    try {
+      await indexContent({
+        type: 'personal_file',
+        fileId: file.id,
+        courseId: data.courseId,
+      });
+    } catch (err) {
+      console.error('Personal file indexing failed:', err);
+    }
   }
 
   revalidatePath('/dashboard');
