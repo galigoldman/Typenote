@@ -4,9 +4,15 @@ import crypto from 'crypto';
 
 import { GoogleGenAI } from '@google/genai';
 
-import { chunkText, embedQuery, embedText } from '@/lib/ai/embeddings';
+import {
+  chunkFlatText,
+  chunkPages,
+  embedQuery,
+  embedText,
+  type PageChunk,
+} from '@/lib/ai/embeddings';
 import { extractDocxText } from '@/lib/ai/extraction/docx';
-import { extractPdfText } from '@/lib/ai/extraction/pdf';
+import { extractPdfPages } from '@/lib/ai/extraction/pdf';
 import { buildSystemPrompt } from '@/lib/ai/prompts';
 import { listContextFiles } from '@/lib/actions/context-files';
 import { resolveContextFileName } from '@/lib/ai/context-files';
@@ -248,19 +254,25 @@ export async function indexContent(source: IndexSource): Promise<IndexResult> {
       return { success: true, segmentsIndexed: 0, skipped: true };
     }
 
-    // Extract text from file
-    let text = '';
-    if (
+    // Extract + chunk with page tags.
+    const isPdfLike =
       mimeType === 'application/pdf' ||
       mimeType.includes('presentationml') ||
-      mimeType.includes('powerpoint')
-    ) {
-      text = await extractPdfText(fileBuffer);
-    } else if (
-      mimeType.includes('wordprocessingml') ||
-      mimeType === 'application/msword'
-    ) {
-      text = await extractDocxText(fileBuffer);
+      mimeType.includes('powerpoint');
+    const isDocx =
+      mimeType.includes('wordprocessingml') || mimeType === 'application/msword';
+
+    let chunks: PageChunk[] = [];
+
+    if (isPdfLike) {
+      const pages = await extractPdfPages(fileBuffer);
+      // Trust Gemini's reported 1-based page numbers (it reads the real PDF).
+      // extractPdfPages already drops non-integer pages and sorts; an empty
+      // result means nothing extractable, so produce no chunks.
+      chunks = pages.length > 0 ? chunkPages(pages) : [];
+    } else if (isDocx) {
+      const text = await extractDocxText(fileBuffer);
+      chunks = chunkFlatText(text);
     } else {
       return {
         success: false,
@@ -270,24 +282,22 @@ export async function indexContent(source: IndexSource): Promise<IndexResult> {
       };
     }
 
-    if (!text.trim()) {
+    if (chunks.length === 0) {
       return { success: true, segmentsIndexed: 0, skipped: true };
     }
 
-    // Chunk text if too large, then embed each chunk
-    const chunks = chunkText(text);
     const rows: EmbeddingRow[] = [];
-
     for (const chunk of chunks) {
       const embedding = await embedText(chunk.text);
+      // embedText returns [] only on a malformed embeddings API response.
       if (!embedding.length) continue;
 
       rows.push({
         source_type: sourceType,
         source_id: sourceId,
         segment_index: chunk.chunkIndex,
-        page_start: null,
-        page_end: null,
+        page_start: chunk.pageStart,
+        page_end: chunk.pageEnd,
         segment_text: chunk.text,
         embedding,
         user_id: userId,
@@ -298,8 +308,22 @@ export async function indexContent(source: IndexSource): Promise<IndexResult> {
       });
     }
 
-    if (!rows.length) {
-      return { success: true, segmentsIndexed: 0, skipped: true };
+    // We already returned above when chunks.length === 0, so reaching here with
+    // no rows means every embedText call failed. Surface it as an error rather
+    // than a (blank) skip — otherwise an embedding outage would silently leave
+    // the file unindexed while reporting success, and the AI couldn't find it.
+    if (rows.length === 0) {
+      return {
+        success: false,
+        segmentsIndexed: 0,
+        skipped: false,
+        error: 'Embedding failed for every chunk (no segments produced)',
+      };
+    }
+    if (rows.length < chunks.length) {
+      console.warn(
+        `indexContent: ${chunks.length - rows.length}/${chunks.length} chunks failed to embed for ${sourceType} ${sourceId}`,
+      );
     }
 
     await upsertEmbeddings(rows);
