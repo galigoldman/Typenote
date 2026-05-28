@@ -75,4 +75,3 @@ export async function extractPdfPages(buffer: Buffer): Promise<PageText[]> {
     )
     .sort((a, b) => a.page - b.page);
 }
-

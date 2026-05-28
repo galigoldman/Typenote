@@ -264,7 +264,8 @@ export async function indexContent(source: IndexSource): Promise<IndexResult> {
       mimeType.includes('presentationml') ||
       mimeType.includes('powerpoint');
     const isDocx =
-      mimeType.includes('wordprocessingml') || mimeType === 'application/msword';
+      mimeType.includes('wordprocessingml') ||
+      mimeType === 'application/msword';
 
     let chunks: PageChunk[] = [];
 
@@ -518,9 +519,11 @@ export async function buildAiContext(params: QuestionParams): Promise<{
   }
 
   // One signed URL per distinct file, fanned out to all its (page) citations.
-  const distinct = [...citationsBySource.entries()].map(
-    ([sourceId, v]) => ({ sourceId, sourceType: v.sourceType, idxs: v.idxs }),
-  );
+  const distinct = [...citationsBySource.entries()].map(([sourceId, v]) => ({
+    sourceId,
+    sourceType: v.sourceType,
+    idxs: v.idxs,
+  }));
   const moodleIds = distinct
     .filter((s) => s.sourceType === 'moodle_file')
     .map((s) => s.sourceId);
@@ -761,17 +764,33 @@ export async function reindexAllContent(): Promise<{
     if (seen.has(key)) continue;
     seen.add(key);
     if (r.source_type === 'moodle_file')
-      jobs.push({ type: 'moodle_file', fileId: r.source_id, courseId: r.course_id });
+      jobs.push({
+        type: 'moodle_file',
+        fileId: r.source_id,
+        courseId: r.course_id,
+      });
     else if (r.source_type === 'course_material')
-      jobs.push({ type: 'course_material', materialId: r.source_id, courseId: r.course_id });
+      jobs.push({
+        type: 'course_material',
+        materialId: r.source_id,
+        courseId: r.course_id,
+      });
     else if (r.source_type === 'personal_file')
-      jobs.push({ type: 'personal_file', fileId: r.source_id, courseId: r.course_id });
+      jobs.push({
+        type: 'personal_file',
+        fileId: r.source_id,
+        courseId: r.course_id,
+      });
   }
   for (const m of (materials ?? []) as { id: string; course_id: string }[]) {
     const key = `course_material:${m.id}`;
     if (seen.has(key)) continue;
     seen.add(key);
-    jobs.push({ type: 'course_material', materialId: m.id, courseId: m.course_id });
+    jobs.push({
+      type: 'course_material',
+      materialId: m.id,
+      courseId: m.course_id,
+    });
   }
 
   // Force re-extraction: clear content hashes so indexContent won't skip.

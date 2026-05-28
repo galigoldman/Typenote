@@ -65,4 +65,3 @@ describe('extractPdfPages', () => {
     expect(pages).toEqual([{ page: 2, text: 'valid' }]);
   });
 });
-

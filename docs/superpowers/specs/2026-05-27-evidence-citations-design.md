@@ -17,13 +17,13 @@
 When the AI chat answers from course materials, we want it to (a) **show its evidence** —
 quote the exact passage it relied on — and (b) let the student **jump to that exact place**
 in the source file. Today neither is reliable, for one root cause: **the RAG pipeline never
-records *where* a passage lives.** PDFs are extracted into a single flat text blob, the blob
+records _where_ a passage lives.** PDFs are extracted into a single flat text blob, the blob
 is stored as one ~25 000-character chunk, and `page_start`/`page_end` are hardcoded `null`.
 
 This design fixes that at the source:
 
 1. **Per-page extraction** — ask Gemini for structured per-page text instead of one blob,
-   keeping today's **faithful, text-only** instruction (LaTeX + Hebrew preserved; *no*
+   keeping today's **faithful, text-only** instruction (LaTeX + Hebrew preserved; _no_
    invented figure descriptions — see §4.0).
 2. **Small, page-tagged, math-aware chunks** — replace the 25 000-char "one chunk per file"
    with a ~1 600-char budget, each chunk tagged with the page(s) it covers, **never splitting
@@ -39,7 +39,7 @@ The citation UI is already done: `FileViewer` accepts `initialPage` and the chat
 Secondary benefits: **sharper retrieval** (one vector for a ~6k-token multi-topic blob is a
 mushy average; small focused chunks discriminate better) and **lower per-query cost** (small
 relevant chunks instead of giant blobs in the prompt). ⚠️ Note: an earlier draft justified
-this as fixing an embedder *truncation* bug — that was based on the old `gemini-embedding-001`
+this as fixing an embedder _truncation_ bug — that was based on the old `gemini-embedding-001`
 2 048-token cap. The live model `gemini-embedding-2-preview` allows **8 192 tokens**, so
 today's ~6 250-token chunks are **not** truncated (a dense Hebrew chunk near the 25k-char
 limit is the only edge case). The justification is dilution + page location + prompt cost, not
@@ -48,7 +48,7 @@ truncation.
 ## 2. Background / current state (verified against `dev`)
 
 - **Chunking:** `src/lib/ai/embeddings.ts` — `MAX_CHARS_PER_CHUNK = 25000` (~6 000 tokens).
-  `chunkText` only splits files *above* that limit; in practice each file → **one chunk**.
+  `chunkText` only splits files _above_ that limit; in practice each file → **one chunk**.
 - **Embedding:** `embedText`/`embedQuery` use `gemini-embedding-2-preview`, 1 536 dims,
   asymmetric task types (`RETRIEVAL_DOCUMENT` / `RETRIEVAL_QUERY`) — keep this.
   - **Input cap:** `gemini-embedding-2-preview` allows **8 192 input tokens**
@@ -66,7 +66,7 @@ truncation.
   reads scanned/image slides. `extraction/docx.ts` (mammoth) returns flat text, no pages.
 - **Indexing:** `indexContent` in `src/lib/actions/ai-context.ts` extracts → `chunkText` →
   `embedText` per chunk → `upsertEmbeddings`. It **hardcodes `page_start: null,
-  page_end: null`** (~lines 289-290). `upsertEmbeddings` deletes prior rows for the source
+page_end: null`** (~lines 289-290). `upsertEmbeddings` deletes prior rows for the source
   then inserts in batches of 20 (`src/lib/queries/embeddings.ts`).
 - ⚠️ **`course_material` is never indexed today.** The only `indexContent` callers pass
   `moodle_file` (`moodle/upload/route.ts:141,185`, `moodle/upload-finalize/route.ts:125,167`,
@@ -79,7 +79,7 @@ truncation.
   `supabase/migrations/20260526120000_document_context_files.sql:66-105` (params include
   `match_moodle_course_id`, `match_imported_moodle_file_ids`, `match_source_ids`; no
   `week_id`). It returns `segment_text, page_start, page_end, source_type, source_id,
-  source_name, mime_type, similarity` and supports the focus filter. Read this migration, not
+source_name, mime_type, similarity` and supports the focus filter. Read this migration, not
   the older `00012`/`00014`.
 - **Context assembly:** the **live** path is `buildAiContext` (used by `POST /api/ai/ask`,
   `ask/route.ts:4,312`). ⚠️ `askQuestion` (`ai-context.ts:373-530`) is a **dead** legacy twin
@@ -127,7 +127,7 @@ truncation.
 
 **Non-goals (this iteration)**
 
-- Pixel-exact text highlighting inside the PDF (we jump to the *page*; sentence-level
+- Pixel-exact text highlighting inside the PDF (we jump to the _page_; sentence-level
   highlight via the viewer's text layer is a later enhancement).
 - Changing the embedding model, the `match_embeddings` RPC signature, or the DB schema.
 - Page numbers for DOCX (no native pages) — DOCX chunks keep `page_start/page_end = null` and
@@ -142,20 +142,20 @@ truncation.
 
 ### 4.0 Images & handwriting — today vs proposed (no regressions)
 
-The design **reuses the existing multimodal Gemini extraction** (we are *not* switching to a
+The design **reuses the existing multimodal Gemini extraction** (we are _not_ switching to a
 pdf.js text layer), so nothing the AI can "see" today gets lost. Concretely:
 
-| Content | Today | Proposed |
-|---|---|---|
-| Strokes/handwriting in the student's **own note** | Invisible (`documentContent` = text+math via `extractNodeText`) | **Unchanged — invisible** (non-goal, §3) |
-| Pasted **images in the student's own note** | Invisible (only the explicit `imageData` screenshot path sends an image) | **Unchanged — invisible** |
-| **Text** in course PDFs (incl. handwriting OCR'd from scans) | Extracted, but truncated past ~2048 tok, one chunk, no page | **Fully extracted, per-page, locatable** (improvement) |
-| **Figures/diagrams** (image-only) in course PDFs | Not captured — prompt is "text as written, no commentary" | **Decision (§4.1): default text-only (unchanged); page citation, no quote** |
+| Content                                                      | Today                                                                    | Proposed                                                                    |
+| ------------------------------------------------------------ | ------------------------------------------------------------------------ | --------------------------------------------------------------------------- |
+| Strokes/handwriting in the student's **own note**            | Invisible (`documentContent` = text+math via `extractNodeText`)          | **Unchanged — invisible** (non-goal, §3)                                    |
+| Pasted **images in the student's own note**                  | Invisible (only the explicit `imageData` screenshot path sends an image) | **Unchanged — invisible**                                                   |
+| **Text** in course PDFs (incl. handwriting OCR'd from scans) | Extracted, but truncated past ~2048 tok, one chunk, no page              | **Fully extracted, per-page, locatable** (improvement)                      |
+| **Figures/diagrams** (image-only) in course PDFs             | Not captured — prompt is "text as written, no commentary"                | **Decision (§4.1): default text-only (unchanged); page citation, no quote** |
 
 ⚠️ **Decision — figure descriptions.** Today's extractor is deliberately faithful ("extract
 text exactly as written… no commentary", `pdf.ts:29`). Adding model-generated figure
 descriptions would improve coverage of diagram-heavy slides **but** produces prose the source
-never literally contained — which an *evidence/quote* feature must not present as verbatim.
+never literally contained — which an _evidence/quote_ feature must not present as verbatim.
 **Default: keep faithful text-only.** Image-only pages therefore get a **page citation with no
 blockquote** (consistent with §4.5's quote-optional rule). Revisit only if diagram retrieval
 proves necessary, and then label such content as a paraphrase, never a quote.
@@ -207,7 +207,7 @@ Algorithm over `PageText[]`:
   as an over-budget chunk rather than bisecting it (a broken `$$` poisons the embedding and
   renders as a KaTeX error in the quote).
 - Page-less input (DOCX / fallback): budgeted, math-aware split with `page_start/page_end =
-  null`.
+null`.
 
 Output `TextChunk { text, chunkIndex, pageStart, pageEnd }` (pageStart/pageEnd 0-indexed or
 null). ⚠️ **Char/token ratio is language-dependent:** ~4 chars/token holds for Latin scripts;
@@ -296,7 +296,7 @@ instead of `null`. With ~15× more rows per file, the existing pgvector index co
 Two distinct problems:
 
 1. **Course materials were never indexed** (§2). Add an `indexContent({ type:
-   'course_material', ... })` call to the course-material upload path (mirroring the moodle /
+'course_material', ... })` call to the course-material upload path (mirroring the moodle /
    personal-file callers) so new uploads are indexed going forward.
 2. **Existing rows are stale** — `null` pages + oversized/truncated embeddings — and **cannot
    be fixed lazily.** `POST /api/ai/reindex` today only **deletes all rows** and tells the user
@@ -315,7 +315,7 @@ Two distinct problems:
 - Is resumable/observable (log per-source success/skip/error), since this touches all content.
 
 **Cost (one-time):** ~$0.02–0.03/file — re-extraction dominates, and structured per-page output
-is a *longer* generation than today's flat extract, so output tokens rise too. ~$10–15 per 500
+is a _longer_ generation than today's flat extract, so output tokens rise too. ~$10–15 per 500
 files. Pays back after ~4 Flash / ~1 Pro questions that touch the file.
 
 **Cutover:** the new read path uses pages when present and degrades to `null`/file-name
@@ -330,7 +330,7 @@ Verified pricing (May 2026): Flash $0.30/1M in · Pro $1.25/1M in · Embedding $
   blob to ~4k tokens of relevant chunks → **~16k fewer input tokens/question**.
   ≈ **$0.005/question (Flash)** / **$0.020/question (Pro)** saved. At 10k questions/month:
   ~$48 (Flash) / ~$200 (Pro).
-- **Index side (small increase):** ~15× more embedding *calls*, ~3× more embedding *tokens*
+- **Index side (small increase):** ~15× more embedding _calls_, ~3× more embedding _tokens_
   per file; embeddings are ~100× cheaper/token than generation, so absolute cost is negligible.
   Structured extraction adds some output tokens. Main concern is rate-limit pressure → throttle.
 - **Honest framing:** absolute savings are modest at low volume; the primary justification is
@@ -340,13 +340,13 @@ Verified pricing (May 2026): Flash $0.30/1M in · Pro $1.25/1M in · Embedding $
 
 ## 8. Tunable parameters (single source of truth)
 
-| Constant | Start | Purpose |
-|---|---|---|
-| `CHUNK_CHAR_BUDGET` | 1600 (~400 tok Latin; more for Hebrew/CJK) | embedding/citation granularity |
-| `CHUNK_CHAR_OVERLAP` | 200 | continuity across intra-page splits |
-| `MAX_CHUNKS_PER_SOURCE` | 3 | stop one file dominating context |
-| `match_count` | 12 | candidates retrieved per pass |
-| `BATCH_EXTRACT_PAGE_THRESHOLD` | 50 | split extraction into page ranges above this |
+| Constant                       | Start                                      | Purpose                                      |
+| ------------------------------ | ------------------------------------------ | -------------------------------------------- |
+| `CHUNK_CHAR_BUDGET`            | 1600 (~400 tok Latin; more for Hebrew/CJK) | embedding/citation granularity               |
+| `CHUNK_CHAR_OVERLAP`           | 200                                        | continuity across intra-page splits          |
+| `MAX_CHUNKS_PER_SOURCE`        | 3                                          | stop one file dominating context             |
+| `match_count`                  | 12                                         | candidates retrieved per pass                |
+| `BATCH_EXTRACT_PAGE_THRESHOLD` | 50                                         | split extraction into page ranges above this |
 
 ## 9. Testing plan
 
@@ -464,7 +464,7 @@ working in pgvector unchanged. **Not chosen as the primary path because:**
 
 - **Evidence quotes require text.** An image embedding finds the right page but yields no
   quotable sentence; the feature's core ("show the exact sentence") still needs extracted
-  text. So image embedding is *additive*, not a replacement → more cost, two pipelines.
+  text. So image embedding is _additive_, not a replacement → more cost, two pipelines.
 - **Text-heavy slides** retrieve at least as well from extracted text; image embedding's unique
   win is pure-figure pages (the minority for lecture decks).
 - **Cost/complexity:** server-side page rasterization (Hebrew/math fonts) + higher
@@ -475,7 +475,7 @@ working in pgvector unchanged. **Not chosen as the primary path because:**
 **Kept as future options (clean because the model is already multimodal):**
 
 1. **Answer-time grounding (cheap, recommended next):** for a figure-heavy cited page, attach
-   that page's image to the *generation* call via the existing `imageData` path so the model
+   that page's image to the _generation_ call via the existing `imageData` path so the model
    can see the diagram — no retrieval changes.
-2. **Per-page image embedding as a 2nd vector** (later, only if diagram *retrieval* proves
+2. **Per-page image embedding as a 2nd vector** (later, only if diagram _retrieval_ proves
    weak): store an image-modality row per page alongside the text chunks; same table/pgvector.
