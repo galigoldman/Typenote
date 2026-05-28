@@ -22,6 +22,8 @@
 - `src/lib/ai/embeddings.ts` — MODIFY: add `PageChunk`, `chunkPages`, `chunkFlatText`, math-aware split helpers, constants.
 - `src/lib/actions/ai-context.ts` — MODIFY: `indexContent` (pages + guard + course_material), `buildAiContext` (multi-chunk + per-(source,page) citations + signed-URL dedupe), add `reindexAllContent`; DELETE dead `askQuestion`.
 - `src/lib/actions/course-materials.ts` — MODIFY: `createCourseMaterial` awaits `indexContent`.
+- `src/app/api/moodle/{upload,upload-finalize,import-existing}/route.ts` — MODIFY: await `indexContent` (was fire-and-forget — dropped on serverless freeze).
+- `src/lib/actions/personal-files.ts` — MODIFY: `addPersonalFile` awaits `indexContent` (was `void`).
 - `src/app/api/ai/reindex/route.ts` — MODIFY: call `reindexAllContent` instead of blanket delete.
 - Tests: `src/lib/ai/extraction/__tests__/pdf-page-count.test.ts` (new), `src/lib/ai/extraction/__tests__/pdf.test.ts` (new), `src/lib/ai/__tests__/embeddings.test.ts` (extend), `src/lib/actions/__tests__/ai-context.test.ts` (extend), `src/lib/actions/__tests__/course-materials.test.ts` (new), `e2e/evidence-citations.spec.ts` (new), `e2e/TEST_REGISTRY.md` (update).
 
@@ -850,6 +852,215 @@ Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>"
 
 ---
 
+### Task 5b: Make Moodle + personal-file indexing serverless-safe (await)
+
+**Why this task exists:** The three Moodle routes and `addPersonalFile` currently fire `indexContent(...)` **without awaiting** and return the HTTP response immediately. On Vercel the function can freeze after responding, dropping the in-flight Gemini extraction+embedding — so the file lands in storage but **never gets a vector**, and the AI literally cannot find it. This is a primary cause of "Moodle files aren't embedded / the AI can't find them." Fix: await the call (logging, not failing, on error) exactly like Task 5 does for course materials.
+
+**Files:**
+- Modify: `src/app/api/moodle/upload/route.ts` (2 call sites)
+- Modify: `src/app/api/moodle/upload-finalize/route.ts` (2 call sites)
+- Modify: `src/app/api/moodle/import-existing/route.ts` (1 call site)
+- Modify: `src/lib/actions/personal-files.ts` (`addPersonalFile`, the `void indexContent` site)
+- Test: `src/app/api/moodle/import-existing/route.test.ts` (extend)
+
+> Why `await` and not Next's `after()`: `after()` would keep the fast upload response while surviving the freeze, but it isn't used anywhere in this codebase yet and would mean mocking `next/server`'s `after` in tests. The established decision (memory `serverless-fire-and-forget-guardrail`) is to await in server routes. `indexContent` short-circuits on a content-hash match, so re-syncs of unchanged files stay instant; only genuinely new files pay the extraction cost. If bulk-sync latency ever bites, switching these sites to `after(() => indexContent(...))` is a clean follow-up.
+
+- [ ] **Step 1: Write the failing test — the route must await indexing before responding**
+
+In `src/app/api/moodle/import-existing/route.test.ts`, add this test inside the main `describe` (it uses a deferred promise to prove the response does not resolve until `indexContent` settles):
+
+```ts
+  it('awaits indexing before returning the response', async () => {
+    const admin = buildAdmin({
+      file: {
+        id: 'file-1',
+        storage_path: 'm.org/c1/abc.pdf',
+        content_hash: 'h',
+        file_size: 1,
+        mime_type: 'application/pdf',
+      },
+    });
+    setupAuth(admin);
+
+    let resolveIndex!: () => void;
+    const gate = new Promise<{ success: boolean; segmentsIndexed: number; skipped: boolean }>(
+      (resolve) => {
+        resolveIndex = () => resolve({ success: true, segmentsIndexed: 1, skipped: false });
+      },
+    );
+    vi.mocked(indexContent).mockReturnValueOnce(gate);
+
+    const respPromise = POST(makeRequest(body) as never);
+
+    // Let microtasks run: indexContent should have been dispatched...
+    await new Promise((r) => setImmediate(r));
+    let settled = false;
+    void respPromise.then(() => {
+      settled = true;
+    });
+    await new Promise((r) => setImmediate(r));
+    // ...but the response must NOT have resolved yet (proves we await).
+    expect(settled).toBe(false);
+
+    resolveIndex();
+    const res = await respPromise;
+    expect(res.status).toBe(200);
+  });
+```
+
+> If `buildAdmin`/`setupAuth`/`makeRequest`/`body` differ in the existing file, reuse that file's exact helpers — do not invent new ones. The key assertion is `settled === false` before `resolveIndex()`.
+
+- [ ] **Step 2: Run the test to verify it fails**
+
+Run: `pnpm test -- src/app/api/moodle/import-existing/route.test.ts -t "awaits indexing"`
+Expected: FAIL — today the route fires `indexContent(...).catch(...)` and returns immediately, so `settled` is already `true`.
+
+- [ ] **Step 3: Implement — `src/app/api/moodle/import-existing/route.ts`**
+
+Replace this block:
+
+```ts
+    if (appCourseId) {
+      // Fire-and-forget. indexContent itself short-circuits on a content
+      // hash match, so re-imports don't re-embed.
+      indexContent({
+        type: 'moodle_file',
+        fileId: file.id,
+        courseId: appCourseId,
+      }).catch((err) => console.error('Index failed:', err));
+    }
+```
+
+with:
+
+```ts
+    if (appCourseId) {
+      // Awaited (not fire-and-forget): a detached promise is dropped when the
+      // serverless function freezes after responding, leaving the file
+      // un-embedded and unfindable. indexContent short-circuits on a content
+      // hash match, so re-imports stay cheap. Failure is logged, not fatal.
+      try {
+        await indexContent({
+          type: 'moodle_file',
+          fileId: file.id,
+          courseId: appCourseId,
+        });
+      } catch (err) {
+        console.error('Index failed:', err);
+      }
+    }
+```
+
+- [ ] **Step 4: Implement — `src/app/api/moodle/upload/route.ts` (both sites)**
+
+There are two identical fire-and-forget blocks (one for the updated `fileRecord`, one for the inserted `newRecord`). Replace each:
+
+```ts
+      // Index for AI search (fire-and-forget)
+      if (appCourseId) {
+        indexContent({
+          type: 'moodle_file',
+          fileId: fileRecord.id,
+          courseId: appCourseId,
+        }).catch((err) => console.error('Index failed:', err));
+      }
+```
+
+with (await + try/catch; the second site uses `newRecord.id` — change `fileRecord.id` accordingly):
+
+```ts
+      // Index for AI search. Awaited (not fire-and-forget): detached promises
+      // are dropped on serverless freeze, leaving the file unfindable.
+      if (appCourseId) {
+        try {
+          await indexContent({
+            type: 'moodle_file',
+            fileId: fileRecord.id,
+            courseId: appCourseId,
+          });
+        } catch (err) {
+          console.error('Index failed:', err);
+        }
+      }
+```
+
+- [ ] **Step 5: Implement — `src/app/api/moodle/upload-finalize/route.ts` (both sites)**
+
+Identical change to the two blocks there (one uses `fileRecord.id`, the other `newRecord.id`):
+
+```ts
+      if (appCourseId) {
+        try {
+          await indexContent({
+            type: 'moodle_file',
+            fileId: fileRecord.id,
+            courseId: appCourseId,
+          });
+        } catch (err) {
+          console.error('Index failed:', err);
+        }
+      }
+```
+
+- [ ] **Step 6: Implement — `src/lib/actions/personal-files.ts` (`addPersonalFile`)**
+
+Replace:
+
+```ts
+  if (embeddable) {
+    const { indexContent } = await import('@/lib/actions/ai-context');
+    void indexContent({
+      type: 'personal_file',
+      fileId: file.id,
+      courseId: data.courseId,
+    });
+  }
+```
+
+with:
+
+```ts
+  if (embeddable) {
+    // Awaited (not fire-and-forget): detached promises are dropped on
+    // serverless freeze, leaving the file un-embedded and unfindable.
+    const { indexContent } = await import('@/lib/actions/ai-context');
+    try {
+      await indexContent({
+        type: 'personal_file',
+        fileId: file.id,
+        courseId: data.courseId,
+      });
+    } catch (err) {
+      console.error('Personal file indexing failed:', err);
+    }
+  }
+```
+
+- [ ] **Step 7: Verify no fire-and-forget indexing remains**
+
+Run: `grep -rn "indexContent" src/app/api/moodle src/lib/actions/personal-files.ts | grep -E "\.catch\(|void indexContent"`
+Expected: NO output (every call site now awaits).
+
+- [ ] **Step 8: Run the test + the existing route tests to verify they pass**
+
+Run: `pnpm test -- src/app/api/moodle/import-existing/route.test.ts`
+Expected: PASS (existing tests + the new "awaits indexing" test).
+
+- [ ] **Step 9: Commit**
+
+```bash
+git add src/app/api/moodle/upload/route.ts src/app/api/moodle/upload-finalize/route.ts src/app/api/moodle/import-existing/route.ts src/lib/actions/personal-files.ts src/app/api/moodle/import-existing/route.test.ts
+git commit -m "fix(ai): await Moodle + personal-file indexing (serverless-safe)
+
+Fire-and-forget indexContent was dropped on serverless freeze, leaving
+files un-embedded and unfindable by the AI. Await so the embedding
+completes within the request lifetime; log (not fail) on error.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>"
+```
+
+---
+
 ### Task 6: Retrieval — multiple chunks per file + per-(source,page) citations
 
 **Files:**
@@ -1459,7 +1670,8 @@ After deploying, trigger `POST /api/ai/reindex` as an authenticated admin to re-
 
 ## Self-review notes
 
-- **Spec coverage:** §4.1 extraction + guard + server-side count → Task 1–2, 4; §4.2 math-aware page-tagged chunks → Task 3; §4.3 indexing 0-indexed pages + course_material → Task 4–5; §4.4 multi-chunk + per-(source,page) + signed-URL dedupe → Task 6; §4.6 viewer (already built, exercised) → Task 10; §6 course-material indexing + backfill → Task 5, 8; testing → Task 9–11. §4.5 (prompt/render) is **Phase 1**.
+- **Spec coverage:** §4.1 extraction + guard + server-side count → Task 1–2, 4; §4.2 math-aware page-tagged chunks → Task 3; §4.3 indexing 0-indexed pages + course_material → Task 4–5; serverless-safe indexing of Moodle + personal files (so they actually get embedded) → Task 5b; §4.4 multi-chunk + per-(source,page) + signed-URL dedupe → Task 6; §4.6 viewer (already built, exercised) → Task 10; §6 course-material indexing + backfill → Task 5, 8; testing → Task 9–11. §4.5 (prompt/render) is **Phase 1**.
+- **Moodle findability (Task 5b):** fixes the *future-uploads* half of "the AI can't find Moodle files" (embedding was silently dropped at upload time); Task 8's backfill re-embeds *existing* files that were dropped; Task 6's multi-chunk retrieval + Task 3's smaller chunks fix the *retrieval-quality* half. All three together close the issue.
 - **Type consistency:** `PageText` (defined in `pdf.ts`, imported by `embeddings.ts` and the `indexContent` flow), `PageChunk` (embeddings.ts), `chunkPages`/`chunkFlatText`, `getPdfPageCount`, `reindexAllContent`, `MAX_CHUNKS_PER_SOURCE`, `CHUNK_CHAR_BUDGET` — all referenced consistently across tasks.
 - **0-indexed contract:** stored `page_start/page_end` are 0-indexed (chunkPages subtracts 1); `pageRangeOf` adds 1 for display ("p. N"); the chat badge subtracts 1 again for `FileViewer.initialPage`. Verified end-to-end in Task 6 + Task 10.
 - **Known limitations (documented, accepted for v1):** cross-user historical backfill of course_material/personal_file is RLS-bound (Task 8 note); pure-image pages produce no chunk (not retrievable in text-only v1 — §13 future); large PDFs that overflow the model's output limit fall back to page-less (Task 4 guard) — batched extraction for >50-page PDFs is a follow-up if it bites.
