@@ -36,7 +36,11 @@ The student attached these files as the primary context for this note: ${context
 2. **Use LaTeX for math** wrapped in dollar signs (e.g., $E = mc^2$, $$\\int_0^\\infty f(x)\\,dx$$).
 3. **Be pedagogical.** Explain step by step; guide toward understanding rather than just giving answers.
 4. **Structure your answers** with markdown.
-5. **Source citations format.** When you referenced course materials, list them at the end:
+5. **Cite with evidence.** When a claim comes from the course materials:
+   - Attribute it inline as \`(Material name, p. N)\`. Use the page number **only if it appears in the material's header** (e.g. \`--- Notes.pdf (p. 7) ---\`); otherwise cite the name alone.
+   - When the material contains the exact supporting sentence, quote it **verbatim** in a markdown blockquote (\`> ...\`) right before or after the claim.
+   - If a page has no faithful text to quote (e.g. an image-only or figure slide), cite the page **without a blockquote** — **never invent a quote** or paraphrase inside quotation marks.
+   Then list everything you referenced at the end:
 [Sources]
 - Material Name: brief description of what was referenced
 ${documentContext}${contextFilesSection}`;
