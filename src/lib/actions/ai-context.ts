@@ -27,6 +27,12 @@ import { createAdminClient } from '@/lib/supabase/admin';
 import { createClient } from '@/lib/supabase/server';
 
 // ---------------------------------------------------------------------------
+// Module-level constants
+// ---------------------------------------------------------------------------
+
+const MAX_CHUNKS_PER_SOURCE = 3;
+
+// ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
 
@@ -615,25 +621,50 @@ export async function buildAiContext(params: QuestionParams): Promise<{
         })
       : [];
   const courseResults = courseId
-    ? await searchContext({ query: question, courseId, maxResults: 8 })
+    ? await searchContext({ query: question, courseId, maxResults: 12 })
     : [];
   const results = [...focusResults, ...courseResults];
 
   const contextTexts: string[] = [];
   const sources: QuestionResult['sources'] = [];
-  const sourceIds: { sourceId: string; sourceType: string; idx: number }[] = [];
-  const seen = new Set<string>();
+  const perSourceCount = new Map<string, number>();
+  // Guards against the same chunk arriving from both the focus and course-wide
+  // passes (results = [...focusResults, ...courseResults]).
+  const seenChunk = new Set<string>();
+  // Dedupes citations at the (sourceId, pageRange) level. citationsBySource is
+  // coarser (keyed per file) and cannot serve this role, so both are needed.
+  const seenCitation = new Set<string>();
+  // sourceId -> { sourceType, idxs: indices in `sources` that share this file's URL }
+  const citationsBySource = new Map<
+    string,
+    { sourceType: string; idxs: number[] }
+  >();
+
+  const pageRangeOf = (r: SearchResult): string | null =>
+    r.pageStart != null
+      ? r.pageEnd != null && r.pageEnd !== r.pageStart
+        ? `p. ${r.pageStart + 1}–${r.pageEnd + 1}`
+        : `p. ${r.pageStart + 1}`
+      : null;
 
   for (const r of results) {
-    if (r.segmentText && !seen.has(r.sourceId)) {
-      seen.add(r.sourceId);
-      contextTexts.push(`--- ${r.sourceName} ---\n${r.segmentText}`);
-      const pageRange =
-        r.pageStart != null
-          ? r.pageEnd != null && r.pageEnd !== r.pageStart
-            ? `p. ${r.pageStart + 1}–${r.pageEnd + 1}`
-            : `p. ${r.pageStart + 1}`
-          : null;
+    if (!r.segmentText) continue;
+    const chunkKey = String(r.id);
+    if (seenChunk.has(chunkKey)) continue;
+    const count = perSourceCount.get(r.sourceId) ?? 0;
+    if (count >= MAX_CHUNKS_PER_SOURCE) continue;
+    seenChunk.add(chunkKey);
+    perSourceCount.set(r.sourceId, count + 1);
+
+    const pageRange = pageRangeOf(r);
+    const header = pageRange
+      ? `--- ${r.sourceName} (${pageRange}) ---`
+      : `--- ${r.sourceName} ---`;
+    contextTexts.push(`${header}\n${r.segmentText}`);
+
+    const citationKey = `${r.sourceId}|${pageRange ?? ''}`;
+    if (!seenCitation.has(citationKey)) {
+      seenCitation.add(citationKey);
       sources.push({
         sourceType: r.sourceType,
         sourceId: r.sourceId,
@@ -641,24 +672,27 @@ export async function buildAiContext(params: QuestionParams): Promise<{
         pageRange,
         signedUrl: null,
       });
-      sourceIds.push({
-        sourceId: r.sourceId,
+      const idx = sources.length - 1;
+      const entry = citationsBySource.get(r.sourceId) ?? {
         sourceType: r.sourceType,
-        idx: sources.length - 1,
-      });
+        idxs: [],
+      };
+      entry.idxs.push(idx);
+      citationsBySource.set(r.sourceId, entry);
     }
   }
 
-  // Batch-fetch storage paths per source type, then generate signed URLs
-  // in parallel. If anything fails, leave signedUrl null — the chat
-  // falls back to a non-clickable badge.
-  const moodleIds = sourceIds
+  // One signed URL per distinct file, fanned out to all its (page) citations.
+  const distinct = [...citationsBySource.entries()].map(
+    ([sourceId, v]) => ({ sourceId, sourceType: v.sourceType, idxs: v.idxs }),
+  );
+  const moodleIds = distinct
     .filter((s) => s.sourceType === 'moodle_file')
     .map((s) => s.sourceId);
-  const materialIds = sourceIds
+  const materialIds = distinct
     .filter((s) => s.sourceType === 'course_material')
     .map((s) => s.sourceId);
-  const personalIds = sourceIds
+  const personalIds = distinct
     .filter((s) => s.sourceType === 'personal_file')
     .map((s) => s.sourceId);
 
@@ -692,12 +726,13 @@ export async function buildAiContext(params: QuestionParams): Promise<{
       .from('personal_files')
       .select('id, storage_path')
       .in('id', personalIds);
-    for (const row of (data ?? []) as { id: string; storage_path: string }[])
+    for (const row of (data ?? []) as { id: string; storage_path: string }[]) {
       personalPaths[row.id] = row.storage_path;
+    }
   }
 
   await Promise.all(
-    sourceIds.map(async ({ sourceId, sourceType, idx }) => {
+    distinct.map(async ({ sourceId, sourceType, idxs }) => {
       const bucket =
         sourceType === 'moodle_file'
           ? 'moodle-materials'
@@ -719,7 +754,8 @@ export async function buildAiContext(params: QuestionParams): Promise<{
       const { data } = await client.storage
         .from(bucket)
         .createSignedUrl(path, 3600);
-      sources[idx].signedUrl = data?.signedUrl ?? null;
+      const url = data?.signedUrl ?? null;
+      for (const idx of idxs) sources[idx].signedUrl = url;
     }),
   );
 

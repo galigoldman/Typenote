@@ -432,6 +432,80 @@ describe('buildAiContext attaches signedUrl to sources', () => {
   });
 });
 
+describe('buildAiContext multi-chunk retrieval + page citations', () => {
+  it('keeps several chunks per file and emits one citation per (source,page)', async () => {
+    // source_id MUST be 'mat-1' to match the supabase mock's fixed
+    // course_materials row, so the signed-URL lookup resolves.
+    const mk = (id: number, page: number) => ({
+      id,
+      source_type: 'course_material',
+      source_id: 'mat-1',
+      source_name: 'Lecture9.pdf',
+      segment_text: `chunk ${id}`,
+      page_start: page,
+      page_end: page,
+      course_id: 'course-1',
+      mime_type: 'application/pdf',
+      similarity: 0.9,
+    });
+    // No attached files -> only the course-wide pass runs (one matchEmbeddings call).
+    vi.mocked(matchEmbeddings).mockResolvedValueOnce([
+      mk(1, 0),
+      mk(2, 0), // same page as chunk 1 -> citation deduped
+      mk(3, 6),
+    ]);
+
+    const { sources } = await buildAiContext({
+      question: 'q',
+      courseId: 'course-1',
+      mode: 'quick',
+    });
+
+    // Two distinct citations: p.1 and p.7 (0-indexed 0 and 6).
+    expect(sources).toHaveLength(2);
+    const ranges = sources.map((s) => s.pageRange).sort();
+    expect(ranges).toEqual(['p. 1', 'p. 7']);
+    // Same file -> both citations share the one signed URL (fetched once).
+    expect(sources.every((s) => s.signedUrl?.startsWith('http'))).toBe(true);
+  });
+
+  it('caps admitted chunks per source at MAX_CHUNKS_PER_SOURCE (3)', async () => {
+    const mk = (id: number, page: number) => ({
+      id,
+      source_type: 'course_material',
+      source_id: 'mat-1',
+      source_name: 'Lecture9.pdf',
+      segment_text: `chunk ${id}`,
+      page_start: page,
+      page_end: page,
+      course_id: 'course-1',
+      mime_type: 'application/pdf',
+      similarity: 0.9,
+    });
+    // Four chunks on four distinct pages from ONE file. The per-source cap (3)
+    // admits the first three (pages 0,2,4) and drops the fourth (page 6).
+    vi.mocked(matchEmbeddings).mockResolvedValueOnce([
+      mk(1, 0),
+      mk(2, 2),
+      mk(3, 4),
+      mk(4, 6),
+    ]);
+
+    const { sources } = await buildAiContext({
+      question: 'q',
+      courseId: 'course-1',
+      mode: 'quick',
+    });
+
+    expect(sources).toHaveLength(3);
+    expect(sources.map((s) => s.pageRange).sort()).toEqual([
+      'p. 1',
+      'p. 3',
+      'p. 5',
+    ]);
+  });
+});
+
 describe('buildAiContext attached-file focus pass', () => {
   it('sets contextFilesUsed=true and surfaces the attached file in sources', async () => {
     // Arrange: one attached context file
