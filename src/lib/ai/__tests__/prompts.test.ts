@@ -93,3 +93,24 @@ describe('buildSystemPrompt context files', () => {
     expect(out).not.toContain('ATTACHED CONTEXT FILES');
   });
 });
+
+describe('buildSystemPrompt — evidence citations', () => {
+  it('instructs the model to quote evidence verbatim in a blockquote', () => {
+    const prompt = buildSystemPrompt({ hasDocumentContent: false });
+    expect(prompt.toLowerCase()).toContain('blockquote');
+    expect(prompt).toMatch(/quote/i);
+  });
+
+  it('instructs an inline citation with optional page', () => {
+    const prompt = buildSystemPrompt({ hasDocumentContent: false });
+    // The literal citation template the model must follow.
+    expect(prompt).toContain('(Material name');
+    expect(prompt).toMatch(/p\.\s*N/);
+  });
+
+  it('tells the model NOT to fabricate a quote for image-only pages', () => {
+    const prompt = buildSystemPrompt({ hasDocumentContent: false });
+    expect(prompt.toLowerCase()).toContain('without a blockquote');
+    expect(prompt).toMatch(/never invent|do not invent|never fabricate/i);
+  });
+});
