@@ -280,13 +280,18 @@ Test lives in `src/__tests__/integration/storage-rls.integration.test.ts`. Verif
 
 ## Evidence Citations (`e2e/evidence-citations.spec.ts`) — IMPLEMENTED
 
-Covers the **evidence-quote + jump-to-page citation** flow introduced in the
-evidence-citations feature (Phase 2). The AI endpoint is mocked with an SSE stub
-so no live Gemini key is required and the test runs unconditionally in CI.
+Covers the **jump-to-source** payoff of the evidence-citations feature (Phase 2):
+sending an AI chat message surfaces a clickable citation badge that opens the
+in-app file viewer. The AI endpoint has a page.route SSE stub, but the app's PWA
+service worker + the route's server-side `AI_RATE_LIMIT_DEBUG` path mean the AI
+response _body_ can't be reliably mock-driven in CI, so this E2E asserts only the
+browser-level behavior. The answer-content guarantees are unit-tested instead:
+the verbatim blockquote in `src/components/ai/__tests__/markdown-response.test.tsx`
+and the per-`(source, page)` `p. N` citation in
+`src/lib/actions/__tests__/ai-context.test.ts`.
 
-- [x] Mocked AI response with a blockquote renders a `<blockquote>` element containing the quoted text
-- [x] Citation badge (`data-testid="ai-citation"`) displays the source file name (`lecture-1-slides.pdf`) and page reference (`p. 7`)
-- [x] Clicking the citation badge opens the file viewer (`data-testid="file-viewer"`)
+- [x] Sending a chat message surfaces a citation badge (`data-testid="ai-citation"`)
+- [x] Clicking the citation badge opens the file viewer (`data-testid="file-viewer"`) — the jump-to-source behavior only a browser can verify
 
 ---
 
