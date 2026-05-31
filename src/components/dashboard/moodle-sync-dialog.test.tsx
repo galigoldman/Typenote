@@ -622,4 +622,86 @@ describe('MoodleSyncDialog', () => {
     // Still `concurrency` — the queued files never started.
     expect(mockDownloadAndUpload).toHaveBeenCalledTimes(CONCURRENCY);
   });
+
+  it('does not close on Escape while a sync is in progress', async () => {
+    const user = userEvent.setup();
+    const onOpenChange = vi.fn();
+
+    const files = [
+      {
+        type: 'file' as const,
+        name: 'a.pdf',
+        moodleUrl: 'https://moodle.test.ac.il/file/a',
+      },
+    ];
+    const mockScrape = vi.fn().mockResolvedValue(mockScrapedCourses);
+    const mockScrapeContent = vi.fn().mockResolvedValue({
+      sections: [
+        {
+          moodleSectionId: 'sec-1',
+          title: 'Week 1',
+          position: 0,
+          items: files,
+        },
+      ],
+    });
+    // Download hangs so the dialog stays in the 'syncing' phase.
+    const mockDownloadAndUpload = vi.fn(() => new Promise<void>(() => {}));
+
+    mockUseMoodleExtension.mockReturnValue(
+      makeExtensionMock({
+        scrapeCourses: mockScrape,
+        scrapeCourseContent: mockScrapeContent,
+        downloadAndUpload: mockDownloadAndUpload,
+      }),
+    );
+    mockCompare.mockResolvedValue(mockComparisons);
+    mockSync.mockResolvedValue({
+      syncedCount: 1,
+      courses: [
+        {
+          moodleCourseId: 'CS101',
+          sections: [
+            {
+              id: 'section-db-1',
+              moodleSectionId: 'sec-1',
+              items: [{ moodleUrl: 'https://moodle.test.ac.il/file/a' }],
+            },
+          ],
+        },
+      ],
+    });
+
+    render(
+      <MoodleSyncDialog
+        open={true}
+        onOpenChange={onOpenChange}
+        moodleConnection={mockConnection}
+      />,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText('Intro to CS')).toBeInTheDocument();
+    });
+    await user.click(screen.getByRole('button', { name: /preview content/i }));
+    await waitFor(() => {
+      expect(screen.getByText('a.pdf')).toBeInTheDocument();
+    });
+    await user.click(screen.getByRole('button', { name: /sync selected/i }));
+
+    // In the syncing phase: the Cancel button is the signal we're mid-sync.
+    await waitFor(() => {
+      expect(
+        screen.getByRole('button', { name: /^cancel$/i }),
+      ).toBeInTheDocument();
+    });
+
+    // Escape must NOT dismiss the dialog mid-sync.
+    await user.keyboard('{Escape}');
+
+    expect(onOpenChange).not.toHaveBeenCalledWith(false);
+    expect(
+      screen.getByRole('button', { name: /^cancel$/i }),
+    ).toBeInTheDocument();
+  });
 });
