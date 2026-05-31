@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Typenote Moodle Sync",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "Import course materials from Moodle into Typenote",
   "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAmAsETPFXkIxxNHGIsBGrtCXNqx3OSLT/BDLyd22QD6Es4IwKlMN3Png15xHpOB+RRaExNC0DtyW73/dnvSEJRJD8vTWV6JWijUeKRP2BGwk06kLTwz0u+RETLJRRvvnfgUh+WiaeX+hFZlfpFXo5zSJP6EhmZq4Asxhc0MIDyAD5JlLtgivQhy3CoFz8eyiAFcziwSKobnUVaEAm96ayjVStCyrayoz676estF5yNRSii/E5XCNdFGVbuiD70wjF3NH2KdxQm1JiGXUrZyefCtVO0cHov5akc+TWT1YIvBrcYaHuXFN/Uf4oJgzhkj9l5uEDPWdx3ajiv1WXbZirmQIDAQAB",
   "permissions": ["storage", "scripting", "cookies", "tabs", "activeTab"],

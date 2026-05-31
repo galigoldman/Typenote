@@ -18,8 +18,9 @@ import type {
   ScrapedCoursesData,
   ScrapedCourseContentData,
 } from '../types/messages';
+import { pickPluginfileUrl, extensionMatches } from '../lib/url-resolve';
 
-const EXTENSION_VERSION = '0.2.0';
+const EXTENSION_VERSION = '0.2.1';
 
 // ============================================
 // Pending permission stash
@@ -590,43 +591,112 @@ async function handleScrapeCourseContent(
 // ============================================
 
 /**
- * Resolves a Moodle activity URL to the actual pluginfile.php download URL.
- * For view.php URLs: navigates a tab to the page and extracts the real URL
- * from the DOM (pluginfile.php links in embeds/iframes/download links).
- * For pluginfile.php URLs: returns as-is.
+ * Maps a Moodle activity URL to the cheapest URL the download step can fetch.
+ *
+ * This does NO network I/O — that's the whole point of the speed fix. The old
+ * code opened a popup window per file (hours for a full course); even the
+ * pre-popup version navigated a tab per file. Instead:
+ *
+ *   - A `pluginfile.php` URL (all folder children + link-sweep items — the
+ *     majority of files) is already the file: return as-is.
+ *   - A `/mod/resource/view.php` URL gets `?redirect=1`. For "force download" /
+ *     "open" resources (the common case) Moodle 302s straight to the file, so
+ *     the download fetch follows it to the bytes with ZERO extra requests.
+ *   - Anything else is returned untouched.
+ *
+ * "Embed/in-frame" resources don't 302 — they return an HTML viewer page. That
+ * case is handled in handleDownloadAndUpload, which parses the pluginfile link
+ * out of the response it already fetched (no extra GET), and escalates to a
+ * single reused tab only if parsing fails. See resolveViaTab.
  */
-async function resolveFileUrl(moodleUrl: string): Promise<string> {
-  // Already a direct file URL
+function resolveFileUrl(moodleUrl: string): string {
   if (moodleUrl.includes('/pluginfile.php')) {
     return moodleUrl;
   }
-
-  // Navigate to the resource page and extract the real file URL
   if (
     moodleUrl.includes('/mod/resource/view.php') ||
     moodleUrl.includes('/mod/folder/view.php')
   ) {
-    const { tabId, windowId } = await openScrapeWindow(moodleUrl);
-    try {
-      try {
-        const realUrl = await executeScraperFunction<string>(
-          tabId,
-          'scrapeFileUrl',
-        );
-        if (realUrl) return realUrl;
-      } catch {
-        // scrapeFileUrl returned null — no pluginfile.php link found on page
-      }
-
-      // Fallback: try redirect=1 parameter
-      const sep = moodleUrl.includes('?') ? '&' : '?';
-      return `${moodleUrl}${sep}redirect=1`;
-    } finally {
-      await closeScrapeWindow(windowId);
-    }
+    const sep = moodleUrl.includes('?') ? '&' : '?';
+    return `${moodleUrl}${sep}redirect=1`;
   }
-
   return moodleUrl;
+}
+
+// ============================================
+// Fallback resolver: one reused background tab
+// ============================================
+// Last resort for resources whose pluginfile link we can't get from the page's
+// server HTML (e.g. JS-rendered viewers). We DOM-scrape via the content script,
+// but — unlike the old code — share ONE inactive tab across all files and
+// serialize navigations through a mutex, so this never becomes "a tab per file"
+// again. The tab is auto-closed shortly after the last fallback resolve.
+
+let fallbackTabId: number | null = null;
+let fallbackChain: Promise<unknown> = Promise.resolve();
+let fallbackCloseTimer: ReturnType<typeof setTimeout> | null = null;
+
+/**
+ * Resolves a view.php URL to its pluginfile link by loading it in the shared
+ * fallback tab and running the DOM scraper. Returns null if it can't. Calls are
+ * serialized: the ≤4 download workers take turns on the single tab so their
+ * navigations can't clobber each other.
+ */
+async function resolveViaTab(moodleUrl: string): Promise<string | null> {
+  const run = fallbackChain.then(() => resolveViaTabInner(moodleUrl));
+  // Keep the mutex chain alive whether this resolve succeeds or throws.
+  fallbackChain = run.then(
+    () => undefined,
+    () => undefined,
+  );
+  return run;
+}
+
+async function resolveViaTabInner(moodleUrl: string): Promise<string | null> {
+  if (fallbackCloseTimer !== null) {
+    clearTimeout(fallbackCloseTimer);
+    fallbackCloseTimer = null;
+  }
+  try {
+    if (fallbackTabId === null) {
+      // Inactive tab: a resource view page has its pluginfile link in the
+      // initial HTML (no timer-driven hydration like the dashboard), so it
+      // doesn't need focus to render — and we don't steal the user's focus.
+      const tab = await chrome.tabs.create({ url: moodleUrl, active: false });
+      if (tab.id === undefined) return null;
+      fallbackTabId = tab.id;
+    } else {
+      await chrome.tabs.update(fallbackTabId, {
+        url: moodleUrl,
+        active: false,
+      });
+    }
+    await waitForTabLoad(fallbackTabId);
+    const realUrl = await executeScraperFunction<string>(
+      fallbackTabId,
+      'scrapeFileUrl',
+    );
+    return realUrl || null;
+  } catch {
+    return null;
+  } finally {
+    scheduleFallbackTabClose();
+  }
+}
+
+/** Close the shared fallback tab a few seconds after the last fallback use. */
+function scheduleFallbackTabClose(): void {
+  if (fallbackCloseTimer !== null) clearTimeout(fallbackCloseTimer);
+  fallbackCloseTimer = setTimeout(() => {
+    fallbackCloseTimer = null;
+    if (fallbackTabId !== null) {
+      const id = fallbackTabId;
+      fallbackTabId = null;
+      chrome.tabs.remove(id).catch(() => {
+        // Tab already gone — fine.
+      });
+    }
+  }, 5_000);
 }
 
 async function handleDownloadAndUpload(
@@ -648,7 +718,7 @@ async function handleDownloadAndUpload(
     };
     if (authToken) jsonHeaders['Authorization'] = `Bearer ${authToken}`;
 
-    const downloadUrl = await resolveFileUrl(moodleFileUrl);
+    const downloadUrl = resolveFileUrl(moodleFileUrl);
 
     // Fast path: if the registry already has this file AND its size matches
     // what Moodle says NOW, we can register the import for this user
@@ -661,7 +731,11 @@ async function handleDownloadAndUpload(
         credentials: 'include',
         redirect: 'follow',
       });
-      if (headResp.ok) {
+      // Skip the size-match shortcut for embed-mode resources: a HEAD on the
+      // view page returns the HTML's length, not the file's, which would feed
+      // import-existing a bogus size.
+      const headType = headResp.headers.get('content-type') ?? '';
+      if (headResp.ok && !headType.includes('text/html')) {
         const sizeHeader = headResp.headers.get('content-length');
         const observedSize = sizeHeader ? Number(sizeHeader) : NaN;
         if (Number.isFinite(observedSize) && observedSize > 0) {
@@ -704,7 +778,7 @@ async function handleDownloadAndUpload(
       // would otherwise complete.
     }
 
-    const response = await fetch(downloadUrl, {
+    let response = await fetch(downloadUrl, {
       credentials: 'include',
       redirect: 'follow',
     });
@@ -714,11 +788,51 @@ async function handleDownloadAndUpload(
       );
     }
 
-    const contentType = response.headers.get('content-type') ?? '';
+    let resolvedUrl = response.url || downloadUrl;
+    let contentType = response.headers.get('content-type') ?? '';
+
+    // Embed/in-frame resource: we got the HTML viewer page, not the file.
+    // Parse the real pluginfile link out of THIS response (no extra GET);
+    // pickPluginfileUrl skips avatar/theme/overview chrome and prefers a
+    // forcedownload link. If the page has no usable link (e.g. JS-rendered),
+    // escalate once to the shared fallback tab.
     if (contentType.includes('text/html')) {
+      const html = await response.text();
+      let real = pickPluginfileUrl(html);
+      if (!real) {
+        real = await resolveViaTab(moodleFileUrl);
+      }
+      if (!real) {
+        throw new Error(
+          `Could not find a downloadable file for ${moodleFileUrl.substring(0, 80)}`,
+        );
+      }
+      response = await fetch(real, {
+        credentials: 'include',
+        redirect: 'follow',
+      });
+      if (!response.ok) {
+        throw new Error(
+          `Download failed: ${response.status} ${response.statusText}`,
+        );
+      }
+      resolvedUrl = response.url || real;
+      contentType = response.headers.get('content-type') ?? '';
+      if (contentType.includes('text/html')) {
+        throw new Error(
+          `Got HTML instead of file — could not resolve download URL. ` +
+            `Resource: ${moodleFileUrl.substring(0, 80)}`,
+        );
+      }
+    }
+
+    // Wrong-file guard: if the resolved file's extension is known and differs
+    // from the expected filename's, we resolved to the wrong thing (e.g. an
+    // avatar PNG for a PDF). The "not HTML" check above can't catch that.
+    if (!extensionMatches(resolvedUrl, metadata.fileName)) {
       throw new Error(
-        `Got HTML instead of file — could not resolve download URL. ` +
-          `Resource: ${moodleFileUrl.substring(0, 80)}`,
+        `Resolved a different file type than expected for ${metadata.fileName} ` +
+          `(got ${resolvedUrl.substring(0, 80)}).`,
       );
     }
 
