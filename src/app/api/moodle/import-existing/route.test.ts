@@ -169,7 +169,9 @@ describe('POST /api/moodle/import-existing', () => {
     expect(data.reason).toBe('not_in_registry');
   });
 
-  it('refuses with size_unknown when registry has no file_size', async () => {
+  it('claims even when file_size is unknown, as long as bytes are stored', async () => {
+    // file_size is metadata; storage_path + content_hash prove we have the
+    // bytes. Claim-from-registry no longer gates on size.
     const admin = buildAdmin({
       file: {
         id: 'file-1',
@@ -184,11 +186,15 @@ describe('POST /api/moodle/import-existing', () => {
     const res = await POST(makeRequest(body) as never);
     const data = await res.json();
 
-    expect(data.imported).toBe(false);
-    expect(data.reason).toBe('size_unknown');
+    expect(data.imported).toBe(true);
+    expect(recordUserFileImport).toHaveBeenCalledWith('u1', 'file-1', 'mc-1');
   });
 
-  it('refuses with size_changed when observedSize disagrees with registry', async () => {
+  it('claims regardless of observedSize differing from the stored size', async () => {
+    // Deliberate tradeoff: we do NOT re-verify size against Moodle. A stored
+    // file (storage_path + content_hash) is claimed even when the HEAD-observed
+    // size differs, so a second user skips the download. A replaced file is
+    // picked up by a future change-detecting re-sync, not here.
     const admin = buildAdmin({
       file: {
         id: 'file-1',
@@ -203,8 +209,28 @@ describe('POST /api/moodle/import-existing', () => {
     const res = await POST(makeRequest(body) as never);
     const data = await res.json();
 
+    expect(data.imported).toBe(true);
+    expect(data.deduplicated).toBe(true);
+    expect(recordUserFileImport).toHaveBeenCalledWith('u1', 'file-1', 'mc-1');
+  });
+
+  it('does not claim a registry row that has no content hash (not materialized)', async () => {
+    const admin = buildAdmin({
+      file: {
+        id: 'file-1',
+        storage_path: 'm.org/c1/abc.pdf',
+        content_hash: null,
+        file_size: 100,
+        mime_type: 'application/pdf',
+      },
+    });
+    setupAuth(admin);
+
+    const res = await POST(makeRequest(body) as never);
+    const data = await res.json();
+
     expect(data.imported).toBe(false);
-    expect(data.reason).toBe('size_changed');
+    expect(data.reason).toBe('not_materialized');
     expect(recordUserFileImport).not.toHaveBeenCalled();
   });
 

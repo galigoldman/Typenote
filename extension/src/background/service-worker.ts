@@ -720,62 +720,48 @@ async function handleDownloadAndUpload(
 
     const downloadUrl = resolveFileUrl(moodleFileUrl);
 
-    // Fast path: if the registry already has this file AND its size matches
-    // what Moodle says NOW, we can register the import for this user
-    // without downloading bytes again. HEAD is one round-trip and pulls no
-    // body. Any failure (HEAD unsupported, network blip, server says
-    // "can't verify") falls through to the existing full-download flow.
+    // Claim-from-registry fast path: ask the server whether the shared
+    // registry already has this file's bytes. If so, it records the import for
+    // this user and we skip the Moodle download ENTIRELY — no HEAD, no bytes,
+    // no re-upload. This is what makes a second user's sync of an
+    // already-stored course near-instant.
+    //
+    // We deliberately don't probe Moodle with a HEAD first: embed-mode
+    // resources (view.php) return HTML on a HEAD, so the old size-match gate
+    // never fired for them and every file re-downloaded. The server owns the
+    // "do we already have it?" decision now. Any error here falls through to
+    // the full-download path below.
     try {
-      const headResp = await fetch(downloadUrl, {
-        method: 'HEAD',
-        credentials: 'include',
-        redirect: 'follow',
+      const fastResp = await fetch(`${baseOrigin}/api/moodle/import-existing`, {
+        method: 'POST',
+        headers: jsonHeaders,
+        body: JSON.stringify({
+          sectionId: metadata.sectionId,
+          moodleUrl: metadata.moodleUrl,
+        }),
       });
-      // Skip the size-match shortcut for embed-mode resources: a HEAD on the
-      // view page returns the HTML's length, not the file's, which would feed
-      // import-existing a bogus size.
-      const headType = headResp.headers.get('content-type') ?? '';
-      if (headResp.ok && !headType.includes('text/html')) {
-        const sizeHeader = headResp.headers.get('content-length');
-        const observedSize = sizeHeader ? Number(sizeHeader) : NaN;
-        if (Number.isFinite(observedSize) && observedSize > 0) {
-          const fastResp = await fetch(
-            `${baseOrigin}/api/moodle/import-existing`,
-            {
-              method: 'POST',
-              headers: jsonHeaders,
-              body: JSON.stringify({
-                sectionId: metadata.sectionId,
-                moodleUrl: metadata.moodleUrl,
-                observedSize,
-              }),
+      if (fastResp.ok) {
+        const fastJson = (await fastResp.json()) as {
+          imported?: boolean;
+          contentHash?: string;
+          fileSize?: number;
+          mimeType?: string;
+        };
+        if (fastJson.imported) {
+          return {
+            success: true,
+            data: {
+              contentHash: fastJson.contentHash ?? '',
+              fileSize: fastJson.fileSize ?? 0,
+              mimeType: fastJson.mimeType ?? '',
+              deduplicated: true,
             },
-          );
-          if (fastResp.ok) {
-            const fastJson = (await fastResp.json()) as {
-              imported?: boolean;
-              contentHash?: string;
-              fileSize?: number;
-              mimeType?: string;
-            };
-            if (fastJson.imported) {
-              return {
-                success: true,
-                data: {
-                  contentHash: fastJson.contentHash ?? '',
-                  fileSize: fastJson.fileSize ?? observedSize,
-                  mimeType: fastJson.mimeType ?? '',
-                  deduplicated: true,
-                },
-              };
-            }
-          }
+          };
         }
       }
     } catch {
-      // Any error in the fast-path probe — fall through to full download.
-      // We never want a HEAD failure to block an import that the slow path
-      // would otherwise complete.
+      // Registry probe failed (network blip, server error) — fall through to
+      // the full download so a transient failure never blocks an import.
     }
 
     let response = await fetch(downloadUrl, {

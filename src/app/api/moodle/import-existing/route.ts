@@ -63,19 +63,25 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    if (file.file_size == null) {
-      // First import never populated file_size — we can't prove the
-      // current Moodle file matches what we have. Force a fresh download.
-      return NextResponse.json({ imported: false, reason: 'size_unknown' });
+    if (!file.content_hash) {
+      // A registry row with no content hash hasn't been fully materialized
+      // (scrape-time placeholder). We can't claim bytes we don't have —
+      // force a fresh download.
+      return NextResponse.json({ imported: false, reason: 'not_materialized' });
     }
 
-    if (
-      typeof observedSize === 'number' &&
-      Number.isFinite(observedSize) &&
-      file.file_size !== observedSize
-    ) {
-      return NextResponse.json({ imported: false, reason: 'size_changed' });
-    }
+    // Claim-from-registry: the shared registry already has this file's bytes
+    // (storage_path + content_hash). Register the import for THIS user and skip
+    // the Moodle download entirely — that's the whole point of the shared
+    // registry, and it makes a second user's sync near-instant for files that
+    // are already stored.
+    //
+    // Tradeoff (intentional): we do NOT re-verify the file hasn't changed on
+    // Moodle here. If an instructor replaces a file under the same URL, users
+    // who claim from the registry keep the existing version until a future
+    // change-detecting re-sync refreshes the registry. `observedSize` is no
+    // longer used to gate this; it's accepted for backward compatibility only.
+    void observedSize;
 
     // Resolve the linked Typenote course (best-effort; AI indexing needs it
     // but registration of the user import does not).
