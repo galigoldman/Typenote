@@ -16,11 +16,18 @@ vi.mock('@/lib/actions/ai-context', () => ({
   indexContent: vi.fn().mockResolvedValue({ success: true, skipped: true }),
 }));
 
+// Default: no existing embedding, so a claim re-indexes. Tests that exercise
+// the skip-when-already-indexed path override this per-case.
+vi.mock('@/lib/queries/embeddings', () => ({
+  getContentHash: vi.fn().mockResolvedValue(null),
+}));
+
 import { POST } from './route';
 import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { recordUserFileImport } from '@/lib/actions/moodle-sync';
 import { indexContent } from '@/lib/actions/ai-context';
+import { getContentHash } from '@/lib/queries/embeddings';
 
 type FileRow = {
   id: string;
@@ -212,6 +219,56 @@ describe('POST /api/moodle/import-existing', () => {
     expect(data.imported).toBe(true);
     expect(data.deduplicated).toBe(true);
     expect(recordUserFileImport).toHaveBeenCalledWith('u1', 'file-1', 'mc-1');
+  });
+
+  it('skips re-indexing when an embedding already exists at the registry hash', async () => {
+    // The expensive part of a "dedup" claim is indexContent downloading +
+    // hashing the file. When an embedding already exists at the same content
+    // hash, the claim must skip it — that is the speed fix for a second user's
+    // sync of an already-indexed course.
+    vi.mocked(getContentHash).mockResolvedValueOnce('abc'); // matches file.content_hash
+    const admin = buildAdmin({
+      file: {
+        id: 'file-1',
+        storage_path: 'm.org/c1/abc.pdf',
+        content_hash: 'abc',
+        file_size: 12345,
+        mime_type: 'application/pdf',
+      },
+    });
+    setupAuth(admin);
+
+    const res = await POST(makeRequest(body) as never);
+    const data = await res.json();
+
+    expect(data.imported).toBe(true);
+    expect(recordUserFileImport).toHaveBeenCalledWith('u1', 'file-1', 'mc-1');
+    // The whole point: no re-index when embeddings are already present + current.
+    expect(indexContent).not.toHaveBeenCalled();
+  });
+
+  it('re-indexes when the existing embedding hash is stale', async () => {
+    vi.mocked(getContentHash).mockResolvedValueOnce('OLD-HASH'); // != file.content_hash
+    const admin = buildAdmin({
+      file: {
+        id: 'file-1',
+        storage_path: 'm.org/c1/abc.pdf',
+        content_hash: 'abc',
+        file_size: 12345,
+        mime_type: 'application/pdf',
+      },
+    });
+    setupAuth(admin);
+
+    const res = await POST(makeRequest(body) as never);
+    const data = await res.json();
+
+    expect(data.imported).toBe(true);
+    expect(indexContent).toHaveBeenCalledWith({
+      type: 'moodle_file',
+      fileId: 'file-1',
+      courseId: 'tn-course-1',
+    });
   });
 
   it('does not claim a registry row that has no content hash (not materialized)', async () => {
