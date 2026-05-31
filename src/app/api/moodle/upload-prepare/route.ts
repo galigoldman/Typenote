@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 
 import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
+import { buildStorageFileName } from '@/lib/moodle/storage-path';
 
 /**
  * Step 1 of the extension's two-phase upload.
@@ -66,8 +67,13 @@ export async function POST(request: NextRequest) {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       (section as any)?.moodle_courses?.moodle_course_id ?? 'unknown';
 
-    const ext = fileName.includes('.') ? fileName.split('.').pop() : '';
-    const safeFileName = ext ? `${contentHash}.${ext}` : contentHash;
+    // The "fileName" is often the Moodle activity TITLE (e.g.
+    // "2025.12.24 - שיעור (CML ו-SML)"), not a real filename. Deriving the
+    // extension by splitting on the last dot then yields garbage with spaces /
+    // parens / unicode, which Supabase Storage rejects (InvalidKey). The key is
+    // content-hash based anyway, so the extension is cosmetic — use a sanitized
+    // one or none. (mime_type, stored separately, is the source of truth.)
+    const safeFileName = buildStorageFileName(contentHash, fileName);
     const storagePath = `${domain}/${moodleCourseId}/${safeFileName}`;
 
     // The storage key is derived from the SHA-256 content hash, so a
