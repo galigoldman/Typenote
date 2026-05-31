@@ -16,10 +16,19 @@ vi.mock('@/lib/actions/ai-context', () => ({
   indexContent: vi.fn().mockResolvedValue({ success: true, skipped: true }),
 }));
 
-// Default: no existing embedding, so a claim re-indexes. Tests that exercise
-// the skip-when-already-indexed path override this per-case.
+// Default: no existing embedding, so a claim schedules a background index.
+// Tests that exercise the skip-when-already-indexed path override this per-case.
 vi.mock('@/lib/queries/embeddings', () => ({
   getContentHash: vi.fn().mockResolvedValue(null),
+}));
+
+// Run scheduled background work synchronously so indexContent assertions hold.
+// One test overrides this with a capturing mock to prove the response does not
+// wait on indexing.
+vi.mock('@/lib/server/after-response', () => ({
+  scheduleAfterResponse: vi.fn((work: () => Promise<void>) => {
+    void work();
+  }),
 }));
 
 import { POST } from './route';
@@ -28,6 +37,7 @@ import { createAdminClient } from '@/lib/supabase/admin';
 import { recordUserFileImport } from '@/lib/actions/moodle-sync';
 import { indexContent } from '@/lib/actions/ai-context';
 import { getContentHash } from '@/lib/queries/embeddings';
+import { scheduleAfterResponse } from '@/lib/server/after-response';
 
 type FileRow = {
   id: string;
@@ -331,33 +341,22 @@ describe('POST /api/moodle/import-existing', () => {
     });
     setupAuth(admin);
 
-    let resolveIndex!: () => void;
-    const gate = new Promise<{ success: boolean; skipped: boolean }>(
-      (resolve) => {
-        resolveIndex = () => resolve({ success: true, skipped: false });
-      },
-    );
-    vi.mocked(indexContent).mockReturnValueOnce(gate as never);
-
-    const respPromise = POST(makeRequest(body) as never);
-
-    // Let microtasks run: indexContent should have been dispatched...
-    await new Promise((r) => setImmediate(r));
-    let settled = false;
-    void respPromise.then(() => {
-      settled = true;
+    // Capture the scheduled work instead of running it, to prove the response
+    // does NOT wait on indexing.
+    let scheduled: (() => Promise<void>) | null = null;
+    vi.mocked(scheduleAfterResponse).mockImplementationOnce((work) => {
+      scheduled = work;
     });
-    await new Promise((r) => setImmediate(r));
-    // ...but the response must NOT have resolved yet (proves we await).
-    expect(settled).toBe(false);
+    // indexContent would hang forever if (wrongly) awaited inline.
+    vi.mocked(indexContent).mockReturnValueOnce(new Promise(() => {}) as never);
 
-    resolveIndex();
-    const res = await respPromise;
+    const res = await POST(makeRequest(body) as never);
+
+    // Response returns immediately even though indexing hasn't run.
     expect(res.status).toBe(200);
-    expect(indexContent).toHaveBeenCalledWith({
-      type: 'moodle_file',
-      fileId: 'file-1',
-      courseId: 'tn-course-1',
-    });
+    expect(indexContent).not.toHaveBeenCalled();
+    // Indexing was scheduled for after the response.
+    expect(scheduleAfterResponse).toHaveBeenCalledTimes(1);
+    expect(scheduled).toBeTypeOf('function');
   });
 });
