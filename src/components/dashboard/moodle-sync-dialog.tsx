@@ -931,6 +931,16 @@ export function MoodleSyncDialog({
   const selectedItemCount =
     phase === 'select-content' ? getSelectedItemCount() : 0;
 
+  // Phases where work is actively running. While busy we block accidental
+  // dismissal (clicking the backdrop or pressing Esc) so a stray click can't
+  // silently cancel an in-progress sync/scan. The explicit Cancel button and
+  // the X still close it — this only stops *accidental* dismissal.
+  const isBusy =
+    phase === 'scraping' ||
+    phase === 'comparing' ||
+    phase === 'scraping-content' ||
+    phase === 'syncing';
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
@@ -940,6 +950,12 @@ export function MoodleSyncDialog({
           display: 'flex',
           flexDirection: 'column',
           overflow: 'hidden',
+        }}
+        onInteractOutside={(e) => {
+          if (isBusy) e.preventDefault();
+        }}
+        onEscapeKeyDown={(e) => {
+          if (isBusy) e.preventDefault();
         }}
       >
         <DialogHeader style={{ flexShrink: 0 }}>
