@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { indexContent } from '@/lib/actions/ai-context';
 import { recordUserFileImport } from '@/lib/actions/moodle-sync';
 import { getContentHash } from '@/lib/queries/embeddings';
+import { scheduleAfterResponse } from '@/lib/server/after-response';
 import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 
@@ -113,30 +114,31 @@ export async function POST(request: NextRequest) {
     }
 
     if (appCourseId) {
-      // Skip indexing entirely when an embedding already exists for this file
-      // at the registry's content hash. indexContent would otherwise download
-      // the full file from storage and SHA-256 it just to discover it can
-      // skip — ~1.5s per file, the dominant cost of a second user's "dedup"
-      // sync. getContentHash is a single cheap row read. The per-user import
-      // row recorded above is what grants AI access; the embeddings are shared
-      // across users by canonical moodle_courses.id, so we don't need to
-      // re-create them. Only index when missing or stale (hash mismatch).
+      // Embeddings are shared across users by canonical moodle_courses.id, so a
+      // file only needs embedding ONCE — never on a claim where it already
+      // exists. getContentHash is a single cheap row read. The per-user import
+      // recorded above is what grants AI access; we never re-create embeddings
+      // that are already current.
       const embeddedHash = await getContentHash('moodle_file', file.id);
       const alreadyIndexed =
         !!embeddedHash && embeddedHash === file.content_hash;
       if (!alreadyIndexed) {
-        // Awaited (not fire-and-forget): a detached promise is dropped when the
-        // serverless function freezes after responding, leaving the file
-        // un-embedded and unfindable. Failure is logged, not fatal.
-        try {
-          await indexContent({
-            type: 'moodle_file',
-            fileId: file.id,
-            courseId: appCourseId,
-          });
-        } catch (err) {
-          console.error('Index failed:', err);
-        }
+        // Index in the BACKGROUND (after the response). Embedding takes tens of
+        // seconds and nobody is waiting on its result, so it must not block the
+        // sync — that was why even deduped files took ~60s each. scheduleAfter-
+        // Response uses Next after() so the work survives the serverless freeze.
+        const fileId = file.id;
+        scheduleAfterResponse(async () => {
+          try {
+            await indexContent({
+              type: 'moodle_file',
+              fileId,
+              courseId: appCourseId,
+            });
+          } catch (err) {
+            console.error('Background index failed:', err);
+          }
+        });
       }
     }
 
