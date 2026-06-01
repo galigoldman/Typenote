@@ -119,7 +119,7 @@ function frame({ body, caption }) {
 
 const shots = [
   {
-    name: '01-connected-sites',
+    name: '01-extension-connected',
     html: frame({
       body: CONNECTED_BODY,
       caption: {
@@ -129,7 +129,7 @@ const shots = [
     }),
   },
   {
-    name: '02-permission-grant',
+    name: '04-extension-permission',
     html: frame({
       body: PENDING_BODY,
       caption: {
@@ -179,7 +179,7 @@ for (const s of shots) {
 
 await page.setViewportSize({ width: 440, height: 280 });
 await page.setContent(promoHtml, { waitUntil: 'networkidle' });
-const promoFile = join(outDir, '03-small-promo-tile.png');
+const promoFile = join(outDir, 'promo-tile.png');
 await page.screenshot({ path: promoFile, clip: { x: 0, y: 0, width: 440, height: 280 } });
 console.log(`\x1b[32m✔\x1b[0m ${promoFile}`);
 
