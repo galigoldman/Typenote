@@ -102,6 +102,46 @@ test.describe('Course sharing', () => {
     await memberCtx.close();
   });
 
+  test('shared course appears in the member sidebar tree, not only the dashboard cards', async ({
+    browser,
+  }) => {
+    test.setTimeout(90_000);
+    const ownerCtx = await browser.newContext();
+    const ownerPage = await ownerCtx.newPage();
+    await loginAs(ownerPage, OWNER.email, OWNER.password);
+    const courseName = `Sidebar Share E2E ${Date.now()}`;
+    await createCourse(ownerPage, courseName);
+    const url = await getShareUrl(ownerPage, 'viewer');
+
+    const memberCtx = await browser.newContext();
+    const memberPage = await memberCtx.newPage();
+    await loginAs(memberPage, MEMBER.email, MEMBER.password);
+    await memberPage.goto(url);
+    await expect(
+      memberPage.getByRole('heading', { name: courseName }),
+    ).toBeVisible({ timeout: 15_000 });
+
+    // Back on the dashboard, the shared course must show in the LEFT sidebar
+    // tree (a separate component that previously listed owned courses only),
+    // under its own "Shared with me" group — not just on the dashboard cards.
+    await memberPage.goto('/dashboard');
+    const sidebar = memberPage.getByTestId('dashboard-sidebar');
+    await expect(sidebar.getByText('Shared with me')).toBeVisible({
+      timeout: 10_000,
+    });
+    const sidebarEntry = sidebar.getByRole('button', { name: courseName });
+    await expect(sidebarEntry).toBeVisible({ timeout: 10_000 });
+
+    // And it navigates to the shared course when clicked from the sidebar.
+    await sidebarEntry.click();
+    await expect(memberPage).toHaveURL(/\/dashboard\/courses\//, {
+      timeout: 10_000,
+    });
+
+    await ownerCtx.close();
+    await memberCtx.close();
+  });
+
   test('leave: member removes course from list; course persists for owner', async ({
     browser,
   }) => {
