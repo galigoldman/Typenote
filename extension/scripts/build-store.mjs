@@ -67,15 +67,26 @@ const STRIP_ORIGINS = new Set([
   'http://151.145.83.151:3001/*',
 ]);
 
+// Not-yet-live origins: the custom domain isn't cut over yet (typenote.app
+// does not resolve), so requesting host access to it would mean shipping a
+// permission for a domain we don't currently serve — exactly what store
+// reviewers question. Strip it from the store bundle and re-add it here at
+// cutover. The dev manifest keeps it so local testing against the future
+// domain stays one edit away.
+const NOT_YET_LIVE_ORIGINS = new Set(['https://*.typenote.app/*']);
+
+const isStrippable = (h) =>
+  STRIP_ORIGINS.has(h) ||
+  NOT_YET_LIVE_ORIGINS.has(h) ||
+  h.startsWith('http://');
+
 manifest.host_permissions = (manifest.host_permissions ?? []).filter(
-  (h) => !STRIP_ORIGINS.has(h) && !h.startsWith('http://'),
+  (h) => !isStrippable(h),
 );
 
 if (manifest.externally_connectable?.matches) {
   manifest.externally_connectable.matches =
-    manifest.externally_connectable.matches.filter(
-      (m) => !STRIP_ORIGINS.has(m) && !m.startsWith('http://'),
-    );
+    manifest.externally_connectable.matches.filter((m) => !isStrippable(m));
 }
 
 // Narrow web_accessible_resources to typical Moodle URL patterns.
