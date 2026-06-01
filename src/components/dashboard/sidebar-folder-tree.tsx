@@ -127,6 +127,7 @@ function CourseNode({ course, level }: CourseNodeProps) {
 export function SidebarFolderTree() {
   const [folders, setFolders] = useState<FolderType[]>([]);
   const [courses, setCourses] = useState<Course[]>([]);
+  const [sharedCourses, setSharedCourses] = useState<Course[]>([]);
   const [loading, setLoading] = useState(true);
   const pathname = usePathname();
 
@@ -142,11 +143,13 @@ export function SidebarFolderTree() {
         setFolders(data as FolderType[]);
       }
 
-      // Scope to OWN courses: the course-sharing member-SELECT RLS policy would
-      // otherwise surface courses shared with the user in the owner sidebar.
       const {
         data: { user },
       } = await supabase.auth.getUser();
+
+      // Owned courses. Scope explicitly to user_id: the course-sharing
+      // member-SELECT RLS policy would otherwise mix shared courses into this
+      // query — we list those separately under "Shared with me" below.
       const { data: courseData } = await supabase
         .from('courses')
         .select('*')
@@ -156,6 +159,27 @@ export function SidebarFolderTree() {
       if (courseData) {
         setCourses(courseData as Course[]);
       }
+
+      // Courses shared with this user via course_members (e.g. a synced Moodle
+      // course another user shared). RLS lets a member read their own
+      // membership rows and the joined course. We query course_members directly
+      // (not getSharedWithMe, which needs the server-only admin client) since
+      // the sidebar only needs the course itself, not owner display names.
+      const { data: memberRows } = await supabase
+        .from('course_members')
+        .select(
+          'courses(id, user_id, folder_id, name, color, position, created_at, updated_at)',
+        )
+        .eq('user_id', user?.id ?? '');
+
+      if (memberRows) {
+        const shared = (memberRows as { courses: Course | Course[] | null }[])
+          .map((r) => (Array.isArray(r.courses) ? r.courses[0] : r.courses))
+          .filter((c): c is Course => c !== null)
+          .sort((a, b) => a.position - b.position);
+        setSharedCourses(shared);
+      }
+
       setLoading(false);
     }
 
@@ -175,7 +199,11 @@ export function SidebarFolderTree() {
     );
   }
 
-  if (rootFolders.length === 0 && rootCourses.length === 0) {
+  if (
+    rootFolders.length === 0 &&
+    rootCourses.length === 0 &&
+    sharedCourses.length === 0
+  ) {
     return (
       <p className="px-2 py-4 text-center text-sm text-muted-foreground">
         No courses or folders yet
@@ -197,6 +225,16 @@ export function SidebarFolderTree() {
           level={0}
         />
       ))}
+      {sharedCourses.length > 0 && (
+        <div className="pt-2">
+          <p className="px-2 pb-1 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+            Shared with me
+          </p>
+          {sharedCourses.map((course) => (
+            <CourseNode key={course.id} course={course} level={0} />
+          ))}
+        </div>
+      )}
     </div>
   );
 }
