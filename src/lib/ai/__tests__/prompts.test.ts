@@ -45,6 +45,17 @@ describe('buildSystemPrompt', () => {
     expect(prompt).toContain('smart AI');
   });
 
+  it('puts a prominent, highest-priority language directive near the top', () => {
+    const prompt = buildSystemPrompt({ hasDocumentContent: false });
+    expect(prompt).toContain('LANGUAGE (HIGHEST PRIORITY)');
+    expect(prompt).toMatch(/same language/i);
+    // The language rule must come before the materials guidance so the model
+    // anchors on it first.
+    expect(prompt.indexOf('LANGUAGE (HIGHEST PRIORITY)')).toBeLessThan(
+      prompt.indexOf('HOW TO USE COURSE MATERIALS'),
+    );
+  });
+
   it('cites materials with name-colon format', () => {
     const prompt = buildSystemPrompt({ hasDocumentContent: false });
     expect(prompt).toContain(
