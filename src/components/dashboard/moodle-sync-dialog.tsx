@@ -635,23 +635,8 @@ export function MoodleSyncDialog({
   }> {
     let downloaded = 0;
     let failed = 0;
-    let totalBytes = 0;
     const errors: string[] = [];
     const newFailed: typeof jobs = [];
-
-    // Lightweight timing so a manual run shows real download speed in the
-    // browser console (e.g. "[Typenote sync] 37 files in 9.4s"). Logged with
-    // console.info — harmless in prod, easy to spot when verifying the fix.
-    // We log each file's size + throughput so a slow file is obviously "big
-    // bytes" vs "overhead" at a glance.
-    const batchStart =
-      typeof performance !== 'undefined' ? performance.now() : Date.now();
-    const now = () =>
-      typeof performance !== 'undefined' ? performance.now() : Date.now();
-    const fmtSize = (bytes: number) =>
-      bytes >= 1_000_000
-        ? `${(bytes / 1_000_000).toFixed(1)}MB`
-        : `${Math.round(bytes / 1000)}KB`;
 
     // Download a few files at once instead of one-by-one. Each worker handles
     // its own failure so a single bad file never rejects the whole pool, and
@@ -659,9 +644,8 @@ export function MoodleSyncDialog({
     await runWithConcurrency(
       jobs,
       async (job) => {
-        const fileStart = now();
         try {
-          const res = await downloadAndUpload({
+          await downloadAndUpload({
             moodleFileUrl: job.moodleUrl,
             uploadEndpoint,
             authToken,
@@ -672,19 +656,6 @@ export function MoodleSyncDialog({
             },
           });
           downloaded++;
-          const ms = Math.round(now() - fileStart);
-          const bytes = res?.fileSize ?? 0;
-          totalBytes += bytes;
-          const mbps =
-            bytes > 0 && ms > 0
-              ? ((bytes * 8) / 1e6 / (ms / 1000)).toFixed(1)
-              : '?';
-          console.info(
-            `[Typenote sync] ✓ ${job.fileName} in ${ms}ms` +
-              (bytes > 0
-                ? ` (${fmtSize(bytes)}, ${mbps} Mbps${res?.deduplicated ? ', dedup' : ''})`
-                : ''),
-          );
         } catch (dlErr) {
           failed++;
           if (errors.length < 3) {
@@ -693,9 +664,6 @@ export function MoodleSyncDialog({
             );
           }
           newFailed.push(job);
-          console.info(
-            `[Typenote sync] ✗ ${job.fileName} in ${Math.round(now() - fileStart)}ms — ${dlErr instanceof Error ? dlErr.message : String(dlErr)}`,
-          );
         }
         setProgress(
           `Downloading files... (${downloaded + failed}/${jobs.length})`,
@@ -705,25 +673,6 @@ export function MoodleSyncDialog({
         concurrency: DOWNLOAD_CONCURRENCY,
         shouldCancel: () => pollCancelRef.current,
       },
-    );
-
-    const elapsedMs = now() - batchStart;
-    const totalSec = (elapsedMs / 1000).toFixed(1);
-    const attempted = downloaded + failed;
-    const aggMbps =
-      totalBytes > 0 && elapsedMs > 0
-        ? ((totalBytes * 8) / 1e6 / (elapsedMs / 1000)).toFixed(1)
-        : '?';
-    console.info(
-      `[Typenote sync] done: ${downloaded} downloaded, ${failed} failed ` +
-        `(${attempted}/${jobs.length} attempted) in ${totalSec}s at ` +
-        `concurrency ${DOWNLOAD_CONCURRENCY}` +
-        (attempted > 0
-          ? ` — avg ${Math.round(elapsedMs / attempted)}ms/file`
-          : '') +
-        (totalBytes > 0
-          ? `, ${fmtSize(totalBytes)} total @ ${aggMbps} Mbps`
-          : ''),
     );
 
     return {
