@@ -159,12 +159,51 @@ const promoHtml = `<!doctype html><html><head><meta charset="utf-8"><style>
   <p>Sections, files and documents, imported and ready for notes & AI study.</p>
 </div></body></html>`;
 
+// Marquee promo tile — 1400x560, the wide featured-placement banner. Embeds
+// the real popup card (same popup.css) on a branded panel beside the headline.
+const marqueeHtml = `<!doctype html><html><head><meta charset="utf-8"><style>
+  ${popupCss}
+  *{box-sizing:border-box}
+  .m{width:1400px;height:560px;margin:0;position:relative;overflow:hidden;display:flex;align-items:center;
+    font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;color:#fff;
+    background:radial-gradient(900px 520px at 92% -10%,#2b3a63 0%,rgba(43,58,99,0) 60%),
+      radial-gradient(700px 400px at 0% 120%,#16203a 0%,rgba(22,32,58,0) 55%),
+      linear-gradient(125deg,#0c1322 0%,#1d2939 100%)}
+  .m .left{flex:1;padding:0 0 0 72px;max-width:720px}
+  .m .badge{display:flex;align-items:center;gap:13px;margin-bottom:26px}
+  .m .badge img{width:52px;height:52px;border-radius:12px;box-shadow:0 8px 22px rgba(0,0,0,.4)}
+  .m .badge span{font-size:17px;font-weight:600;color:#cdd5e0}
+  .m h1{font-size:52px;line-height:1.08;margin:0 0 18px;font-weight:700;letter-spacing:-.025em}
+  .m h1 em{font-style:normal;color:#8ab4ff}
+  .m p{font-size:21px;line-height:1.5;margin:0;color:#aeb8c7;max-width:540px}
+  .m .dots{display:flex;gap:22px;margin-top:30px}
+  .m .dots span{display:flex;align-items:center;gap:9px;font-size:15px;color:#c6cedb;font-weight:500}
+  .m .dots b{width:8px;height:8px;border-radius:50%;background:#22c55e;display:inline-block}
+  .m .right{flex:0 0 460px;display:flex;align-items:center;justify-content:center;height:100%}
+  .m .popup-card{width:320px;background:#fff;color:#111;border-radius:14px;overflow:hidden;transform:scale(1.18);
+    box-shadow:0 30px 80px rgba(0,0,0,.45),0 8px 20px rgba(0,0,0,.3)}
+  .m .popup-card header h1{color:#111;font-size:14px;font-weight:600;line-height:1.2;letter-spacing:0}
+  .m .popup-card header,.m .popup-card section{width:320px}
+</style></head><body style="margin:0"><div class="m">
+  <div class="left">
+    <div class="badge"><img src="${iconSrc}" alt=""><span>Typenote Moodle Sync</span></div>
+    <h1>Your Moodle course,<br><em>one click</em> into Typenote.</h1>
+    <p>Import every section, file and document — organised by course, ready for note-taking and AI study.</p>
+    <div class="dots">
+      <span><b></b>No passwords stored</span>
+      <span><b></b>Runs only on your click</span>
+      <span><b></b>Moodle &amp; Typenote only</span>
+    </div>
+  </div>
+  <div class="right"><div class="popup-card">${CONNECTED_BODY}</div></div>
+</div></body></html>`;
+
 const browser = await chromium.launch();
-// Chrome Web Store requires screenshots at EXACTLY 1280x800 (or 640x400) and
-// the promo tile at EXACTLY 440x280. deviceScaleFactor must be 1 so the PNG's
-// pixel dimensions equal the CSS viewport — a 2x factor would emit 2560x1600
-// and be rejected. The layout is vector text at native resolution, so 1x is
-// already crisp.
+// Chrome Web Store requires screenshots at EXACTLY 1280x800 (or 640x400), the
+// small promo tile at EXACTLY 440x280, and the marquee at EXACTLY 1400x560.
+// deviceScaleFactor must be 1 so the PNG's pixel dimensions equal the CSS
+// viewport — a 2x factor would emit double-size images and be rejected. The
+// layout is vector text at native resolution, so 1x is already crisp.
 const page = await browser.newPage({
   viewport: { width: 1280, height: 800 },
   deviceScaleFactor: 1,
@@ -183,5 +222,11 @@ const promoFile = join(outDir, 'promo-tile.png');
 await page.screenshot({ path: promoFile, clip: { x: 0, y: 0, width: 440, height: 280 } });
 console.log(`\x1b[32m✔\x1b[0m ${promoFile}`);
 
+await page.setViewportSize({ width: 1400, height: 560 });
+await page.setContent(marqueeHtml, { waitUntil: 'networkidle' });
+const marqueeFile = join(outDir, 'marquee-tile.png');
+await page.screenshot({ path: marqueeFile, clip: { x: 0, y: 0, width: 1400, height: 560 } });
+console.log(`\x1b[32m✔\x1b[0m ${marqueeFile}`);
+
 await browser.close();
-console.log(`\nStore assets written to ${outDir} (screenshots 1280x800, promo 440x280).`);
+console.log(`\nStore assets written to ${outDir} (screenshots 1280x800, promo 440x280, marquee 1400x560).`);

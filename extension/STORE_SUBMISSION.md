@@ -138,8 +138,7 @@ the four screenshots in numeric order and the promo tile in the marketing slot.
 - [x] **04-extension-permission.png** (1280 × 800) — per-site permission prompt
       ("you're always in control")
 - [x] **promo-tile.png** (440 × 280) — small promo / marketing tile
-- [ ] _(Optional)_ Marquee promo tile — 1400 × 560 (not generated; add if you
-      want the featured-placement slot)
+- [x] **marquee-tile.png** (1400 × 560) — wide featured-placement banner
 
 ### How they were produced
 
