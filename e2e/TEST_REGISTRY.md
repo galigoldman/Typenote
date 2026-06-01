@@ -32,6 +32,7 @@ When adding or modifying a feature, update this registry and write the correspon
 - [x] Delete document with confirmation dialog
 - [x] Document appears in correct folder
 - [x] Move document to different folder/course
+- [x] Create document dialog has no subject selector (subject removed at creation)
 
 ---
 
@@ -273,6 +274,7 @@ Test lives in `src/__tests__/integration/storage-rls.integration.test.ts`. Verif
 - [x] Contributor link: member joins, sees materials, uploads a file, owner sees it
 - [x] Viewer link: member cannot see upload controls
 - [x] Leave: member removes course from list; course persists for owner
+- [x] Shared course appears in the member's left sidebar tree (under "Shared with me"), not only the dashboard cards
 - [ ] Privacy: member's note in a shared course is invisible to the owner (covered by integration tests; E2E optional)
 - [ ] AI: member's chat cites an owner-uploaded file (needs Gemini key; covered by integration + manual)
 
@@ -319,7 +321,7 @@ and the per-`(source, page)` `p. N` citation in
 | Homework AI Context   | Removed     | (deleted)                                | —          |
 | Version History       | Planned     | `e2e/version-history.spec.ts`            | 0/5        |
 | PDF Visual Regression | Implemented | `e2e/pdf-visual-regression.spec.ts`      | 8/8        |
-| Course Sharing        | Implemented | `e2e/sharing.spec.ts`                    | 3/5        |
+| Course Sharing        | Implemented | `e2e/sharing.spec.ts`                    | 4/6        |
 | **Total**             |             |                                          | **97/107** |
 
 ---

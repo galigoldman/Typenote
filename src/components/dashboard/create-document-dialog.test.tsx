@@ -30,9 +30,10 @@ describe('CreateDocumentDialog', () => {
     expect(screen.getByLabelText(/title/i)).toHaveValue('Untitled');
   });
 
-  it('renders subject select trigger', () => {
+  it('does not render a subject selector (removed at creation time)', () => {
     renderDialog();
-    expect(screen.getByRole('combobox')).toBeInTheDocument();
+    expect(screen.queryByRole('combobox')).not.toBeInTheDocument();
+    expect(screen.queryByText(/^subject$/i)).not.toBeInTheDocument();
   });
 
   it('renders canvas type options', () => {

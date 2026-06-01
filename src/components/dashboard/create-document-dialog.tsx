@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { SUBJECTS, CANVAS_TYPES } from '@/lib/constants/subjects';
+import { CANVAS_TYPES } from '@/lib/constants/subjects';
 import { createDocument } from '@/lib/actions/documents';
 import { trackEvent } from '@/lib/analytics/events';
 import {
@@ -17,13 +17,6 @@ import {
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
 import { PageTypeThumb } from '@/components/ui/page-type-thumb';
 
 interface CreateDocumentDialogProps {
@@ -42,8 +35,6 @@ export function CreateDocumentDialog({
   const router = useRouter();
   const [open, setOpen] = useState(defaultOpen);
   const [title, setTitle] = useState('Untitled');
-  const [subject, setSubject] = useState('calculus');
-  const [subjectCustom, setSubjectCustom] = useState('');
   const [canvasType, setCanvasType] = useState('blank');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -56,8 +47,9 @@ export function CreateDocumentDialog({
     try {
       const doc = await createDocument({
         title: title.trim() || 'Untitled',
-        subject,
-        subject_custom: subject === 'other' ? subjectCustom : undefined,
+        // Subject is no longer chosen at creation time; the column defaults to
+        // 'other' (see documents.subject in 00001_initial_schema.sql).
+        subject: 'other',
         canvas_type: canvasType,
         folder_id: courseId ? null : folderId,
         course_id: courseId,
@@ -82,8 +74,6 @@ export function CreateDocumentDialog({
 
   function resetForm() {
     setTitle('Untitled');
-    setSubject('calculus');
-    setSubjectCustom('');
     setCanvasType('blank');
     setError(null);
   }
@@ -102,7 +92,7 @@ export function CreateDocumentDialog({
           <DialogHeader>
             <DialogTitle>Create New Document</DialogTitle>
             <DialogDescription>
-              Set up your new document with a title, subject, and canvas type.
+              Set up your new document with a title and canvas type.
             </DialogDescription>
           </DialogHeader>
 
@@ -116,34 +106,6 @@ export function CreateDocumentDialog({
                 placeholder="Untitled"
               />
             </div>
-
-            <div className="grid gap-2">
-              <Label htmlFor="subject">Subject</Label>
-              <Select value={subject} onValueChange={setSubject}>
-                <SelectTrigger id="subject">
-                  <SelectValue placeholder="Select a subject" />
-                </SelectTrigger>
-                <SelectContent>
-                  {SUBJECTS.map((s) => (
-                    <SelectItem key={s.value} value={s.value}>
-                      {s.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            {subject === 'other' && (
-              <div className="grid gap-2">
-                <Label htmlFor="subject-custom">Custom Subject</Label>
-                <Input
-                  id="subject-custom"
-                  value={subjectCustom}
-                  onChange={(e) => setSubjectCustom(e.target.value)}
-                  placeholder="Enter custom subject"
-                />
-              </div>
-            )}
 
             <div className="grid gap-2">
               <Label>Page Style</Label>
