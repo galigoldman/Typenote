@@ -86,7 +86,9 @@ export async function POST(req: Request) {
     );
 
     // Fire-and-forget token recording (latex always runs on Flash).
-    recordTokenUsage(user.id, 'flash', inputTokens, outputTokens).catch(() => {});
+    recordTokenUsage(user.id, 'flash', inputTokens, outputTokens).catch(
+      () => {},
+    );
 
     return NextResponse.json({ latex });
   } catch (error) {

@@ -6,7 +6,7 @@
 
 ## 1. Problem & Goal
 
-We have no first-party, accurate, *named* view of AI usage and cost. We need
+We have no first-party, accurate, _named_ view of AI usage and cost. We need
 observability over: AI generation usage (chat + LaTeX), token consumption, an
 estimated dollar cost, per-user quota state, and embedding usage — plus the
 foundation to add controls later.
@@ -27,10 +27,10 @@ free and we will not rebuild them.
 
 ### Division of responsibility
 
-| Concern | Home | Why |
-| --- | --- | --- |
-| Trends, latency, traces, per-model charts | PostHog LLM Analytics | Free, exploratory, time-series |
-| Exact per-named-user usage, cost, quota %, controls | This dashboard | Accurate, named, joined to domain, actionable |
+| Concern                                             | Home                  | Why                                           |
+| --------------------------------------------------- | --------------------- | --------------------------------------------- |
+| Trends, latency, traces, per-model charts           | PostHog LLM Analytics | Free, exploratory, time-series                |
+| Exact per-named-user usage, cost, quota %, controls | This dashboard        | Accurate, named, joined to domain, actionable |
 
 ## 2. Current State (verified against code)
 
@@ -52,7 +52,7 @@ free and we will not rebuild them.
 - No `is_admin` concept, no `/admin` route. `createAdminClient()`
   (`src/lib/supabase/admin.ts`) provides a service-role client.
 - Middleware (`src/lib/supabase/middleware.ts`) redirects unauthenticated users
-  off non-auth pages to `/login`, and redirects authenticated users *away* from
+  off non-auth pages to `/login`, and redirects authenticated users _away_ from
   auth pages.
 - Seed has `test@typenote.dev` and `test-b@typenote.dev`; no admin user.
 
@@ -90,6 +90,7 @@ running totals). Replaces the old UPDATE-only RPC. Per-model keying eliminates
 the lossy `last_model` problem (a user mixing Flash + Pro is priced correctly).
 
 **Token capture:**
+
 - `src/app/api/ai/ask/route.ts`: after the stream completes, read generation
   token counts from the final chunk's `usageMetadata` **if present**, else fall
   back to a char-based estimate (never record zeros again). Record under the
@@ -107,7 +108,7 @@ the lossy `last_model` problem (a user mixing Flash + Pro is priced correctly).
   - `searchContext`: attributed to the searching user.
   - `moodle_file`: the stored embedding row stays **shared** (`user_id = null`,
     so retrieval works for everyone), but the **cost** is attributed to the user
-    who *triggered* the one-time embed. The triggering user id is threaded in
+    who _triggered_ the one-time embed. The triggering user id is threaded in
     from the authenticated Moodle API routes (`/api/moodle/upload`,
     `upload-finalize`, `import-existing`) via a new field on the `moodle_file`
     `IndexSource`. **Artifact ownership and cost attribution are separate
@@ -149,10 +150,10 @@ credentials/login (that fragments auth and doubles attack surface). Concretely:
   passed raw to client components (see "heavy props to client components"
   guidance — pass derived rows only). Defense in depth: authz gate first,
   privileged read second, server-only throughout.
-- Future hardening lever (out of scope): MFA / step-up auth on admin *actions*.
+- Future hardening lever (out of scope): MFA / step-up auth on admin _actions_.
 
-**Authentication vs authorization (interview point):** Supabase proves *who you
-are*; `is_admin` decides *what you may do*. Keeping them separate is the pattern.
+**Authentication vs authorization (interview point):** Supabase proves _who you
+are_; `is_admin` decides _what you may do_. Keeping them separate is the pattern.
 
 ### Layer 3 — Read-only dashboard at `/admin`
 
@@ -235,6 +236,6 @@ it down is safe.
   prices). Per-model keying makes it accurate to the model mix; the only
   inaccuracy is drift between configured and actual published prices, which the
   env override exists to correct.
-- Moodle embedding cost is attributed to the *first importer* (who triggered the
+- Moodle embedding cost is attributed to the _first importer_ (who triggered the
   one-time embed), not split across later reusers — by design, since reuse is
   free.

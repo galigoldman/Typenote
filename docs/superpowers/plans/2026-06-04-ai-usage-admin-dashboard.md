@@ -17,6 +17,7 @@
 ## File Structure
 
 **Layer 1 — accurate ledger**
+
 - Create `supabase/migrations/20260604120000_ai_token_usage.sql` — new cost-ledger table, new `record_token_usage(model)` upsert RPC, drop zeroed columns, lock down the leaky view.
 - Create `src/lib/ai/tokens.ts` — `estimateTokens(text)` (single source of the char→token estimate).
 - Create `src/lib/ai/pricing.ts` — env-overridable per-model prices + `estimateCostUsd()`.
@@ -29,6 +30,7 @@
 - Modify the Moodle routes that call `indexContent` — thread `triggeredByUserId`.
 
 **Layer 2/3 — auth + dashboard**
+
 - Create `supabase/migrations/20260604120100_profiles_is_admin.sql` — `is_admin` column.
 - Modify `supabase/seed.sql` — add admin user + deterministic dashboard seed rows.
 - Create `src/lib/auth/require-admin.ts` — `requireAdmin()` guard.
@@ -44,6 +46,7 @@
 ## Task 1: Token-ledger migration (`ai_token_usage` + upsert RPC + view lockdown)
 
 **Files:**
+
 - Create: `supabase/migrations/20260604120000_ai_token_usage.sql`
 - Test: `src/lib/queries/ai-token-usage.integration.test.ts`
 
@@ -267,6 +270,7 @@ Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>"
 ## Task 2: Token estimate helper (`tokens.ts`)
 
 **Files:**
+
 - Create: `src/lib/ai/tokens.ts`
 - Test: `src/lib/ai/__tests__/tokens.test.ts`
 
@@ -339,6 +343,7 @@ Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>"
 ## Task 3: Pricing module (`pricing.ts`)
 
 **Files:**
+
 - Create: `src/lib/ai/pricing.ts`
 - Test: `src/lib/ai/__tests__/pricing.test.ts`
 
@@ -470,6 +475,7 @@ Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>"
 ## Task 4: Embeddings return token estimate
 
 **Files:**
+
 - Modify: `src/lib/ai/embeddings.ts:16-47`
 - Test: `src/lib/ai/__tests__/embeddings.test.ts` (update existing assertions)
 
@@ -478,16 +484,16 @@ Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>"
 In `src/lib/ai/__tests__/embeddings.test.ts`, the existing `embedText`/`embedQuery` tests assert the function returns the raw array. Change them to assert the new `{ values, tokens }` shape. Replace the body of the first `embedText` test with:
 
 ```ts
-  it('sends text with RETRIEVAL_DOCUMENT task type and returns values + token estimate', async () => {
-    const mockValues = Array.from({ length: 1536 }, () => 0.2);
-    mockEmbedContent.mockResolvedValueOnce({
-      embeddings: [{ values: mockValues }],
-    });
-
-    const result = await embedText('Some document text'); // 18 chars -> ceil(18/4)=5
-    expect(result.values).toEqual(mockValues);
-    expect(result.tokens).toBe(5);
+it('sends text with RETRIEVAL_DOCUMENT task type and returns values + token estimate', async () => {
+  const mockValues = Array.from({ length: 1536 }, () => 0.2);
+  mockEmbedContent.mockResolvedValueOnce({
+    embeddings: [{ values: mockValues }],
   });
+
+  const result = await embedText('Some document text'); // 18 chars -> ceil(18/4)=5
+  expect(result.values).toEqual(mockValues);
+  expect(result.tokens).toBe(5);
+});
 ```
 
 For any other test in this file that does `const result = await embedText(...)` / `embedQuery(...)` and asserts on the array directly, change it to assert on `result.values`.
@@ -576,6 +582,7 @@ Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>"
 ## Task 5: `recordTokenUsage` keyed by model
 
 **Files:**
+
 - Modify: `src/lib/ai/rate-limit.ts:202-222`
 - Test: `src/lib/ai/__tests__/rate-limit.test.ts` (add a case)
 
@@ -603,7 +610,9 @@ describe('recordTokenUsage', () => {
     const rpc = vi.fn().mockRejectedValue(new Error('db down'));
     vi.mocked(createClient).mockResolvedValue({ rpc } as never);
 
-    await expect(recordTokenUsage('user-1', 'flash', 1, 1)).resolves.toBeUndefined();
+    await expect(
+      recordTokenUsage('user-1', 'flash', 1, 1),
+    ).resolves.toBeUndefined();
   });
 });
 ```
@@ -673,6 +682,7 @@ Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>"
 ## Task 6: Capture real generation tokens in the ask route
 
 **Files:**
+
 - Modify: `src/app/api/ai/ask/route.ts:319-382`
 
 - [ ] **Step 1: Add the estimate import**
@@ -688,30 +698,28 @@ import { estimateTokens } from '@/lib/ai/tokens';
 In the `ReadableStream`'s `start`, before the `for await` loop, add accumulators next to `let fullResponse = '';`:
 
 ```ts
-    let fullResponse = '';
-    let usageInput = 0;
-    let usageOutput = 0;
+let fullResponse = '';
+let usageInput = 0;
+let usageOutput = 0;
 ```
 
 Inside the loop, after the `if (text) { ... }` block, capture usage from each chunk (the final chunk carries cumulative `usageMetadata`):
 
 ```ts
-          for await (const chunk of streamResult) {
-            const text = chunk.text ?? '';
-            if (text) {
-              fullResponse += text;
-              controller.enqueue(
-                encoder.encode(
-                  `data: ${JSON.stringify({ type: 'text', text })}\n\n`,
-                ),
-              );
-            }
-            const usage = chunk.usageMetadata;
-            if (usage) {
-              usageInput = usage.promptTokenCount ?? usageInput;
-              usageOutput = usage.candidatesTokenCount ?? usageOutput;
-            }
-          }
+for await (const chunk of streamResult) {
+  const text = chunk.text ?? '';
+  if (text) {
+    fullResponse += text;
+    controller.enqueue(
+      encoder.encode(`data: ${JSON.stringify({ type: 'text', text })}\n\n`),
+    );
+  }
+  const usage = chunk.usageMetadata;
+  if (usage) {
+    usageInput = usage.promptTokenCount ?? usageInput;
+    usageOutput = usage.candidatesTokenCount ?? usageOutput;
+  }
+}
 ```
 
 - [ ] **Step 3: Record real tokens (with estimate fallback)**
@@ -719,22 +727,22 @@ Inside the loop, after the `if (text) { ... }` block, capture usage from each ch
 Replace the existing fire-and-forget line:
 
 ```ts
-          // Fire-and-forget token recording for admin observability
-          recordTokenUsage(user.id, 'chat', 0, 0).catch(() => {});
+// Fire-and-forget token recording for admin observability
+recordTokenUsage(user.id, 'chat', 0, 0).catch(() => {});
 ```
 
 with:
 
 ```ts
-          // Fire-and-forget token recording for cost observability.
-          // Prefer the model's reported usage; fall back to a char estimate so
-          // we never silently record zeros.
-          const inputTokens =
-            usageInput || estimateTokens(`${systemPrompt}\n${question}`);
-          const outputTokens = usageOutput || estimateTokens(fullResponse);
-          recordTokenUsage(user.id, modelLabel, inputTokens, outputTokens).catch(
-            () => {},
-          );
+// Fire-and-forget token recording for cost observability.
+// Prefer the model's reported usage; fall back to a char estimate so
+// we never silently record zeros.
+const inputTokens =
+  usageInput || estimateTokens(`${systemPrompt}\n${question}`);
+const outputTokens = usageOutput || estimateTokens(fullResponse);
+recordTokenUsage(user.id, modelLabel, inputTokens, outputTokens).catch(
+  () => {},
+);
 ```
 
 (`modelLabel` is already defined at line 325 as `mode === 'deep' ? 'pro' : 'flash'`.)
@@ -765,6 +773,7 @@ Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>"
 ## Task 7: Capture real latex tokens
 
 **Files:**
+
 - Modify: `src/lib/ai/latex.ts`
 - Modify: `src/app/api/ai/latex/route.ts:83-88`
 - Test: `src/lib/ai/latex.test.ts` (update return-shape assertions)
@@ -774,10 +783,10 @@ Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>"
 In `src/lib/ai/latex.test.ts`, the existing tests expect `convertToLatex` to resolve to a string. Update them to the new object shape. For each `expect(await convertToLatex(...)).toBe('...')`, change to:
 
 ```ts
-    const result = await convertToLatex('five times a half');
-    expect(result.latex).toBe('5 \\times \\frac{1}{2}');
-    expect(result.inputTokens).toBeGreaterThan(0);
-    expect(result.outputTokens).toBeGreaterThan(0);
+const result = await convertToLatex('five times a half');
+expect(result.latex).toBe('5 \\times \\frac{1}{2}');
+expect(result.inputTokens).toBeGreaterThan(0);
+expect(result.outputTokens).toBeGreaterThan(0);
 ```
 
 If the test mocks `generateText`, make the mock return `{ text: '...', usage: { inputTokens: 12, outputTokens: 7 } }` and assert `result.inputTokens === 12`.
@@ -827,7 +836,9 @@ export async function convertToLatex(
       }
     | undefined;
   const inputTokens =
-    usage?.inputTokens ?? usage?.promptTokens ?? estimateTokens(`${system}\n${text}`);
+    usage?.inputTokens ??
+    usage?.promptTokens ??
+    estimateTokens(`${system}\n${text}`);
   const outputTokens =
     usage?.outputTokens ?? usage?.completionTokens ?? estimateTokens(latex);
 
@@ -840,28 +851,28 @@ export async function convertToLatex(
 In `src/app/api/ai/latex/route.ts`, replace lines 83-90:
 
 ```ts
-    const latex = await convertToLatex(text.trim(), courseName || undefined);
+const latex = await convertToLatex(text.trim(), courseName || undefined);
 
-    // Fire-and-forget token recording
-    // convertToLatex returns just the string for now; token recording
-    // will be enhanced when we update latex.ts to return usage in US3
-    recordTokenUsage(user.id, 'latex', 0, 0).catch(() => {});
+// Fire-and-forget token recording
+// convertToLatex returns just the string for now; token recording
+// will be enhanced when we update latex.ts to return usage in US3
+recordTokenUsage(user.id, 'latex', 0, 0).catch(() => {});
 
-    return NextResponse.json({ latex });
+return NextResponse.json({ latex });
 ```
 
 with:
 
 ```ts
-    const { latex, inputTokens, outputTokens } = await convertToLatex(
-      text.trim(),
-      courseName || undefined,
-    );
+const { latex, inputTokens, outputTokens } = await convertToLatex(
+  text.trim(),
+  courseName || undefined,
+);
 
-    // Fire-and-forget token recording (latex always runs on Flash).
-    recordTokenUsage(user.id, 'flash', inputTokens, outputTokens).catch(() => {});
+// Fire-and-forget token recording (latex always runs on Flash).
+recordTokenUsage(user.id, 'flash', inputTokens, outputTokens).catch(() => {});
 
-    return NextResponse.json({ latex });
+return NextResponse.json({ latex });
 ```
 
 - [ ] **Step 5: Run tests + typecheck**
@@ -883,6 +894,7 @@ Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>"
 ## Task 8: Attribute embedding tokens per user
 
 **Files:**
+
 - Modify: `src/lib/actions/ai-context.ts` (IndexSource type L37-40; indexContent L118-336; searchContext L353-358)
 - Modify: `src/app/api/moodle/upload/route.ts`, `src/app/api/moodle/upload-finalize/route.ts`, `src/app/api/moodle/import-existing/route.ts` (thread triggering user)
 - Test: `src/lib/actions/__tests__/personal-file-embedding.integration.test.ts` (extend) — see Step 6
@@ -909,15 +921,15 @@ export type IndexSource =
 In `indexContent`, add a cost-attribution variable next to the existing `let userId` declaration (line 124):
 
 ```ts
-    let userId: string | null = null;
-    let costUserId: string | null = null; // who pays for the embed (may differ from row owner)
+let userId: string | null = null;
+let costUserId: string | null = null; // who pays for the embed (may differ from row owner)
 ```
 
 In the `moodle_file` branch (after `userId = null;` at line 134) add:
 
 ```ts
-      userId = null;
-      costUserId = source.triggeredByUserId ?? null; // shared vector, attributed cost
+userId = null;
+costUserId = source.triggeredByUserId ?? null; // shared vector, attributed cost
 ```
 
 In the `course_material` branch (after `userId = await getAuthUserId();` ~line 190) add `costUserId = userId;`. Do the same in the `personal_file` branch (after line 222): `costUserId = userId;`.
@@ -949,17 +961,17 @@ with:
 After `await upsertEmbeddings(rows);` (line 334), record the cost:
 
 ```ts
-    await upsertEmbeddings(rows);
+await upsertEmbeddings(rows);
 
-    // Fire-and-forget embedding cost attribution. The vector is shared
-    // (user_id may be null for Moodle); the COST belongs to whoever triggered it.
-    if (costUserId && embedTokens > 0) {
-      await recordTokenUsage(costUserId, 'embedding', embedTokens, 0).catch(
-        () => {},
-      );
-    }
+// Fire-and-forget embedding cost attribution. The vector is shared
+// (user_id may be null for Moodle); the COST belongs to whoever triggered it.
+if (costUserId && embedTokens > 0) {
+  await recordTokenUsage(costUserId, 'embedding', embedTokens, 0).catch(
+    () => {},
+  );
+}
 
-    return { success: true, segmentsIndexed: rows.length, skipped: false };
+return { success: true, segmentsIndexed: rows.length, skipped: false };
 ```
 
 Add the import at the top of the file:
@@ -981,16 +993,16 @@ In `searchContext` (line ~356-358), replace:
 so the embed call destructures and records:
 
 ```ts
-  const userId = await getAuthUserId();
+const userId = await getAuthUserId();
 ```
 
 …and where `embedQuery` is called:
 
 ```ts
-  const { values: queryEmbedding, tokens: queryTokens } = await embedQuery(
-    params.query,
-  );
-  recordTokenUsage(userId, 'embedding', queryTokens, 0).catch(() => {});
+const { values: queryEmbedding, tokens: queryTokens } = await embedQuery(
+  params.query,
+);
+recordTokenUsage(userId, 'embedding', queryTokens, 0).catch(() => {});
 ```
 
 (Confirm `queryEmbedding` is still used by the downstream similarity call unchanged.)
@@ -1000,12 +1012,12 @@ so the embed call destructures and records:
 In each of `src/app/api/moodle/upload/route.ts`, `src/app/api/moodle/upload-finalize/route.ts`, and `src/app/api/moodle/import-existing/route.ts`, every `indexContent({ type: 'moodle_file', fileId: ..., courseId: ... })` call gains `triggeredByUserId: user.id` (each route already authenticates a `user` before reaching the indexing call — use that variable; if it is named differently, e.g. `userId`, pass that). Example edit:
 
 ```ts
-          await indexContent({
-            type: 'moodle_file',
-            fileId: file.id,
-            courseId,
-            triggeredByUserId: user.id,
-          });
+await indexContent({
+  type: 'moodle_file',
+  fileId: file.id,
+  courseId,
+  triggeredByUserId: user.id,
+});
 ```
 
 Run to find every call site to update:
@@ -1018,18 +1030,18 @@ Expected: update each listed call to include `triggeredByUserId`.
 In `src/lib/actions/__tests__/personal-file-embedding.integration.test.ts`, add an assertion that after indexing a personal file, an `ai_token_usage` row with `model='embedding'` exists for the user with `input_tokens > 0`. Mirror the file's existing setup; add:
 
 ```ts
-  it('records embedding token cost for the indexing user', async () => {
-    // (after the existing indexContent personal_file call in this suite)
-    const { data } = await supabase
-      .from('ai_token_usage')
-      .select('input_tokens')
-      .eq('user_id', TEST_USER_ID)
-      .eq('model', 'embedding')
-      .eq('usage_month', currentMonth())
-      .maybeSingle();
+it('records embedding token cost for the indexing user', async () => {
+  // (after the existing indexContent personal_file call in this suite)
+  const { data } = await supabase
+    .from('ai_token_usage')
+    .select('input_tokens')
+    .eq('user_id', TEST_USER_ID)
+    .eq('model', 'embedding')
+    .eq('usage_month', currentMonth())
+    .maybeSingle();
 
-    expect((data?.input_tokens ?? 0)).toBeGreaterThan(0);
-  });
+  expect(data?.input_tokens ?? 0).toBeGreaterThan(0);
+});
 ```
 
 Add a cleanup of `ai_token_usage` for `TEST_USER_ID` in this file's `afterAll`/`beforeAll` (mirror the `ai-token-usage.integration.test.ts` cleanup helper) and a local `currentMonth()` if the file lacks one.
@@ -1056,6 +1068,7 @@ Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>"
 ## Task 9: `is_admin` migration + seed admin user + deterministic dashboard seed
 
 **Files:**
+
 - Create: `supabase/migrations/20260604120100_profiles_is_admin.sql`
 - Modify: `supabase/seed.sql`
 
@@ -1137,11 +1150,13 @@ Expected: completes; both new migrations applied; no seed errors.
 - [ ] **Step 5: Confirm the admin flag and rows exist**
 
 Run:
+
 ```bash
 pnpm supabase db reset >/dev/null 2>&1; \
 psql "$(pnpm -s supabase status | grep 'DB URL' | awk '{print $NF}')" \
   -c "select email, is_admin from profiles where email in ('admin@typenote.dev','test@typenote.dev');"
 ```
+
 Expected: `admin@typenote.dev | t` and `test@typenote.dev | f`.
 (If the worktree uses isolated Supabase ports, source `.env.worktree.sh` first per project memory.)
 
@@ -1159,6 +1174,7 @@ Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>"
 ## Task 10: `requireAdmin()` guard
 
 **Files:**
+
 - Create: `src/lib/auth/require-admin.ts`
 - Test: `src/lib/auth/__tests__/require-admin.test.ts`
 
@@ -1186,7 +1202,10 @@ function mockProfile(is_admin: boolean | null) {
   from.mockReturnValue({
     select: () => ({
       eq: () => ({
-        single: async () => ({ data: is_admin === null ? null : { is_admin }, error: null }),
+        single: async () => ({
+          data: is_admin === null ? null : { is_admin },
+          error: null,
+        }),
       }),
     }),
   });
@@ -1283,6 +1302,7 @@ Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>"
 ## Task 11: Admin usage aggregate query
 
 **Files:**
+
 - Create: `src/lib/queries/admin-usage.ts`
 - Test: `src/lib/queries/admin-usage.integration.test.ts`
 
@@ -1308,7 +1328,10 @@ describe('getAdminUsage (2099-01 seed)', () => {
     expect(row).toBeDefined();
     expect(row!.chatCount).toBe(12);
     expect(row!.latexCount).toBe(30);
-    expect(row!.tokensByModel.flash).toEqual({ input: 1000000, output: 500000 });
+    expect(row!.tokensByModel.flash).toEqual({
+      input: 1000000,
+      output: 500000,
+    });
     expect(row!.tokensByModel.embedding.input).toBe(2000000);
     // flash 1M in*0.30 + 0.5M out*2.50 + embedding 2M*0.15 = 0.30 + 1.25 + 0.30
     expect(row!.estimatedCostUsd).toBeCloseTo(1.85, 4);
@@ -1376,17 +1399,20 @@ const EMPTY_MODEL: ModelTokens = { input: 0, output: 0 };
 export async function getAdminUsage(month: string): Promise<AdminUsage> {
   const admin = createAdminClient();
 
-  const [{ data: profiles }, { data: usage }, { data: tokens }] = await Promise.all([
-    admin.from('profiles').select('id, email, display_name, subscription_tier'),
-    admin
-      .from('ai_usage')
-      .select('user_id, query_type, query_count')
-      .eq('usage_month', month),
-    admin
-      .from('ai_token_usage')
-      .select('user_id, model, input_tokens, output_tokens')
-      .eq('usage_month', month),
-  ]);
+  const [{ data: profiles }, { data: usage }, { data: tokens }] =
+    await Promise.all([
+      admin
+        .from('profiles')
+        .select('id, email, display_name, subscription_tier'),
+      admin
+        .from('ai_usage')
+        .select('user_id, query_type, query_count')
+        .eq('usage_month', month),
+      admin
+        .from('ai_token_usage')
+        .select('user_id, model, input_tokens, output_tokens')
+        .eq('usage_month', month),
+    ]);
 
   const byUser = new Map<string, AdminUserUsage>();
   for (const p of profiles ?? []) {
@@ -1436,7 +1462,8 @@ export async function getAdminUsage(month: string): Promise<AdminUsage> {
     }
     row.estimatedCostUsd = cost;
     const chatLimit = resolveLimitForTier(row.tier, 'chat');
-    row.chatQuotaPct = chatLimit > 0 ? Math.round((row.chatCount / chatLimit) * 100) : 0;
+    row.chatQuotaPct =
+      chatLimit > 0 ? Math.round((row.chatCount / chatLimit) * 100) : 0;
 
     totals.chatCount += row.chatCount;
     totals.latexCount += row.latexCount;
@@ -1478,6 +1505,7 @@ Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>"
 ## Task 12: Month selector component
 
 **Files:**
+
 - Create: `src/components/admin/month-select.tsx`
 
 - [ ] **Step 1: Implement (no unit test — thin client wrapper, covered by E2E)**
@@ -1494,7 +1522,9 @@ function recentMonths(selected: string): string[] {
   const months = new Set<string>([selected]);
   const now = new Date();
   for (let i = 0; i < 12; i++) {
-    const d = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - i, 1));
+    const d = new Date(
+      Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - i, 1),
+    );
     months.add(
       `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}`,
     );
@@ -1540,6 +1570,7 @@ Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>"
 ## Task 13: Admin layout (gate) + dashboard page
 
 **Files:**
+
 - Create: `src/app/(admin)/admin/layout.tsx`
 - Create: `src/app/(admin)/admin/page.tsx`
 
@@ -1572,12 +1603,7 @@ Create `src/app/(admin)/admin/page.tsx`:
 ```tsx
 import { getAdminUsage } from '@/lib/queries/admin-usage';
 import { MonthSelect } from '@/components/admin/month-select';
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-} from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 
 export const dynamic = 'force-dynamic';
 
@@ -1691,7 +1717,9 @@ export default async function AdminUsagePage({
                 <td className="px-3 py-2 text-right">
                   {tokensFor(u.tokensByModel, 'embedding').toLocaleString()}
                 </td>
-                <td className="px-3 py-2 text-right">{usd(u.estimatedCostUsd)}</td>
+                <td className="px-3 py-2 text-right">
+                  {usd(u.estimatedCostUsd)}
+                </td>
                 <td
                   className={
                     'px-3 py-2 text-right ' +
@@ -1738,12 +1766,14 @@ Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>"
 ## Task 14: E2E coverage + test registry
 
 **Files:**
+
 - Modify: `e2e/TEST_REGISTRY.md`
 - Create: `e2e/admin-dashboard.spec.ts`
 
 - [ ] **Step 1: Update the test registry first**
 
 In `e2e/TEST_REGISTRY.md`, add an "Admin AI Usage Dashboard" section listing:
+
 - Admin logs in and views the usage dashboard for a seeded month (asserts totals + a seeded user row + cost).
 - Non-admin is blocked from `/admin` (404).
 
@@ -1782,9 +1812,9 @@ test.describe('Admin AI Usage Dashboard', () => {
     await login(page); // seeded non-admin test@typenote.dev
     const response = await page.goto('/admin');
     expect(response?.status()).toBe(404);
-    await expect(
-      page.getByRole('heading', { name: 'AI Usage' }),
-    ).toHaveCount(0);
+    await expect(page.getByRole('heading', { name: 'AI Usage' })).toHaveCount(
+      0,
+    );
   });
 });
 ```
@@ -1839,5 +1869,5 @@ gh pr create --base dev --title "feat: AI usage admin dashboard + accurate token
 
 - **Env vars (document in your env example / Vercel):** `AI_PRICE_FLASH_INPUT`, `AI_PRICE_FLASH_OUTPUT`, `AI_PRICE_PRO_INPUT`, `AI_PRICE_PRO_OUTPUT`, `AI_PRICE_EMBEDDING`. All optional; defaults are approximate Gemini prices.
 - **Prod:** the admin user is seeded for local/CI only. In production, set `is_admin=true` on the real owner account via SQL once.
-- **AI E2E has no Gemini key in CI** — the dashboard E2E deliberately asserts against *seeded* rows, never live AI calls.
+- **AI E2E has no Gemini key in CI** — the dashboard E2E deliberately asserts against _seeded_ rows, never live AI calls.
 - **Worktree Supabase:** if running in an isolated worktree with its own stack, source the worktree env (`.env.worktree.sh`) before `supabase`/test commands.
