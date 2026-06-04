@@ -337,3 +337,11 @@ fail any PR that drifts from the committed baselines — which is the whole poin
 - [x] Draw stroke, select, and verify selection exists
 - [x] Undo restores previous state after drawing
 - [x] Cut and paste stroke to different page
+
+---
+
+## LaTeX Onboarding Tooltip (`e2e/latex-onboarding.spec.ts`) — IMPLEMENTED
+
+- [x] First-time user sees onboarding popover with "Got it" button
+- [x] Clicking "Got it" dismisses the popover and persists dismissal across reloads
+- [x] Returning user can click LaTeX icon to see help without "Got it" button

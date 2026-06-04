@@ -74,6 +74,7 @@ describe('EditorToolbar', () => {
         'Code block',
         'Horizontal rule',
         'Blockquote',
+        'LaTeX shortcut',
       ];
 
       for (const label of expectedLabels) {

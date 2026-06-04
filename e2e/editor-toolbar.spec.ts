@@ -82,6 +82,7 @@ test.describe('Editor Toolbar', () => {
         'Code block',
         'Horizontal rule',
         'Blockquote',
+        'LaTeX shortcut',
       ];
 
       for (const label of expectedButtons) {
