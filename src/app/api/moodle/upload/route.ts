@@ -151,6 +151,7 @@ export async function POST(request: NextRequest) {
             type: 'moodle_file',
             fileId: fileRecord.id,
             courseId: appCourseId,
+            triggeredByUserId: userId ?? undefined,
           });
         } catch (err) {
           console.error('Index failed:', err);
@@ -203,6 +204,7 @@ export async function POST(request: NextRequest) {
           type: 'moodle_file',
           fileId: newRecord.id,
           courseId: appCourseId,
+          triggeredByUserId: userId ?? undefined,
         });
       } catch (err) {
         console.error('Index failed:', err);
