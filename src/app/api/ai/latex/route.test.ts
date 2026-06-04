@@ -50,7 +50,11 @@ describe('POST /api/ai/latex', () => {
   });
 
   it('should return 200 with latex for valid input', async () => {
-    vi.mocked(convertToLatex).mockResolvedValue('\\frac{1}{2} \\times 5');
+    vi.mocked(convertToLatex).mockResolvedValue({
+      latex: '\\frac{1}{2} \\times 5',
+      inputTokens: 12,
+      outputTokens: 7,
+    });
 
     const res = await POST(createRequest({ text: 'one half times five' }));
     const data = await res.json();
@@ -60,7 +64,11 @@ describe('POST /api/ai/latex', () => {
   });
 
   it('should pass latex query type to rate limiter', async () => {
-    vi.mocked(convertToLatex).mockResolvedValue('x^2');
+    vi.mocked(convertToLatex).mockResolvedValue({
+      latex: 'x^2',
+      inputTokens: 12,
+      outputTokens: 7,
+    });
 
     await POST(createRequest({ text: 'x squared' }));
 
@@ -68,7 +76,11 @@ describe('POST /api/ai/latex', () => {
   });
 
   it('should accept optional courseName', async () => {
-    vi.mocked(convertToLatex).mockResolvedValue('\\det(A)');
+    vi.mocked(convertToLatex).mockResolvedValue({
+      latex: '\\det(A)',
+      inputTokens: 12,
+      outputTokens: 7,
+    });
 
     const res = await POST(
       createRequest({ text: 'determinant of A', courseName: 'Linear Algebra' }),
@@ -84,7 +96,11 @@ describe('POST /api/ai/latex', () => {
   });
 
   it('should work without courseName', async () => {
-    vi.mocked(convertToLatex).mockResolvedValue('x^2');
+    vi.mocked(convertToLatex).mockResolvedValue({
+      latex: 'x^2',
+      inputTokens: 12,
+      outputTokens: 7,
+    });
 
     const res = await POST(createRequest({ text: 'x squared' }));
 
@@ -93,11 +109,15 @@ describe('POST /api/ai/latex', () => {
   });
 
   it('should call recordTokenUsage after conversion', async () => {
-    vi.mocked(convertToLatex).mockResolvedValue('x^2');
+    vi.mocked(convertToLatex).mockResolvedValue({
+      latex: 'x^2',
+      inputTokens: 12,
+      outputTokens: 7,
+    });
 
     await POST(createRequest({ text: 'x squared' }));
 
-    expect(recordTokenUsage).toHaveBeenCalledWith('u1', 'latex', 0, 0);
+    expect(recordTokenUsage).toHaveBeenCalledWith('u1', 'flash', 12, 7);
   });
 
   it('should return 400 when text is missing', async () => {
