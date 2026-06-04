@@ -50,6 +50,10 @@ The project uses a two-branch model: `dev` (integration) and `main` (production)
 - PRs cannot be merged unless CI passes. This is enforced via GitHub branch protection rules on both `main` and `dev`.
 
 ## Active Technologies
+- TypeScript 5 / Node.js 22+ + React 19, Next.js 16 (App Router), TipTap 3 (ProseMirror), KaTeX, Canvas 2D API (048-fix-overflow-clipping)
+- N/A — purely client-side CSS/positioning changes, no database changes (048-fix-overflow-clipping)
+- TypeScript 5 / Node.js 22+ + React 19, Next.js 16 (App Router), Tailwind CSS 4 (049-fix-chat-scroll)
+- N/A — purely client-side CSS fix, no database changes (049-fix-chat-scroll)
 
 - TypeScript 5 / Node.js 22+ + Next.js 16 (App Router), React 19, Tailwind 4 (`pointer-fine:` variant), Chrome Manifest V3, Vitest, Playwright (2026-05-13-extension-readiness)
 - N/A — manifest tightening + client-side gating; no schema changes (2026-05-13-extension-readiness)

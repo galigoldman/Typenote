@@ -462,7 +462,7 @@ export function AiChatPanel({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex h-full w-full flex-col border-l border-border/30 bg-background/90 backdrop-blur-xl shadow-xl lg:static lg:z-auto lg:w-[480px] lg:shrink-0 xl:w-[560px] 2xl:w-[640px]">
+    <div className="fixed inset-0 z-50 flex h-full w-full flex-col border-l border-border/30 bg-background/90 backdrop-blur-xl shadow-xl lg:static lg:z-auto lg:min-h-0 lg:w-[480px] lg:shrink-0 xl:w-[560px] 2xl:w-[640px]">
       {/* Header */}
       <div className="flex items-center justify-between border-b px-4 py-3">
         <div className="flex min-w-0 items-center gap-2">

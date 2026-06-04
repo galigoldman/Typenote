@@ -232,6 +232,12 @@ Test lives in `src/__tests__/integration/storage-rls.integration.test.ts`. Verif
 
 ---
 
+## AI Chat Scroll Containment (`e2e/chat-scroll.spec.ts`) — IMPLEMENTED
+
+- [x] Chat messages scroll inside panel, not the page (desktop viewport with injected overflow content)
+
+---
+
 ## Summary
 
 | Feature               | Status      | Spec File                                | Tests     |
@@ -250,9 +256,10 @@ Test lives in `src/__tests__/integration/storage-rls.integration.test.ts`. Verif
 | Drawing Copy/Paste    | Implemented | `e2e/drawing-copy-paste.spec.ts`         | 8/8       |
 | Moodle Ext Gating     | Implemented | `e2e/moodle-touch-gating.spec.ts`        | 2/2       |
 | Extension Real Load   | Implemented | `e2e/extension-real.spec.ts`             | 3/3       |
+| Chat Scroll Fix       | Implemented | `e2e/chat-scroll.spec.ts`                | 1/1       |
 | Version History       | Planned     | `e2e/version-history.spec.ts`            | 0/5       |
 | PDF Visual Regression | Implemented | `e2e/pdf-visual-regression.spec.ts`      | 8/8       |
-| **Total**             |             |                                          | **88/96** |
+| **Total**             |             |                                          | **89/97** |
 
 ---
 
