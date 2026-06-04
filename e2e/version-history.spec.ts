@@ -75,14 +75,18 @@ test.describe('Version History', () => {
 
   test('open version history sidebar from editor toolbar', async ({ page }) => {
     await page.getByTitle('Version history').click();
-    await expect(page.getByText('Version History')).toBeVisible({
+    await expect(
+      page.getByRole('heading', { name: 'Version History' }),
+    ).toBeVisible({
       timeout: 5_000,
     });
   });
 
   test('sidebar lists the seeded versions newest-first', async ({ page }) => {
     await page.getByTitle('Version history').click();
-    await expect(page.getByText('Version History')).toBeVisible({
+    await expect(
+      page.getByRole('heading', { name: 'Version History' }),
+    ).toBeVisible({
       timeout: 5_000,
     });
 
@@ -98,7 +102,9 @@ test.describe('Version History', () => {
     page,
   }) => {
     await page.getByTitle('Version history').click();
-    await expect(page.getByText('Version History')).toBeVisible({
+    await expect(
+      page.getByRole('heading', { name: 'Version History' }),
+    ).toBeVisible({
       timeout: 5_000,
     });
 

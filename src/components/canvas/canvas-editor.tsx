@@ -20,6 +20,7 @@ import type {
 } from '@/types/canvas';
 import { PAGE_WIDTH, PAGE_HEIGHT } from '@/types/canvas';
 import { processClipboardImage } from '@/lib/canvas/image-utils';
+import { findClosestPage, type PageRect } from '@/lib/canvas/page-detection';
 import { findOverflowSplitIndex } from '@/lib/canvas/text-split';
 import { decideCursorTarget } from '@/lib/canvas/cursor-target';
 import type { Document } from '@/types/database';
@@ -551,6 +552,16 @@ export function CanvasEditor({
         imageId: string;
         from: { x: number; y: number; width: number; height: number };
         to: { x: number; y: number; width: number; height: number };
+      }
+    | {
+        type: 'cross-page-move';
+        fromPageId: string;
+        toPageId: string;
+        strokes: Stroke[];
+        textBoxes: TextBox[];
+        images: ImageObject[];
+        dx: number;
+        dy: number;
       };
   const undoStackRef = useRef<CanvasAction[]>([]);
   const redoStackRef = useRef<CanvasAction[]>([]);
@@ -558,6 +569,19 @@ export function CanvasEditor({
 
   const pagesRef = useRef(pages);
   const saveStatusRef = useRef<SaveStatus>('saved');
+
+  // Track recent overflow events so handleUndo can clean up the
+  // destination page when TipTap's undo restores content on the source.
+  const lastOverflowRef = useRef<{
+    sourcePageId: string;
+    destPageId: string;
+    destContentBefore: Record<string, unknown> | null;
+    timestamp: number;
+  } | null>(null);
+  // Suppress overflow detection briefly after an undo that restores
+  // overflow content — prevents the restored content from immediately
+  // re-overflowing before the user gets a chance to undo more.
+  const suppressOverflowRef = useRef(false);
 
   useEffect(() => {
     pagesRef.current = pages;
@@ -926,15 +950,29 @@ export function CanvasEditor({
                 ...(existing?.content || [{ type: 'paragraph' }]),
               ],
             };
-            editor.commands.setContent(
-              merged as unknown as Record<string, unknown>,
-            );
+            // Mark as addToHistory: false so TipTap can't undo the
+            // overflow merge — preventing the data-loss bug where Undo
+            // removes overflow content from the destination while the
+            // source already lost it.
+            editor
+              .chain()
+              .command(({ tr }) => {
+                tr.setMeta('addToHistory', false);
+                return true;
+              })
+              .setContent(merged as unknown as Record<string, unknown>)
+              .run();
           } else {
             // New page — set overflow content directly (fires onUpdate
             // so overflow detection can cascade to further pages)
-            editor.commands.setContent(
-              overflowContent as Record<string, unknown>,
-            );
+            editor
+              .chain()
+              .command(({ tr }) => {
+                tr.setMeta('addToHistory', false);
+                return true;
+              })
+              .setContent(overflowContent as Record<string, unknown>)
+              .run();
           }
         }
         // Three cursor policies after the content merge:
@@ -1156,6 +1194,9 @@ export function CanvasEditor({
       overflowContent: Record<string, unknown> | null,
       cursorTarget?: { blockIndex: number; offset: number },
     ) => {
+      // Suppress overflow during undo restoration to prevent loops
+      if (suppressOverflowRef.current) return;
+
       // Read the current pages synchronously via ref — we can't rely on
       // the setPages updater function setting local variables because
       // React 19's automatic batching defers updater execution when
@@ -1167,8 +1208,25 @@ export function CanvasEditor({
       const nextPage = currentPages[pageIndex + 1];
 
       if (nextPage) {
+        // Capture dest content before merge for undo cleanup
+        const destEditor =
+          editorsRef.current.get(nextPage.id) ??
+          textBoxEditorsRef.current.get(`${nextPage.id}-ftb`);
+        const destContentBefore = destEditor
+          ? (destEditor.getJSON() as Record<string, unknown>)
+          : null;
+
         // Existing next page — pass overflow content to merge
         focusPage(nextPage.id, overflowContent, true, cursorTarget);
+
+        // Track the overflow so handleUndo can clean up the dest page
+        lastOverflowRef.current = {
+          sourcePageId: pageId,
+          destPageId: nextPage.id,
+          destContentBefore,
+          timestamp: Date.now(),
+        };
+
         triggerSave();
         return;
       }
@@ -1190,6 +1248,15 @@ export function CanvasEditor({
       // React processes the setPages update. Pass overflow content so
       // setContent() fires onUpdate and enables cascade.
       focusPage(newPage.id, overflowContent, false, cursorTarget);
+
+      // Track the overflow (new page case)
+      lastOverflowRef.current = {
+        sourcePageId: pageId,
+        destPageId: newPage.id,
+        destContentBefore: null,
+        timestamp: Date.now(),
+      };
+
       triggerSave();
     },
     [triggerSave, document.canvas_type, focusPage],
@@ -1708,6 +1775,118 @@ export function CanvasEditor({
     [triggerSave],
   );
 
+  // Move objects between pages (cross-page drag)
+  const handleCrossPageMove = useCallback(
+    (
+      fromPageId: string,
+      toPageId: string,
+      strokeIds: string[],
+      textBoxIds: string[],
+      imageIds: string[],
+      dx: number,
+      dy: number,
+    ) => {
+      const fromPage = pagesRef.current.find((p) => p.id === fromPageId);
+      if (!fromPage) return;
+
+      // Gather original objects for undo
+      const movedStrokes = fromPage.strokes.filter((s) =>
+        strokeIds.includes(s.id),
+      );
+      const movedTextBoxes = fromPage.textBoxes.filter((tb) =>
+        textBoxIds.includes(tb.id),
+      );
+      const movedImages = (fromPage.images ?? []).filter((img) =>
+        imageIds.includes(img.id),
+      );
+
+      setPages((prev) => {
+        let updated = prev;
+
+        // If toPageId doesn't exist, create a new page
+        if (!updated.find((p) => p.id === toPageId)) {
+          const lastPage = updated[updated.length - 1];
+          const newType = lastPage?.pageType || document.canvas_type;
+          const newPage = createEmptyPage(updated.length, newType);
+          // Override the auto-generated ID with the expected toPageId
+          newPage.id = toPageId;
+          updated = [...updated, newPage];
+        }
+
+        return updated.map((p) => {
+          if (p.id === fromPageId) {
+            // Remove objects from source page
+            return {
+              ...p,
+              strokes: p.strokes.filter((s) => !strokeIds.includes(s.id)),
+              textBoxes: p.textBoxes.filter(
+                (tb) => !textBoxIds.includes(tb.id),
+              ),
+              images: (p.images ?? []).filter(
+                (img) => !imageIds.includes(img.id),
+              ),
+            };
+          }
+          if (p.id === toPageId) {
+            // Add objects to target page with adjusted coordinates
+            return {
+              ...p,
+              strokes: [
+                ...p.strokes,
+                ...movedStrokes.map((s) => ({
+                  ...s,
+                  points: s.points.map(
+                    ([px, py, pr]) =>
+                      [px + dx, py + dy, pr] as Stroke['points'][0],
+                  ),
+                  bbox: {
+                    minX: s.bbox.minX + dx,
+                    minY: s.bbox.minY + dy,
+                    maxX: s.bbox.maxX + dx,
+                    maxY: s.bbox.maxY + dy,
+                  },
+                })),
+              ],
+              textBoxes: [
+                ...p.textBoxes,
+                ...movedTextBoxes.map((tb) => ({
+                  ...tb,
+                  x: tb.x + dx,
+                  y: tb.y + dy,
+                })),
+              ],
+              images: [
+                ...(p.images ?? []),
+                ...movedImages.map((img) => ({
+                  ...img,
+                  x: img.x + dx,
+                  y: img.y + dy,
+                })),
+              ],
+            };
+          }
+          return p;
+        });
+      });
+
+      undoStackRef.current.push({
+        type: 'cross-page-move',
+        fromPageId,
+        toPageId,
+        strokes: movedStrokes,
+        textBoxes: movedTextBoxes,
+        images: movedImages,
+        dx,
+        dy,
+      });
+      redoStackRef.current = [];
+      if (undoStackRef.current.length > 100) undoStackRef.current.shift();
+      setHistoryVersion((v) => v + 1);
+      triggerSave();
+    },
+    [triggerSave, document.canvas_type],
+  );
+
   // Resize a single image
   const handleImageResize = useCallback(
     (
@@ -1797,6 +1976,8 @@ export function CanvasEditor({
     onModeChange: setActiveTool,
     onDeleteSelected: handleDeleteSelected,
     onPaste: handlePaste,
+    onCrossPageMove: handleCrossPageMove,
+    pageOrder: pages.map((p) => ({ id: p.id, order: p.order })),
     pendingImageSelect: pendingImageSelectRef.current,
     onPendingImageSelectConsumed: () => {
       pendingImageSelectRef.current = null;
@@ -1864,7 +2045,58 @@ export function CanvasEditor({
   // Undo / Redo
   const handleUndo = useCallback(() => {
     if (activeTool === 'text' && activeEditor) {
+      const overflow = lastOverflowRef.current;
+      const contentLenBefore = activeEditor.state.doc.content.size;
+
       activeEditor.chain().focus().undo().run();
+
+      const contentLenAfter = activeEditor.state.doc.content.size;
+
+      // If the undo INCREASED content size significantly, TipTap just
+      // undid the overflow's deleteRange — content was restored from
+      // the overflow. We need to:
+      // 1. Clean up the destination page (remove the duplicate content)
+      // 2. Suppress overflow detection briefly so the restored content
+      //    doesn't immediately re-overflow
+      if (
+        overflow &&
+        contentLenAfter > contentLenBefore + 10 &&
+        Date.now() - overflow.timestamp < 30_000
+      ) {
+        // Suppress overflow so the restored content doesn't re-overflow
+        suppressOverflowRef.current = true;
+        setTimeout(() => {
+          suppressOverflowRef.current = false;
+        }, 200);
+
+        // Restore the dest page to its pre-overflow content
+        const destEditor =
+          editorsRef.current.get(overflow.destPageId) ??
+          textBoxEditorsRef.current.get(`${overflow.destPageId}-ftb`);
+        if (destEditor) {
+          if (overflow.destContentBefore) {
+            destEditor
+              .chain()
+              .command(({ tr }) => {
+                tr.setMeta('addToHistory', false);
+                return true;
+              })
+              .setContent(overflow.destContentBefore as Record<string, unknown>)
+              .run();
+          } else {
+            // New page was created — remove it
+            setPages((prev) =>
+              prev
+                .filter((p) => p.id !== overflow.destPageId)
+                .map((p, i) => ({ ...p, order: i })),
+            );
+          }
+        }
+
+        lastOverflowRef.current = null;
+        triggerSave();
+      }
+
       return;
     }
     const action = undoStackRef.current.pop();
@@ -2009,6 +2241,37 @@ export function CanvasEditor({
           ),
         );
         break;
+      case 'cross-page-move': {
+        const strokeIds = new Set(action.strokes.map((s) => s.id));
+        const tbIds = new Set(action.textBoxes.map((tb) => tb.id));
+        const imgIds = new Set(action.images.map((img) => img.id));
+        setPages((prev) => {
+          const updated = prev.map((p) => {
+            if (p.id === action.toPageId) {
+              // Remove objects from target page
+              return {
+                ...p,
+                strokes: p.strokes.filter((s) => !strokeIds.has(s.id)),
+                textBoxes: p.textBoxes.filter((tb) => !tbIds.has(tb.id)),
+                images: (p.images ?? []).filter((img) => !imgIds.has(img.id)),
+              };
+            }
+            if (p.id === action.fromPageId) {
+              // Restore objects to source page with original coordinates
+              return {
+                ...p,
+                strokes: [...p.strokes, ...action.strokes],
+                textBoxes: [...p.textBoxes, ...action.textBoxes],
+                images: [...(p.images ?? []), ...action.images],
+              };
+            }
+            return p;
+          });
+          // Strip trailing empty pages that may have been auto-created
+          return stripTrailingEmptyPages(updated, 1);
+        });
+        break;
+      }
     }
     redoStackRef.current.push(action);
     setHistoryVersion((v) => v + 1);
@@ -2150,6 +2413,75 @@ export function CanvasEditor({
           ),
         );
         break;
+      case 'cross-page-move': {
+        const strokeIds = new Set(action.strokes.map((s) => s.id));
+        const tbIds = new Set(action.textBoxes.map((tb) => tb.id));
+        const imgIds = new Set(action.images.map((img) => img.id));
+        setPages((prev) => {
+          let updated = prev;
+          // Re-create target page if it was stripped during undo
+          if (!updated.find((p) => p.id === action.toPageId)) {
+            const lastPage = updated[updated.length - 1];
+            const newType = lastPage?.pageType || document.canvas_type;
+            const newPage = createEmptyPage(updated.length, newType);
+            newPage.id = action.toPageId;
+            updated = [...updated, newPage];
+          }
+          return updated.map((p) => {
+            if (p.id === action.fromPageId) {
+              return {
+                ...p,
+                strokes: p.strokes.filter((s) => !strokeIds.has(s.id)),
+                textBoxes: p.textBoxes.filter((tb) => !tbIds.has(tb.id)),
+                images: (p.images ?? []).filter((img) => !imgIds.has(img.id)),
+              };
+            }
+            if (p.id === action.toPageId) {
+              return {
+                ...p,
+                strokes: [
+                  ...p.strokes,
+                  ...action.strokes.map((s) => ({
+                    ...s,
+                    points: s.points.map(
+                      ([px, py, pr]) =>
+                        [
+                          px + action.dx,
+                          py + action.dy,
+                          pr,
+                        ] as Stroke['points'][0],
+                    ),
+                    bbox: {
+                      minX: s.bbox.minX + action.dx,
+                      minY: s.bbox.minY + action.dy,
+                      maxX: s.bbox.maxX + action.dx,
+                      maxY: s.bbox.maxY + action.dy,
+                    },
+                  })),
+                ],
+                textBoxes: [
+                  ...p.textBoxes,
+                  ...action.textBoxes.map((tb) => ({
+                    ...tb,
+                    x: tb.x + action.dx,
+                    y: tb.y + action.dy,
+                  })),
+                ],
+                images: [
+                  ...(p.images ?? []),
+                  ...action.images.map((img) => ({
+                    ...img,
+                    x: img.x + action.dx,
+                    y: img.y + action.dy,
+                  })),
+                ],
+              };
+            }
+            return p;
+          });
+        });
+        break;
+      }
     }
     undoStackRef.current.push(action);
     setHistoryVersion((v) => v + 1);
@@ -2245,9 +2577,10 @@ export function CanvasEditor({
             const centerClientY = viewH / 2;
             // Find which page is near center and compute coordinates
             const pageEls = container.querySelectorAll('[data-page-id]');
+            const containerRect = container.getBoundingClientRect();
+            let pastedOnPage = false;
             for (const pageEl of pageEls) {
               const rect = pageEl.getBoundingClientRect();
-              const containerRect = container.getBoundingClientRect();
               const relY = rect.top - containerRect.top + scrollTop;
               if (
                 relY <= scrollTop + centerClientY &&
@@ -2266,7 +2599,47 @@ export function CanvasEditor({
                   Math.max(0, Math.min(PAGE_HEIGHT, y)),
                   pageId,
                 );
+                pastedOnPage = true;
                 break;
+              }
+            }
+            // Fallback: find closest page to viewport center
+            if (!pastedOnPage) {
+              const pageRects: PageRect[] = [];
+              for (const pageEl of pageEls) {
+                const rect = pageEl.getBoundingClientRect();
+                const id = pageEl.getAttribute('data-page-id');
+                if (id) {
+                  pageRects.push({
+                    id,
+                    top: rect.top - containerRect.top + scrollTop,
+                    height: rect.height,
+                  });
+                }
+              }
+              const closest = findClosestPage(
+                pageRects,
+                scrollTop + centerClientY,
+              );
+              if (closest) {
+                for (const pageEl of pageEls) {
+                  if (pageEl.getAttribute('data-page-id') === closest.pageId) {
+                    const rect = pageEl.getBoundingClientRect();
+                    const scaleX = PAGE_WIDTH / rect.width;
+                    const scaleY = PAGE_HEIGHT / rect.height;
+                    const x =
+                      (centerClientX - (rect.left - containerRect.left)) *
+                      scaleX;
+                    const y =
+                      (centerClientY - (rect.top - containerRect.top)) * scaleY;
+                    pasteAtPosition(
+                      Math.max(0, Math.min(PAGE_WIDTH, x)),
+                      Math.max(0, Math.min(PAGE_HEIGHT, y)),
+                      closest.pageId,
+                    );
+                    break;
+                  }
+                }
               }
             }
           }
@@ -2344,9 +2717,35 @@ export function CanvasEditor({
         }
 
         if (!targetPageId) {
-          // Fallback: use first page
-          const firstPageEl = pageEls[0];
-          targetPageId = firstPageEl?.getAttribute('data-page-id') ?? null;
+          // Fallback: find closest page to viewport center
+          const pageRects: PageRect[] = [];
+          for (const pageEl of pageEls) {
+            const rect = pageEl.getBoundingClientRect();
+            const id = pageEl.getAttribute('data-page-id');
+            if (id) {
+              pageRects.push({
+                id,
+                top: rect.top - containerRect.top + scrollTop,
+                height: rect.height,
+              });
+            }
+          }
+          const closest = findClosestPage(pageRects, scrollTop + centerClientY);
+          if (closest) {
+            targetPageId = closest.pageId;
+            // Find the matching page element to compute X/Y coordinates
+            for (const pageEl of pageEls) {
+              if (pageEl.getAttribute('data-page-id') === targetPageId) {
+                const rect = pageEl.getBoundingClientRect();
+                const scaleX = PAGE_WIDTH / rect.width;
+                const scaleY = PAGE_HEIGHT / rect.height;
+                pageX = (viewW / 2 - (rect.left - containerRect.left)) * scaleX;
+                pageY =
+                  (centerClientY - (rect.top - containerRect.top)) * scaleY;
+                break;
+              }
+            }
+          }
         }
         if (!targetPageId) return;
 
