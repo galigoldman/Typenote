@@ -89,13 +89,17 @@ export function AiChatPanel({
   >(null);
   const [view, setView] = useState<'chat' | 'list'>('chat');
   const [loadingConversation, setLoadingConversation] = useState(false);
+  const messagesContainerRef = useRef<HTMLDivElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const abortRef = useRef<AbortController | null>(null);
   const initialLoadDone = useRef(false);
 
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    const container = messagesContainerRef.current;
+    if (container) {
+      container.scrollTop = container.scrollHeight;
+    }
   }, [messages, streamingText]);
 
   useEffect(() => {
@@ -462,7 +466,7 @@ export function AiChatPanel({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex h-full w-full flex-col border-l border-border/30 bg-background/90 backdrop-blur-xl shadow-xl lg:static lg:z-auto lg:w-[480px] lg:shrink-0 xl:w-[560px] 2xl:w-[640px]">
+    <div className="fixed inset-0 z-50 flex h-full w-full flex-col border-l border-border/30 bg-background/90 backdrop-blur-xl shadow-xl lg:static lg:z-auto lg:min-h-0 lg:overflow-hidden lg:w-[480px] lg:shrink-0 xl:w-[560px] 2xl:w-[640px]">
       {/* Header */}
       <div className="flex items-center justify-between border-b px-4 py-3">
         <div className="flex min-w-0 items-center gap-2">
@@ -565,7 +569,7 @@ export function AiChatPanel({
       ) : (
         <>
           {/* Chat Messages */}
-          <div className="flex-1 overflow-y-auto px-4 py-4">
+          <div ref={messagesContainerRef} className="flex-1 overflow-y-auto px-4 py-4">
             {loadingConversation ? (
               <div className="flex items-center justify-center py-12 text-sm text-muted-foreground">
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
