@@ -34,7 +34,9 @@ export function getModelPrices(): Record<string, ModelPrice> {
       output: envPrice('AI_PRICE_PRO_OUTPUT', 10.0),
     },
     embedding: {
-      input: envPrice('AI_PRICE_EMBEDDING', 0.15),
+      // Default = Gemini Embedding 2 text input ($0.20/1M); the app embeds with
+      // gemini-embedding-2-preview. Override via AI_PRICE_EMBEDDING.
+      input: envPrice('AI_PRICE_EMBEDDING', 0.2),
       output: 0,
     },
   };

@@ -13,9 +13,9 @@ describe('estimateCostUsd', () => {
   });
 
   it('prices embedding as input-only', () => {
-    // default embedding input 0.15 per 1M, output unused
+    // default embedding input 0.20 per 1M (Gemini Embedding 2), output unused
     const cost = estimateCostUsd('embedding', 2_000_000, 0);
-    expect(cost).toBeCloseTo(0.3, 6);
+    expect(cost).toBeCloseTo(0.4, 6);
   });
 
   it('returns 0 for an unknown model', () => {

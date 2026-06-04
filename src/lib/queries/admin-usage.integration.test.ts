@@ -20,9 +20,9 @@ describe('getAdminUsage (2099-01 seed)', () => {
       output: 500000,
     });
     expect(row!.tokensByModel.embedding.input).toBe(2000000);
-    // flash 1M in*0.30 + 0.5M out*2.50 + embedding 2M*0.15 = 0.30 + 1.25 + 0.30
-    expect(row!.estimatedCostUsd).toBeCloseTo(1.85, 4);
-    expect(totals.estimatedCostUsd).toBeGreaterThanOrEqual(1.85);
+    // flash 1M in*0.30 + 0.5M out*2.50 + embedding 2M*0.20 = 0.30 + 1.25 + 0.40
+    expect(row!.estimatedCostUsd).toBeCloseTo(1.95, 4);
+    expect(totals.estimatedCostUsd).toBeGreaterThanOrEqual(1.95);
   });
 
   it('returns no rows for a month with no activity', async () => {
