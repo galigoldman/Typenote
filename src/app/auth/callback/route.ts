@@ -55,7 +55,14 @@ export async function GET(request: Request) {
       });
       return response;
     }
+
+    // Code was present but exchange failed (e.g. PKCE verifier lost on Safari)
+    console.error('[auth/callback] session exchange failed:', error.message);
+    return NextResponse.redirect(
+      `${origin}/login?error=session_exchange_failed`,
+    );
   }
 
-  return NextResponse.redirect(`${origin}/login?error=auth_failed`);
+  // No authorization code in the URL at all
+  return NextResponse.redirect(`${origin}/login?error=no_code`);
 }

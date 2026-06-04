@@ -7,7 +7,7 @@
  * operations directly using the service-role admin client.
  *
  * Covers:
- *   - Moving between folder, course, week, and root
+ *   - Moving between folder, course, and root (flat model — no weeks)
  *   - Cross-course move (course A -> course B)
  *   - CHECK constraint enforcement (folder_id XOR course_id)
  *   - Content preservation after move
@@ -20,8 +20,6 @@ import { createAdminClient, TEST_USER_ID } from '@/test/supabase-client';
 const FOLDER_ID = '10000000-0000-0000-0000-000000000001'; // Calculus I
 const COURSE_ID = '30000000-0000-0000-0000-000000000001'; // CS101
 const COURSE_B_ID = '30000000-0000-0000-0000-000000000002'; // Linear Algebra
-const WEEK_1_ID = '40000000-0000-0000-0000-000000000001'; // Week 1
-const WEEK_2_ID = '40000000-0000-0000-0000-000000000002'; // Week 2
 
 let supabase: SupabaseClient;
 
@@ -43,7 +41,6 @@ async function insertDoc(
       position: 0,
       folder_id: null,
       course_id: null,
-      week_id: null,
       ...overrides,
     })
     .select('id')
@@ -95,7 +92,6 @@ describe('moveDocument — DB-level operations', () => {
       .update({
         folder_id: null,
         course_id: COURSE_ID,
-        week_id: null,
       })
       .eq('id', docId);
 
@@ -104,14 +100,10 @@ describe('moveDocument — DB-level operations', () => {
     const doc = await fetchDoc(docId);
     expect(doc.folder_id).toBeNull();
     expect(doc.course_id).toBe(COURSE_ID);
-    expect(doc.week_id).toBeNull();
   });
 
-  it('move course -> folder: clears course_id/week_id, sets folder_id', async () => {
-    const docId = await insertDoc({
-      course_id: COURSE_ID,
-      week_id: WEEK_1_ID,
-    });
+  it('move course -> folder: clears course_id, sets folder_id', async () => {
+    const docId = await insertDoc({ course_id: COURSE_ID });
 
     // Simulate moveDocument destination: { type: 'folder', folderId }
     const { error } = await supabase
@@ -119,7 +111,6 @@ describe('moveDocument — DB-level operations', () => {
       .update({
         folder_id: FOLDER_ID,
         course_id: null,
-        week_id: null,
       })
       .eq('id', docId);
 
@@ -128,45 +119,21 @@ describe('moveDocument — DB-level operations', () => {
     const doc = await fetchDoc(docId);
     expect(doc.folder_id).toBe(FOLDER_ID);
     expect(doc.course_id).toBeNull();
-    expect(doc.week_id).toBeNull();
   });
 
-  it('move week -> week (same course): updates week_id, course_id unchanged', async () => {
-    const docId = await insertDoc({
-      course_id: COURSE_ID,
-      week_id: WEEK_1_ID,
-    });
-
-    const { error } = await supabase
-      .from('documents')
-      .update({ week_id: WEEK_2_ID })
-      .eq('id', docId);
-
-    expect(error).toBeNull();
-
-    const doc = await fetchDoc(docId);
-    expect(doc.course_id).toBe(COURSE_ID);
-    expect(doc.week_id).toBe(WEEK_2_ID);
-  });
-
-  it('cross-course move: updates course_id and clears week_id', async () => {
-    // Create a document in course A, week 1
-    const docId = await insertDoc({
-      course_id: COURSE_ID,
-      week_id: WEEK_1_ID,
-    });
+  it('cross-course move: updates course_id', async () => {
+    // Create a document in course A
+    const docId = await insertDoc({ course_id: COURSE_ID });
 
     // Verify initial state
     const before = await fetchDoc(docId);
     expect(before.course_id).toBe(COURSE_ID);
-    expect(before.week_id).toBe(WEEK_1_ID);
 
-    // Move to course B (different course), clearing week and folder
+    // Move to course B (different course)
     const { error } = await supabase
       .from('documents')
       .update({
         course_id: COURSE_B_ID,
-        week_id: null,
         folder_id: null,
       })
       .eq('id', docId);
@@ -175,15 +142,11 @@ describe('moveDocument — DB-level operations', () => {
 
     const doc = await fetchDoc(docId);
     expect(doc.course_id).toBe(COURSE_B_ID);
-    expect(doc.week_id).toBeNull();
     expect(doc.folder_id).toBeNull();
   });
 
-  it('move to root: clears folder_id, course_id, week_id', async () => {
-    const docId = await insertDoc({
-      course_id: COURSE_ID,
-      week_id: WEEK_1_ID,
-    });
+  it('move to root: clears folder_id and course_id', async () => {
+    const docId = await insertDoc({ course_id: COURSE_ID });
 
     // Simulate moveDocument destination: { type: 'root' }
     const { error } = await supabase
@@ -191,7 +154,6 @@ describe('moveDocument — DB-level operations', () => {
       .update({
         folder_id: null,
         course_id: null,
-        week_id: null,
       })
       .eq('id', docId);
 
@@ -200,7 +162,6 @@ describe('moveDocument — DB-level operations', () => {
     const doc = await fetchDoc(docId);
     expect(doc.folder_id).toBeNull();
     expect(doc.course_id).toBeNull();
-    expect(doc.week_id).toBeNull();
   });
 
   it('DB constraint rejects folder_id AND course_id set simultaneously', async () => {
@@ -238,13 +199,12 @@ describe('moveDocument — DB-level operations', () => {
       folder_id: FOLDER_ID,
     });
 
-    // Move from folder to course with week
+    // Move from folder to course
     const { error } = await supabase
       .from('documents')
       .update({
         folder_id: null,
         course_id: COURSE_ID,
-        week_id: WEEK_1_ID,
       })
       .eq('id', docId);
 
@@ -256,6 +216,5 @@ describe('moveDocument — DB-level operations', () => {
     // Confirm the location actually changed
     expect(doc.folder_id).toBeNull();
     expect(doc.course_id).toBe(COURSE_ID);
-    expect(doc.week_id).toBe(WEEK_1_ID);
   });
 });

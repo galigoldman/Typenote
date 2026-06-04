@@ -64,23 +64,17 @@ describe('Schema & seed data', () => {
     expect(data!.map((c) => c.code)).toContain('CS101');
   });
 
-  it('course_weeks table exists and has seeded weeks', async () => {
-    const { data, error } = await supabase
-      .from('course_weeks')
-      .select('id, topic, week_number')
-      .order('week_number');
-
-    expect(error).toBeNull();
-    expect(data!.length).toBeGreaterThanOrEqual(3);
-  });
-
-  it('course_materials table exists and has seeded materials', async () => {
+  it('course_materials table exists and has seeded materials with course_id', async () => {
     const { data, error } = await supabase
       .from('course_materials')
-      .select('id, file_name, category')
+      .select('id, file_name, category, course_id')
       .order('created_at');
 
     expect(error).toBeNull();
     expect(data!.length).toBeGreaterThanOrEqual(3);
+    // All materials must have a course_id (flat model — no week_id)
+    for (const m of data!) {
+      expect(m.course_id).not.toBeNull();
+    }
   });
 });

@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { FileText, FileType2, Loader2, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { createClient } from '@/lib/supabase/client';
@@ -8,12 +9,13 @@ import {
   openPersonalFileAsDocument,
   deletePersonalFile,
 } from '@/lib/actions/personal-files';
-import { useTabs } from '@/contexts/tabs-context';
 import { toast } from 'sonner';
 import type { PersonalFile } from '@/types/database';
 
 interface PersonalFileItemProps {
   file: PersonalFile;
+  currentUserId?: string;
+  isOwner?: boolean;
 }
 
 function formatFileSize(bytes: number): string {
@@ -30,10 +32,17 @@ async function getPdfPageCount(signedUrl: string): Promise<number> {
   return count;
 }
 
-export function PersonalFileItem({ file }: PersonalFileItemProps) {
-  const { openTab } = useTabs();
+export function PersonalFileItem({
+  file,
+  currentUserId,
+  isOwner = false,
+}: PersonalFileItemProps) {
+  const router = useRouter();
   const [opening, setOpening] = useState(false);
   const [deleting, setDeleting] = useState(false);
+
+  const canDelete =
+    isOwner || currentUserId === undefined || file.user_id === currentUserId;
 
   const isPdf = file.mime_type === 'application/pdf';
   const isDocx = file.mime_type.includes('wordprocessingml');
@@ -61,7 +70,7 @@ export function PersonalFileItem({ file }: PersonalFileItemProps) {
           pageCount,
         });
 
-        openTab(result.documentId, file.display_name);
+        router.push(`/dashboard/documents/${result.documentId}`);
       } catch {
         toast.error('Failed to open file');
         setOpening(false);
@@ -73,7 +82,7 @@ export function PersonalFileItem({ file }: PersonalFileItemProps) {
           fileId: file.id,
         });
 
-        openTab(result.documentId, file.display_name);
+        router.push(`/dashboard/documents/${result.documentId}`);
       } catch {
         toast.error('Failed to open file');
         setOpening(false);
@@ -117,15 +126,18 @@ export function PersonalFileItem({ file }: PersonalFileItemProps) {
           {formatFileSize(file.file_size)}
         </span>
       </button>
-      <Button
-        variant="ghost"
-        size="icon-xs"
-        onClick={handleDelete}
-        disabled={deleting}
-        className="shrink-0 opacity-0 group-hover:opacity-100 hover:opacity-100"
-      >
-        <Trash2 className="size-3.5 text-muted-foreground" />
-      </Button>
+      {canDelete && (
+        <Button
+          variant="ghost"
+          size="icon-xs"
+          onClick={handleDelete}
+          disabled={deleting}
+          aria-label="Delete file"
+          className="shrink-0 opacity-0 group-hover:opacity-100 hover:opacity-100"
+        >
+          <Trash2 className="size-3.5 text-muted-foreground" />
+        </Button>
+      )}
     </div>
   );
 }

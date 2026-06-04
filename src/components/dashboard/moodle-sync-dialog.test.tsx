@@ -527,4 +527,181 @@ describe('MoodleSyncDialog', () => {
     });
     expect(previewButton).toBeDisabled();
   });
+
+  it('cancel during sync stops downloads not yet started and reports partial progress', async () => {
+    const user = userEvent.setup();
+
+    // More files than the download concurrency (4), so once we cancel before
+    // the pool pulls the rest, only the first `concurrency` ever start.
+    const CONCURRENCY = 4;
+    const files = Array.from({ length: CONCURRENCY + 4 }, (_, i) => ({
+      type: 'file' as const,
+      name: `f${i}.pdf`,
+      moodleUrl: `https://moodle.test.ac.il/file/${i}`,
+    }));
+
+    const mockScrape = vi.fn().mockResolvedValue(mockScrapedCourses);
+    const mockScrapeContent = vi.fn().mockResolvedValue({
+      sections: [
+        {
+          moodleSectionId: 'sec-1',
+          title: 'Week 1',
+          position: 0,
+          items: files,
+        },
+      ],
+    });
+
+    // Each download hangs until we release it, so we can click Cancel while the
+    // first batch is genuinely in-flight.
+    const releases: Array<() => void> = [];
+    const mockDownloadAndUpload = vi.fn(
+      () => new Promise<void>((resolve) => releases.push(resolve)),
+    );
+
+    mockUseMoodleExtension.mockReturnValue(
+      makeExtensionMock({
+        scrapeCourses: mockScrape,
+        scrapeCourseContent: mockScrapeContent,
+        downloadAndUpload: mockDownloadAndUpload,
+      }),
+    );
+    mockCompare.mockResolvedValue(mockComparisons);
+    mockSync.mockResolvedValue({
+      syncedCount: 1,
+      courses: [
+        {
+          moodleCourseId: 'CS101',
+          sections: [
+            {
+              id: 'section-db-1',
+              moodleSectionId: 'sec-1',
+              items: files.map((f) => ({ moodleUrl: f.moodleUrl })),
+            },
+          ],
+        },
+      ],
+    });
+
+    render(
+      <MoodleSyncDialog
+        open={true}
+        onOpenChange={vi.fn()}
+        moodleConnection={mockConnection}
+      />,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText('Intro to CS')).toBeInTheDocument();
+    });
+    await user.click(screen.getByRole('button', { name: /preview content/i }));
+    await waitFor(() => {
+      expect(screen.getByText('f0.pdf')).toBeInTheDocument();
+    });
+    await user.click(screen.getByRole('button', { name: /sync selected/i }));
+
+    // Pool launches exactly `concurrency` workers and then waits on the
+    // hanging downloads.
+    await waitFor(() => {
+      expect(mockDownloadAndUpload).toHaveBeenCalledTimes(CONCURRENCY);
+    });
+
+    // Cancel while that first batch is in-flight.
+    await user.click(screen.getByRole('button', { name: /^cancel$/i }));
+
+    // Release the in-flight downloads; the workers should then see the cancel
+    // flag and NOT pull the remaining queued jobs.
+    releases.forEach((resolve) => resolve());
+
+    await waitFor(() => {
+      expect(
+        screen.getByText(/downloaded before stopping/i),
+      ).toBeInTheDocument();
+    });
+
+    // Still `concurrency` — the queued files never started.
+    expect(mockDownloadAndUpload).toHaveBeenCalledTimes(CONCURRENCY);
+  });
+
+  it('does not close on Escape while a sync is in progress', async () => {
+    const user = userEvent.setup();
+    const onOpenChange = vi.fn();
+
+    const files = [
+      {
+        type: 'file' as const,
+        name: 'a.pdf',
+        moodleUrl: 'https://moodle.test.ac.il/file/a',
+      },
+    ];
+    const mockScrape = vi.fn().mockResolvedValue(mockScrapedCourses);
+    const mockScrapeContent = vi.fn().mockResolvedValue({
+      sections: [
+        {
+          moodleSectionId: 'sec-1',
+          title: 'Week 1',
+          position: 0,
+          items: files,
+        },
+      ],
+    });
+    // Download hangs so the dialog stays in the 'syncing' phase.
+    const mockDownloadAndUpload = vi.fn(() => new Promise<void>(() => {}));
+
+    mockUseMoodleExtension.mockReturnValue(
+      makeExtensionMock({
+        scrapeCourses: mockScrape,
+        scrapeCourseContent: mockScrapeContent,
+        downloadAndUpload: mockDownloadAndUpload,
+      }),
+    );
+    mockCompare.mockResolvedValue(mockComparisons);
+    mockSync.mockResolvedValue({
+      syncedCount: 1,
+      courses: [
+        {
+          moodleCourseId: 'CS101',
+          sections: [
+            {
+              id: 'section-db-1',
+              moodleSectionId: 'sec-1',
+              items: [{ moodleUrl: 'https://moodle.test.ac.il/file/a' }],
+            },
+          ],
+        },
+      ],
+    });
+
+    render(
+      <MoodleSyncDialog
+        open={true}
+        onOpenChange={onOpenChange}
+        moodleConnection={mockConnection}
+      />,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText('Intro to CS')).toBeInTheDocument();
+    });
+    await user.click(screen.getByRole('button', { name: /preview content/i }));
+    await waitFor(() => {
+      expect(screen.getByText('a.pdf')).toBeInTheDocument();
+    });
+    await user.click(screen.getByRole('button', { name: /sync selected/i }));
+
+    // In the syncing phase: the Cancel button is the signal we're mid-sync.
+    await waitFor(() => {
+      expect(
+        screen.getByRole('button', { name: /^cancel$/i }),
+      ).toBeInTheDocument();
+    });
+
+    // Escape must NOT dismiss the dialog mid-sync.
+    await user.keyboard('{Escape}');
+
+    expect(onOpenChange).not.toHaveBeenCalledWith(false);
+    expect(
+      screen.getByRole('button', { name: /^cancel$/i }),
+    ).toBeInTheDocument();
+  });
 });

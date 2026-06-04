@@ -110,6 +110,34 @@ describe('AiChatPanel', () => {
   });
 
   // -----------------------------------------------------------------------
+  // 1b. Layout: docked (default) vs overlay
+  // -----------------------------------------------------------------------
+  it('uses the static side-column layout by default (docked)', () => {
+    setupDefaultFetchResponses();
+
+    const { container } = render(<AiChatPanel {...defaultProps} />);
+    const panel = container.firstElementChild as HTMLElement;
+
+    // Docked panels become a static flex column on lg+.
+    expect(panel.className).toContain('lg:static');
+    expect(panel.className).not.toContain('lg:right-0');
+  });
+
+  it('stays a fixed right-docked drawer when docked={false}', () => {
+    setupDefaultFetchResponses();
+
+    const { container } = render(
+      <AiChatPanel {...defaultProps} docked={false} />,
+    );
+    const panel = container.firstElementChild as HTMLElement;
+
+    // Overlay panels must never collapse to static flow — they dock right.
+    expect(panel.className).not.toContain('lg:static');
+    expect(panel.className).toContain('lg:right-0');
+    expect(panel.className).toContain('lg:left-auto');
+  });
+
+  // -----------------------------------------------------------------------
   // 2. Does not render when closed
   // -----------------------------------------------------------------------
   it('does not render when closed', () => {

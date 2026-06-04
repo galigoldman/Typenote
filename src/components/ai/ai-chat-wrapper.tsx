@@ -1,17 +1,17 @@
 'use client';
 
 import { useState } from 'react';
-import { MessageCircle, X } from 'lucide-react';
+import { MessageCircle } from 'lucide-react';
 
 import type { AiContextItem } from './ai-chat-panel';
+import type { ContextFileType, ResolvedContextFile } from '@/types/database';
 
 import { AiChatPanel } from './ai-chat-panel';
 
 interface AiChatWrapperProps {
   courseId?: string;
-  weekId?: string;
   courseName?: string;
-  weekLabel?: string;
+  documentId?: string;
   getDocumentContent?: () => string;
   pendingContextItems?: AiContextItem[];
   onRemoveContextItem?: (index: number) => void;
@@ -19,13 +19,26 @@ interface AiChatWrapperProps {
   isOpen?: boolean;
   onToggle?: () => void;
   onClose?: () => void;
+  onOpenSource?: (
+    fileType: ContextFileType,
+    fileId: string,
+    page?: number,
+  ) => void;
+  /** Per-document focus files (owned by the host) + a reload callback. */
+  focusFiles?: ResolvedContextFile[];
+  onFocusFilesChanged?: () => void | Promise<void>;
+  /**
+   * Pass `false` when the panel is rendered in normal document flow (e.g. the
+   * course page toolbar) rather than as a flex-row sibling of the main content.
+   * Defaults to `true` (static side-column layout). See {@link AiChatPanel}.
+   */
+  docked?: boolean;
 }
 
 export function AiChatWrapper({
   courseId,
-  weekId,
   courseName,
-  weekLabel,
+  documentId,
   getDocumentContent,
   pendingContextItems = [],
   onRemoveContextItem,
@@ -33,6 +46,10 @@ export function AiChatWrapper({
   isOpen: externalIsOpen,
   onToggle: externalOnToggle,
   onClose: externalOnClose,
+  onOpenSource,
+  focusFiles,
+  onFocusFilesChanged,
+  docked = true,
 }: AiChatWrapperProps) {
   const [internalIsOpen, setInternalIsOpen] = useState(false);
 
@@ -61,15 +78,18 @@ export function AiChatWrapper({
 
       <AiChatPanel
         courseId={courseId}
-        weekId={weekId}
         courseName={courseName}
-        weekLabel={weekLabel}
+        documentId={documentId}
         getDocumentContent={getDocumentContent}
         isOpen={isOpen}
         onClose={handleClose}
         pendingContextItems={pendingContextItems}
         onRemoveContextItem={onRemoveContextItem}
         onClearAllContext={onClearAllContext}
+        onOpenSource={onOpenSource}
+        focusFiles={focusFiles}
+        onFocusFilesChanged={onFocusFilesChanged}
+        docked={docked}
       />
     </>
   );

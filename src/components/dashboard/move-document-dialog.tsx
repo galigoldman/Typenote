@@ -2,8 +2,6 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react';
 import {
-  ChevronRight,
-  ChevronDown,
   FolderOpen,
   BookOpen,
   AlertTriangle,
@@ -24,7 +22,7 @@ import { createClient } from '@/lib/supabase/client';
 import { moveDocument } from '@/lib/actions/documents';
 import type { MoveDestination } from '@/lib/actions/documents';
 import { createFolder } from '@/lib/actions/folders';
-import type { Document, Course, CourseWeek, Folder } from '@/types/database';
+import type { Document, Course, Folder } from '@/types/database';
 import { cn } from '@/lib/utils';
 import { trackEvent } from '@/lib/analytics/events';
 
@@ -34,10 +32,6 @@ interface MoveDocumentDialogProps {
   onOpenChange: (open: boolean) => void;
 }
 
-interface CourseWithWeeks extends Course {
-  weeks: CourseWeek[];
-}
-
 export function MoveDocumentDialog({
   document,
   open,
@@ -45,16 +39,11 @@ export function MoveDocumentDialog({
 }: MoveDocumentDialogProps) {
   const supabaseRef = useRef(createClient());
 
-  const [courses, setCourses] = useState<CourseWithWeeks[]>([]);
+  const [courses, setCourses] = useState<Course[]>([]);
   const [folders, setFolders] = useState<Folder[]>([]);
   const [loading, setLoading] = useState(false);
   const [moving, setMoving] = useState(false);
   const [error, setError] = useState('');
-
-  // Tree expand state — set of course IDs that are expanded
-  const [expandedCourses, setExpandedCourses] = useState<Set<string>>(
-    new Set(),
-  );
 
   // Selection state
   const [destination, setDestination] = useState<MoveDestination | null>(null);
@@ -71,11 +60,7 @@ export function MoveDocumentDialog({
       return { type: 'folder', folderId: document.folder_id };
     }
     if (document.course_id) {
-      return {
-        type: 'course',
-        courseId: document.course_id,
-        weekId: document.week_id ?? undefined,
-      };
+      return { type: 'course', courseId: document.course_id };
     }
     return { type: 'root' };
   }
@@ -92,7 +77,7 @@ export function MoveDocumentDialog({
       return a.folderId === b.folderId;
     }
     if (a.type === 'course' && b.type === 'course') {
-      return a.courseId === b.courseId && a.weekId === b.weekId;
+      return a.courseId === b.courseId;
     }
     return false;
   }
@@ -122,17 +107,12 @@ export function MoveDocumentDialog({
         return;
       }
 
-      const [coursesRes, weeksRes, foldersRes] = await Promise.all([
+      const [coursesRes, foldersRes] = await Promise.all([
         supabase
           .from('courses')
           .select('*')
           .eq('user_id', user.id)
           .order('position'),
-        supabase
-          .from('course_weeks')
-          .select('*')
-          .eq('user_id', user.id)
-          .order('week_number'),
         supabase
           .from('folders')
           .select('*')
@@ -142,37 +122,16 @@ export function MoveDocumentDialog({
       ]);
 
       if (coursesRes.error) throw new Error(coursesRes.error.message);
-      if (weeksRes.error) throw new Error(weeksRes.error.message);
       if (foldersRes.error) throw new Error(foldersRes.error.message);
 
-      // Group weeks by course
-      const weeksByCourse = new Map<string, CourseWeek[]>();
-      for (const week of weeksRes.data) {
-        const existing = weeksByCourse.get(week.course_id) ?? [];
-        existing.push(week);
-        weeksByCourse.set(week.course_id, existing);
-      }
-
-      const coursesWithWeeks: CourseWithWeeks[] = coursesRes.data.map(
-        (course) => ({
-          ...course,
-          weeks: weeksByCourse.get(course.id) ?? [],
-        }),
-      );
-
-      setCourses(coursesWithWeeks);
+      setCourses(coursesRes.data);
       setFolders(foldersRes.data);
-
-      // Auto-expand the course that contains the current document
-      if (document?.course_id) {
-        setExpandedCourses(new Set([document.course_id]));
-      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load data');
     } finally {
       setLoading(false);
     }
-  }, [document?.course_id]);
+  }, []);
 
   useEffect(() => {
     if (open && document) {
@@ -184,18 +143,6 @@ export function MoveDocumentDialog({
       fetchData();
     }
   }, [open, document, fetchData]);
-
-  function toggleCourseExpand(courseId: string) {
-    setExpandedCourses((prev) => {
-      const next = new Set(prev);
-      if (next.has(courseId)) {
-        next.delete(courseId);
-      } else {
-        next.add(courseId);
-      }
-      return next;
-    });
-  }
 
   async function handleCreateFolder() {
     const trimmed = newFolderName.trim();
@@ -274,109 +221,43 @@ export function MoveDocumentDialog({
                 </div>
                 <div className="space-y-0.5">
                   {courses.map((course) => {
-                    const isExpanded = expandedCourses.has(course.id);
                     const isCourseSelected =
                       destination?.type === 'course' &&
-                      destination.courseId === course.id &&
-                      !destination.weekId;
+                      destination.courseId === course.id;
                     const isCourseCurrentLocation =
                       currentLocation?.type === 'course' &&
-                      currentLocation.courseId === course.id &&
-                      !currentLocation.weekId;
+                      currentLocation.courseId === course.id;
 
                     return (
-                      <div key={course.id}>
-                        <div className="flex items-center">
-                          <button
-                            type="button"
-                            className="flex size-6 items-center justify-center rounded hover:bg-accent"
-                            onClick={() => toggleCourseExpand(course.id)}
-                            aria-label={
-                              isExpanded
-                                ? `Collapse ${course.name}`
-                                : `Expand ${course.name}`
-                            }
-                          >
-                            {isExpanded ? (
-                              <ChevronDown className="size-3.5" />
-                            ) : (
-                              <ChevronRight className="size-3.5" />
-                            )}
-                          </button>
-                          <button
-                            type="button"
-                            className={cn(
-                              'flex flex-1 items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm transition-colors hover:bg-accent',
-                              isCourseSelected &&
-                                'bg-primary/10 font-medium text-primary',
-                              isCourseCurrentLocation &&
-                                !isCourseSelected &&
-                                'text-muted-foreground',
-                            )}
-                            onClick={() =>
-                              setDestination({
-                                type: 'course',
-                                courseId: course.id,
-                              })
-                            }
-                          >
-                            <div
-                              className="size-2.5 rounded-full"
-                              style={{ backgroundColor: course.color }}
-                            />
-                            <span className="flex-1">{course.name}</span>
-                            {isCourseCurrentLocation && (
-                              <span className="text-[10px] text-muted-foreground">
-                                current
-                              </span>
-                            )}
-                          </button>
-                        </div>
-
-                        {isExpanded &&
-                          course.weeks.map((week) => {
-                            const isWeekSelected =
-                              destination?.type === 'course' &&
-                              destination.courseId === course.id &&
-                              destination.weekId === week.id;
-                            const isWeekCurrentLocation =
-                              currentLocation?.type === 'course' &&
-                              currentLocation.courseId === course.id &&
-                              currentLocation.weekId === week.id;
-
-                            return (
-                              <button
-                                key={week.id}
-                                type="button"
-                                className={cn(
-                                  'ml-6 flex w-[calc(100%-1.5rem)] items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm transition-colors hover:bg-accent',
-                                  isWeekSelected &&
-                                    'bg-primary/10 font-medium text-primary',
-                                  isWeekCurrentLocation &&
-                                    !isWeekSelected &&
-                                    'text-muted-foreground',
-                                )}
-                                onClick={() =>
-                                  setDestination({
-                                    type: 'course',
-                                    courseId: course.id,
-                                    weekId: week.id,
-                                  })
-                                }
-                              >
-                                <span className="flex-1">
-                                  Week {week.week_number}
-                                  {week.topic ? ` \u2014 ${week.topic}` : ''}
-                                </span>
-                                {isWeekCurrentLocation && (
-                                  <span className="text-[10px] text-muted-foreground">
-                                    current
-                                  </span>
-                                )}
-                              </button>
-                            );
-                          })}
-                      </div>
+                      <button
+                        key={course.id}
+                        type="button"
+                        className={cn(
+                          'flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm transition-colors hover:bg-accent',
+                          isCourseSelected &&
+                            'bg-primary/10 font-medium text-primary',
+                          isCourseCurrentLocation &&
+                            !isCourseSelected &&
+                            'text-muted-foreground',
+                        )}
+                        onClick={() =>
+                          setDestination({
+                            type: 'course',
+                            courseId: course.id,
+                          })
+                        }
+                      >
+                        <div
+                          className="size-2.5 rounded-full"
+                          style={{ backgroundColor: course.color }}
+                        />
+                        <span className="flex-1">{course.name}</span>
+                        {isCourseCurrentLocation && (
+                          <span className="text-[10px] text-muted-foreground">
+                            current
+                          </span>
+                        )}
+                      </button>
                     );
                   })}
                 </div>

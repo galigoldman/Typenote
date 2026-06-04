@@ -20,6 +20,7 @@ import {
   syncMoodleCourses,
   getExistingFileUrls,
 } from '@/lib/actions/moodle-sync';
+import { runWithConcurrency } from '@/lib/concurrency';
 import type {
   CourseComparison,
   CourseComparisonStatus,
@@ -123,6 +124,17 @@ function friendlyFileLabel(mimeType: string | undefined): string {
     return 'PPTX';
   return 'file';
 }
+
+// How many Moodle files to process at once. The extension resolves+downloads
+// each file via a credentialed fetch (no browser window anymore), so several in
+// parallel is a big speedup over the old one-at-a-time loop. Kept at 4 on
+// purpose: each file's upload-finalize runs AI indexing (per-chunk embedding
+// calls) synchronously server-side, so a higher fan-out just overloads the
+// embedding API (observed: multi-minute finalizes + "fetch failed") without
+// downloading any faster. Raise this only once indexing moves off the
+// finalize path. The worker pool re-checks cancellation before each new file,
+// so Cancel / closing the dialog still stops promptly.
+const DOWNLOAD_CONCURRENCY = 4;
 
 export function MoodleSyncDialog({
   open,
@@ -340,6 +352,9 @@ export function MoodleSyncDialog({
 
   // ---- Phase 1: Load courses ----
   const loadCourses = useCallback(async () => {
+    // Fresh run — clear any stale cancel flag left by a previous close, so the
+    // scrape/permission path can't inherit a `true` from an earlier session.
+    pollCancelRef.current = false;
     setError(null);
     setAuthError(false);
     setNetworkError(false);
@@ -506,6 +521,8 @@ export function MoodleSyncDialog({
   // ---- Phase 2: Scrape content and show picker ----
   async function handlePreviewContent() {
     setPhase('scraping-content');
+    // Fresh run — clear any stale cancel flag left by a previous close.
+    pollCancelRef.current = false;
     setError(null);
 
     try {
@@ -515,6 +532,12 @@ export function MoodleSyncDialog({
       const results: CourseWithContent[] = [];
 
       for (let i = 0; i < selected.length; i++) {
+        // Scanning a course opens a Moodle window per course; bail out
+        // immediately if the user cancelled instead of grinding through them.
+        if (pollCancelRef.current) {
+          setPhase('select-courses');
+          return;
+        }
         const course = selected[i];
         setProgress(
           `Scanning "${course.name}" (${i + 1}/${selected.length})...`,
@@ -608,43 +631,63 @@ export function MoodleSyncDialog({
     failed: number;
     failedJobs: typeof jobs;
     errors: string[];
+    cancelled: boolean;
   }> {
     let downloaded = 0;
     let failed = 0;
     const errors: string[] = [];
     const newFailed: typeof jobs = [];
 
-    for (const job of jobs) {
-      try {
-        await downloadAndUpload({
-          moodleFileUrl: job.moodleUrl,
-          uploadEndpoint,
-          authToken,
-          metadata: {
-            sectionId: job.sectionId,
-            moodleUrl: job.moodleUrl,
-            fileName: job.fileName,
-          },
-        });
-        downloaded++;
-      } catch (dlErr) {
-        failed++;
-        if (errors.length < 3) {
-          errors.push(
-            `${job.fileName}: ${dlErr instanceof Error ? dlErr.message : String(dlErr)}`,
-          );
+    // Download a few files at once instead of one-by-one. Each worker handles
+    // its own failure so a single bad file never rejects the whole pool, and
+    // the pool stops pulling new files the moment pollCancelRef flips.
+    await runWithConcurrency(
+      jobs,
+      async (job) => {
+        try {
+          await downloadAndUpload({
+            moodleFileUrl: job.moodleUrl,
+            uploadEndpoint,
+            authToken,
+            metadata: {
+              sectionId: job.sectionId,
+              moodleUrl: job.moodleUrl,
+              fileName: job.fileName,
+            },
+          });
+          downloaded++;
+        } catch (dlErr) {
+          failed++;
+          if (errors.length < 3) {
+            errors.push(
+              `${job.fileName}: ${dlErr instanceof Error ? dlErr.message : String(dlErr)}`,
+            );
+          }
+          newFailed.push(job);
         }
-        newFailed.push(job);
-      }
-      setProgress(
-        `Downloading files... (${downloaded + failed}/${jobs.length})`,
-      );
-    }
-    return { downloaded, failed, failedJobs: newFailed, errors };
+        setProgress(
+          `Downloading files... (${downloaded + failed}/${jobs.length})`,
+        );
+      },
+      {
+        concurrency: DOWNLOAD_CONCURRENCY,
+        shouldCancel: () => pollCancelRef.current,
+      },
+    );
+
+    return {
+      downloaded,
+      failed,
+      failedJobs: newFailed,
+      errors,
+      cancelled: pollCancelRef.current,
+    };
   }
 
   async function handleSync() {
     setPhase('syncing');
+    // Fresh run — clear any stale cancel flag left by a previous close.
+    pollCancelRef.current = false;
     setError(null);
     setFailedJobs([]);
     setProgress('Saving to registry...');
@@ -720,6 +763,7 @@ export function MoodleSyncDialog({
       setTotalFileJobs(fileJobs.length);
       let downloaded = 0;
       let failed = 0;
+      let cancelled = false;
       const errors: string[] = [];
       if (fileJobs.length > 0) {
         const {
@@ -736,6 +780,7 @@ export function MoodleSyncDialog({
         );
         downloaded = dlResult.downloaded;
         failed = dlResult.failed;
+        cancelled = dlResult.cancelled;
         errors.push(...dlResult.errors);
         setFailedJobs(dlResult.failedJobs);
       }
@@ -743,7 +788,11 @@ export function MoodleSyncDialog({
       setSyncedCount(result.syncedCount);
       setDownloadedCount(downloaded);
       setFailedCount(failed);
-      if (errors.length > 0) {
+      if (cancelled) {
+        setError(
+          `Sync cancelled — ${downloaded} file(s) downloaded before stopping.`,
+        );
+      } else if (errors.length > 0) {
         setError(`${failed} file(s) failed:\n${errors.join('\n')}`);
       }
       setPhase('done');
@@ -761,6 +810,14 @@ export function MoodleSyncDialog({
     pollCancelRef.current = true;
   }
 
+  // Stop an in-progress scan or download run. The worker pool / scan loop
+  // re-checks pollCancelRef before each item, so this halts new work without
+  // closing the dialog (closing also cancels, via the open-change effect).
+  function cancelSync() {
+    pollCancelRef.current = true;
+    setProgress('Cancelling…');
+  }
+
   async function handleRetryLogin() {
     // User has (presumably) just logged into Moodle in another tab.
     // Re-run the full handshake from the top.
@@ -770,27 +827,49 @@ export function MoodleSyncDialog({
   async function handleRetryFailed() {
     if (failedJobs.length === 0) return;
     setPhase('syncing');
+    // Fresh run — clear any stale cancel flag left by a previous close.
+    pollCancelRef.current = false;
     setError(null);
     setProgress(`Retrying ${failedJobs.length} failed file(s)...`);
 
-    const {
-      data: { session },
-    } = await supabaseRef.current.auth.getSession();
-    const authToken = session?.access_token;
-    const uploadEndpoint = `${window.location.origin}/api/moodle/upload`;
+    // Wrapped so a throw before/around the download run (e.g. getSession
+    // failing) lands on the error phase instead of wedging on 'syncing' —
+    // whose only footer button is a now-useless Cancel.
+    try {
+      const {
+        data: { session },
+      } = await supabaseRef.current.auth.getSession();
+      const authToken = session?.access_token;
+      const uploadEndpoint = `${window.location.origin}/api/moodle/upload`;
 
-    const result = await runDownloadJobs(failedJobs, authToken, uploadEndpoint);
-    setDownloadedCount((prev) => prev + result.downloaded);
-    setFailedCount(result.failed);
-    setFailedJobs(result.failedJobs);
-    if (result.errors.length > 0) {
-      setError(
-        `${result.failed} file(s) still failed:\n${result.errors.join('\n')}`,
+      const result = await runDownloadJobs(
+        failedJobs,
+        authToken,
+        uploadEndpoint,
       );
-    } else {
-      setError(null);
+      setDownloadedCount((prev) => prev + result.downloaded);
+      setFailedCount(result.failed);
+      setFailedJobs(result.failedJobs);
+      if (result.cancelled) {
+        setError(
+          `Cancelled — ${result.downloaded} of ${failedJobs.length} retried before stopping.`,
+        );
+      } else if (result.errors.length > 0) {
+        setError(
+          `${result.failed} file(s) still failed:\n${result.errors.join('\n')}`,
+        );
+      } else {
+        setError(null);
+      }
+      setPhase('done');
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Retry failed';
+      setError(message);
+      setAuthError(isAuthError(message));
+      setNetworkError(isNetworkError(message) && !isAuthError(message));
+      setPermissionError(isPermissionError(message) && !isAuthError(message));
+      setPhase('error');
     }
-    setPhase('done');
   }
 
   // ---- Render ----
@@ -801,6 +880,16 @@ export function MoodleSyncDialog({
   const selectedItemCount =
     phase === 'select-content' ? getSelectedItemCount() : 0;
 
+  // Phases where work is actively running. While busy we block accidental
+  // dismissal (clicking the backdrop or pressing Esc) so a stray click can't
+  // silently cancel an in-progress sync/scan. The explicit Cancel button and
+  // the X still close it — this only stops *accidental* dismissal.
+  const isBusy =
+    phase === 'scraping' ||
+    phase === 'comparing' ||
+    phase === 'scraping-content' ||
+    phase === 'syncing';
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
@@ -810,6 +899,12 @@ export function MoodleSyncDialog({
           display: 'flex',
           flexDirection: 'column',
           overflow: 'hidden',
+        }}
+        onInteractOutside={(e) => {
+          if (isBusy) e.preventDefault();
+        }}
+        onEscapeKeyDown={(e) => {
+          if (isBusy) e.preventDefault();
         }}
       >
         <DialogHeader style={{ flexShrink: 0 }}>
@@ -1235,6 +1330,11 @@ export function MoodleSyncDialog({
           {phase === 'error' && (
             <Button variant="outline" onClick={loadCourses}>
               Retry
+            </Button>
+          )}
+          {(phase === 'syncing' || phase === 'scraping-content') && (
+            <Button variant="outline" onClick={cancelSync}>
+              Cancel
             </Button>
           )}
           {phase === 'awaiting-permission' && (

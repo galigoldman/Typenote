@@ -2,7 +2,7 @@ import { test, expect, chromium, type BrowserContext } from '@playwright/test';
 import * as path from 'path';
 
 const EXTENSION_PATH = path.resolve(__dirname, '..', 'extension');
-const EXPECTED_VERSION = '0.2.0';
+const EXPECTED_VERSION = '0.2.1';
 const PINNED_EXTENSION_ID = 'beajdnpmcbgjfkhojoangknkeimimmfm';
 // CI's webServer serves on localhost:3000; locally override via PLAYWRIGHT_BASE_URL
 // to point at a deployed instance.
@@ -52,7 +52,7 @@ test.describe('Typenote Moodle Extension — real extension load', () => {
     }
   });
 
-  test('PING from an allowed origin returns version 0.2.0', async () => {
+  test('PING from an allowed origin returns version 0.2.1', async () => {
     const context = await launchWithExtension();
     try {
       const sw = await getServiceWorker(context);

@@ -1,17 +1,19 @@
 'use client';
 
 import { useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { FileText, Loader2, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { createClient } from '@/lib/supabase/client';
 import { openMaterialAsDocument } from '@/lib/actions/documents';
 import { deleteCourseMaterial } from '@/lib/actions/course-materials';
-import { useTabs } from '@/contexts/tabs-context';
 import { toast } from 'sonner';
 import type { CourseMaterial } from '@/types/database';
 
 interface MaterialItemProps {
   material: CourseMaterial;
+  currentUserId?: string;
+  isOwner?: boolean;
 }
 
 function formatFileSize(bytes: number): string {
@@ -28,10 +30,19 @@ async function getPdfPageCount(signedUrl: string): Promise<number> {
   return count;
 }
 
-export function MaterialItem({ material }: MaterialItemProps) {
-  const { openTab } = useTabs();
+export function MaterialItem({
+  material,
+  currentUserId,
+  isOwner = false,
+}: MaterialItemProps) {
+  const router = useRouter();
   const [opening, setOpening] = useState(false);
   const [deleting, setDeleting] = useState(false);
+
+  const canDelete =
+    isOwner ||
+    currentUserId === undefined ||
+    material.user_id === currentUserId;
 
   async function handleView() {
     if (opening) return;
@@ -63,7 +74,7 @@ export function MaterialItem({ material }: MaterialItemProps) {
       const result = await openMaterialAsDocument(material.id, pageCount);
 
       // Navigate to the document
-      openTab(result.documentId, material.file_name.replace(/\.[^.]+$/, ''));
+      router.push(`/dashboard/documents/${result.documentId}`);
     } catch {
       toast.error('Failed to open material');
       setOpening(false);
@@ -99,15 +110,18 @@ export function MaterialItem({ material }: MaterialItemProps) {
           {formatFileSize(material.file_size)}
         </span>
       </button>
-      <Button
-        variant="ghost"
-        size="icon-xs"
-        onClick={handleDelete}
-        disabled={deleting}
-        className="shrink-0 opacity-0 group-hover:opacity-100 hover:opacity-100"
-      >
-        <Trash2 className="size-3.5 text-muted-foreground" />
-      </Button>
+      {canDelete && (
+        <Button
+          variant="ghost"
+          size="icon-xs"
+          onClick={handleDelete}
+          disabled={deleting}
+          aria-label="Delete file"
+          className="shrink-0 opacity-0 group-hover:opacity-100 hover:opacity-100"
+        >
+          <Trash2 className="size-3.5 text-muted-foreground" />
+        </Button>
+      )}
     </div>
   );
 }

@@ -60,6 +60,7 @@ import { useSelection } from '@/hooks/use-selection';
 import { usePinchZoom } from '@/hooks/use-pinch-zoom';
 import { ZoomIndicator } from './zoom-indicator';
 import { EditorToolbar } from '@/components/editor/editor-toolbar';
+import { FocusFilesButton } from '@/components/dashboard/focus-files-button';
 import { AiHeadIcon } from '@/components/icons/ai-head-icon';
 import { useExportPdf } from '@/hooks/use-export-pdf';
 import { CanvasPage } from './canvas-page';
@@ -97,6 +98,9 @@ interface CanvasEditorProps {
       | { type: 'image'; dataUrl: string },
   ) => void;
   onToggleVersionHistory?: () => void;
+  onToggleFocusFiles?: () => void;
+  focusFilesCount?: number;
+  isFocusFilesOpen?: boolean;
 }
 
 const CANVAS_CLASSES: Record<string, string> = {
@@ -337,6 +341,9 @@ export function CanvasEditor({
   personalFileId,
   courseName,
   isAiPanelOpen,
+  onToggleFocusFiles,
+  focusFilesCount = 0,
+  isFocusFilesOpen = false,
   onAskAiWithContext,
   onToggleVersionHistory,
 }: CanvasEditorProps) {
@@ -3289,8 +3296,17 @@ export function CanvasEditor({
             </>
           )}
 
-          {/* Version History — always visible */}
+          {/* Focus files + Version History — always visible */}
           <div className="flex-1" />
+          {onToggleFocusFiles && (
+            <span className="mr-1" onPointerDown={(e) => e.stopPropagation()}>
+              <FocusFilesButton
+                count={focusFilesCount}
+                isOpen={isFocusFilesOpen}
+                onClick={onToggleFocusFiles}
+              />
+            </span>
+          )}
           {onToggleVersionHistory && (
             <button
               onPointerDown={(e) => {

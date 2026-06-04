@@ -21,6 +21,8 @@ When adding or modifying a feature, update this registry and write the correspon
 - [x] Unauthenticated user is redirected to login
 - [x] Login page still shows both email/password and Google options
 - [x] Privacy policy (`/privacy`) is publicly reachable while logged out (required for Chrome Web Store review)
+- [x] OAuth callback without code redirects to login with error message
+- [x] Login page shows error message when redirected with session_exchange_failed error
 
 ---
 
@@ -234,25 +236,25 @@ Test lives in `src/__tests__/integration/storage-rls.integration.test.ts`. Verif
 
 ## Summary
 
-| Feature               | Status      | Spec File                                | Tests     |
-| --------------------- | ----------- | ---------------------------------------- | --------- |
-| Auth                  | Implemented | `e2e/auth.spec.ts`                       | 7/7       |
-| Documents             | Implemented | `e2e/documents.spec.ts`                  | 6/6       |
-| Canvas Editor         | Implemented | `e2e/canvas-editor.spec.ts`              | 15/15     |
-| Text Editor Toolbar   | Implemented | `e2e/editor-toolbar.spec.ts`             | 12/12     |
-| LaTeX Math            | Implemented | `e2e/latex-math.spec.ts`                 | 5/5       |
-| Courses               | Implemented | `e2e/courses.spec.ts`                    | 5/6       |
-| File Upload           | Implemented | `e2e/file-upload.spec.ts`                | 3/4       |
-| AI Chat               | Implemented | `e2e/ai-chat.spec.ts`                    | 6/6       |
-| AI Chat — Per-user    | Planned     | `e2e/ai-chat-per-user-materials.spec.ts` | 0/2       |
-| PDF Export            | Implemented | `e2e/export-pdf-*.spec.ts`               | 6/7       |
-| Real-time Sync        | Implemented | `e2e/realtime-sync.spec.ts`              | 3/3       |
-| Drawing Copy/Paste    | Implemented | `e2e/drawing-copy-paste.spec.ts`         | 8/8       |
-| Moodle Ext Gating     | Implemented | `e2e/moodle-touch-gating.spec.ts`        | 2/2       |
-| Extension Real Load   | Implemented | `e2e/extension-real.spec.ts`             | 3/3       |
-| Version History       | Planned     | `e2e/version-history.spec.ts`            | 0/5       |
-| PDF Visual Regression | Implemented | `e2e/pdf-visual-regression.spec.ts`      | 8/8       |
-| **Total**             |             |                                          | **88/96** |
+| Feature               | Status      | Spec File                                | Tests      |
+| --------------------- | ----------- | ---------------------------------------- | ---------- |
+| Auth                  | Implemented | `e2e/auth.spec.ts`                       | 9/9        |
+| Documents             | Implemented | `e2e/documents.spec.ts`                  | 6/6        |
+| Canvas Editor         | Implemented | `e2e/canvas-editor.spec.ts`              | 15/15      |
+| Text Editor Toolbar   | Implemented | `e2e/editor-toolbar.spec.ts`             | 12/12      |
+| LaTeX Math            | Implemented | `e2e/latex-math.spec.ts`                 | 5/5        |
+| Courses               | Implemented | `e2e/courses.spec.ts`                    | 5/6        |
+| File Upload           | Implemented | `e2e/file-upload.spec.ts`                | 3/4        |
+| AI Chat               | Implemented | `e2e/ai-chat.spec.ts`                    | 6/6        |
+| AI Chat — Per-user    | Planned     | `e2e/ai-chat-per-user-materials.spec.ts` | 0/2        |
+| PDF Export            | Implemented | `e2e/export-pdf-*.spec.ts`               | 6/7        |
+| Real-time Sync        | Implemented | `e2e/realtime-sync.spec.ts`              | 3/3        |
+| Drawing Copy/Paste    | Implemented | `e2e/drawing-copy-paste.spec.ts`         | 8/8        |
+| Moodle Ext Gating     | Implemented | `e2e/moodle-touch-gating.spec.ts`        | 2/2        |
+| Extension Real Load   | Implemented | `e2e/extension-real.spec.ts`             | 3/3        |
+| Version History       | Planned     | `e2e/version-history.spec.ts`            | 0/5        |
+| PDF Visual Regression | Implemented | `e2e/pdf-visual-regression.spec.ts`      | 8/8        |
+| **Total**             |             |                                          | **99/109** |
 
 ---
 

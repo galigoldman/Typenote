@@ -13,11 +13,9 @@ export async function POST(req: Request) {
     const {
       question,
       courseId,
-      weekId,
       documentId,
       mode,
       courseName,
-      weekLabel,
       documentContent,
       conversationHistory,
       conversationId,
@@ -263,7 +261,7 @@ export async function POST(req: Request) {
         start(controller) {
           controller.enqueue(
             encoder.encode(
-              `data: ${JSON.stringify({ type: 'sources', sources: [], model: mode === 'deep' ? 'pro' : 'flash' })}\n\n`,
+              `data: ${JSON.stringify({ type: 'sources', sources: [], model: mode === 'deep' ? 'pro' : 'flash', contextFilesUsed: false })}\n\n`,
             ),
           );
           if (activeConversationId) {
@@ -297,11 +295,9 @@ export async function POST(req: Request) {
     const params: QuestionParams = {
       question: question.trim(),
       courseId,
-      weekId: weekId || undefined,
       documentId: documentId || undefined,
       mode,
       courseName: courseName || undefined,
-      weekLabel: weekLabel || undefined,
       documentContent: documentContent || undefined,
       // Use server-loaded history if available, otherwise fall back to client-sent history
       conversationHistory:
@@ -312,7 +308,7 @@ export async function POST(req: Request) {
     };
 
     // Build context (RAG search, prompt, etc.)
-    const { systemPrompt, contents, modelName, sources } =
+    const { systemPrompt, contents, modelName, sources, contextFilesUsed } =
       await buildAiContext(params);
 
     // Stream the response
@@ -337,7 +333,7 @@ export async function POST(req: Request) {
           // Send sources metadata first
           controller.enqueue(
             encoder.encode(
-              `data: ${JSON.stringify({ type: 'sources', sources, model: modelLabel })}\n\n`,
+              `data: ${JSON.stringify({ type: 'sources', sources, model: modelLabel, contextFilesUsed })}\n\n`,
             ),
           );
 

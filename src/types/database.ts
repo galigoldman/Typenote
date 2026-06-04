@@ -43,19 +43,9 @@ export interface Course {
   updated_at: string;
 }
 
-export interface CourseWeek {
-  id: string;
-  course_id: string;
-  user_id: string;
-  week_number: number;
-  topic: string | null;
-  created_at: string;
-  updated_at: string;
-}
-
 export interface CourseMaterial {
   id: string;
-  week_id: string;
+  course_id: string;
   user_id: string;
   category: MaterialCategory;
   storage_path: string;
@@ -72,7 +62,6 @@ export interface Document {
   user_id: string;
   folder_id: string | null;
   course_id: string | null;
-  week_id: string | null;
   material_id: string | null;
   personal_file_id: string | null;
   purpose: 'homework' | 'summary' | 'notes' | null;
@@ -91,7 +80,6 @@ export interface PersonalFile {
   id: string;
   user_id: string;
   course_id: string;
-  week_id: string | null;
   category: MaterialCategory;
   file_name: string;
   display_name: string;
@@ -188,8 +176,8 @@ export interface AiConversation {
 
 export interface ChatSource {
   sourceType: string;
+  sourceId: string;
   sourceName: string;
-  weekId: string | null;
   pageRange: string | null;
 }
 
@@ -203,36 +191,33 @@ export interface AiMessage {
   created_at: string;
 }
 
-export type HomeworkMaterialType =
+export type ContextFileType =
   | 'course_material'
   | 'personal_file'
-  | 'document';
+  | 'moodle_file';
 
-export interface HomeworkSession {
+export interface DocumentContextFile {
   id: string;
   document_id: string;
-  exercise_document_id: string;
-  course_id: string;
-  user_id: string;
+  file_type: ContextFileType;
+  file_id: string;
   created_at: string;
 }
 
-export interface HomeworkSessionMaterial {
-  id: string;
-  session_id: string;
-  material_type: HomeworkMaterialType;
-  material_id: string;
-  created_at: string;
+/** A file the user can attach (candidate in the add-picker). */
+export interface AttachableFile {
+  fileType: ContextFileType;
+  fileId: string;
+  name: string;
+  mimeType: string | null;
 }
 
-export interface HomeworkContext {
-  session: HomeworkSession;
-  exerciseDocument: { id: string; title: string };
-  materials: Array<{
-    type: HomeworkMaterialType;
-    id: string;
-    name: string;
-  }>;
+/** An attached file resolved for display in the panel. */
+export interface ResolvedContextFile {
+  fileType: ContextFileType;
+  fileId: string;
+  name: string;
+  mimeType: string | null;
 }
 
 export type VersionTrigger = 'idle' | 'periodic' | 'close' | 'before_restore';
@@ -245,5 +230,25 @@ export interface DocumentVersion {
   pages: Record<string, unknown> | null;
   title: string;
   trigger: VersionTrigger;
+  created_at: string;
+}
+
+// Course sharing
+export type CourseRole = 'viewer' | 'contributor';
+
+export interface CourseMember {
+  id: string;
+  course_id: string;
+  user_id: string;
+  role: CourseRole;
+  created_at: string;
+}
+
+export interface CourseShareLink {
+  id: string;
+  course_id: string;
+  token: string;
+  role: CourseRole;
+  is_active: boolean;
   created_at: string;
 }

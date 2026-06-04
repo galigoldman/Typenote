@@ -132,17 +132,29 @@ export async function POST(request: NextRequest) {
 
     if (!fileError && fileRecord) {
       if (moodleCourseDbId) {
-        recordUserFileImport(userId, fileRecord.id, moodleCourseDbId).catch(
-          (err) => console.error('user_file_imports upsert failed:', err),
+        // Awaited: a dropped user_file_imports row (serverless freeze) makes
+        // course_moodle_view return [] imported ids, which hides the file from
+        // AI search even when it's embedded. Non-fatal — log and continue.
+        await recordUserFileImport(
+          userId,
+          fileRecord.id,
+          moodleCourseDbId,
+        ).catch((err) =>
+          console.error('user_file_imports upsert failed:', err),
         );
       }
-      // Index for AI search (fire-and-forget)
+      // Index for AI search. Awaited (not fire-and-forget): detached promises
+      // are dropped on serverless freeze, leaving the file unfindable.
       if (appCourseId) {
-        indexContent({
-          type: 'moodle_file',
-          fileId: fileRecord.id,
-          courseId: appCourseId,
-        }).catch((err) => console.error('Index failed:', err));
+        try {
+          await indexContent({
+            type: 'moodle_file',
+            fileId: fileRecord.id,
+            courseId: appCourseId,
+          });
+        } catch (err) {
+          console.error('Index failed:', err);
+        }
       }
       return NextResponse.json({
         fileId: fileRecord.id,
@@ -176,17 +188,25 @@ export async function POST(request: NextRequest) {
     }
 
     if (moodleCourseDbId) {
-      recordUserFileImport(userId, newRecord.id, moodleCourseDbId).catch(
+      // Awaited: a dropped user_file_imports row (serverless freeze) makes
+      // course_moodle_view return [] imported ids, which hides the file from
+      // AI search even when it's embedded. Non-fatal — log and continue.
+      await recordUserFileImport(userId, newRecord.id, moodleCourseDbId).catch(
         (err) => console.error('user_file_imports upsert failed:', err),
       );
     }
-    // Index for AI search (fire-and-forget)
+    // Index for AI search. Awaited (not fire-and-forget): detached promises
+    // are dropped on serverless freeze, leaving the file unfindable.
     if (appCourseId) {
-      indexContent({
-        type: 'moodle_file',
-        fileId: newRecord.id,
-        courseId: appCourseId,
-      }).catch((err) => console.error('Index failed:', err));
+      try {
+        await indexContent({
+          type: 'moodle_file',
+          fileId: newRecord.id,
+          courseId: appCourseId,
+        });
+      } catch (err) {
+        console.error('Index failed:', err);
+      }
     }
 
     return NextResponse.json({

@@ -5,17 +5,20 @@ import LoginPage from './page';
 const mockPush = vi.fn();
 const mockRefresh = vi.fn();
 const mockSignInWithPassword = vi.fn();
-const mockSignInWithOAuth = vi.fn();
+const mockSignInWithGoogle = vi.fn();
 let mockSearchParams = new URLSearchParams();
 
 vi.mock('@/lib/supabase/client', () => ({
   createClient: () => ({
     auth: {
       signInWithPassword: mockSignInWithPassword,
-      signInWithOAuth: mockSignInWithOAuth,
       signUp: vi.fn(),
     },
   }),
+}));
+
+vi.mock('@/lib/supabase/oauth', () => ({
+  signInWithGoogle: (...args: unknown[]) => mockSignInWithGoogle(...args),
 }));
 
 vi.mock('next/navigation', () => ({
@@ -106,17 +109,12 @@ describe('LoginPage', () => {
     });
   });
 
-  it('calls signInWithOAuth when Google button is clicked', () => {
+  it('calls signInWithGoogle helper when Google button is clicked', () => {
     render(<LoginPage />);
 
     fireEvent.click(screen.getByRole('button', { name: /google/i }));
 
-    expect(mockSignInWithOAuth).toHaveBeenCalledWith({
-      provider: 'google',
-      options: {
-        redirectTo: expect.stringContaining('/auth/callback'),
-      },
-    });
+    expect(mockSignInWithGoogle).toHaveBeenCalled();
   });
 
   it('shows success banner when ?message=password-reset-success', () => {

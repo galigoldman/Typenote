@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 
 import { indexContent } from '@/lib/actions/ai-context';
 import { recordUserFileImport } from '@/lib/actions/moodle-sync';
+import { scheduleAfterResponse } from '@/lib/server/after-response';
 import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 
@@ -117,16 +118,33 @@ export async function POST(request: NextRequest) {
 
     if (!updateError && fileRecord) {
       if (moodleCourseDbId) {
-        recordUserFileImport(userId, fileRecord.id, moodleCourseDbId).catch(
-          (err) => console.error('user_file_imports upsert failed:', err),
+        // Awaited: a dropped user_file_imports row (serverless freeze) makes
+        // course_moodle_view return [] imported ids, which hides the file from
+        // AI search even when it's embedded. Non-fatal — log and continue.
+        await recordUserFileImport(
+          userId,
+          fileRecord.id,
+          moodleCourseDbId,
+        ).catch((err) =>
+          console.error('user_file_imports upsert failed:', err),
         );
       }
+      // Index for AI search in the BACKGROUND (after the response). Embedding
+      // takes tens of seconds; the user's sync must not wait on it. scheduleAfter-
+      // Response uses Next after() so the work survives the serverless freeze.
       if (appCourseId) {
-        indexContent({
-          type: 'moodle_file',
-          fileId: fileRecord.id,
-          courseId: appCourseId,
-        }).catch((err) => console.error('Index failed:', err));
+        const fileId = fileRecord.id;
+        scheduleAfterResponse(async () => {
+          try {
+            await indexContent({
+              type: 'moodle_file',
+              fileId,
+              courseId: appCourseId,
+            });
+          } catch (err) {
+            console.error('Background index failed:', err);
+          }
+        });
       }
       return NextResponse.json({
         fileId: fileRecord.id,
@@ -159,16 +177,27 @@ export async function POST(request: NextRequest) {
     }
 
     if (moodleCourseDbId) {
-      recordUserFileImport(userId, newRecord.id, moodleCourseDbId).catch(
+      // Awaited: a dropped user_file_imports row (serverless freeze) makes
+      // course_moodle_view return [] imported ids, which hides the file from
+      // AI search even when it's embedded. Non-fatal — log and continue.
+      await recordUserFileImport(userId, newRecord.id, moodleCourseDbId).catch(
         (err) => console.error('user_file_imports upsert failed:', err),
       );
     }
+    // Index for AI search in the BACKGROUND (after the response) — see above.
     if (appCourseId) {
-      indexContent({
-        type: 'moodle_file',
-        fileId: newRecord.id,
-        courseId: appCourseId,
-      }).catch((err) => console.error('Index failed:', err));
+      const fileId = newRecord.id;
+      scheduleAfterResponse(async () => {
+        try {
+          await indexContent({
+            type: 'moodle_file',
+            fileId,
+            courseId: appCourseId,
+          });
+        } catch (err) {
+          console.error('Background index failed:', err);
+        }
+      });
     }
 
     return NextResponse.json({

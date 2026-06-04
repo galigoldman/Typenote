@@ -132,4 +132,44 @@ test.describe('AI Chat', () => {
         .or(page.locator('ul.divide-y li').first()),
     ).toBeVisible({ timeout: 5_000 });
   });
+
+  // Regression: on the course page the chat panel is rendered inside the
+  // header button toolbar (normal document flow), not as a flex-row sibling
+  // of the main content. With the old `lg:static` layout it collapsed inline
+  // into the toolbar on desktop. With `docked={false}` it must stay a fixed
+  // drawer pinned to the right edge, full height.
+  test('course page: chat panel docks to the right edge, not inline in the toolbar', async ({
+    page,
+  }) => {
+    const viewport = page.viewportSize();
+    expect(viewport).not.toBeNull();
+    // Desktop width is required for the bug to manifest (lg+ breakpoint).
+    expect(viewport!.width).toBeGreaterThanOrEqual(1024);
+
+    // Open via the floating bubble (uncontrolled on the course page).
+    await page.getByRole('button', { name: /open ai chat/i }).click();
+    await expect(page.getByText('AI Tutor')).toBeVisible({ timeout: 5_000 });
+
+    // Measure the panel container (nearest fixed-position ancestor of the header).
+    const box = await page.evaluate(() => {
+      const header = Array.from(document.querySelectorAll('*')).find(
+        (el) => el.textContent?.trim() === 'AI Tutor',
+      );
+      let el: Element | null = header ?? null;
+      while (el && !String((el as HTMLElement).className).includes('fixed')) {
+        el = el.parentElement;
+      }
+      if (!el) return null;
+      const r = el.getBoundingClientRect();
+      return { x: r.x, right: r.right, width: r.width, height: r.height };
+    });
+
+    expect(box).not.toBeNull();
+    // Pinned to the right edge…
+    expect(box!.right).toBeGreaterThanOrEqual(viewport!.width - 2);
+    // …occupying the right portion (never collapsed to the top-left toolbar)…
+    expect(box!.x).toBeGreaterThan(viewport!.width / 2);
+    // …and full-height like a drawer, not a short inline toolbar element.
+    expect(box!.height).toBeGreaterThan(viewport!.height * 0.8);
+  });
 });

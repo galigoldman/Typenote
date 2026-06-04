@@ -1,4 +1,4 @@
-import { GoogleGenAI } from '@google/genai';
+import { GoogleGenAI, Type } from '@google/genai';
 
 function getGenAI() {
   return new GoogleGenAI({
@@ -6,11 +6,19 @@ function getGenAI() {
   });
 }
 
+export interface PageText {
+  /** 1-indexed page number as returned by the model. */
+  page: number;
+  text: string;
+}
+
 /**
- * Extract text from a PDF using Gemini Flash (multimodal).
- * Preserves math notation as LaTeX and handles Hebrew text.
+ * Extract text from a PDF/PPTX as structured per-page output using Gemini Flash
+ * (multimodal). Faithful, text-only: preserves LaTeX and Hebrew; does NOT invent
+ * figure descriptions (so quoted "evidence" stays verbatim). Returns pages sorted
+ * by page number; returns [] if the response can't be parsed.
  */
-export async function extractPdfText(buffer: Buffer): Promise<string> {
+export async function extractPdfPages(buffer: Buffer): Promise<PageText[]> {
   const genai = getGenAI();
 
   const result = await genai.models.generateContent({
@@ -26,12 +34,44 @@ export async function extractPdfText(buffer: Buffer): Promise<string> {
             },
           },
           {
-            text: 'Extract ALL text content from this PDF exactly as written. Preserve math notation using LaTeX (e.g. $x^2$). Output only the extracted text, no commentary.',
+            text: 'Extract the text of EACH PAGE of this PDF exactly as written, in page order. Preserve math notation using LaTeX ($...$ for inline, $$...$$ for display). Preserve Hebrew exactly. Do NOT describe images or invent figure captions — output only text that is actually written on the page. Return one object per page with its 1-based page number.',
           },
         ],
       },
     ],
+    config: {
+      responseMimeType: 'application/json',
+      responseSchema: {
+        type: Type.ARRAY,
+        items: {
+          type: Type.OBJECT,
+          properties: {
+            page: { type: Type.INTEGER },
+            text: { type: Type.STRING },
+          },
+          required: ['page', 'text'],
+        },
+      },
+    },
   });
 
-  return result.text ?? '';
+  const raw = result.text ?? '[]';
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    return [];
+  }
+  if (!Array.isArray(parsed)) return [];
+
+  return (parsed as PageText[])
+    .filter(
+      (p) =>
+        p &&
+        typeof p.page === 'number' &&
+        Number.isFinite(p.page) &&
+        p.page >= 1 &&
+        typeof p.text === 'string',
+    )
+    .sort((a, b) => a.page - b.page);
 }

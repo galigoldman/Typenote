@@ -27,6 +27,12 @@ export default async function FolderPage({
   const { folderId } = await params;
   const supabase = await createClient();
 
+  // Fetch current user to scope owned-course queries (prevents shared courses
+  // visible via is_course_member RLS from appearing in the owner's folders).
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
   const { data: folder } = await supabase
     .from('folders')
     .select('*')
@@ -48,6 +54,7 @@ export default async function FolderPage({
   const { data: courses } = await supabase
     .from('courses')
     .select('*')
+    .eq('user_id', user?.id)
     .eq('folder_id', folderId)
     .order('position', { ascending: true });
 
