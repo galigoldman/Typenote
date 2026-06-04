@@ -80,12 +80,13 @@ export async function POST(req: Request) {
       );
     }
 
-    const latex = await convertToLatex(text.trim(), courseName || undefined);
+    const { latex, inputTokens, outputTokens } = await convertToLatex(
+      text.trim(),
+      courseName || undefined,
+    );
 
-    // Fire-and-forget token recording
-    // convertToLatex returns just the string for now; token recording
-    // will be enhanced when we update latex.ts to return usage in US3
-    recordTokenUsage(user.id, 'latex', 0, 0).catch(() => {});
+    // Fire-and-forget token recording (latex always runs on Flash).
+    recordTokenUsage(user.id, 'flash', inputTokens, outputTokens).catch(() => {});
 
     return NextResponse.json({ latex });
   } catch (error) {
