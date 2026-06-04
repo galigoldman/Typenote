@@ -1,3 +1,4 @@
+import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
 import { signOut } from '@/lib/actions/auth';
@@ -5,7 +6,7 @@ import { SidebarFolderTree } from '@/components/dashboard/sidebar-folder-tree';
 import { SidebarLayout } from '@/components/dashboard/sidebar-layout';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
-import { LogOut } from 'lucide-react';
+import { Gauge, LogOut } from 'lucide-react';
 
 export default async function DashboardLayout({
   children,
@@ -21,6 +22,16 @@ export default async function DashboardLayout({
     redirect('/login');
   }
 
+  // Admin-only nav entry. Rendered server-side and only for admins, so the
+  // link never ships to non-admins. Access is still enforced by requireAdmin()
+  // on /admin (defense in depth) — the link is convenience, not the control.
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('is_admin')
+    .eq('id', user.id)
+    .single();
+  const isAdmin = profile?.is_admin ?? false;
+
   const sidebarContent = (
     <>
       <div className="flex h-14 items-center px-4">
@@ -33,6 +44,20 @@ export default async function DashboardLayout({
         <SidebarFolderTree />
       </div>
       <Separator />
+      {isAdmin && (
+        <div className="px-2 pt-2">
+          <Button
+            asChild
+            variant="ghost"
+            className="w-full justify-start min-h-[44px] hover:bg-primary/10 hover:text-primary"
+          >
+            <Link href="/admin">
+              <Gauge className="size-4" />
+              AI Usage
+            </Link>
+          </Button>
+        </div>
+      )}
       <div className="p-2">
         <form action={signOut}>
           <Button
