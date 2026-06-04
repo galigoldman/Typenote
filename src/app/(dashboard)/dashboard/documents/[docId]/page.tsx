@@ -2,10 +2,10 @@ import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { GraduationCap } from 'lucide-react';
 import { createClient } from '@/lib/supabase/server';
+import { AiChatWrapper } from '@/components/ai/ai-chat-wrapper';
 import { DocumentWithAi } from '@/components/ai/document-with-ai';
 import { TiptapEditorWithVersions } from '@/components/editor/tiptap-editor-with-versions';
-import { TabRegistrar } from '@/components/tabs/tab-registrar';
-import type { Course, CourseWeek, Document } from '@/types/database';
+import type { Course, Document } from '@/types/database';
 
 interface DocumentPageProps {
   params: Promise<{ docId: string }>;
@@ -28,7 +28,6 @@ export default async function DocumentPage({ params }: DocumentPageProps) {
   const typedDocument = document as Document;
 
   let course: Course | null = null;
-  let week: CourseWeek | null = null;
 
   if (typedDocument.course_id) {
     const { data: courseData } = await supabase
@@ -37,24 +36,13 @@ export default async function DocumentPage({ params }: DocumentPageProps) {
       .eq('id', typedDocument.course_id)
       .single();
     course = courseData as Course | null;
-
-    if (typedDocument.week_id) {
-      const { data: weekData } = await supabase
-        .from('course_weeks')
-        .select('*')
-        .eq('id', typedDocument.week_id)
-        .single();
-      week = weekData as CourseWeek | null;
-    }
   }
 
   // Text-only document (e.g. imported .docx) — use TipTap editor directly
   const isTextDocument = !typedDocument.pages && !typedDocument.material_id;
-  const weekLabel = week ? `Week ${week.week_number}` : undefined;
 
   return (
     <div className="flex flex-1 min-h-0 flex-col overflow-hidden">
-      <TabRegistrar documentId={docId} title={typedDocument.title} />
       {/* Course breadcrumb (desktop only) */}
       {course && (
         <div className="flex pointer-touch:hidden items-center justify-between px-4 pt-2">
@@ -73,15 +61,11 @@ export default async function DocumentPage({ params }: DocumentPageProps) {
           document={typedDocument}
           courseId={course?.id}
           courseName={course?.name}
-          weekId={typedDocument.week_id ?? undefined}
-          weekLabel={weekLabel}
         />
       ) : (
         <DocumentWithAi
           courseId={course?.id}
           courseName={course?.name}
-          weekId={typedDocument.week_id ?? undefined}
-          weekLabel={weekLabel}
           document={typedDocument}
           materialId={typedDocument.material_id}
           personalFileId={typedDocument.personal_file_id}

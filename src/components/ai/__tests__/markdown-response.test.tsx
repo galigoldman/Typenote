@@ -147,3 +147,24 @@ describe('MarkdownResponse — XSS safety', () => {
     expect(link!.getAttribute('href')).toBe('https://example.com');
   });
 });
+
+describe('MarkdownResponse — resilience & RTL', () => {
+  it('renders a malformed/unterminated LaTeX fragment without crashing', () => {
+    // A malformed fragment an evidence quote cut at a chunk boundary could
+    // produce. rehype-katex recovers from parse errors internally (rendering a
+    // .katex-error span), so a render that threw would simply fail this test.
+    // Assert a .katex/.katex-error node IS produced, so the test also guards
+    // against the KaTeX plugin tuple being dropped or misconfigured.
+    const content =
+      'Here is the proof:\n\n$$\n\\frac{-b \\pm \\sqrt{b^2\n$$\n\nend';
+    const { container } = render(<MarkdownResponse content={content} />);
+    expect(container.querySelector('.katex, .katex-error')).toBeInTheDocument();
+  });
+
+  it('sets dir="auto" so Hebrew renders right-to-left', () => {
+    const { container } = render(
+      <MarkdownResponse content="זוהי תשובה בעברית (Notes.pdf)" />,
+    );
+    expect(container.firstChild).toHaveAttribute('dir', 'auto');
+  });
+});

@@ -41,13 +41,11 @@ describe('trackEvent', () => {
     trackEvent('file_uploaded', {
       file_size: 1024000,
       mime_type: 'application/pdf',
-      week_id: 'week-789',
     });
 
     expect(posthog.capture).toHaveBeenCalledWith('file_uploaded', {
       file_size: 1024000,
       mime_type: 'application/pdf',
-      week_id: 'week-789',
     });
   });
 
@@ -84,6 +82,18 @@ describe('trackEvent', () => {
 
     expect(posthog.capture).toHaveBeenCalledWith('document_moved', {
       destination_type: 'folder',
+    });
+  });
+
+  it('captures context_files_used with course_id and file_count', () => {
+    trackEvent('context_files_used', {
+      course_id: 'course-abc',
+      file_count: 3,
+    });
+
+    expect(posthog.capture).toHaveBeenCalledWith('context_files_used', {
+      course_id: 'course-abc',
+      file_count: 3,
     });
   });
 

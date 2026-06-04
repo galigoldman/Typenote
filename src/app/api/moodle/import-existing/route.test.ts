@@ -16,11 +16,28 @@ vi.mock('@/lib/actions/ai-context', () => ({
   indexContent: vi.fn().mockResolvedValue({ success: true, skipped: true }),
 }));
 
+// Default: no existing embedding, so a claim schedules a background index.
+// Tests that exercise the skip-when-already-indexed path override this per-case.
+vi.mock('@/lib/queries/embeddings', () => ({
+  getContentHash: vi.fn().mockResolvedValue(null),
+}));
+
+// Run scheduled background work synchronously so indexContent assertions hold.
+// One test overrides this with a capturing mock to prove the response does not
+// wait on indexing.
+vi.mock('@/lib/server/after-response', () => ({
+  scheduleAfterResponse: vi.fn((work: () => Promise<void>) => {
+    void work();
+  }),
+}));
+
 import { POST } from './route';
 import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { recordUserFileImport } from '@/lib/actions/moodle-sync';
 import { indexContent } from '@/lib/actions/ai-context';
+import { getContentHash } from '@/lib/queries/embeddings';
+import { scheduleAfterResponse } from '@/lib/server/after-response';
 
 type FileRow = {
   id: string;
@@ -169,7 +186,9 @@ describe('POST /api/moodle/import-existing', () => {
     expect(data.reason).toBe('not_in_registry');
   });
 
-  it('refuses with size_unknown when registry has no file_size', async () => {
+  it('claims even when file_size is unknown, as long as bytes are stored', async () => {
+    // file_size is metadata; storage_path + content_hash prove we have the
+    // bytes. Claim-from-registry no longer gates on size.
     const admin = buildAdmin({
       file: {
         id: 'file-1',
@@ -184,11 +203,15 @@ describe('POST /api/moodle/import-existing', () => {
     const res = await POST(makeRequest(body) as never);
     const data = await res.json();
 
-    expect(data.imported).toBe(false);
-    expect(data.reason).toBe('size_unknown');
+    expect(data.imported).toBe(true);
+    expect(recordUserFileImport).toHaveBeenCalledWith('u1', 'file-1', 'mc-1');
   });
 
-  it('refuses with size_changed when observedSize disagrees with registry', async () => {
+  it('claims regardless of observedSize differing from the stored size', async () => {
+    // Deliberate tradeoff: we do NOT re-verify size against Moodle. A stored
+    // file (storage_path + content_hash) is claimed even when the HEAD-observed
+    // size differs, so a second user skips the download. A replaced file is
+    // picked up by a future change-detecting re-sync, not here.
     const admin = buildAdmin({
       file: {
         id: 'file-1',
@@ -203,8 +226,78 @@ describe('POST /api/moodle/import-existing', () => {
     const res = await POST(makeRequest(body) as never);
     const data = await res.json();
 
+    expect(data.imported).toBe(true);
+    expect(data.deduplicated).toBe(true);
+    expect(recordUserFileImport).toHaveBeenCalledWith('u1', 'file-1', 'mc-1');
+  });
+
+  it('skips re-indexing when an embedding already exists at the registry hash', async () => {
+    // The expensive part of a "dedup" claim is indexContent downloading +
+    // hashing the file. When an embedding already exists at the same content
+    // hash, the claim must skip it — that is the speed fix for a second user's
+    // sync of an already-indexed course.
+    vi.mocked(getContentHash).mockResolvedValueOnce('abc'); // matches file.content_hash
+    const admin = buildAdmin({
+      file: {
+        id: 'file-1',
+        storage_path: 'm.org/c1/abc.pdf',
+        content_hash: 'abc',
+        file_size: 12345,
+        mime_type: 'application/pdf',
+      },
+    });
+    setupAuth(admin);
+
+    const res = await POST(makeRequest(body) as never);
+    const data = await res.json();
+
+    expect(data.imported).toBe(true);
+    expect(recordUserFileImport).toHaveBeenCalledWith('u1', 'file-1', 'mc-1');
+    // The whole point: no re-index when embeddings are already present + current.
+    expect(indexContent).not.toHaveBeenCalled();
+  });
+
+  it('re-indexes when the existing embedding hash is stale', async () => {
+    vi.mocked(getContentHash).mockResolvedValueOnce('OLD-HASH'); // != file.content_hash
+    const admin = buildAdmin({
+      file: {
+        id: 'file-1',
+        storage_path: 'm.org/c1/abc.pdf',
+        content_hash: 'abc',
+        file_size: 12345,
+        mime_type: 'application/pdf',
+      },
+    });
+    setupAuth(admin);
+
+    const res = await POST(makeRequest(body) as never);
+    const data = await res.json();
+
+    expect(data.imported).toBe(true);
+    expect(indexContent).toHaveBeenCalledWith({
+      type: 'moodle_file',
+      fileId: 'file-1',
+      courseId: 'tn-course-1',
+    });
+  });
+
+  it('does not claim a registry row that has no content hash (not materialized)', async () => {
+    const admin = buildAdmin({
+      file: {
+        id: 'file-1',
+        storage_path: 'm.org/c1/abc.pdf',
+        content_hash: null,
+        file_size: 100,
+        mime_type: 'application/pdf',
+      },
+    });
+    setupAuth(admin);
+
+    const res = await POST(makeRequest(body) as never);
+    const data = await res.json();
+
     expect(data.imported).toBe(false);
-    expect(data.reason).toBe('size_changed');
+    expect(data.reason).toBe('not_materialized');
     expect(recordUserFileImport).not.toHaveBeenCalled();
   });
 
@@ -234,5 +327,36 @@ describe('POST /api/moodle/import-existing', () => {
 
     const res = await POST(makeRequest(body) as never);
     expect(res.status).toBe(401);
+  });
+
+  it('awaits indexing before returning the response', async () => {
+    const admin = buildAdmin({
+      file: {
+        id: 'file-1',
+        storage_path: 'm.org/c1/abc.pdf',
+        content_hash: 'abc',
+        file_size: 12345, // must match body.observedSize so the route indexes
+        mime_type: 'application/pdf',
+      },
+    });
+    setupAuth(admin);
+
+    // Capture the scheduled work instead of running it, to prove the response
+    // does NOT wait on indexing.
+    let scheduled: (() => Promise<void>) | null = null;
+    vi.mocked(scheduleAfterResponse).mockImplementationOnce((work) => {
+      scheduled = work;
+    });
+    // indexContent would hang forever if (wrongly) awaited inline.
+    vi.mocked(indexContent).mockReturnValueOnce(new Promise(() => {}) as never);
+
+    const res = await POST(makeRequest(body) as never);
+
+    // Response returns immediately even though indexing hasn't run.
+    expect(res.status).toBe(200);
+    expect(indexContent).not.toHaveBeenCalled();
+    // Indexing was scheduled for after the response.
+    expect(scheduleAfterResponse).toHaveBeenCalledTimes(1);
+    expect(scheduled).toBeTypeOf('function');
   });
 });

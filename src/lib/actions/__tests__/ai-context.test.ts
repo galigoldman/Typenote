@@ -1,7 +1,17 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('@/lib/ai/embeddings', () => ({
-  chunkText: vi.fn((text: string) => [{ text, chunkIndex: 0 }]),
+  chunkPages: vi.fn((pages: { page: number; text: string }[]) =>
+    pages.map((p, i) => ({
+      text: p.text,
+      chunkIndex: i,
+      pageStart: p.page - 1,
+      pageEnd: p.page - 1,
+    })),
+  ),
+  chunkFlatText: vi.fn((text: string) => [
+    { text, chunkIndex: 0, pageStart: null, pageEnd: null },
+  ]),
   embedText: vi.fn(async () => Array.from({ length: 1536 }, () => 0.1)),
   embedQuery: vi.fn(async () => Array.from({ length: 1536 }, () => 0.1)),
 }));
@@ -11,7 +21,10 @@ vi.mock('@/lib/ai/extraction/docx', () => ({
 }));
 
 vi.mock('@/lib/ai/extraction/pdf', () => ({
-  extractPdfText: vi.fn(async () => 'PDF extracted text with $x^2$ math'),
+  extractPdfPages: vi.fn(async () => [
+    { page: 1, text: 'PDF page one with $x^2$ math' },
+    { page: 2, text: 'PDF page two' },
+  ]),
 }));
 
 vi.mock('@/lib/queries/embeddings', () => ({
@@ -29,25 +42,8 @@ vi.mock('@/lib/supabase/server', () => ({
       file_name: 'lecture.pdf',
       mime_type: 'application/pdf',
     };
-    const syncRow = { id: 'sync-1', moodle_course_id: 'moodle-course-1' };
-    const importsRows = [
-      { moodle_file_id: 'imported-file-a' },
-      { moodle_file_id: 'imported-file-b' },
-    ];
 
     const from = vi.fn((table: string) => {
-      if (table === 'user_file_imports') {
-        // Awaitable directly (no .single/.maybeSingle in our usage)
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const chain: any = {
-          select: vi.fn(() => chain),
-          eq: vi.fn(() => chain),
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          then: (resolve: (value: any) => any) =>
-            resolve({ data: importsRows, error: null }),
-        };
-        return chain;
-      }
       if (table === 'course_materials') {
         const rows = [{ id: 'mat-1', storage_path: 'materials/mat-1.pdf' }];
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -69,13 +65,12 @@ vi.mock('@/lib/supabase/server', () => ({
         };
         return chain;
       }
-      const data = table === 'user_course_syncs' ? syncRow : null;
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const chain: any = {
         select: vi.fn(() => chain),
         eq: vi.fn(() => chain),
-        maybeSingle: vi.fn(async () => ({ data, error: null })),
-        single: vi.fn(async () => ({ data, error: null })),
+        maybeSingle: vi.fn(async () => ({ data: null, error: null })),
+        single: vi.fn(async () => ({ data: null, error: null })),
       };
       return chain;
     });
@@ -88,6 +83,18 @@ vi.mock('@/lib/supabase/server', () => ({
         })),
       },
       from,
+      // course_moodle_view RPC — replaces the old user_course_syncs +
+      // user_file_imports queries in searchContext. Returns the owner's
+      // moodle course id and imported file ids.
+      rpc: vi.fn(async (_name: string, _args: unknown) => ({
+        data: [
+          {
+            moodle_course_id: 'moodle-course-1',
+            imported_file_ids: ['imported-file-a', 'imported-file-b'],
+          },
+        ],
+        error: null,
+      })),
       storage: {
         from: vi.fn(() => ({
           download: vi.fn(async () => ({
@@ -133,6 +140,38 @@ vi.mock('@/lib/supabase/admin', () => {
           };
           return chain;
         }
+        if (table === 'content_embeddings') {
+          const rows = [
+            {
+              source_type: 'moodle_file',
+              source_id: 'file-1',
+              course_id: 'mc-1',
+            },
+          ];
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const chain: any = {
+            select: vi.fn(() => chain),
+            update: vi.fn(() => chain),
+            // .update(...).not(...) resolves (clearing hashes)
+            not: vi.fn(async () => ({ data: null, error: null })),
+            // await admin.from('content_embeddings').select(...) resolves here
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            then: (resolve: (value: any) => any) =>
+              resolve({ data: rows, error: null }),
+          };
+          return chain;
+        }
+        if (table === 'course_materials') {
+          const rows = [{ id: 'mat-2', course_id: 'course-2' }];
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const chain: any = {
+            select: vi.fn(() => chain),
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            then: (resolve: (value: any) => any) =>
+              resolve({ data: rows, error: null }),
+          };
+          return chain;
+        }
         const data = table === 'moodle_sections' ? moodleSectionRow : null;
         return {
           select: vi.fn(() => ({
@@ -172,13 +211,30 @@ vi.mock('@/lib/ai/prompts', () => ({
   buildSystemPrompt: vi.fn(() => 'You are a test tutor.'),
 }));
 
-import { extractPdfText } from '@/lib/ai/extraction/pdf';
-import { getContentHash, upsertEmbeddings } from '@/lib/queries/embeddings';
+vi.mock('@/lib/actions/context-files', () => ({
+  listContextFiles: vi.fn(async () => []),
+}));
+
+vi.mock('@/lib/ai/context-files', () => ({
+  resolveContextFileName: vi.fn(async () => null),
+  resolveContextFileMeta: vi.fn(async () => null),
+  fileSourceConfig: vi.fn(),
+}));
+
+import { embedText } from '@/lib/ai/embeddings';
+import { extractPdfPages } from '@/lib/ai/extraction/pdf';
+import { listContextFiles } from '@/lib/actions/context-files';
+import { resolveContextFileName } from '@/lib/ai/context-files';
+import {
+  getContentHash,
+  matchEmbeddings,
+  upsertEmbeddings,
+} from '@/lib/queries/embeddings';
 
 import {
-  askQuestion,
   buildAiContext,
   indexContent,
+  reindexAllContent,
   searchContext,
 } from '../ai-context';
 
@@ -187,26 +243,49 @@ afterEach(() => {
 });
 
 describe('indexContent', () => {
-  it('extracts text from PDF and embeds as text', async () => {
+  it('extracts per-page text and stores 0-indexed page numbers', async () => {
     const result = await indexContent({
       type: 'course_material',
       materialId: 'mat-1',
       courseId: 'course-1',
-      weekId: 'week-1',
     });
 
     expect(result.success).toBe(true);
-    expect(result.skipped).toBe(false);
-    expect(result.segmentsIndexed).toBe(1);
-    expect(extractPdfText).toHaveBeenCalledWith(expect.any(Buffer));
+    expect(result.segmentsIndexed).toBe(2);
+    expect(extractPdfPages).toHaveBeenCalled();
     expect(upsertEmbeddings).toHaveBeenCalledWith(
       expect.arrayContaining([
         expect.objectContaining({
           source_type: 'course_material',
-          segment_text: 'PDF extracted text with $x^2$ math',
+          segment_text: 'PDF page one with $x^2$ math',
+          page_start: 0,
+          page_end: 0,
+        }),
+        expect.objectContaining({
+          segment_text: 'PDF page two',
+          page_start: 1,
+          page_end: 1,
         }),
       ]),
     );
+  });
+
+  it('fails (not skips) when every chunk embedding fails', async () => {
+    // Both pages' embeddings come back empty (malformed API response). The file
+    // has chunks, so this is an embedding failure, not a blank file — it must
+    // surface as success:false, never a silent skip that hides the outage.
+    vi.mocked(embedText).mockResolvedValueOnce([]).mockResolvedValueOnce([]);
+
+    const result = await indexContent({
+      type: 'course_material',
+      materialId: 'mat-1',
+      courseId: 'course-1',
+    });
+
+    expect(result.success).toBe(false);
+    expect(result.skipped).toBe(false);
+    expect(result.segmentsIndexed).toBe(0);
+    expect(upsertEmbeddings).not.toHaveBeenCalled();
   });
 
   it('skips indexing when content hash matches', async () => {
@@ -216,7 +295,6 @@ describe('indexContent', () => {
       type: 'course_material',
       materialId: 'mat-1',
       courseId: 'course-1',
-      weekId: 'week-1',
     });
 
     expect(result.success).toBe(true);
@@ -255,7 +333,6 @@ describe('searchContext', () => {
         page_start: null,
         page_end: null,
         course_id: 'course-1',
-        week_id: 'week-5',
         mime_type: 'application/pdf',
         similarity: 0.92,
       },
@@ -291,77 +368,8 @@ describe('searchContext', () => {
   });
 });
 
-describe('askQuestion', () => {
-  it('generates an answer using flash model in quick mode', async () => {
-    const result = await askQuestion({
-      question: 'What is an integral?',
-      courseId: 'course-1',
-      mode: 'quick',
-    });
-
-    expect(result.answer).toContain('AI answer');
-    expect(result.model).toBe('flash');
-    expect(mockGenerateContent).toHaveBeenCalledWith(
-      expect.objectContaining({
-        model: 'gemini-2.5-flash',
-        config: expect.objectContaining({
-          systemInstruction: expect.any(String),
-        }),
-      }),
-    );
-  });
-
-  it('sends matched text as context instead of downloading files', async () => {
-    const { matchEmbeddings } = await import('@/lib/queries/embeddings');
-    vi.mocked(matchEmbeddings).mockResolvedValueOnce([
-      {
-        id: 1,
-        source_type: 'moodle_file',
-        source_id: 'file-1',
-        source_name: 'Lecture.pdf',
-        segment_text: 'This is the lecture content about integrals.',
-        page_start: null,
-        page_end: null,
-        course_id: 'course-1',
-        week_id: 'week-1',
-        mime_type: 'application/pdf',
-        similarity: 0.85,
-      },
-    ]);
-
-    await askQuestion({
-      question: 'What is an integral?',
-      courseId: 'course-1',
-      mode: 'quick',
-    });
-
-    const call = mockGenerateContent.mock.calls[0][0];
-    // Should have text context, not file inlineData
-    const firstUserPart = call.contents[0].parts[0];
-    expect(firstUserPart.text).toContain('Lecture.pdf');
-    expect(firstUserPart.text).toContain('integrals');
-    // Should NOT have inlineData
-    expect(firstUserPart.inlineData).toBeUndefined();
-  });
-
-  it('uses pro model in deep mode', async () => {
-    await askQuestion({
-      question: 'Explain eigenvalues',
-      courseId: 'course-1',
-      mode: 'deep',
-    });
-
-    expect(mockGenerateContent).toHaveBeenCalledWith(
-      expect.objectContaining({
-        model: 'gemini-2.5-pro',
-      }),
-    );
-  });
-});
-
 describe('buildAiContext attaches signedUrl to sources', () => {
   it('returns a signed URL for each moodle_file source', async () => {
-    const { matchEmbeddings } = await import('@/lib/queries/embeddings');
     vi.mocked(matchEmbeddings).mockResolvedValueOnce([
       {
         id: 1,
@@ -372,7 +380,6 @@ describe('buildAiContext attaches signedUrl to sources', () => {
         page_start: null,
         page_end: null,
         course_id: 'moodle-course-1',
-        week_id: null,
         mime_type: 'application/pdf',
         similarity: 0.9,
       },
@@ -386,5 +393,137 @@ describe('buildAiContext attaches signedUrl to sources', () => {
 
     expect(sources).toHaveLength(1);
     expect(sources[0].signedUrl).toMatch(/^https?:\/\//);
+  });
+});
+
+describe('buildAiContext multi-chunk retrieval + page citations', () => {
+  it('keeps several chunks per file and emits one citation per (source,page)', async () => {
+    // source_id MUST be 'mat-1' to match the supabase mock's fixed
+    // course_materials row, so the signed-URL lookup resolves.
+    const mk = (id: number, page: number) => ({
+      id,
+      source_type: 'course_material',
+      source_id: 'mat-1',
+      source_name: 'Lecture9.pdf',
+      segment_text: `chunk ${id}`,
+      page_start: page,
+      page_end: page,
+      course_id: 'course-1',
+      mime_type: 'application/pdf',
+      similarity: 0.9,
+    });
+    // No attached files -> only the course-wide pass runs (one matchEmbeddings call).
+    vi.mocked(matchEmbeddings).mockResolvedValueOnce([
+      mk(1, 0),
+      mk(2, 0), // same page as chunk 1 -> citation deduped
+      mk(3, 6),
+    ]);
+
+    const { sources } = await buildAiContext({
+      question: 'q',
+      courseId: 'course-1',
+      mode: 'quick',
+    });
+
+    // Two distinct citations: p.1 and p.7 (0-indexed 0 and 6).
+    expect(sources).toHaveLength(2);
+    const ranges = sources.map((s) => s.pageRange).sort();
+    expect(ranges).toEqual(['p. 1', 'p. 7']);
+    // Same file -> both citations share the one signed URL (fetched once).
+    expect(sources.every((s) => s.signedUrl?.startsWith('http'))).toBe(true);
+  });
+
+  it('caps admitted chunks per source at MAX_CHUNKS_PER_SOURCE (3)', async () => {
+    const mk = (id: number, page: number) => ({
+      id,
+      source_type: 'course_material',
+      source_id: 'mat-1',
+      source_name: 'Lecture9.pdf',
+      segment_text: `chunk ${id}`,
+      page_start: page,
+      page_end: page,
+      course_id: 'course-1',
+      mime_type: 'application/pdf',
+      similarity: 0.9,
+    });
+    // Four chunks on four distinct pages from ONE file. The per-source cap (3)
+    // admits the first three (pages 0,2,4) and drops the fourth (page 6).
+    vi.mocked(matchEmbeddings).mockResolvedValueOnce([
+      mk(1, 0),
+      mk(2, 2),
+      mk(3, 4),
+      mk(4, 6),
+    ]);
+
+    const { sources } = await buildAiContext({
+      question: 'q',
+      courseId: 'course-1',
+      mode: 'quick',
+    });
+
+    expect(sources).toHaveLength(3);
+    expect(sources.map((s) => s.pageRange).sort()).toEqual([
+      'p. 1',
+      'p. 3',
+      'p. 5',
+    ]);
+  });
+});
+
+describe('reindexAllContent', () => {
+  it('enumerates indexed sources + unindexed course materials and indexes each', async () => {
+    const res = await reindexAllContent();
+    // 1 indexed moodle_file (file-1) + 1 unindexed course_material (mat-2) = 2 jobs,
+    // both of which index successfully against the mocks — assert the success
+    // path, not just that jobs were attempted.
+    expect(res.processed).toBe(2);
+    expect(res.failed).toBe(0);
+  });
+});
+
+describe('buildAiContext attached-file focus pass', () => {
+  it('sets contextFilesUsed=true and surfaces the attached file in sources', async () => {
+    // Arrange: one attached context file
+    vi.mocked(listContextFiles).mockResolvedValueOnce([
+      {
+        id: 'r1',
+        document_id: 'doc1',
+        file_type: 'course_material',
+        file_id: 'fileA',
+        created_at: '',
+      },
+    ]);
+    vi.mocked(resolveContextFileName).mockResolvedValueOnce('HW3.pdf');
+
+    // Focus pass (searchContext with sourceIds=['fileA']) returns a matching chunk
+    const focusChunk = {
+      id: 10,
+      source_type: 'course_material',
+      source_id: 'fileA',
+      source_name: 'HW3.pdf',
+      segment_text: 'Relevant content from HW3',
+      page_start: null,
+      page_end: null,
+      course_id: 'course1',
+      mime_type: 'application/pdf',
+      similarity: 0.95,
+    };
+    vi.mocked(matchEmbeddings).mockResolvedValueOnce([focusChunk]);
+
+    // Course-wide pass returns empty (keeps focus chunk as the only source)
+    vi.mocked(matchEmbeddings).mockResolvedValueOnce([]);
+
+    // Act
+    const result = await buildAiContext({
+      question: 'q',
+      courseId: 'course1',
+      documentId: 'doc1',
+      mode: 'quick',
+    });
+
+    // Assert
+    expect(result.contextFilesUsed).toBe(true);
+    expect(result.sources.length).toBeGreaterThan(0);
+    expect(result.sources.some((s) => s.sourceId === 'fileA')).toBe(true);
   });
 });

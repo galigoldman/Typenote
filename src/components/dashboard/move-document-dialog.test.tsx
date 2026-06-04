@@ -32,7 +32,6 @@ const mockDocument: Document = {
   user_id: 'user-1',
   folder_id: 'folder-1',
   course_id: null,
-  week_id: null,
   material_id: null,
   personal_file_id: null,
   purpose: null,
@@ -55,18 +54,6 @@ const mockCourses = [
     name: 'Calculus II',
     color: '#EF4444',
     position: 0,
-    created_at: '2026-01-01',
-    updated_at: '2026-01-01',
-  },
-];
-
-const mockWeeks = [
-  {
-    id: 'week-1',
-    course_id: 'course-1',
-    user_id: 'user-1',
-    week_number: 1,
-    topic: 'Integrals',
     created_at: '2026-01-01',
     updated_at: '2026-01-01',
   },
@@ -104,11 +91,9 @@ const mockFolders = [
  */
 function setupSupabaseMock({
   courses = mockCourses,
-  weeks = mockWeeks,
   folders = mockFolders,
 }: {
   courses?: typeof mockCourses;
-  weeks?: typeof mockWeeks;
   folders?: typeof mockFolders;
 } = {}) {
   mockFrom.mockImplementation((table: string) => {
@@ -117,15 +102,6 @@ function setupSupabaseMock({
         select: vi.fn().mockReturnValue({
           eq: vi.fn().mockReturnValue({
             order: vi.fn().mockResolvedValue({ data: courses, error: null }),
-          }),
-        }),
-      };
-    }
-    if (table === 'course_weeks') {
-      return {
-        select: vi.fn().mockReturnValue({
-          eq: vi.fn().mockReturnValue({
-            order: vi.fn().mockResolvedValue({ data: weeks, error: null }),
           }),
         }),
       };

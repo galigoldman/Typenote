@@ -41,6 +41,14 @@ function LoginForm() {
             ? 'Sign-in failed. Please try again.'
             : null;
 
+  // Post-login destination. Only allow same-site absolute paths (must start
+  // with a single "/") to avoid open-redirect via "//evil.com" or full URLs.
+  const nextParam = searchParams.get('next');
+  const nextDest =
+    nextParam && nextParam.startsWith('/') && !nextParam.startsWith('//')
+      ? nextParam
+      : '/dashboard';
+
   async function handleEmailLogin(e: React.FormEvent) {
     e.preventDefault();
     setError('');
@@ -58,7 +66,7 @@ function LoginForm() {
       return;
     }
 
-    router.push('/dashboard');
+    router.push(nextDest);
     router.refresh();
   }
 

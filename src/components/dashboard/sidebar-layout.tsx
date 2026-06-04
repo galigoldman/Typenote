@@ -197,6 +197,7 @@ export function SidebarLayout({ sidebar, children }: SidebarLayoutProps) {
         {/* Desktop: inline sidebar */}
         {!isMobile && (
           <aside
+            data-testid="dashboard-sidebar"
             className={`flex shrink-0 flex-col border-r border-border/30 bg-sidebar transition-[width] duration-200 overflow-hidden ${
               isOpen ? 'w-[250px]' : 'w-0 border-r-0'
             }`}

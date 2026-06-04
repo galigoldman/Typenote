@@ -60,7 +60,8 @@ describe('Moodle user syncs — seeded data', () => {
       .from('user_file_imports')
       .select('*')
       .eq('sync_id', '65000000-0000-0000-0000-000000000001')
-      .order('created_at');
+      .order('created_at')
+      .order('moodle_file_id');
 
     expect(error).toBeNull();
     expect(data!.length).toBe(2);

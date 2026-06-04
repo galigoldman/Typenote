@@ -11,7 +11,6 @@ export interface EmbeddingRow {
   embedding: number[];
   user_id: string | null;
   course_id: string | null;
-  week_id: string | null;
   source_name: string | null;
   mime_type: string | null;
   content_hash: string | null;
@@ -83,7 +82,6 @@ export interface MatchResult {
   page_start: number | null;
   page_end: number | null;
   course_id: string | null;
-  week_id: string | null;
   mime_type: string | null;
   similarity: number;
 }
@@ -94,7 +92,7 @@ export async function matchEmbeddings(params: {
   courseId?: string | null;
   moodleCourseId?: string | null;
   importedMoodleFileIds?: string[] | null;
-  weekId?: string | null;
+  sourceIds?: string[] | null;
   matchCount?: number;
   similarityThreshold?: number;
 }): Promise<MatchResult[]> {
@@ -105,33 +103,11 @@ export async function matchEmbeddings(params: {
     match_course_id: params.courseId ?? null,
     match_moodle_course_id: params.moodleCourseId ?? null,
     match_imported_moodle_file_ids: params.importedMoodleFileIds ?? null,
-    match_week_id: params.weekId ?? null,
+    match_source_ids: params.sourceIds ?? null,
     match_count: params.matchCount ?? 8,
     similarity_threshold: params.similarityThreshold ?? 0.3,
   });
 
   if (error) throw new Error(`match_embeddings failed: ${error.message}`);
   return (data as MatchResult[]) ?? [];
-}
-
-export interface FileRef {
-  source_type: string;
-  source_id: string;
-  source_name: string;
-  mime_type: string;
-  storage_path: string;
-}
-
-export async function getWeekFileRefs(
-  courseId: string,
-  weekId: string,
-): Promise<FileRef[]> {
-  const supabase = await createClient();
-  const { data, error } = await supabase.rpc('get_week_file_refs', {
-    target_course_id: courseId,
-    target_week_id: weekId,
-  });
-
-  if (error) throw new Error(`get_week_file_refs failed: ${error.message}`);
-  return (data as FileRef[]) ?? [];
 }

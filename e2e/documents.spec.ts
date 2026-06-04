@@ -29,6 +29,27 @@ test.describe('Documents', () => {
     });
   });
 
+  test('create document dialog has no subject selector', async ({ page }) => {
+    await page.getByRole('button', { name: 'New Document' }).click();
+    await expect(page.getByText('Create New Document')).toBeVisible();
+
+    // Subject selection was removed from creation: the dialog should expose a
+    // title input and page-style choices, but no subject combobox/label.
+    await expect(page.getByLabel('Title')).toBeVisible();
+    await expect(page.getByRole('combobox')).toHaveCount(0);
+    await expect(page.getByText('Subject', { exact: true })).toHaveCount(0);
+
+    // It still creates a document end-to-end.
+    const docTitle = `No Subject ${Date.now()}`;
+    const titleInput = page.getByLabel('Title');
+    await titleInput.clear();
+    await titleInput.fill(docTitle);
+    await page.getByRole('button', { name: 'Create', exact: true }).click();
+    await expect(page).toHaveURL(/\/dashboard\/documents\//, {
+      timeout: 10_000,
+    });
+  });
+
   test('open existing document navigates to editor', async ({ page }) => {
     // Click the first document card on the dashboard
     const firstDoc = page.locator('[data-testid="document-card"]').first();

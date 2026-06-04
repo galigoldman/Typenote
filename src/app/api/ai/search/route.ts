@@ -7,7 +7,6 @@ export async function GET(req: Request) {
     const { searchParams } = new URL(req.url);
     const query = searchParams.get('query');
     const courseId = searchParams.get('courseId');
-    const weekId = searchParams.get('weekId');
     const maxResultsParam = searchParams.get('maxResults');
 
     if (!query || !query.trim()) {
@@ -34,7 +33,6 @@ export async function GET(req: Request) {
     const results = await searchContext({
       query: query.trim(),
       courseId,
-      weekId: weekId || undefined,
       maxResults,
     });
 
