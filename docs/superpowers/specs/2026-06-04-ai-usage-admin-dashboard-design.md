@@ -100,14 +100,35 @@ the lossy `last_model` problem (a user mixing Flash + Pro is priced correctly).
   chunking already targets ~1600 chars ≈ ~400 tokens).
 - `src/lib/actions/ai-context.ts`: at the two embed call sites
   (`indexContent` ~L296, `searchContext` ~L358) record estimated embedding
-  tokens under model `'embedding'`, attributed to the authenticated user.
-  **The Moodle shared-registry path (`userId=null`, ~L134) is skipped** — that
-  corpus is deduplicated/shared and has no single owner. Documented gap.
+  tokens under model `'embedding'`. **Full observability — every embed is
+  attributed:**
+  - `course_material` / `personal_file`: attributed to the authenticated owner
+    (already in scope as `userId`).
+  - `searchContext`: attributed to the searching user.
+  - `moodle_file`: the stored embedding row stays **shared** (`user_id = null`,
+    so retrieval works for everyone), but the **cost** is attributed to the user
+    who *triggered* the one-time embed. The triggering user id is threaded in
+    from the authenticated Moodle API routes (`/api/moodle/upload`,
+    `upload-finalize`, `import-existing`) via a new field on the `moodle_file`
+    `IndexSource`. **Artifact ownership and cost attribution are separate
+    concerns** (interview point): the vector is shared; the cost belongs to
+    whoever caused it.
+  - **Dedup means embed-once:** the content-hash check (`ai-context.ts:254`) and
+    the `getContentHash` guard in `import-existing` skip already-embedded files,
+    so a Moodle file is embedded exactly once — by the first importer — and
+    later importers incur **zero** embed cost. Attributing to the first importer
+    is therefore both complete and fair.
 
-**Pricing** — `src/lib/ai/pricing.ts`: per-1M-token price constants per model
-(`flash`, `pro`, `embedding`; input vs output where applicable). Cost is computed
-in app code: `Σ over models (tokens × price)`. Prices are approximate and easy to
-update; the dashboard labels cost as an **estimate**.
+**Pricing** — `src/lib/ai/pricing.ts`: per-1M-token prices per model
+(`flash`, `pro`, `embedding`) and direction (input/output). **Prices must be
+switchable without a code change**, so each is **env-overridable** with a
+sensible default, mirroring the existing rate-limit pattern
+(`AI_LIMIT_*` / `AI_LATEX_LIMIT_*` in `rate-limit.ts`): e.g.
+`AI_PRICE_FLASH_INPUT`, `AI_PRICE_FLASH_OUTPUT`, `AI_PRICE_PRO_INPUT`,
+`AI_PRICE_PRO_OUTPUT`, `AI_PRICE_EMBEDDING`. Cost is computed in app code:
+`Σ over models (tokens × price)`. **Tokens are the primary, accurate metric;
+the dollar figure is a switchable estimate derived from them** and is labeled as
+such in the UI.
 
 **Cleanup:** drop the now-superseded `total_input_tokens` /
 `total_output_tokens` columns from `ai_usage` (only ever held zeros).
@@ -163,7 +184,8 @@ it down is safe.
    `record_token_usage(user, model, input, output)` (fire-and-forget, never
    throws).
 2. User imports a file / searches → embedding tokens estimated → recorded under
-   model `embedding` for the triggering user (shared Moodle path skipped).
+   model `embedding`, attributed to the triggering user (Moodle: the first
+   importer who caused the one-time embed; the vector itself stays shared).
 3. Admin visits `/admin` → middleware lets the logged-in user through →
    `requireAdmin()` confirms `is_admin` → Server Component reads + aggregates via
    service-role → renders cards + table. No state changes.
@@ -204,12 +226,15 @@ it down is safe.
   follow-up once the numbers are trusted.
 - Historical trend charts / per-model time series — PostHog covers these free.
 - All-time cost rollup, alerting, MFA/step-up — deferred.
-- Per-user attribution of the shared Moodle/dedup embedding corpus — documented
-  gap (no single owner by design).
 
 ## 8. Known Limitations
 
-- Embedding token counts are **estimates** (Developer API exposes none).
-- Dollar cost is an **estimate** from a static price table; per-model keying
-  makes it accurate to the model mix, but published prices can drift.
-- Shared Moodle embedding cost is not attributed to any user in v1.
+- Embedding token counts are **estimates** (Developer API exposes none) — this
+  is accepted; tokens are the metric we care about and the estimate is close.
+- Dollar cost is a **derived, switchable estimate** (env-overridable per-model
+  prices). Per-model keying makes it accurate to the model mix; the only
+  inaccuracy is drift between configured and actual published prices, which the
+  env override exists to correct.
+- Moodle embedding cost is attributed to the *first importer* (who triggered the
+  one-time embed), not split across later reusers — by design, since reuse is
+  free.
