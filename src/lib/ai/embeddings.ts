@@ -1,5 +1,6 @@
 import { GoogleGenAI } from '@google/genai';
 import type { PageText } from '@/lib/ai/extraction/pdf';
+import { estimateTokens } from '@/lib/ai/tokens';
 
 const EMBEDDING_MODEL = 'gemini-embedding-2-preview';
 const EMBEDDING_DIMENSIONS = 1536;
@@ -10,10 +11,16 @@ function getGenAI() {
   });
 }
 
+export interface EmbedResult {
+  values: number[];
+  /** Estimated token count (Developer API returns none for embeddings). */
+  tokens: number;
+}
+
 /**
  * Embed a text string for storage (document side of asymmetric retrieval).
  */
-export async function embedText(text: string): Promise<number[]> {
+export async function embedText(text: string): Promise<EmbedResult> {
   const genai = getGenAI();
 
   const response = await genai.models.embedContent({
@@ -25,13 +32,16 @@ export async function embedText(text: string): Promise<number[]> {
     },
   });
 
-  return response.embeddings?.[0]?.values ?? [];
+  return {
+    values: response.embeddings?.[0]?.values ?? [],
+    tokens: estimateTokens(text),
+  };
 }
 
 /**
  * Embed a search query (query side of asymmetric retrieval).
  */
-export async function embedQuery(text: string): Promise<number[]> {
+export async function embedQuery(text: string): Promise<EmbedResult> {
   const genai = getGenAI();
 
   const response = await genai.models.embedContent({
@@ -43,7 +53,10 @@ export async function embedQuery(text: string): Promise<number[]> {
     },
   });
 
-  return response.embeddings?.[0]?.values ?? [];
+  return {
+    values: response.embeddings?.[0]?.values ?? [],
+    tokens: estimateTokens(text),
+  };
 }
 
 export interface PageChunk {

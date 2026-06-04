@@ -20,13 +20,15 @@ afterEach(() => {
 });
 
 describe('embedText', () => {
-  it('sends text with RETRIEVAL_DOCUMENT task type', async () => {
+  it('sends text with RETRIEVAL_DOCUMENT task type and returns values + token estimate', async () => {
     const mockValues = Array.from({ length: 1536 }, () => 0.2);
     mockEmbedContent.mockResolvedValueOnce({
       embeddings: [{ values: mockValues }],
     });
 
-    const result = await embedText('Some document text');
+    const result = await embedText('Some document text'); // 18 chars -> ceil(18/4)=5
+    expect(result.values).toEqual(mockValues);
+    expect(result.tokens).toBe(5);
 
     expect(mockEmbedContent).toHaveBeenCalledWith({
       model: 'gemini-embedding-2-preview',
@@ -36,7 +38,7 @@ describe('embedText', () => {
         taskType: 'RETRIEVAL_DOCUMENT',
       },
     });
-    expect(result).toHaveLength(1536);
+    expect(result.values).toHaveLength(1536);
   });
 });
 
@@ -57,13 +59,13 @@ describe('embedQuery', () => {
         taskType: 'RETRIEVAL_QUERY',
       },
     });
-    expect(result).toHaveLength(1536);
+    expect(result.values).toHaveLength(1536);
   });
 
   it('returns empty array when no embeddings returned', async () => {
     mockEmbedContent.mockResolvedValueOnce({ embeddings: [] });
     const result = await embedQuery('test');
-    expect(result).toEqual([]);
+    expect(result.values).toEqual([]);
   });
 });
 

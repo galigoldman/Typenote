@@ -293,7 +293,7 @@ export async function indexContent(source: IndexSource): Promise<IndexResult> {
 
     const rows: EmbeddingRow[] = [];
     for (const chunk of chunks) {
-      const embedding = await embedText(chunk.text);
+      const { values: embedding } = await embedText(chunk.text);
       // embedText returns [] only on a malformed embeddings API response.
       if (!embedding.length) continue;
 
@@ -355,7 +355,7 @@ export async function searchContext(
 ): Promise<SearchResult[]> {
   const userId = await getAuthUserId();
   const supabase = await createClient();
-  const queryEmbedding = await embedQuery(params.query);
+  const { values: queryEmbedding } = await embedQuery(params.query);
 
   // Resolve Typenote course -> canonical moodle_courses.id (if synced).
   // Uses course_moodle_view RPC so members see the OWNER's Moodle imports,

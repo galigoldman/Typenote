@@ -34,8 +34,14 @@ vi.mock('@/lib/ai/embeddings', async (orig) => {
   const actual = await orig<typeof import('@/lib/ai/embeddings')>();
   return {
     ...actual, // real chunkPages / chunkFlatText
-    embedText: vi.fn(async () => Array.from({ length: 1536 }, () => 0.05)),
-    embedQuery: vi.fn(async () => Array.from({ length: 1536 }, () => 0.05)),
+    embedText: vi.fn(async () => ({
+      values: Array.from({ length: 1536 }, () => 0.05),
+      tokens: 1,
+    })),
+    embedQuery: vi.fn(async () => ({
+      values: Array.from({ length: 1536 }, () => 0.05),
+      tokens: 1,
+    })),
   };
 });
 
