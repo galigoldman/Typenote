@@ -40,17 +40,20 @@ export interface AdminUsage {
 export async function getAdminUsage(month: string): Promise<AdminUsage> {
   const admin = createAdminClient();
 
-  const [{ data: profiles }, { data: usage }, { data: tokens }] = await Promise.all([
-    admin.from('profiles').select('id, email, display_name, subscription_tier'),
-    admin
-      .from('ai_usage')
-      .select('user_id, query_type, query_count')
-      .eq('usage_month', month),
-    admin
-      .from('ai_token_usage')
-      .select('user_id, model, input_tokens, output_tokens')
-      .eq('usage_month', month),
-  ]);
+  const [{ data: profiles }, { data: usage }, { data: tokens }] =
+    await Promise.all([
+      admin
+        .from('profiles')
+        .select('id, email, display_name, subscription_tier'),
+      admin
+        .from('ai_usage')
+        .select('user_id, query_type, query_count')
+        .eq('usage_month', month),
+      admin
+        .from('ai_token_usage')
+        .select('user_id, model, input_tokens, output_tokens')
+        .eq('usage_month', month),
+    ]);
 
   const byUser = new Map<string, AdminUserUsage>();
   for (const p of profiles ?? []) {
@@ -100,7 +103,8 @@ export async function getAdminUsage(month: string): Promise<AdminUsage> {
     }
     row.estimatedCostUsd = cost;
     const chatLimit = resolveLimitForTier(row.tier, 'chat');
-    row.chatQuotaPct = chatLimit > 0 ? Math.round((row.chatCount / chatLimit) * 100) : 0;
+    row.chatQuotaPct =
+      chatLimit > 0 ? Math.round((row.chatCount / chatLimit) * 100) : 0;
 
     totals.chatCount += row.chatCount;
     totals.latexCount += row.latexCount;

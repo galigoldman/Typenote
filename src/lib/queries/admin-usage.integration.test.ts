@@ -15,7 +15,10 @@ describe('getAdminUsage (2099-01 seed)', () => {
     expect(row).toBeDefined();
     expect(row!.chatCount).toBe(12);
     expect(row!.latexCount).toBe(30);
-    expect(row!.tokensByModel.flash).toEqual({ input: 1000000, output: 500000 });
+    expect(row!.tokensByModel.flash).toEqual({
+      input: 1000000,
+      output: 500000,
+    });
     expect(row!.tokensByModel.embedding.input).toBe(2000000);
     // flash 1M in*0.30 + 0.5M out*2.50 + embedding 2M*0.15 = 0.30 + 1.25 + 0.30
     expect(row!.estimatedCostUsd).toBeCloseTo(1.85, 4);

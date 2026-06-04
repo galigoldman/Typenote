@@ -18,7 +18,10 @@ function mockProfile(is_admin: boolean | null) {
   from.mockReturnValue({
     select: () => ({
       eq: () => ({
-        single: async () => ({ data: is_admin === null ? null : { is_admin }, error: null }),
+        single: async () => ({
+          data: is_admin === null ? null : { is_admin },
+          error: null,
+        }),
       }),
     }),
   });

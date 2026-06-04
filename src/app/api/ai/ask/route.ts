@@ -392,9 +392,12 @@ export async function POST(req: Request) {
           const inputTokens =
             usageInput || estimateTokens(`${systemPrompt}\n${question}`);
           const outputTokens = usageOutput || estimateTokens(fullResponse);
-          recordTokenUsage(user.id, modelLabel, inputTokens, outputTokens).catch(
-            () => {},
-          );
+          recordTokenUsage(
+            user.id,
+            modelLabel,
+            inputTokens,
+            outputTokens,
+          ).catch(() => {});
         } catch (err) {
           const message = err instanceof Error ? err.message : 'Stream error';
           controller.enqueue(

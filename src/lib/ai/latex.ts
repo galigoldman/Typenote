@@ -33,7 +33,9 @@ export async function convertToLatex(
       }
     | undefined;
   const inputTokens =
-    usage?.inputTokens ?? usage?.promptTokens ?? estimateTokens(`${system}\n${text}`);
+    usage?.inputTokens ??
+    usage?.promptTokens ??
+    estimateTokens(`${system}\n${text}`);
   const outputTokens =
     usage?.outputTokens ?? usage?.completionTokens ?? estimateTokens(latex);
 
