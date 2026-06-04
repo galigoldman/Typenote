@@ -164,7 +164,11 @@ export default async function CoursePage({
           </BreadcrumbList>
         </Breadcrumb>
         <div className="flex flex-wrap items-center gap-2">
-          <AiChatWrapper courseId={courseId} courseName={typedCourse.name} />
+          <AiChatWrapper
+            courseId={courseId}
+            courseName={typedCourse.name}
+            docked={false}
+          />
           <CreateDocumentDialog folderId={null} courseId={courseId}>
             <Button variant="outline" size="sm">
               New Document

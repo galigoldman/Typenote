@@ -141,6 +141,7 @@ Covers the Phase 1 refactor that removed the "Weeks" model and replaced it with 
 - [x] Chat renders markdown in responses — ⚠️ SKIPPED IN CI (needs AI API key)
 - [x] Start new conversation — ⚠️ SKIPPED IN CI
 - [x] Switch between conversations — ⚠️ SKIPPED IN CI
+- [x] Course page: chat panel docks to the right edge, not inline in the toolbar — ⚠️ SKIPPED IN CI (needs course page)
 
 ---
 
@@ -309,7 +310,7 @@ and the per-`(source, page)` `p. N` citation in
 | Courses               | Implemented | `e2e/courses.spec.ts`                    | 5/6        |
 | Flat Course Page      | Implemented | `e2e/course-materials.spec.ts`           | 3/3        |
 | File Upload           | Implemented | `e2e/file-upload.spec.ts`                | 3/4        |
-| AI Chat               | Implemented | `e2e/ai-chat.spec.ts`                    | 6/6        |
+| AI Chat               | Implemented | `e2e/ai-chat.spec.ts`                    | 7/7        |
 | AI Chat — Per-user    | Planned     | `e2e/ai-chat-per-user-materials.spec.ts` | 0/2        |
 | PDF Export            | Implemented | `e2e/export-pdf-*.spec.ts`               | 6/7        |
 | Real-time Sync        | Implemented | `e2e/realtime-sync.spec.ts`              | 3/3        |

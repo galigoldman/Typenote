@@ -27,6 +27,12 @@ interface AiChatWrapperProps {
   /** Per-document focus files (owned by the host) + a reload callback. */
   focusFiles?: ResolvedContextFile[];
   onFocusFilesChanged?: () => void | Promise<void>;
+  /**
+   * Pass `false` when the panel is rendered in normal document flow (e.g. the
+   * course page toolbar) rather than as a flex-row sibling of the main content.
+   * Defaults to `true` (static side-column layout). See {@link AiChatPanel}.
+   */
+  docked?: boolean;
 }
 
 export function AiChatWrapper({
@@ -43,6 +49,7 @@ export function AiChatWrapper({
   onOpenSource,
   focusFiles,
   onFocusFilesChanged,
+  docked = true,
 }: AiChatWrapperProps) {
   const [internalIsOpen, setInternalIsOpen] = useState(false);
 
@@ -82,6 +89,7 @@ export function AiChatWrapper({
         onOpenSource={onOpenSource}
         focusFiles={focusFiles}
         onFocusFilesChanged={onFocusFilesChanged}
+        docked={docked}
       />
     </>
   );
