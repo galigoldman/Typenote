@@ -12,8 +12,14 @@ vi.mock('@/lib/ai/embeddings', () => ({
   chunkFlatText: vi.fn((text: string) => [
     { text, chunkIndex: 0, pageStart: null, pageEnd: null },
   ]),
-  embedText: vi.fn(async () => Array.from({ length: 1536 }, () => 0.1)),
-  embedQuery: vi.fn(async () => Array.from({ length: 1536 }, () => 0.1)),
+  embedText: vi.fn(async () => ({
+    values: Array.from({ length: 1536 }, () => 0.1),
+    tokens: 1,
+  })),
+  embedQuery: vi.fn(async () => ({
+    values: Array.from({ length: 1536 }, () => 0.1),
+    tokens: 1,
+  })),
 }));
 
 vi.mock('@/lib/ai/extraction/docx', () => ({
@@ -274,7 +280,9 @@ describe('indexContent', () => {
     // Both pages' embeddings come back empty (malformed API response). The file
     // has chunks, so this is an embedding failure, not a blank file — it must
     // surface as success:false, never a silent skip that hides the outage.
-    vi.mocked(embedText).mockResolvedValueOnce([]).mockResolvedValueOnce([]);
+    vi.mocked(embedText)
+      .mockResolvedValueOnce({ values: [], tokens: 0 })
+      .mockResolvedValueOnce({ values: [], tokens: 0 });
 
     const result = await indexContent({
       type: 'course_material',
