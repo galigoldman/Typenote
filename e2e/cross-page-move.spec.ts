@@ -1,6 +1,13 @@
 import { test, expect, type Page } from '@playwright/test';
 import { login } from './helpers/auth';
 
+// These tests require canvas pointer events which are unreliable in
+// headless CI. Run locally with `pnpm test:e2e`.
+test.skip(
+  () => !!process.env.CI,
+  'Cross-page move tests require canvas interaction — skip in headless CI',
+);
+
 // Seeded document URL
 const DOC_URL = '/dashboard/documents/20000000-0000-0000-0000-000000000001';
 

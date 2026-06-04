@@ -1,6 +1,13 @@
 import { test, expect, type Page } from '@playwright/test';
 import { login } from './helpers/auth';
 
+// These tests require clipboard API access and a real canvas which
+// are unreliable in headless CI. Run locally with `pnpm test:e2e`.
+test.skip(
+  () => !!process.env.CI,
+  'Image paste tests require clipboard API — skip in headless CI',
+);
+
 // Seeded document URL (multi-page document)
 const DOC_URL = '/dashboard/documents/20000000-0000-0000-0000-000000000001';
 
