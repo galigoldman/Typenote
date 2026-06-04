@@ -407,25 +407,24 @@ describe('getQuota', () => {
 // ---------------------------------------------------------------------------
 
 describe('recordTokenUsage', () => {
-  it('calls record_token_usage RPC with correct params', async () => {
+  it('calls record_token_usage RPC keyed by model', async () => {
     mockRpc.mockResolvedValueOnce({ data: null, error: null });
 
-    await recordTokenUsage('user-123', 'chat', 5000, 400);
+    await recordTokenUsage('user-1', 'pro', 123, 45);
 
     expect(mockRpc).toHaveBeenCalledWith('record_token_usage', {
-      p_user_id: 'user-123',
-      p_query_type: 'chat',
-      p_input_tokens: 5000,
-      p_output_tokens: 400,
+      p_user_id: 'user-1',
+      p_model: 'pro',
+      p_input_tokens: 123,
+      p_output_tokens: 45,
     });
   });
 
-  it('does not throw when RPC fails (fire-and-forget)', async () => {
-    mockRpc.mockRejectedValueOnce(new Error('DB down'));
+  it('never throws if the RPC errors (fire-and-forget)', async () => {
+    mockRpc.mockRejectedValueOnce(new Error('db down'));
 
-    // Should not throw
     await expect(
-      recordTokenUsage('user-123', 'latex', 100, 30),
+      recordTokenUsage('user-1', 'flash', 1, 1),
     ).resolves.toBeUndefined();
   });
 });
