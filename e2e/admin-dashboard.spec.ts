@@ -28,8 +28,25 @@ test.describe('Admin AI Usage Dashboard', () => {
     await expect(page.getByRole('cell', { name: '$1.85' })).toBeVisible();
   });
 
-  test('non-admin is blocked from /admin (404)', async ({ page }) => {
+  test('admin sees the AI Usage nav link and can reach the dashboard from it', async ({
+    page,
+  }) => {
+    await loginAs(page, ADMIN_EMAIL, ADMIN_PASSWORD);
+    // login lands on /dashboard; the admin-only sidebar link is present.
+    const navLink = page.getByRole('link', { name: 'AI Usage' });
+    await expect(navLink).toBeVisible();
+    await navLink.click();
+    await expect(page).toHaveURL(/\/admin/);
+    await expect(page.getByRole('heading', { name: 'AI Usage' })).toBeVisible();
+  });
+
+  test('non-admin is blocked from /admin (404) and has no nav link', async ({
+    page,
+  }) => {
     await login(page); // seeded non-admin test@typenote.dev
+    // The admin-only nav link must not render for non-admins.
+    await expect(page.getByRole('link', { name: 'AI Usage' })).toHaveCount(0);
+
     const response = await page.goto('/admin');
     expect(response?.status()).toBe(404);
     await expect(page.getByRole('heading', { name: 'AI Usage' })).toHaveCount(
