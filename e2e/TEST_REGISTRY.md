@@ -234,27 +234,38 @@ Test lives in `src/__tests__/integration/storage-rls.integration.test.ts`. Verif
 
 ---
 
+## Admin AI Usage Dashboard (`e2e/admin-dashboard.spec.ts`) — IMPLEMENTED
+
+Covers the admin-only `/admin` AI usage dashboard (token-ledger aggregation + cost estimate). The route is in the `(admin)` group whose layout calls `requireAdmin()`, which `notFound()`s for non-admins. Uses the seeded admin user (`admin@typenote.dev`) and the deterministic month `2099-01` (test user: chat=12, latex=30, flash 1M/0.5M tokens, embedding 2M tokens → estimated cost `$1.85`).
+
+- [x] Admin logs in and views the dashboard for `/admin?month=2099-01` — asserts the "AI Usage" heading, the seeded test user's email row, the "Chat queries"/"LaTeX queries" summary cards, and the seeded `$1.85` cost
+- [x] Admin sees the "AI Usage" sidebar nav link and reaches the dashboard by clicking it
+- [x] Non-admin (`test@typenote.dev`) is blocked from `/admin` — HTTP 404, and the admin-only "AI Usage" nav link does not render
+
+---
+
 ## Summary
 
-| Feature               | Status      | Spec File                                | Tests      |
-| --------------------- | ----------- | ---------------------------------------- | ---------- |
-| Auth                  | Implemented | `e2e/auth.spec.ts`                       | 9/9        |
-| Documents             | Implemented | `e2e/documents.spec.ts`                  | 6/6        |
-| Canvas Editor         | Implemented | `e2e/canvas-editor.spec.ts`              | 15/15      |
-| Text Editor Toolbar   | Implemented | `e2e/editor-toolbar.spec.ts`             | 12/12      |
-| LaTeX Math            | Implemented | `e2e/latex-math.spec.ts`                 | 5/5        |
-| Courses               | Implemented | `e2e/courses.spec.ts`                    | 5/6        |
-| File Upload           | Implemented | `e2e/file-upload.spec.ts`                | 3/4        |
-| AI Chat               | Implemented | `e2e/ai-chat.spec.ts`                    | 6/6        |
-| AI Chat — Per-user    | Planned     | `e2e/ai-chat-per-user-materials.spec.ts` | 0/2        |
-| PDF Export            | Implemented | `e2e/export-pdf-*.spec.ts`               | 6/7        |
-| Real-time Sync        | Implemented | `e2e/realtime-sync.spec.ts`              | 3/3        |
-| Drawing Copy/Paste    | Implemented | `e2e/drawing-copy-paste.spec.ts`         | 8/8        |
-| Moodle Ext Gating     | Implemented | `e2e/moodle-touch-gating.spec.ts`        | 2/2        |
-| Extension Real Load   | Implemented | `e2e/extension-real.spec.ts`             | 3/3        |
-| Version History       | Planned     | `e2e/version-history.spec.ts`            | 0/5        |
-| PDF Visual Regression | Implemented | `e2e/pdf-visual-regression.spec.ts`      | 8/8        |
-| **Total**             |             |                                          | **99/109** |
+| Feature               | Status      | Spec File                                | Tests       |
+| --------------------- | ----------- | ---------------------------------------- | ----------- |
+| Auth                  | Implemented | `e2e/auth.spec.ts`                       | 9/9         |
+| Documents             | Implemented | `e2e/documents.spec.ts`                  | 6/6         |
+| Canvas Editor         | Implemented | `e2e/canvas-editor.spec.ts`              | 15/15       |
+| Text Editor Toolbar   | Implemented | `e2e/editor-toolbar.spec.ts`             | 12/12       |
+| LaTeX Math            | Implemented | `e2e/latex-math.spec.ts`                 | 5/5         |
+| Courses               | Implemented | `e2e/courses.spec.ts`                    | 5/6         |
+| File Upload           | Implemented | `e2e/file-upload.spec.ts`                | 3/4         |
+| AI Chat               | Implemented | `e2e/ai-chat.spec.ts`                    | 6/6         |
+| AI Chat — Per-user    | Planned     | `e2e/ai-chat-per-user-materials.spec.ts` | 0/2         |
+| PDF Export            | Implemented | `e2e/export-pdf-*.spec.ts`               | 6/7         |
+| Real-time Sync        | Implemented | `e2e/realtime-sync.spec.ts`              | 3/3         |
+| Drawing Copy/Paste    | Implemented | `e2e/drawing-copy-paste.spec.ts`         | 8/8         |
+| Moodle Ext Gating     | Implemented | `e2e/moodle-touch-gating.spec.ts`        | 2/2         |
+| Extension Real Load   | Implemented | `e2e/extension-real.spec.ts`             | 3/3         |
+| Version History       | Planned     | `e2e/version-history.spec.ts`            | 0/5         |
+| PDF Visual Regression | Implemented | `e2e/pdf-visual-regression.spec.ts`      | 8/8         |
+| Admin AI Usage        | Implemented | `e2e/admin-dashboard.spec.ts`            | 3/3         |
+| **Total**             |             |                                          | **102/112** |
 
 ---
 
