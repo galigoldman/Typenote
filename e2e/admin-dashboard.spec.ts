@@ -20,12 +20,12 @@ test.describe('Admin AI Usage Dashboard', () => {
     await expect(page.getByText('Chat queries')).toBeVisible();
     await expect(page.getByText('LaTeX queries')).toBeVisible();
 
-    // Seeded cost for the test user is $1.85 (see admin-usage seed).
-    // $1.85 appears in both the "Est. cost" summary card and the user's table
-    // row (the test user is the only one with activity, so the total equals the
-    // row), which trips strict mode — scope to the table cell for the per-user
-    // value while still asserting the real seeded $1.85.
-    await expect(page.getByRole('cell', { name: '$1.85' })).toBeVisible();
+    // Seeded cost for the test user is $1.95 (see admin-usage seed:
+    // flash 0.30+1.25 + embedding 2M*0.20=0.40). $1.95 appears in both the
+    // "Est. cost" summary card and the user's table row (the test user is the
+    // only one with activity, so the total equals the row), which trips strict
+    // mode — scope to the table cell for the per-user value.
+    await expect(page.getByRole('cell', { name: '$1.95' })).toBeVisible();
   });
 
   test('admin sees the AI Usage nav link and can reach the dashboard from it', async ({
