@@ -72,6 +72,17 @@ interface AiChatPanelProps {
   ) => void;
   focusFiles?: ResolvedContextFile[];
   onFocusFilesChanged?: () => void | Promise<void>;
+  /**
+   * Layout mode.
+   * - `true` (default): the panel is a static flex column (`lg:static`), meant
+   *   to sit as a sibling of the main content in a flex row (e.g. the document
+   *   editor). It only works when its parent is a flex container.
+   * - `false`: the panel stays `fixed` and docks to the right edge on every
+   *   breakpoint. Use this when the panel is rendered in normal document flow
+   *   (e.g. inside the course page toolbar), where `lg:static` would otherwise
+   *   collapse it inline.
+   */
+  docked?: boolean;
 }
 
 export function AiChatPanel({
@@ -87,6 +98,7 @@ export function AiChatPanel({
   onOpenSource,
   focusFiles,
   onFocusFilesChanged,
+  docked = true,
 }: AiChatPanelProps) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState('');
@@ -476,8 +488,15 @@ export function AiChatPanel({
 
   if (!isOpen) return null;
 
+  // Base: full-screen overlay on mobile/tablet.
+  // - docked: becomes a static flex column on lg+ (must sit in a flex row).
+  // - overlay: stays fixed and docks to the right edge on lg+ (works anywhere).
+  const containerClassName = docked
+    ? 'fixed inset-0 z-50 flex h-full w-full flex-col border-l border-border/30 bg-background/90 backdrop-blur-xl shadow-xl lg:static lg:z-auto lg:w-[480px] lg:shrink-0 xl:w-[560px] 2xl:w-[640px]'
+    : 'fixed inset-0 z-50 flex h-full w-full flex-col border-l border-border/30 bg-background/90 backdrop-blur-xl shadow-xl lg:inset-y-0 lg:left-auto lg:right-0 lg:w-[480px] xl:w-[560px] 2xl:w-[640px]';
+
   return (
-    <div className="fixed inset-0 z-50 flex h-full w-full flex-col border-l border-border/30 bg-background/90 backdrop-blur-xl shadow-xl lg:static lg:z-auto lg:w-[480px] lg:shrink-0 xl:w-[560px] 2xl:w-[640px]">
+    <div className={containerClassName}>
       {/* Header */}
       <div className="flex items-center justify-between border-b px-4 py-3">
         <div className="flex min-w-0 items-center gap-2">
