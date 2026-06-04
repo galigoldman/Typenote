@@ -130,6 +130,73 @@ INSERT INTO auth.identities (
 
 UPDATE public.profiles SET subscription_tier = 'free' WHERE id = 'bd4ce88e-5677-507d-ad1d-8d4275a45b52';
 
+-- ============================================
+-- ADMIN USER (for /admin dashboard authorization)
+-- Email: admin@typenote.dev | Password: Admin1234
+-- ============================================
+
+INSERT INTO auth.users (
+  id,
+  instance_id,
+  aud,
+  role,
+  email,
+  encrypted_password,
+  email_confirmed_at,
+  raw_app_meta_data,
+  raw_user_meta_data,
+  created_at,
+  updated_at,
+  confirmation_token,
+  recovery_token,
+  email_change,
+  email_change_token_new,
+  email_change_token_current,
+  email_change_confirm_status
+) VALUES (
+  '00000000-0000-4000-a000-000000000001',
+  '00000000-0000-0000-0000-000000000000',
+  'authenticated',
+  'authenticated',
+  'admin@typenote.dev',
+  crypt('Admin1234', gen_salt('bf')),
+  now(),
+  '{"provider":"email","providers":["email"]}',
+  '{"email":"admin@typenote.dev","email_verified":true,"full_name":"Admin User"}',
+  now(),
+  now(),
+  '',
+  '',
+  '',
+  '',
+  '',
+  0
+) ON CONFLICT (id) DO NOTHING;
+
+INSERT INTO auth.identities (
+  id,
+  user_id,
+  identity_data,
+  provider,
+  provider_id,
+  last_sign_in_at,
+  created_at,
+  updated_at
+) VALUES (
+  '00000000-0000-4000-a000-000000000001',
+  '00000000-0000-4000-a000-000000000001',
+  '{"sub":"00000000-0000-4000-a000-000000000001","email":"admin@typenote.dev","email_verified":true}',
+  'email',
+  '00000000-0000-4000-a000-000000000001',
+  now(),
+  now(),
+  now()
+) ON CONFLICT (provider_id, provider) DO NOTHING;
+
+-- The profile is auto-created by handle_new_user(); flip the authorization flag.
+UPDATE public.profiles SET is_admin = true
+  WHERE id = '00000000-0000-4000-a000-000000000001';
+
 -- Sample AI usage data for testing the quota display
 INSERT INTO public.ai_usage (user_id, usage_month, query_type, query_count, last_model)
 VALUES ('ac3be77d-4566-406c-9ac0-7c410634ad41', to_char(CURRENT_DATE, 'YYYY-MM'), 'chat', 3, 'flash')
@@ -615,3 +682,20 @@ VALUES (
   'close',
   '2026-04-10 14:30:00+00'
 ) ON CONFLICT (id) DO NOTHING;
+
+-- ============================================
+-- DETERMINISTIC AI-USAGE ROWS (admin dashboard E2E, month 2099-01)
+-- ============================================
+
+-- Deterministic AI-usage rows for the admin dashboard E2E (month 2099-01).
+INSERT INTO public.ai_usage (user_id, usage_month, query_type, query_count, last_model)
+VALUES
+  ('ac3be77d-4566-406c-9ac0-7c410634ad41', '2099-01', 'chat', 12, 'flash'),
+  ('ac3be77d-4566-406c-9ac0-7c410634ad41', '2099-01', 'latex', 30, 'flash')
+ON CONFLICT (user_id, usage_month, query_type) DO NOTHING;
+
+INSERT INTO public.ai_token_usage (user_id, usage_month, model, input_tokens, output_tokens)
+VALUES
+  ('ac3be77d-4566-406c-9ac0-7c410634ad41', '2099-01', 'flash', 1000000, 500000),
+  ('ac3be77d-4566-406c-9ac0-7c410634ad41', '2099-01', 'embedding', 2000000, 0)
+ON CONFLICT (user_id, usage_month, model) DO NOTHING;
