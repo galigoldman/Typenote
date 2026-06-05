@@ -332,3 +332,11 @@ the standard local-Supabase JWT, so CI / local default works without env tweaks)
 
 After regenerating, commit the updated PNGs in the same PR as the intentional change. CI will
 fail any PR that drifts from the committed baselines — which is the whole point.
+
+---
+
+## LaTeX Onboarding Tooltip (`e2e/latex-onboarding.spec.ts`) — IMPLEMENTED
+
+- [x] First-time user sees onboarding popover with "Got it" button
+- [x] Clicking "Got it" dismisses the popover and persists dismissal across reloads
+- [x] Returning user can click LaTeX icon to see help without "Got it" button

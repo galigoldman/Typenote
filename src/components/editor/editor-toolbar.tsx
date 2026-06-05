@@ -30,7 +30,9 @@ import {
   TooltipTrigger,
 } from '@/components/ui/tooltip';
 import { HeadingDropdown } from './heading-dropdown';
+import { LaTeXOnboarding } from './latex-onboarding';
 import { useExportPdf } from '@/hooks/use-export-pdf';
+import { useLocalDismissal } from '@/hooks/use-local-dismissal';
 import type { ExportableDocument } from '@/lib/pdf/export-pdf';
 import { useCallback, useEffect, useRef, useState } from 'react';
 
@@ -282,6 +284,23 @@ export function EditorToolbar({
   document,
 }: EditorToolbarProps) {
   const { exportPdf, isExporting } = useExportPdf();
+  const [isDismissed, dismiss] = useLocalDismissal();
+  const [latexOpen, setLatexOpen] = useState(false);
+
+  useEffect(() => {
+    if (!isDismissed) {
+      setLatexOpen(true);
+    }
+  }, [isDismissed]);
+
+  const handleLatexDismiss = useCallback(() => {
+    dismiss();
+    setLatexOpen(false);
+  }, [dismiss]);
+
+  const handleLatexToggle = useCallback(() => {
+    setLatexOpen((o) => !o);
+  }, []);
 
   const setLink = useCallback(() => {
     const previousUrl = editor.getAttributes('link').href as string | undefined;
@@ -441,6 +460,12 @@ export function EditorToolbar({
         isActive={editor.isActive('blockquote')}
         icon={<Quote />}
         label="Blockquote"
+      />
+      <LaTeXOnboarding
+        isFirstTime={!isDismissed}
+        isOpen={latexOpen}
+        onDismiss={handleLatexDismiss}
+        onToggle={handleLatexToggle}
       />
 
       {/* Export PDF — hidden in compact mode (canvas toolbar has its own) */}
