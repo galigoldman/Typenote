@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="220" height="64" viewBox="0 0 220 64" fill="none">
+  <!-- Before: typed text -->
+  <rect x="0" y="0" width="100" height="64" rx="8" fill="#f4f4f5"/>
+  <text x="50" y="24" text-anchor="middle" font-family="monospace" font-size="11" fill="#71717a">you type</text>
+  <text x="50" y="46" text-anchor="middle" font-family="monospace" font-size="13" fill="#18181b">x^2 + y^2 = r^2</text>
+
+  <!-- Arrow -->
+  <path d="M108 32 L128 32" stroke="#a1a1aa" stroke-width="2" stroke-linecap="round"/>
+  <path d="M125 27 L132 32 L125 37" stroke="#a1a1aa" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+
+  <!-- After: rendered equation -->
+  <rect x="140" y="0" width="80" height="64" rx="8" fill="#eff6ff"/>
+  <text x="180" y="24" text-anchor="middle" font-family="serif" font-size="11" fill="#3b82f6">result</text>
+  <text x="180" y="48" text-anchor="middle" font-family="serif" font-style="italic" font-size="16" fill="#18181b">x² + y² = r²</text>
+</svg>
