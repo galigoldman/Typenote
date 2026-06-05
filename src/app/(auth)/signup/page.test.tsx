@@ -2,14 +2,10 @@ import { render, screen, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import SignupPage from './page';
 
-const mockSignInWithOAuth = vi.fn();
+const mockSignInWithGoogle = vi.fn();
 
-vi.mock('@/lib/supabase/client', () => ({
-  createClient: () => ({
-    auth: {
-      signInWithOAuth: mockSignInWithOAuth,
-    },
-  }),
+vi.mock('@/lib/supabase/oauth', () => ({
+  signInWithGoogle: (...args: unknown[]) => mockSignInWithGoogle(...args),
 }));
 
 let mockSearchParams = new URLSearchParams();
@@ -24,8 +20,6 @@ describe('SignupPage', () => {
     vi.clearAllMocks();
     mockSearchParams = new URLSearchParams();
   });
-
-  // T001: Renders only Google button, no email/password form
   it('renders Google sign-up button', () => {
     render(<SignupPage />);
     expect(
@@ -68,18 +62,13 @@ describe('SignupPage', () => {
     expect(link).toHaveAttribute('href', '/login');
   });
 
-  it('calls signInWithOAuth when Google button is clicked', () => {
+  it('calls signInWithGoogle helper when Google button is clicked', () => {
     render(<SignupPage />);
 
     fireEvent.click(
       screen.getByRole('button', { name: /sign up with google/i }),
     );
 
-    expect(mockSignInWithOAuth).toHaveBeenCalledWith({
-      provider: 'google',
-      options: {
-        redirectTo: expect.stringContaining('/auth/callback'),
-      },
-    });
+    expect(mockSignInWithGoogle).toHaveBeenCalled();
   });
 });

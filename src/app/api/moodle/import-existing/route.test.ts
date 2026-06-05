@@ -151,6 +151,7 @@ describe('POST /api/moodle/import-existing', () => {
       type: 'moodle_file',
       fileId: 'file-1',
       courseId: 'tn-course-1',
+      triggeredByUserId: 'u1',
     });
   });
 
@@ -278,6 +279,7 @@ describe('POST /api/moodle/import-existing', () => {
       type: 'moodle_file',
       fileId: 'file-1',
       courseId: 'tn-course-1',
+      triggeredByUserId: 'u1',
     });
   });
 

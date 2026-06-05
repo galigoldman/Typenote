@@ -34,9 +34,24 @@ vi.mock('@/lib/ai/embeddings', async (orig) => {
   const actual = await orig<typeof import('@/lib/ai/embeddings')>();
   return {
     ...actual, // real chunkPages / chunkFlatText
-    embedText: vi.fn(async () => Array.from({ length: 1536 }, () => 0.05)),
-    embedQuery: vi.fn(async () => Array.from({ length: 1536 }, () => 0.05)),
+    embedText: vi.fn(async () => ({
+      values: Array.from({ length: 1536 }, () => 0.05),
+      tokens: 1,
+    })),
+    embedQuery: vi.fn(async () => ({
+      values: Array.from({ length: 1536 }, () => 0.05),
+      tokens: 1,
+    })),
   };
+});
+
+// recordTokenUsage (the embedding cost attribution) goes through the cookie-based
+// server client, which can't run in this plain node env. Point it at the admin
+// client so the record_token_usage RPC actually writes to Postgres and the
+// embedding-cost assertion below can read it back.
+vi.mock('@/lib/supabase/server', async () => {
+  const { createAdminClient } = await import('@/test/supabase-client');
+  return { createClient: vi.fn(async () => createAdminClient()) };
 });
 
 // ---------------------------------------------------------------------------
@@ -44,8 +59,13 @@ vi.mock('@/lib/ai/embeddings', async (orig) => {
 // ---------------------------------------------------------------------------
 
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
-import { createAdminClient } from '@/test/supabase-client';
+import { createAdminClient, TEST_USER_ID } from '@/test/supabase-client';
 import { indexContent } from '@/lib/actions/ai-context';
+
+function currentMonth(): string {
+  const now = new Date();
+  return `${now.getUTCFullYear()}-${String(now.getUTCMonth() + 1).padStart(2, '0')}`;
+}
 
 // ---------------------------------------------------------------------------
 // Fixed UUIDs for this test — chosen to be collision-free with seeded data
@@ -139,6 +159,14 @@ async function cleanup() {
   await admin.from('moodle_courses').delete().eq('id', MOODLE_COURSE_ID);
   await admin.from('moodle_instances').delete().eq('id', INSTANCE_ID);
   await admin.storage.from('moodle-materials').remove([STORAGE_PATH]);
+  // Clear this user's embedding-cost rows for the current month so the
+  // attribution assertion isn't polluted by a prior run.
+  await admin
+    .from('ai_token_usage')
+    .delete()
+    .eq('user_id', TEST_USER_ID)
+    .eq('usage_month', currentMonth())
+    .eq('model', 'embedding');
 }
 
 // ---------------------------------------------------------------------------
@@ -160,6 +188,7 @@ describe('indexContent (moodle_file path) — per-page indexing', () => {
       type: 'moodle_file',
       fileId: MOODLE_FILE_ID,
       courseId: MOODLE_COURSE_ID,
+      triggeredByUserId: TEST_USER_ID,
     });
 
     expect(r1.success).toBe(true);
@@ -210,5 +239,21 @@ describe('indexContent (moodle_file path) — per-page indexing', () => {
       .eq('source_id', MOODLE_FILE_ID);
 
     expect(data).toHaveLength(2);
+  });
+
+  it('records embedding token cost for the triggering user', async () => {
+    // The first index ran 2 chunks through embedText (tokens:1 each), and the
+    // Moodle vector itself is shared (user_id=null) — but the COST is attributed
+    // to triggeredByUserId via record_token_usage.
+    const admin = createAdminClient();
+    const { data } = await admin
+      .from('ai_token_usage')
+      .select('input_tokens')
+      .eq('user_id', TEST_USER_ID)
+      .eq('model', 'embedding')
+      .eq('usage_month', currentMonth())
+      .maybeSingle();
+
+    expect(data?.input_tokens ?? 0).toBeGreaterThan(0);
   });
 });

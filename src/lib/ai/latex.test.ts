@@ -18,29 +18,34 @@ describe('convertToLatex', () => {
     vi.clearAllMocks();
   });
 
-  it('should return LaTeX from the AI model', async () => {
+  it('should return LaTeX and token usage from the AI model', async () => {
     vi.mocked(generateText).mockResolvedValue({
-      text: '\\frac{1}{2} \\times 5',
+      text: '<latex>',
+      usage: { inputTokens: 12, outputTokens: 7 },
     } as unknown as Awaited<ReturnType<typeof generateText>>);
 
     const result = await convertToLatex('one half times five');
 
-    expect(result).toBe('\\frac{1}{2} \\times 5');
+    expect(result.latex).toBe('<latex>');
+    expect(result.inputTokens).toBe(12);
+    expect(result.outputTokens).toBe(7);
   });
 
   it('should trim whitespace from the response', async () => {
     vi.mocked(generateText).mockResolvedValue({
       text: '  \\frac{1}{2}  \n',
+      usage: { inputTokens: 12, outputTokens: 7 },
     } as unknown as Awaited<ReturnType<typeof generateText>>);
 
     const result = await convertToLatex('one half');
 
-    expect(result).toBe('\\frac{1}{2}');
+    expect(result.latex).toBe('\\frac{1}{2}');
   });
 
   it('should call generateText with the correct parameters', async () => {
     vi.mocked(generateText).mockResolvedValue({
       text: '\\frac{1}{2}',
+      usage: { inputTokens: 12, outputTokens: 7 },
     } as unknown as Awaited<ReturnType<typeof generateText>>);
 
     await convertToLatex('one half');

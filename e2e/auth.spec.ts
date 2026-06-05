@@ -88,6 +88,29 @@ test.describe('Auth', () => {
     ).toBeVisible();
   });
 
+  test('OAuth callback without code redirects to login with error message', async ({
+    page,
+  }) => {
+    // Navigate directly to the callback route without an authorization code.
+    // This simulates a broken OAuth redirect (e.g., PKCE cookie lost on Safari).
+    await page.goto('/auth/callback');
+
+    // Should redirect to /login with an error parameter
+    await expect(page).toHaveURL(/\/login\?error=no_code/, { timeout: 10_000 });
+    await expect(page.locator('p[role="alert"]')).toBeVisible();
+  });
+
+  test('login page shows error message when redirected with session_exchange_failed error', async ({
+    page,
+  }) => {
+    await page.goto('/login?error=session_exchange_failed');
+
+    const alert = page.locator('p[role="alert"]');
+    await expect(alert).toBeVisible();
+    await expect(alert).toContainText(/sign-in failed/i);
+    await expect(alert).toContainText(/clearing your browser cookies/i);
+  });
+
   test('forgot password shows confirmation message', async ({ page }) => {
     await page.goto('/forgot-password');
 
