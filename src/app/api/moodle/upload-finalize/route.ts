@@ -140,6 +140,7 @@ export async function POST(request: NextRequest) {
               type: 'moodle_file',
               fileId,
               courseId: appCourseId,
+              triggeredByUserId: userId,
             });
           } catch (err) {
             console.error('Background index failed:', err);
@@ -193,6 +194,7 @@ export async function POST(request: NextRequest) {
             type: 'moodle_file',
             fileId,
             courseId: appCourseId,
+            triggeredByUserId: userId,
           });
         } catch (err) {
           console.error('Background index failed:', err);

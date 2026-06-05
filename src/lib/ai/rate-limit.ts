@@ -191,32 +191,27 @@ export async function getQuota(userId: string): Promise<QuotaInfo> {
 // ---------------------------------------------------------------------------
 
 /**
- * Record token counts for admin observability. Called AFTER the AI response.
+ * Record token counts for cost observability. Called AFTER the AI response.
  *
- * This is a fire-and-forget update — it never throws. If the DB update fails,
- * we log and move on. The user's query is not affected.
- *
- * Why not in the atomic RPC? Because token counts are unknown before the AI call,
- * and the RPC runs before the call for fail-closed rate limiting.
+ * Keyed by MODEL ('flash' | 'pro' | 'embedding') so mixed-model usage is priced
+ * correctly. Fire-and-forget — never throws; a metrics-write failure must never
+ * fail the user's AI response.
  */
 export async function recordTokenUsage(
   userId: string,
-  queryType: QueryType,
+  model: string,
   inputTokens: number,
   outputTokens: number,
 ): Promise<void> {
   try {
     const supabase = await createClient();
-
-    // Atomic increment via RPC — can't use .update() because it replaces, not adds.
     await supabase.rpc('record_token_usage', {
       p_user_id: userId,
-      p_query_type: queryType,
+      p_model: model,
       p_input_tokens: inputTokens,
       p_output_tokens: outputTokens,
     });
   } catch (err) {
-    // Fire-and-forget: log but never throw
     console.error('[rate-limit] Failed to record token usage:', err);
   }
 }

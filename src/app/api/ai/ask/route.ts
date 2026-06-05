@@ -3,6 +3,7 @@ import { GoogleGenAI } from '@google/genai';
 
 import { buildAiContext, type QuestionParams } from '@/lib/actions/ai-context';
 import { checkAndIncrementUsage, recordTokenUsage } from '@/lib/ai/rate-limit';
+import { estimateTokens } from '@/lib/ai/tokens';
 import { createClient } from '@/lib/supabase/server';
 
 const isDebugMode = process.env.AI_RATE_LIMIT_DEBUG === 'true';
@@ -327,6 +328,8 @@ export async function POST(req: Request) {
     // Create a streaming response using SSE-like format
     const encoder = new TextEncoder();
     let fullResponse = '';
+    let usageInput = 0;
+    let usageOutput = 0;
     const stream = new ReadableStream({
       async start(controller) {
         try {
@@ -356,6 +359,11 @@ export async function POST(req: Request) {
                 ),
               );
             }
+            const usage = chunk.usageMetadata;
+            if (usage) {
+              usageInput = usage.promptTokenCount ?? usageInput;
+              usageOutput = usage.candidatesTokenCount ?? usageOutput;
+            }
           }
 
           controller.enqueue(
@@ -378,8 +386,18 @@ export async function POST(req: Request) {
               .update({ updated_at: new Date().toISOString() })
               .eq('id', activeConversationId);
           }
-          // Fire-and-forget token recording for admin observability
-          recordTokenUsage(user.id, 'chat', 0, 0).catch(() => {});
+          // Fire-and-forget token recording for cost observability.
+          // Prefer the model's reported usage; fall back to a char estimate so
+          // we never silently record zeros.
+          const inputTokens =
+            usageInput || estimateTokens(`${systemPrompt}\n${question}`);
+          const outputTokens = usageOutput || estimateTokens(fullResponse);
+          recordTokenUsage(
+            user.id,
+            modelLabel,
+            inputTokens,
+            outputTokens,
+          ).catch(() => {});
         } catch (err) {
           const message = err instanceof Error ? err.message : 'Stream error';
           controller.enqueue(

@@ -12,6 +12,7 @@ import {
 import { extractDocxText } from '@/lib/ai/extraction/docx';
 import { extractPdfPages } from '@/lib/ai/extraction/pdf';
 import { buildSystemPrompt } from '@/lib/ai/prompts';
+import { recordTokenUsage } from '@/lib/ai/rate-limit';
 import { listContextFiles } from '@/lib/actions/context-files';
 import { resolveContextFileName } from '@/lib/ai/context-files';
 import {
@@ -35,7 +36,13 @@ const MAX_CHUNKS_PER_SOURCE = 3;
 // ---------------------------------------------------------------------------
 
 export type IndexSource =
-  | { type: 'moodle_file'; fileId: string; courseId: string }
+  | {
+      type: 'moodle_file';
+      fileId: string;
+      courseId: string;
+      /** User who triggered the one-time shared embed (for cost attribution). */
+      triggeredByUserId?: string;
+    }
   | { type: 'course_material'; materialId: string; courseId: string }
   | { type: 'personal_file'; fileId: string; courseId: string };
 
@@ -122,6 +129,7 @@ export async function indexContent(source: IndexSource): Promise<IndexResult> {
     let sourceType = '';
     let sourceId = '';
     let userId: string | null = null;
+    let costUserId: string | null = null; // who pays for the embed (may differ from row owner)
     let courseId: string | null = null;
     let mimeType = 'application/octet-stream';
     let storageBucket = '';
@@ -132,6 +140,7 @@ export async function indexContent(source: IndexSource): Promise<IndexResult> {
       sourceId = source.fileId;
       courseId = source.courseId;
       userId = null;
+      costUserId = source.triggeredByUserId ?? null;
 
       const { data: fileRow, error: fileErr } = await admin
         .from('moodle_files')
@@ -188,6 +197,7 @@ export async function indexContent(source: IndexSource): Promise<IndexResult> {
     } else if (source.type === 'course_material') {
       const supabase = await createClient();
       userId = await getAuthUserId();
+      costUserId = userId;
       sourceType = 'course_material';
       sourceId = source.materialId;
       courseId = source.courseId;
@@ -220,6 +230,7 @@ export async function indexContent(source: IndexSource): Promise<IndexResult> {
     } else {
       const supabase = await createClient();
       userId = await getAuthUserId();
+      costUserId = userId;
       sourceType = 'personal_file';
       sourceId = source.fileId;
       courseId = source.courseId;
@@ -292,8 +303,10 @@ export async function indexContent(source: IndexSource): Promise<IndexResult> {
     }
 
     const rows: EmbeddingRow[] = [];
+    let embedTokens = 0;
     for (const chunk of chunks) {
-      const embedding = await embedText(chunk.text);
+      const { values: embedding, tokens } = await embedText(chunk.text);
+      embedTokens += tokens;
       // embedText returns [] only on a malformed embeddings API response.
       if (!embedding.length) continue;
 
@@ -333,6 +346,12 @@ export async function indexContent(source: IndexSource): Promise<IndexResult> {
 
     await upsertEmbeddings(rows);
 
+    // Fire-and-forget embedding cost attribution. The vector is shared
+    // (user_id may be null for Moodle); the COST belongs to whoever triggered it.
+    if (costUserId && embedTokens > 0) {
+      recordTokenUsage(costUserId, 'embedding', embedTokens, 0).catch(() => {});
+    }
+
     return { success: true, segmentsIndexed: rows.length, skipped: false };
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Unknown error';
@@ -355,7 +374,12 @@ export async function searchContext(
 ): Promise<SearchResult[]> {
   const userId = await getAuthUserId();
   const supabase = await createClient();
-  const queryEmbedding = await embedQuery(params.query);
+  const { values: queryEmbedding, tokens: queryTokens } = await embedQuery(
+    params.query,
+  );
+  if (queryTokens > 0) {
+    recordTokenUsage(userId, 'embedding', queryTokens, 0).catch(() => {});
+  }
 
   // Resolve Typenote course -> canonical moodle_courses.id (if synced).
   // Uses course_moodle_view RPC so members see the OWNER's Moodle imports,
