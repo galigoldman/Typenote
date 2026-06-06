@@ -32,11 +32,12 @@ response.
    failure mode: same as the Moodle-indexing drop that the serverless
    fire-and-forget guardrail (ESLint rule + await-in-route) was created for.
 
-> **Out of scope here (tracked separately):** "not all users show" is a
-> `profiles`-completeness gap (users with no profile row), **not** a dashboard
-> bug — the roster query already iterates every `profiles` row. Fixed by a
-> one-time backfill from `auth.users` + hardening the `handle_new_user` trigger,
-> after prod is inspected. See "Follow-up" below.
+3. **Roster misses users with no profile row.** The roster currently iterates
+   `profiles`, so any user whose `handle_new_user` trigger never created a
+   profile row (e.g. signups during the months prod was schema-stale) is
+   invisible — which presents as "only users who had usage show up." Fixed by
+   sourcing the roster from `auth.users` (the real source of truth for "who
+   exists") via the service-role admin API, then left-joining profile data.
 
 ## Architecture — append-only event log (single source of truth)
 
@@ -120,10 +121,15 @@ export async function recordAiEvent(e: {
 All reads go through the service-role admin client after `requireAdmin()`.
 
 ### `/admin` — roster (existing page, re-pointed to events)
-Per-user totals for the selected month, aggregated from `ai_usage_events`:
-chat count, latex count, tokens by model, est. cost, chat-quota %. Same columns
-and sort as today (cost desc → volume → email). Each user row links to the
-drill-down page.
+**User source = `auth.users`**, enumerated via the service-role
+`supabase.auth.admin.listUsers()` (paged until exhausted), so every registered
+user appears even with no `profiles` row and no usage. Each auth user is
+left-joined to `profiles` (tier, display_name; fall back to the auth email /
+'free' tier when absent) and to per-user totals aggregated from
+`ai_usage_events` for the selected month: chat count, latex count, tokens by
+model, est. cost, chat-quota %. Same columns and sort as today (cost desc →
+volume → email). Each user row links to the drill-down page. This replaces the
+old `profiles`-only enumeration and fixes "only users with usage show up."
 
 ### `/admin/users/[userId]` — drill-down (new)
 Server component, `requireAdmin()` + `dynamic = 'force-dynamic'`. Sections:
@@ -166,8 +172,10 @@ date-filtered fetch at current scale). Cost via `estimateCostUsd`.
 
 ## Follow-up (separate change, not in this plan)
 
-- **Missing users (#1):** inspect prod `count(auth.users)` vs `count(profiles)`;
-  if there's a gap, backfill missing `profiles` rows and harden
-  `handle_new_user`. Small, independent migration/script.
+- **Profiles hygiene (optional):** the roster no longer depends on `profiles`
+  being complete, but a later cleanup can still backfill missing `profiles` rows
+  from `auth.users` and harden `handle_new_user` so other features that read
+  `profiles` are also correct. Verify the gap once Supabase prod access is set
+  up.
 - Drop `ai_token_usage` + `record_token_usage` once the event log is proven in
   prod.
