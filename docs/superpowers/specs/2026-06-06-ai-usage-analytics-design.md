@@ -70,6 +70,7 @@ alter table public.ai_usage_events enable row level security;
 
 **Design rationale (interview framing):** this separates two concerns that the
 current schema conflates.
+
 - `ai_usage` stays as the **rate-limit counter** — a denormalized,
   atomically-incremented count optimized for the hot enforcement path
   (`increment_ai_usage` RPC returns "are you under quota?"). Untouched.
@@ -121,6 +122,7 @@ export async function recordAiEvent(e: {
 All reads go through the service-role admin client after `requireAdmin()`.
 
 ### `/admin` — roster (existing page, re-pointed to events)
+
 **User source = `auth.users`**, enumerated via the service-role
 `supabase.auth.admin.listUsers()` (paged until exhausted), so every registered
 user appears even with no `profiles` row and no usage. Each auth user is
@@ -132,6 +134,7 @@ volume → email). Each user row links to the drill-down page. This replaces the
 old `profiles`-only enumeration and fixes "only users with usage show up."
 
 ### `/admin/users/[userId]` — drill-down (new)
+
 Server component, `requireAdmin()` + `dynamic = 'force-dynamic'`. Sections:
 
 1. **By month** — one row per month the user has events: total queries (by
