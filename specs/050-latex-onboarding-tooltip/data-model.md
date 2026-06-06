@@ -11,17 +11,17 @@ No database changes required. This feature uses browser localStorage only.
 
 ### localStorage Entry
 
-| Key | Type | Default | Description |
-| --- | ---- | ------- | ----------- |
-| `typenote:latex-onboarding-dismissed` | `"true"` or absent | absent | Set to `"true"` when user clicks "Got it". Absence means the onboarding has not been dismissed. |
+| Key                                   | Type               | Default | Description                                                                                     |
+| ------------------------------------- | ------------------ | ------- | ----------------------------------------------------------------------------------------------- |
+| `typenote:latex-onboarding-dismissed` | `"true"` or absent | absent  | Set to `"true"` when user clicks "Got it". Absence means the onboarding has not been dismissed. |
 
 ### Component State
 
-| State | Type | Owner | Description |
-| ----- | ---- | ----- | ----------- |
-| `isDismissed` | `boolean` | `useLocalDismissal` hook | Whether the user has previously dismissed the onboarding. Read from localStorage on mount. |
-| `isOpen` | `boolean` | `LaTeXOnboarding` component | Whether the popover is currently visible (either auto-shown or manually opened). |
-| `isFirstTime` | `boolean` | Derived (`!isDismissed`) | Controls whether the "Got it" button is shown. |
+| State         | Type      | Owner                       | Description                                                                                |
+| ------------- | --------- | --------------------------- | ------------------------------------------------------------------------------------------ |
+| `isDismissed` | `boolean` | `useLocalDismissal` hook    | Whether the user has previously dismissed the onboarding. Read from localStorage on mount. |
+| `isOpen`      | `boolean` | `LaTeXOnboarding` component | Whether the popover is currently visible (either auto-shown or manually opened).           |
+| `isFirstTime` | `boolean` | Derived (`!isDismissed`)    | Controls whether the "Got it" button is shown.                                             |
 
 ## State Transitions
 
