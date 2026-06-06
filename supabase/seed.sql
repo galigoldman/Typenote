@@ -699,3 +699,16 @@ VALUES
   ('ac3be77d-4566-406c-9ac0-7c410634ad41', '2099-01', 'flash', 1000000, 500000),
   ('ac3be77d-4566-406c-9ac0-7c410634ad41', '2099-01', 'embedding', 2000000, 0)
 ON CONFLICT (user_id, usage_month, model) DO NOTHING;
+
+-- DETERMINISTIC AI-USAGE EVENTS (admin drill-down E2E, month 2099-01).
+-- Reproduces test@typenote.dev's $1.95 cost across 2 days + 1 document so the
+-- month→day→query and by-document views have stable data.
+-- Totals: flash 1,000,000 in / 500,000 out = $1.55; embedding 2,000,000 = $0.40 → $1.95.
+-- document_id '20000000-0000-0000-0000-000000000001' is seeded above at line 234.
+INSERT INTO public.ai_usage_events
+  (user_id, query_type, model, input_tokens, output_tokens, document_id, created_at)
+VALUES
+  ('ac3be77d-4566-406c-9ac0-7c410634ad41', 'chat', 'flash', 600000, 300000, '20000000-0000-0000-0000-000000000001', '2099-01-05T10:00:00Z'),
+  ('ac3be77d-4566-406c-9ac0-7c410634ad41', 'chat', 'flash', 400000, 200000, NULL, '2099-01-06T11:00:00Z'),
+  ('ac3be77d-4566-406c-9ac0-7c410634ad41', 'embedding', 'embedding', 2000000, 0, '20000000-0000-0000-0000-000000000001', '2099-01-06T11:05:00Z')
+ON CONFLICT DO NOTHING;
