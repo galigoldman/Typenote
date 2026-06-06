@@ -15,11 +15,13 @@ vi.mock('@/lib/supabase/server', () => ({
 
 // Mock rate-limit helper
 const mockCheckAndIncrement = vi.fn();
-const mockRecordTokenUsage = vi.fn().mockResolvedValue(undefined);
 vi.mock('@/lib/ai/rate-limit', () => ({
   checkAndIncrementUsage: (...args: unknown[]) =>
     mockCheckAndIncrement(...args),
-  recordTokenUsage: (...args: unknown[]) => mockRecordTokenUsage(...args),
+}));
+
+vi.mock('@/lib/ai/usage-events', () => ({
+  recordAiEvent: vi.fn().mockResolvedValue(undefined),
 }));
 
 // Mock buildAiContext to prevent actual AI calls

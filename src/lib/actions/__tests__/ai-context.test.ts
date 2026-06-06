@@ -217,8 +217,8 @@ vi.mock('@/lib/ai/prompts', () => ({
   buildSystemPrompt: vi.fn(() => 'You are a test tutor.'),
 }));
 
-vi.mock('@/lib/ai/rate-limit', () => ({
-  recordTokenUsage: vi.fn(async () => {}),
+vi.mock('@/lib/ai/usage-events', () => ({
+  recordAiEvent: vi.fn(async () => {}),
 }));
 
 vi.mock('@/lib/actions/context-files', () => ({
@@ -232,7 +232,7 @@ vi.mock('@/lib/ai/context-files', () => ({
 }));
 
 import { embedText } from '@/lib/ai/embeddings';
-import { recordTokenUsage } from '@/lib/ai/rate-limit';
+import { recordAiEvent } from '@/lib/ai/usage-events';
 import { extractPdfPages } from '@/lib/ai/extraction/pdf';
 import { listContextFiles } from '@/lib/actions/context-files';
 import { resolveContextFileName } from '@/lib/ai/context-files';
@@ -322,11 +322,14 @@ describe('indexContent', () => {
     });
 
     // 2 PDF pages -> 2 chunks -> embedText mock returns tokens:1 each = 2.
-    expect(recordTokenUsage).toHaveBeenCalledWith(
-      'test-user-id',
-      'embedding',
-      2,
-      0,
+    expect(recordAiEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        userId: 'test-user-id',
+        queryType: 'embedding',
+        model: 'embedding',
+        inputTokens: 2,
+        outputTokens: 0,
+      }),
     );
   });
 
@@ -338,11 +341,14 @@ describe('indexContent', () => {
       triggeredByUserId: 'triggering-user',
     });
 
-    expect(recordTokenUsage).toHaveBeenCalledWith(
-      'triggering-user',
-      'embedding',
-      2,
-      0,
+    expect(recordAiEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        userId: 'triggering-user',
+        queryType: 'embedding',
+        model: 'embedding',
+        inputTokens: 2,
+        outputTokens: 0,
+      }),
     );
   });
 
@@ -353,7 +359,7 @@ describe('indexContent', () => {
       courseId: 'callers-typenote-course',
     });
 
-    expect(recordTokenUsage).not.toHaveBeenCalled();
+    expect(recordAiEvent).not.toHaveBeenCalled();
   });
 
   it('embeds moodle_file with canonical moodle_courses.id (not caller course_id)', async () => {
