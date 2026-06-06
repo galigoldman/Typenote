@@ -12,7 +12,7 @@ import {
 import { extractDocxText } from '@/lib/ai/extraction/docx';
 import { extractPdfPages } from '@/lib/ai/extraction/pdf';
 import { buildSystemPrompt } from '@/lib/ai/prompts';
-import { recordTokenUsage } from '@/lib/ai/rate-limit';
+import { recordAiEvent } from '@/lib/ai/usage-events';
 import { listContextFiles } from '@/lib/actions/context-files';
 import { resolveContextFileName } from '@/lib/ai/context-files';
 import {
@@ -346,10 +346,25 @@ export async function indexContent(source: IndexSource): Promise<IndexResult> {
 
     await upsertEmbeddings(rows);
 
-    // Fire-and-forget embedding cost attribution. The vector is shared
-    // (user_id may be null for Moodle); the COST belongs to whoever triggered it.
+    // Await so the write completes before the serverless function can freeze.
+    // The vector is shared (user_id may be null for Moodle);
+    // the COST belongs to whoever triggered it.
+    //
+    // ai_usage_events.course_id is a FK to public.courses (not moodle_courses),
+    // so pass null for moodle_file sources to avoid a FK violation.
     if (costUserId && embedTokens > 0) {
-      recordTokenUsage(costUserId, 'embedding', embedTokens, 0).catch(() => {});
+      await recordAiEvent({
+        userId: costUserId,
+        queryType: 'embedding',
+        model: 'embedding',
+        inputTokens: embedTokens,
+        outputTokens: 0,
+        courseId:
+          sourceType !== 'moodle_file' && typeof courseId === 'string'
+            ? courseId
+            : null,
+        documentId: null,
+      });
     }
 
     return { success: true, segmentsIndexed: rows.length, skipped: false };
@@ -378,7 +393,15 @@ export async function searchContext(
     params.query,
   );
   if (queryTokens > 0) {
-    recordTokenUsage(userId, 'embedding', queryTokens, 0).catch(() => {});
+    await recordAiEvent({
+      userId,
+      queryType: 'embedding',
+      model: 'embedding',
+      inputTokens: queryTokens,
+      outputTokens: 0,
+      courseId: typeof params.courseId === 'string' ? params.courseId : null,
+      documentId: null,
+    });
   }
 
   // Resolve Typenote course -> canonical moodle_courses.id (if synced).

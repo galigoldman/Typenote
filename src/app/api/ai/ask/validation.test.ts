@@ -17,7 +17,10 @@ const mockCheckAndIncrement = vi.fn();
 vi.mock('@/lib/ai/rate-limit', () => ({
   checkAndIncrementUsage: (...args: unknown[]) =>
     mockCheckAndIncrement(...args),
-  recordTokenUsage: vi.fn().mockResolvedValue(undefined),
+}));
+
+vi.mock('@/lib/ai/usage-events', () => ({
+  recordAiEvent: vi.fn().mockResolvedValue(undefined),
 }));
 
 vi.mock('@/lib/actions/ai-context', () => ({

@@ -10,13 +10,17 @@ vi.mock('@/lib/supabase/server', () => ({
 
 vi.mock('@/lib/ai/rate-limit', () => ({
   checkAndIncrementUsage: vi.fn(),
-  recordTokenUsage: vi.fn().mockResolvedValue(undefined),
+}));
+
+vi.mock('@/lib/ai/usage-events', () => ({
+  recordAiEvent: vi.fn().mockResolvedValue(undefined),
 }));
 
 import { POST } from './route';
 import { convertToLatex } from '@/lib/ai/latex';
 import { createClient } from '@/lib/supabase/server';
-import { checkAndIncrementUsage, recordTokenUsage } from '@/lib/ai/rate-limit';
+import { checkAndIncrementUsage } from '@/lib/ai/rate-limit';
+import { recordAiEvent } from '@/lib/ai/usage-events';
 
 function createRequest(body: unknown): Request {
   return new Request('http://localhost:3000/api/ai/latex', {
@@ -108,7 +112,7 @@ describe('POST /api/ai/latex', () => {
     expect(convertToLatex).toHaveBeenCalledWith('x squared', undefined);
   });
 
-  it('should call recordTokenUsage after conversion', async () => {
+  it('should call recordAiEvent after conversion', async () => {
     vi.mocked(convertToLatex).mockResolvedValue({
       latex: 'x^2',
       inputTokens: 12,
@@ -117,7 +121,15 @@ describe('POST /api/ai/latex', () => {
 
     await POST(createRequest({ text: 'x squared' }));
 
-    expect(recordTokenUsage).toHaveBeenCalledWith('u1', 'flash', 12, 7);
+    expect(recordAiEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        userId: 'u1',
+        queryType: 'latex',
+        model: 'flash',
+        inputTokens: 12,
+        outputTokens: 7,
+      }),
+    );
   });
 
   it('should return 400 when text is missing', async () => {

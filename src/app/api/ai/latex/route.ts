@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { convertToLatex } from '@/lib/ai/latex';
-import { checkAndIncrementUsage, recordTokenUsage } from '@/lib/ai/rate-limit';
+import { checkAndIncrementUsage } from '@/lib/ai/rate-limit';
+import { recordAiEvent } from '@/lib/ai/usage-events';
 import { createClient } from '@/lib/supabase/server';
 
 const isDebugMode = process.env.AI_RATE_LIMIT_DEBUG === 'true';
@@ -85,10 +86,15 @@ export async function POST(req: Request) {
       courseName || undefined,
     );
 
-    // Fire-and-forget token recording (latex always runs on Flash).
-    recordTokenUsage(user.id, 'flash', inputTokens, outputTokens).catch(
-      () => {},
-    );
+    // Await so the write completes before the serverless function can freeze.
+    await recordAiEvent({
+      userId: user.id,
+      queryType: 'latex',
+      model: 'flash',
+      inputTokens,
+      outputTokens,
+      courseId: null,
+    });
 
     return NextResponse.json({ latex });
   } catch (error) {
