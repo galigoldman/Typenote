@@ -111,17 +111,16 @@ export async function getAdminUsage(month: string): Promise<AdminUsage> {
     totals.estimatedCostUsd += cost;
   }
 
-  // Only surface users with activity this month (sorted by cost desc — top
-  // spenders first). Zero-activity users add noise; totals already exclude them
-  // since their contribution is zero.
-  const users = [...byUser.values()]
-    .filter(
-      (u) =>
-        u.chatCount > 0 ||
-        u.latexCount > 0 ||
-        Object.keys(u.tokensByModel).length > 0,
-    )
-    .sort((a, b) => b.estimatedCostUsd - a.estimatedCostUsd);
+  // Surface every registered user (full roster), not just those active this
+  // month — admins want complete visibility, including who has never used AI.
+  // Sort top spenders first (cost desc), then by query volume, then email so the
+  // ordering is stable; zero-activity users naturally sink to the bottom.
+  const users = [...byUser.values()].sort(
+    (a, b) =>
+      b.estimatedCostUsd - a.estimatedCostUsd ||
+      b.chatCount + b.latexCount - (a.chatCount + a.latexCount) ||
+      a.email.localeCompare(b.email),
+  );
 
   return { users, totals };
 }
