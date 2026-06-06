@@ -1,4 +1,4 @@
-import { createClient } from '@/lib/supabase/server';
+import { createAdminClient } from '@/lib/supabase/admin';
 
 export type AiQueryType = 'chat' | 'latex' | 'embedding';
 
@@ -21,7 +21,7 @@ export interface AiUsageEvent {
  */
 export async function recordAiEvent(e: AiUsageEvent): Promise<void> {
   try {
-    const supabase = await createClient();
+    const supabase = createAdminClient();
     const { error } = await supabase.from('ai_usage_events').insert({
       user_id: e.userId,
       query_type: e.queryType,
