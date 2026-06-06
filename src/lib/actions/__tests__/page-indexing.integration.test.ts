@@ -156,12 +156,14 @@ async function cleanup() {
   await admin.storage.from('moodle-materials').remove([STORAGE_PATH]);
   // Clear this user's embedding-cost rows so the attribution assertion
   // isn't polluted by a prior run.
+  // Scope to created_at < 2090 to spare the far-future 2099 seed rows the admin E2E reads.
   await admin
     .from('ai_usage_events')
     .delete()
     .eq('user_id', TEST_USER_ID)
     .eq('query_type', 'embedding')
-    .eq('model', 'embedding');
+    .eq('model', 'embedding')
+    .lt('created_at', '2090-01-01'); // spare the far-future 2099 seed rows the admin E2E reads
 }
 
 // ---------------------------------------------------------------------------
