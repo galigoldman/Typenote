@@ -706,9 +706,9 @@ ON CONFLICT (user_id, usage_month, model) DO NOTHING;
 -- Totals: flash 1,000,000 in / 500,000 out = $1.55; embedding 2,000,000 = $0.40 → $1.95.
 -- document_id '20000000-0000-0000-0000-000000000001' is seeded above at line 234.
 INSERT INTO public.ai_usage_events
-  (user_id, query_type, model, input_tokens, output_tokens, document_id, created_at)
+  (id, user_id, query_type, model, input_tokens, output_tokens, document_id, created_at)
 VALUES
-  ('ac3be77d-4566-406c-9ac0-7c410634ad41', 'chat', 'flash', 600000, 300000, '20000000-0000-0000-0000-000000000001', '2099-01-05T10:00:00Z'),
-  ('ac3be77d-4566-406c-9ac0-7c410634ad41', 'chat', 'flash', 400000, 200000, NULL, '2099-01-06T11:00:00Z'),
-  ('ac3be77d-4566-406c-9ac0-7c410634ad41', 'embedding', 'embedding', 2000000, 0, '20000000-0000-0000-0000-000000000001', '2099-01-06T11:05:00Z')
-ON CONFLICT DO NOTHING;
+  ('a5a5a5a5-0000-4000-a000-000000000001', 'ac3be77d-4566-406c-9ac0-7c410634ad41', 'chat', 'flash', 600000, 300000, '20000000-0000-0000-0000-000000000001', '2099-01-05T10:00:00Z'),
+  ('a5a5a5a5-0000-4000-a000-000000000002', 'ac3be77d-4566-406c-9ac0-7c410634ad41', 'chat', 'flash', 400000, 200000, NULL, '2099-01-06T11:00:00Z'),
+  ('a5a5a5a5-0000-4000-a000-000000000003', 'ac3be77d-4566-406c-9ac0-7c410634ad41', 'embedding', 'embedding', 2000000, 0, '20000000-0000-0000-0000-000000000001', '2099-01-06T11:05:00Z')
+ON CONFLICT (id) DO NOTHING;
