@@ -285,13 +285,7 @@ export function EditorToolbar({
 }: EditorToolbarProps) {
   const { exportPdf, isExporting } = useExportPdf();
   const [isDismissed, dismiss] = useLocalDismissal();
-  const [latexOpen, setLatexOpen] = useState(false);
-
-  useEffect(() => {
-    if (!isDismissed) {
-      setLatexOpen(true);
-    }
-  }, [isDismissed]);
+  const [latexOpen, setLatexOpen] = useState(() => !isDismissed);
 
   const handleLatexDismiss = useCallback(() => {
     dismiss();
