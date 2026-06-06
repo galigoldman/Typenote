@@ -1,3 +1,4 @@
+import Link from 'next/link';
 import { getAdminUsage } from '@/lib/queries/admin-usage';
 import { MonthSelect } from '@/components/admin/month-select';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -101,7 +102,14 @@ export default async function AdminUsagePage({
           <tbody>
             {users.map((u) => (
               <tr key={u.userId} className="border-t">
-                <td className="px-3 py-2">{u.email}</td>
+                <td className="px-3 py-2">
+                  <Link
+                    href={`/admin/users/${u.userId}`}
+                    className="text-primary underline-offset-2 hover:underline"
+                  >
+                    {u.email}
+                  </Link>
+                </td>
                 <td className="px-3 py-2">{u.tier}</td>
                 <td className="px-3 py-2 text-right">{u.chatCount}</td>
                 <td className="px-3 py-2 text-right">{u.latexCount}</td>
