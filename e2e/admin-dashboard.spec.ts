@@ -16,6 +16,10 @@ test.describe('Admin AI Usage Dashboard', () => {
     // Seeded test user row is present with its email.
     await expect(page.getByText('test@typenote.dev')).toBeVisible();
 
+    // Full roster: zero-activity users appear too. The admin account has no
+    // usage in 2099-01 but must still be listed (sorted below active users).
+    await expect(page.getByRole('cell', { name: ADMIN_EMAIL })).toBeVisible();
+
     // Summary cards present.
     await expect(page.getByText('Chat queries')).toBeVisible();
     await expect(page.getByText('LaTeX queries')).toBeVisible();

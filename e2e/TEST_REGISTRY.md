@@ -236,9 +236,9 @@ Test lives in `src/__tests__/integration/storage-rls.integration.test.ts`. Verif
 
 ## Admin AI Usage Dashboard (`e2e/admin-dashboard.spec.ts`) — IMPLEMENTED
 
-Covers the admin-only `/admin` AI usage dashboard (token-ledger aggregation + cost estimate). The route is in the `(admin)` group whose layout calls `requireAdmin()`, which `notFound()`s for non-admins. Uses the seeded admin user (`admin@typenote.dev`) and the deterministic month `2099-01` (test user: chat=12, latex=30, flash 1M/0.5M tokens, embedding 2M tokens → estimated cost `$1.85`).
+Covers the admin-only `/admin` AI usage dashboard (token-ledger aggregation + cost estimate). The route is in the `(admin)` group whose layout calls `requireAdmin()`, which `notFound()`s for non-admins. Uses the seeded admin user (`admin@typenote.dev`) and the deterministic month `2099-01` (test user: chat=12, latex=30, flash 1M/0.5M tokens, embedding 2M tokens → estimated cost `$1.95`). The dashboard lists the **full user roster** (every profile), not just active users — zero-activity users appear with zeroed columns, sorted below active ones.
 
-- [x] Admin logs in and views the dashboard for `/admin?month=2099-01` — asserts the "AI Usage" heading, the seeded test user's email row, the "Chat queries"/"LaTeX queries" summary cards, and the seeded `$1.85` cost
+- [x] Admin logs in and views the dashboard for `/admin?month=2099-01` — asserts the "AI Usage" heading, the seeded test user's email row, the zero-activity admin user's email row (full-roster behavior), the "Chat queries"/"LaTeX queries" summary cards, and the seeded `$1.95` cost
 - [x] Admin sees the "AI Usage" sidebar nav link and reaches the dashboard by clicking it
 - [x] Non-admin (`test@typenote.dev`) is blocked from `/admin` — HTTP 404, and the admin-only "AI Usage" nav link does not render
 
