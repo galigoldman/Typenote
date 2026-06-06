@@ -2,7 +2,8 @@ import { NextResponse } from 'next/server';
 import { GoogleGenAI } from '@google/genai';
 
 import { buildAiContext, type QuestionParams } from '@/lib/actions/ai-context';
-import { checkAndIncrementUsage, recordTokenUsage } from '@/lib/ai/rate-limit';
+import { checkAndIncrementUsage } from '@/lib/ai/rate-limit';
+import { recordAiEvent } from '@/lib/ai/usage-events';
 import { estimateTokens } from '@/lib/ai/tokens';
 import { createClient } from '@/lib/supabase/server';
 
@@ -386,18 +387,21 @@ export async function POST(req: Request) {
               .update({ updated_at: new Date().toISOString() })
               .eq('id', activeConversationId);
           }
-          // Fire-and-forget token recording for cost observability.
+          // Await so the write completes before the serverless function can freeze.
           // Prefer the model's reported usage; fall back to a char estimate so
           // we never silently record zeros.
           const inputTokens =
             usageInput || estimateTokens(`${systemPrompt}\n${question}`);
           const outputTokens = usageOutput || estimateTokens(fullResponse);
-          recordTokenUsage(
-            user.id,
-            modelLabel,
+          await recordAiEvent({
+            userId: user.id,
+            queryType: 'chat',
+            model: modelLabel,
             inputTokens,
             outputTokens,
-          ).catch(() => {});
+            courseId: typeof courseId === 'string' ? courseId : null,
+            documentId: typeof documentId === 'string' ? documentId : null,
+          });
         } catch (err) {
           const message = err instanceof Error ? err.message : 'Stream error';
           controller.enqueue(
