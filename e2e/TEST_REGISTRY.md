@@ -241,6 +241,8 @@ Covers the admin-only `/admin` AI usage dashboard (token-ledger aggregation + co
 - [x] Admin logs in and views the dashboard for `/admin?month=2099-01` — asserts the "AI Usage" heading, the seeded test user's email row, the zero-activity admin user's email row (full-roster behavior), the "Chat queries"/"LaTeX queries" summary cards, and the seeded `$1.95` cost
 - [x] Admin sees the "AI Usage" sidebar nav link and reaches the dashboard by clicking it
 - [x] Non-admin (`test@typenote.dev`) is blocked from `/admin` — HTTP 404, and the admin-only "AI Usage" nav link does not render
+- [x] Admin user drill-down — roster email link → `/admin/users/<id>` heading; by-month row `2099-01` drills to `?month=2099-01`; by-day row `2099-01-06` (2 events) drills to `?day=2099-01-06`; per-query table shows the `embedding` type row; "Questions by document" section is present
+- [x] Non-admin receives HTTP 404 when navigating directly to `/admin/users/<id>`
 
 ---
 
@@ -264,8 +266,8 @@ Covers the admin-only `/admin` AI usage dashboard (token-ledger aggregation + co
 | Extension Real Load   | Implemented | `e2e/extension-real.spec.ts`             | 3/3         |
 | Version History       | Planned     | `e2e/version-history.spec.ts`            | 0/5         |
 | PDF Visual Regression | Implemented | `e2e/pdf-visual-regression.spec.ts`      | 8/8         |
-| Admin AI Usage        | Implemented | `e2e/admin-dashboard.spec.ts`            | 3/3         |
-| **Total**             |             |                                          | **102/112** |
+| Admin AI Usage        | Implemented | `e2e/admin-dashboard.spec.ts`            | 5/5         |
+| **Total**             |             |                                          | **104/114** |
 
 ---
 
