@@ -37,6 +37,7 @@
 ## Task 1: Migration — `ai_usage_events` table
 
 **Files:**
+
 - Create: `supabase/migrations/20260606120000_ai_usage_events.sql`
 
 - [ ] **Step 1: Write the migration**
@@ -99,6 +100,7 @@ git commit -m "feat(db): add ai_usage_events append-only analytics ledger"
 ## Task 2: `recordAiEvent` helper
 
 **Files:**
+
 - Create: `src/lib/ai/usage-events.ts`
 - Create: `src/lib/ai/__tests__/usage-events.test.ts`
 
@@ -240,6 +242,7 @@ git commit -m "feat(ai): add recordAiEvent append-only usage logger"
 ## Task 3: Integration test — recordAiEvent writes a real row
 
 **Files:**
+
 - Create: `src/lib/queries/ai-usage-events.integration.test.ts`
 
 This uses the cookie-based server client against local Supabase, like `src/lib/queries/ai-token-usage.integration.test.ts`. Insert via the service-role client directly (RLS-bypass) to keep it independent of auth.
@@ -300,6 +303,7 @@ git commit -m "test(ai): integration — ai_usage_events insert round-trips"
 ## Task 4: Wire recording into the three call sites (awaited)
 
 **Files:**
+
 - Modify: `src/app/api/ai/latex/route.ts:88-91`
 - Modify: `src/app/api/ai/ask/route.ts:389-400`
 - Modify: `src/lib/actions/ai-context.ts:352,381`
@@ -448,6 +452,7 @@ git commit -m "fix(ai): await usage logging at all call sites (fixes prod \$0 dr
 ## Task 5: Roster reads from auth.users + event aggregation
 
 **Files:**
+
 - Modify: `src/lib/queries/admin-usage.ts`
 - Create: `src/lib/queries/__tests__/admin-usage.test.ts`
 - Create: `src/lib/queries/admin-usage.integration.test.ts`
@@ -481,18 +486,38 @@ describe('aggregateRoster', () => {
       { id: 'u2', email: 'b@x.dev' }, // no profile, no usage
     ];
     const profiles = [
-      { id: 'u1', email: 'a@x.dev', display_name: 'A', subscription_tier: 'pro' },
+      {
+        id: 'u1',
+        email: 'a@x.dev',
+        display_name: 'A',
+        subscription_tier: 'pro',
+      },
     ];
     const events = [
-      { user_id: 'u1', query_type: 'chat', model: 'flash', input_tokens: 1_000_000, output_tokens: 500_000 },
-      { user_id: 'u1', query_type: 'embedding', model: 'embedding', input_tokens: 2_000_000, output_tokens: 0 },
+      {
+        user_id: 'u1',
+        query_type: 'chat',
+        model: 'flash',
+        input_tokens: 1_000_000,
+        output_tokens: 500_000,
+      },
+      {
+        user_id: 'u1',
+        query_type: 'embedding',
+        model: 'embedding',
+        input_tokens: 2_000_000,
+        output_tokens: 0,
+      },
     ];
     const { users, totals } = aggregateRoster(authUsers, profiles, events);
 
     expect(users).toHaveLength(2);
     const u1 = users.find((u) => u.userId === 'u1')!;
     expect(u1.chatCount).toBe(1);
-    expect(u1.tokensByModel.flash).toEqual({ input: 1_000_000, output: 500_000 });
+    expect(u1.tokensByModel.flash).toEqual({
+      input: 1_000_000,
+      output: 500_000,
+    });
     expect(u1.estimatedCostUsd).toBeCloseTo(1.95, 2); // 0.30+1.25 flash + 0.40 embed
     const u2 = users.find((u) => u.userId === 'u2')!;
     expect(u2.email).toBe('b@x.dev');
@@ -543,7 +568,10 @@ export interface AdminUsage {
   totals: AdminUsageTotals;
 }
 
-interface AuthUserLite { id: string; email: string | null | undefined; }
+interface AuthUserLite {
+  id: string;
+  email: string | null | undefined;
+}
 interface ProfileLite {
   id: string;
   email: string | null;
@@ -713,6 +741,7 @@ git commit -m "feat(admin): roster from auth.users, aggregated from ai_usage_eve
 ## Task 6: Per-user drill-down query functions
 
 **Files:**
+
 - Create: `src/lib/queries/admin-user-usage.ts`
 - Create: `src/lib/queries/__tests__/admin-user-usage.test.ts`
 
@@ -952,7 +981,8 @@ export async function fetchDocumentTitles(
     .select('id, title')
     .in('id', ids);
   const map: Record<string, string> = {};
-  for (const d of data ?? []) map[d.id as string] = (d.title as string) ?? '(untitled)';
+  for (const d of data ?? [])
+    map[d.id as string] = (d.title as string) ?? '(untitled)';
   return map;
 }
 
@@ -976,6 +1006,7 @@ git commit -m "feat(admin): per-user month/day/query/document usage aggregations
 ## Task 7: Drill-down page + roster links
 
 **Files:**
+
 - Create: `src/app/(admin)/admin/users/[userId]/page.tsx`
 - Modify: `src/app/(admin)/admin/page.tsx` (wrap the email cell in a link)
 
@@ -993,7 +1024,7 @@ import Link from 'next/link';
   >
     {u.email}
   </Link>
-</td>
+</td>;
 ```
 
 - [ ] **Step 2: Create the drill-down page**
@@ -1072,7 +1103,12 @@ export default async function AdminUserUsagePage({
           rows={months.map((m) => ({
             key: m.month,
             href: `/admin/users/${userId}?month=${m.month}`,
-            cells: [m.month, m.queryCount, m.totalTokens.toLocaleString(), usd(m.estimatedCostUsd)],
+            cells: [
+              m.month,
+              m.queryCount,
+              m.totalTokens.toLocaleString(),
+              usd(m.estimatedCostUsd),
+            ],
           }))}
           empty="No usage recorded."
         />
@@ -1089,7 +1125,12 @@ export default async function AdminUserUsagePage({
             rows={days.map((d) => ({
               key: d.day,
               href: `/admin/users/${userId}?month=${month}&day=${d.day}`,
-              cells: [d.day, d.queryCount, d.totalTokens.toLocaleString(), usd(d.estimatedCostUsd)],
+              cells: [
+                d.day,
+                d.queryCount,
+                d.totalTokens.toLocaleString(),
+                usd(d.estimatedCostUsd),
+              ],
             }))}
             empty="No usage that month."
           />
@@ -1129,7 +1170,12 @@ export default async function AdminUserUsagePage({
           headers={['Document', 'Queries', 'Tokens', 'Est. cost']}
           rows={byDocument.map((d) => ({
             key: d.documentId ?? 'none',
-            cells: [d.title, d.queryCount, d.totalTokens.toLocaleString(), usd(d.estimatedCostUsd)],
+            cells: [
+              d.title,
+              d.queryCount,
+              d.totalTokens.toLocaleString(),
+              usd(d.estimatedCostUsd),
+            ],
           }))}
           empty="No document-scoped usage."
         />
@@ -1157,7 +1203,9 @@ function UsageTable({
             {headers.map((h, i) => (
               <th
                 key={h}
-                className={'px-3 py-2 font-medium' + (i === 0 ? '' : ' text-right')}
+                className={
+                  'px-3 py-2 font-medium' + (i === 0 ? '' : ' text-right')
+                }
               >
                 {h}
               </th>
@@ -1173,7 +1221,10 @@ function UsageTable({
                   className={'px-3 py-2' + (i === 0 ? '' : ' text-right')}
                 >
                   {i === 0 && r.href ? (
-                    <Link href={r.href} className="text-primary hover:underline">
+                    <Link
+                      href={r.href}
+                      className="text-primary hover:underline"
+                    >
                       {c}
                     </Link>
                   ) : (
@@ -1207,6 +1258,7 @@ git commit -m "feat(admin): per-user usage drill-down page (month/day/query/docu
 ## Task 8: Deterministic seed for the event log
 
 **Files:**
+
 - Modify: `supabase/seed.sql` (append after the existing 2099-01 block, ~line 700)
 
 The seed must reproduce the existing E2E cost of **$1.95** for `test@typenote.dev`
@@ -1255,6 +1307,7 @@ git commit -m "test(seed): deterministic ai_usage_events for admin drill-down (\
 ## Task 9: E2E drill-down + registry
 
 **Files:**
+
 - Modify: `e2e/admin-dashboard.spec.ts`
 - Modify: `e2e/TEST_REGISTRY.md`
 
@@ -1357,4 +1410,7 @@ gh pr create --base dev --title "feat(admin): AI usage analytics — event log +
 - Branch is `feat/ai-usage-analytics` off `dev`; PR targets `dev` (rebase-only repo — no merge commits).
 - AI E2E has no Gemini key in CI — these admin tests don't call Gemini (they read seeded events), so they run unconditionally.
 - Prod follow-ups (separate, with user's go-ahead): verify `auth.users` vs `profiles` gap; drop `ai_token_usage` + `record_token_usage` once the event log is proven in prod.
+
+```
+
 ```
