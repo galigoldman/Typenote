@@ -1,0 +1,198 @@
+---
+title: Organize with courses & folders
+description: Course pages, color tags, folders, and moving notes — keep a whole degree tidy.
+url: http://localhost:3000/dashboard
+viewport: { width: 1440, height: 900 }
+auth: { storageState: "../auth.json" }
+tts:
+  voice: en-US-JennyNeural
+  rate: "+0%"
+---
+
+# Organize with courses & folders
+
+```playwright
+// fx.cursorTo / fx.highlight resolve with document.querySelector (plain CSS),
+// so text-matched targets get tagged with a data-demo attribute first.
+// IMPORTANT: the sidebar also lists course/folder names as <button>s, so any
+// text-match against buttons must be scoped (course cards, dialog, etc.).
+const tag = (label, match, scope) => page.evaluate(([label, match, scope]) => {
+  const el = [...document.querySelectorAll(scope || "button")]
+    .find((e) => (e.textContent || "").trim().includes(match));
+  if (el) el.setAttribute("data-demo", label);
+}, [label, match, scope]);
+const tagExact = (label, match, scope) => page.evaluate(([label, match, scope]) => {
+  const el = [...document.querySelectorAll(scope || "button")]
+    .find((e) => (e.textContent || "").trim() === match);
+  if (el) el.setAttribute("data-demo", label);
+}, [label, match, scope]);
+// Tag the section container that holds a given exact h2 heading.
+const tagSection = (label, heading) => page.evaluate(([label, heading]) => {
+  const h = [...document.querySelectorAll("h2")]
+    .find((e) => (e.textContent || "").trim() === heading);
+  if (h && h.parentElement) h.parentElement.setAttribute("data-demo", label);
+}, [label, heading]);
+
+await fx.step("Your courses, one card each");
+// Hide the Next.js dev badge IMMEDIATELY (recording starts before the script),
+// and via an init script so any future document never paints it either.
+await page.addStyleTag({ content: "nextjs-portal{display:none!important}" });
+await page.addInitScript(() => {
+  const add = () => {
+    const s = document.createElement("style");
+    s.textContent = "nextjs-portal{display:none!important}";
+    (document.head || document.documentElement).appendChild(s);
+  };
+  if (document.documentElement) add();
+  else new MutationObserver((_, o) => {
+    if (document.documentElement) { add(); o.disconnect(); }
+  }).observe(document, { childList: true });
+});
+await page.waitForLoadState("networkidle");
+await page.waitForSelector('[data-testid="course-card"]');
+await fx.pause(0.5);
+await tagSection("courses-section", "Courses");
+const s1 = fx.say("Courses are how Typenote organizes your degree — one card per course, each tagged with its own color.");
+await fx.highlight('[data-demo="courses-section"]', "The course cards", { duration: 1.8 });
+await s1;
+
+await fx.step("Colors follow the course");
+await tag("linalg-card", "Linear Algebra 1", '[data-testid="course-card"]');
+await fx.cursorTo('[data-demo="linalg-card"]', "Linear Algebra 1 course card");
+const s2 = fx.say("That color follows the course everywhere — on its tags, its links, and its dialogs.");
+await fx.pause(1.4);
+await s2;
+
+await fx.step("Open a course");
+const s3 = fx.say("Let's step inside Linear Algebra.");
+await fx.click('[data-demo="linalg-card"]', "Open Linear Algebra 1");
+await page.waitForSelector('h1:has-text("Linear Algebra 1")', { timeout: 30000 });
+await s3;
+await fx.pause(0.5);
+
+await fx.step("Notes live in the Documents grid");
+await page.waitForSelector('[data-testid="document-card"]');
+await tagSection("docs-section", "Documents");
+const s4 = fx.say("Everything for the course lives on this one page. Your notes sit in the Documents grid.");
+await fx.highlight('[data-demo="docs-section"]', "Documents grid", { duration: 2.0 });
+await s4;
+
+await fx.step("Materials sit below");
+await tagSection("materials-section", "Materials");
+const s5 = fx.say("Below them, Materials — the slides and files you import. The course A.I. reads these when you ask it questions.");
+await fx.highlight('[data-demo="materials-section"]', "Materials section", { duration: 2.0 });
+await s5;
+
+await fx.step("Course actions");
+// Tag the toolbar that holds New Document / Import File / Share by walking up
+// from the (unique) "New Document" button.
+await page.evaluate(() => {
+  const btn = [...document.querySelectorAll("button")]
+    .find((e) => (e.textContent || "").trim() === "New Document");
+  if (btn && btn.parentElement) btn.parentElement.setAttribute("data-demo", "actions-bar");
+});
+const s6 = fx.say("And up top — create a new document, import a file, or share the whole course with your study group.");
+await fx.highlight('[data-demo="actions-bar"]', "Course action buttons", { duration: 2.2 });
+await s6;
+await fx.pause(0.3);
+
+await fx.step("Back to the dashboard");
+await tagExact("back-link", "Dashboard", "a");
+const s7 = fx.say("The Dashboard button takes us back.");
+await fx.cursorTo('[data-demo="back-link"]', "Dashboard back button");
+await fx.click('[data-demo="back-link"]', "Return to the dashboard");
+await page.waitForSelector('[data-testid="course-card"]', { timeout: 30000 });
+await s7;
+await fx.pause(0.4);
+
+await fx.step("Create a folder");
+await tagExact("new-folder-btn", "New Folder");
+const s8 = fx.say("As the semesters pile up, folders keep things tidy. Let's make one.");
+await fx.cursorTo('[data-demo="new-folder-btn"]', "New Folder button");
+await fx.click('[data-demo="new-folder-btn"]', "Open the New Folder dialog");
+await page.waitForSelector('#folder-name');
+await s8;
+
+await fx.step("Name it Semester B");
+const s9 = fx.say("Call it Semester B, give it a color, and create it.");
+await fx.typeWithDelay('#folder-name', "Semester B", 12);
+await fx.pause(0.3);
+await fx.click('button[aria-label="Select color #F97316"]', "Pick the orange color");
+await fx.pause(0.4);
+await tagExact("create-folder-btn", "Create Folder");
+await fx.click('[data-demo="create-folder-btn"]', "Create the folder");
+// The new folder card lands at the top of the dashboard once the dialog closes.
+await page.waitForSelector('div[role="button"]:has-text("Semester B")', { timeout: 20000 });
+await s9;
+await fx.pause(0.4);
+
+await fx.step("Move a note into the folder");
+await page.locator('[data-testid="document-card"]:has-text("Lecture 1")').first().scrollIntoViewIfNeeded();
+await page.evaluate(() => {
+  const card = [...document.querySelectorAll('[data-testid="document-card"]')]
+    .find((e) => (e.textContent || "").includes("Lecture 1"));
+  if (card) {
+    card.setAttribute("data-demo", "calc-doc");
+    const menu = card.querySelector('[aria-label="Document options"]');
+    if (menu) menu.setAttribute("data-demo", "calc-doc-menu");
+  }
+});
+await fx.cursorTo('[data-demo="calc-doc"]', "The Calculus lecture card");
+const s10 = fx.say("Notes can move right in. The Calculus lecture has a Move option in its menu.");
+await fx.pause(0.5);
+await fx.click('[data-demo="calc-doc-menu"]', "Open the document menu");
+await page.waitForSelector('[role="menuitem"]:has-text("Move")');
+await fx.pause(0.3);
+await tag("move-item", "Move", '[role="menuitem"]');
+await fx.click('[data-demo="move-item"]', "Choose Move");
+await page.waitForSelector('text="Move Document"');
+await s10;
+
+await fx.step("Pick the destination");
+// The dialog lists courses and folders; scope to the dialog so the sidebar's
+// folder entry can never be tagged by mistake.
+await page.waitForSelector('[role="dialog"] button:has-text("Semester B")', { timeout: 20000 });
+await tag("dest-folder", "Semester B", '[role="dialog"] button');
+const s11 = fx.say("Pick Semester B — and move it here.");
+await fx.cursorTo('[data-demo="dest-folder"]', "Semester B in the folder list");
+await fx.click('[data-demo="dest-folder"]', "Select Semester B");
+await fx.pause(0.4);
+await tagExact("move-here-btn", "Move Here", '[role="dialog"] button');
+await fx.click('[data-demo="move-here-btn"]', "Move the document");
+await page.waitForSelector('text="Move Document"', { state: "hidden", timeout: 20000 });
+await s11;
+await fx.pause(0.4);
+
+await fx.step("Open the folder");
+// Let the post-move refresh settle: the moved card should leave the root
+// Documents list before we interact with the (re-rendering) dashboard.
+// Best-effort — the folder page render below is the real proof.
+await page.locator('[data-testid="document-card"]:has-text("Lecture 1")')
+  .waitFor({ state: "detached", timeout: 15000 }).catch(() => {});
+await page.locator('div[role="button"]:has-text("Semester B")').first().scrollIntoViewIfNeeded();
+await tag("folder-card", "Semester B", 'div[role="button"]');
+const s12 = fx.say("Open the folder — and there it is, filed away.");
+await fx.cursorTo('[data-demo="folder-card"]', "Semester B folder card");
+await fx.click('div[role="button"]:has-text("Semester B")', "Open Semester B");
+// The card click navigates client-side; verify the URL actually moved (a
+// refresh re-render can swallow the first click) and retry once if not.
+try {
+  await page.waitForURL(/\/dashboard\/folders\//, { timeout: 10000 });
+} catch {
+  await page.click('div[role="button"]:has-text("Semester B")');
+  await page.waitForURL(/\/dashboard\/folders\//, { timeout: 30000 });
+}
+await page.waitForSelector('[data-testid="document-card"]:has-text("Lecture 1")', { timeout: 60000 });
+await s12;
+await page.evaluate(() => {
+  const card = [...document.querySelectorAll('[data-testid="document-card"]')]
+    .find((e) => (e.textContent || "").includes("Lecture 1"));
+  if (card) card.setAttribute("data-demo", "moved-doc");
+});
+await fx.highlight('[data-demo="moved-doc"]', "The moved note", { duration: 1.8 });
+await fx.pause(0.6);
+
+await fx.step("Wrap up");
+await fx.say("Courses, colors, folders — your dashboard stays clean as your degree grows.");
+await fx.pause(0.6);
+```
