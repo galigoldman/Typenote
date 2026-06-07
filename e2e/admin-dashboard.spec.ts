@@ -99,4 +99,74 @@ test.describe('Admin AI Usage Dashboard', () => {
     );
     expect(res?.status()).toBe(404);
   });
+
+  test('shows richer KPIs and a month-wide daily-totals trend', async ({
+    page,
+  }) => {
+    await loginAs(page, ADMIN_EMAIL, ADMIN_PASSWORD);
+    await page.goto('/admin?month=2099-01');
+
+    // New KPI cards beyond chat/latex.
+    await expect(page.getByText('Active users')).toBeVisible();
+    await expect(page.getByText('Total queries')).toBeVisible();
+    await expect(page.getByText('Embeddings')).toBeVisible();
+
+    // Daily trend section lists both seeded days (06 has 2 events, 05 has 1).
+    await expect(
+      page.getByRole('heading', { name: 'Daily totals — 2099-01' }),
+    ).toBeVisible();
+    await expect(page.getByRole('link', { name: '2099-01-06' })).toBeVisible();
+    await expect(page.getByRole('link', { name: '2099-01-05' })).toBeVisible();
+  });
+
+  test('day picker / trend link scopes the roster to a single day', async ({
+    page,
+  }) => {
+    await loginAs(page, ADMIN_EMAIL, ADMIN_PASSWORD);
+    await page.goto('/admin?month=2099-01');
+
+    const roster = page.getByTestId('usage-roster');
+    const testRow = roster
+      .getByRole('row')
+      .filter({ has: page.getByRole('link', { name: 'test@typenote.dev' }) });
+
+    // Month view: test user's full-month cost is $1.95.
+    await expect(testRow).toContainText('$1.95');
+
+    // Scope to 2099-01-06 via the daily-trend link.
+    await page.getByRole('link', { name: '2099-01-06' }).click();
+    await expect(page).toHaveURL(/day=2099-01-06/);
+
+    // That day's slice for the test user is $1.02 (chat $0.62 + embedding $0.40).
+    await expect(testRow).toContainText('$1.02');
+    await expect(testRow).not.toContainText('$1.95');
+
+    // The day picker reflects the selection.
+    await expect(page.getByLabel('Usage day')).toHaveValue('2099-01-06');
+  });
+
+  test('roster columns sort on header click', async ({ page }) => {
+    await loginAs(page, ADMIN_EMAIL, ADMIN_PASSWORD);
+    await page.goto('/admin?month=2099-01');
+
+    const roster = page.getByTestId('usage-roster');
+    const firstRow = roster.locator('tbody tr').first();
+
+    // Default sort is cost desc → the only active user (test@) is on top.
+    await expect(firstRow).toContainText('test@typenote.dev');
+
+    // Click "Est. cost" header → toggles to ascending → a $0.00 user surfaces.
+    await roster.getByRole('button', { name: /Est\. cost/ }).click();
+    const costHeader = roster.getByRole('columnheader', { name: /Est\. cost/ });
+    await expect(costHeader).toHaveAttribute('aria-sort', 'ascending');
+    await expect(firstRow).toContainText('$0.00');
+    await expect(firstRow).not.toContainText('test@typenote.dev');
+
+    // Filter box narrows the roster to the matching user.
+    await page.getByLabel('Filter users').fill('test@typenote');
+    await expect(roster.locator('tbody tr')).toHaveCount(1);
+    await expect(roster.locator('tbody tr').first()).toContainText(
+      'test@typenote.dev',
+    );
+  });
 });
