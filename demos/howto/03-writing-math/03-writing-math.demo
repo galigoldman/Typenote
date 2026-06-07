@@ -1,0 +1,136 @@
+---
+title: Writing math in Typenote
+description: Describe math in plain English — Typenote writes the LaTeX, renders it, and lets you edit or copy it.
+url: http://localhost:3000/dashboard
+viewport: { width: 1440, height: 900 }
+auth: { storageState: "../auth.json" }
+tts:
+  voice: en-US-JennyNeural
+  rate: "+0%"
+---
+
+# Writing math
+
+```playwright
+const tag = (label, match, scope) => page.evaluate(([label, match, scope]) => {
+  const el = [...document.querySelectorAll(scope || "button")]
+    .find((e) => (e.textContent || "").trim().includes(match));
+  if (el) el.setAttribute("data-demo", label);
+}, [label, match, scope]);
+// Exact-text variant for the floating equation menu ("Edit" must not match
+// "Edit Expression"; "Copy" must not match other buttons elsewhere on the page).
+const tagExact = (label, match) => page.evaluate(([label, match]) => {
+  const el = [...document.querySelectorAll("button")]
+    .find((e) => (e.textContent || "").trim() === match);
+  if (el) el.setAttribute("data-demo", label);
+}, [label, match]);
+
+// Deterministic capture: mock the AI LaTeX + quota endpoints up front, and
+// grant clipboard permissions so the Copy button can reach "Copied!".
+await page.route("**/api/ai/latex", (route) => route.fulfill({
+  status: 200,
+  contentType: "application/json",
+  body: JSON.stringify({ latex: "\\det(A - \\lambda I) = 0" }),
+}));
+await page.route("**/api/ai/quota**", (route) => route.fulfill({
+  status: 200,
+  contentType: "application/json",
+  body: JSON.stringify({
+    chat: { used: 7, limit: 50, remaining: 43 },
+    latex: { used: 12, limit: 150, remaining: 138 },
+    tier: "free",
+    resetsAt: "2026-07-01T00:00:00.000Z",
+    deepModeAvailable: false,
+  }),
+}));
+await page.context().grantPermissions(["clipboard-read", "clipboard-write"]);
+
+await fx.step("Open a problem set");
+await page.waitForLoadState("networkidle");
+await page.addStyleTag({ content: "nextjs-portal{display:none!important}" });
+await page.waitForSelector('[data-testid="document-card"]');
+await fx.pause(0.6);
+await tag("ps3", "Problem Set 3", '[data-testid="document-card"]');
+await fx.cursorTo('[data-demo="ps3"]', "Problem Set 3 document card");
+const s1 = fx.say("Math is first-class in Typenote. Let's open a problem set and write some.");
+await fx.pause(0.8);
+await fx.click('[data-demo="ps3"]', "Open Problem Set 3");
+await page.waitForSelector(".ProseMirror", { timeout: 30000 });
+await s1;
+await fx.pause(0.5);
+
+await fx.step("Start typing the solution");
+await page.click('button:has-text("Type")').catch(() => {});
+await page.click(".ProseMirror");
+const s2 = fx.say("Start typing your working like in any note.");
+await page.keyboard.type("Q1. Eigenvalues of A — characteristic equation: ", { delay: 22 });
+await s2;
+await fx.pause(0.3);
+
+await fx.step("Trigger the math box");
+const s3 = fx.say("When you need an equation, type a colon, then an open curly brace — and a math box appears.");
+await fx.pause(0.9);
+await page.keyboard.type(":");
+await fx.pause(0.4);
+await page.keyboard.type("{");
+await page.waitForSelector('textarea[placeholder="Describe math in plain English..."]', { timeout: 10000 });
+await fx.highlight('textarea[placeholder="Describe math in plain English..."]', "Math input box", { duration: 1.3 });
+await s3;
+
+await fx.step("Describe the math in plain English");
+const s4 = fx.say("Now describe the math in plain words — and Typenote writes the LaTeX for you.");
+await page.locator('textarea[placeholder="Describe math in plain English..."]')
+  .pressSequentially("determinant of A minus lambda I equals zero", { delay: 34 });
+await fx.pause(0.5);
+await page.keyboard.press("Enter");
+await page.waitForSelector(".math-expression-node", { timeout: 15000 });
+await s4;
+
+await fx.step("A real rendered equation");
+await fx.highlight(".math-expression-node", "Rendered equation", { duration: 1.5 });
+await fx.say("There it is — a properly rendered equation, sitting right in your notes.");
+await fx.pause(0.3);
+
+await fx.step("Edit the LaTeX directly");
+const s6 = fx.say("Need fine control? Click the equation, hit Edit — power users can edit the LaTeX directly.");
+await fx.cursorTo(".math-expression-node", "The equation");
+const eqBox = await page.locator(".math-expression-node").first().boundingBox();
+await page.mouse.click(eqBox.x + eqBox.width / 2, eqBox.y + eqBox.height / 2);
+await page.waitForSelector('button:text-is("Edit")', { timeout: 10000 });
+await fx.pause(0.4);
+await tagExact("edit-btn", "Edit");
+await fx.click('[data-demo="edit-btn"]', "Edit button");
+await page.waitForSelector('button:text-is("Edit LaTeX")', { timeout: 10000 });
+await fx.pause(0.4);
+await tagExact("latex-tab", "Edit LaTeX");
+await fx.click('[data-demo="latex-tab"]', "Edit LaTeX tab");
+await page.waitForSelector('textarea[placeholder="Enter LaTeX code..."]', { timeout: 10000 });
+await fx.highlight('textarea[placeholder="Enter LaTeX code..."]', "Raw LaTeX", { duration: 1.6 });
+await s6;
+await fx.pause(0.6);
+await page.keyboard.press("Escape");
+await fx.pause(0.4);
+
+await fx.step("Copy it anywhere");
+const s7 = fx.say("Copy gives you the LaTeX to paste anywhere — and pasted back into Typenote, it stays an editable equation.");
+await fx.cursorTo(".math-expression-node", "The equation");
+const eqBox2 = await page.locator(".math-expression-node").first().boundingBox();
+await page.mouse.click(eqBox2.x + eqBox2.width / 2, eqBox2.y + eqBox2.height / 2);
+await page.waitForSelector('button:text-is("Copy")', { timeout: 10000 });
+await fx.pause(0.3);
+await tagExact("copy-btn", "Copy");
+await fx.click('[data-demo="copy-btn"]', "Copy button");
+await page.waitForSelector('button:text-is("Copied!")', { timeout: 5000 });
+await fx.highlight('[data-demo="copy-btn"]', "Copied! confirmation", { duration: 1.3 });
+await s7;
+await fx.pause(0.4);
+
+await fx.step("Wrap up");
+// ArrowRight collapses the NodeSelection to a text cursor after the equation,
+// dismissing the floating Edit/Copy menu for a clean closing frame.
+await page.keyboard.press("ArrowRight").catch(() => {});
+const s8 = fx.say("Describe it in plain words, get real math — saved automatically with the rest of your notes.");
+await page.waitForSelector('text="Saved"', { timeout: 20000 }).catch(() => {});
+await s8;
+await fx.pause(0.6);
+```

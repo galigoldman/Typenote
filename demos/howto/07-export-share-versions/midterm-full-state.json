@@ -1,0 +1,167 @@
+{
+  "content": {},
+  "pages": {
+    "pages": [
+      {
+        "id": "690ec171-a02e-45e5-8f4f-2a0ffa439d31-p0",
+        "order": 0,
+        "images": [],
+        "strokes": [],
+        "pageType": "grid",
+        "textBoxes": [
+          {
+            "x": 40,
+            "y": 40,
+            "id": "690ec171-a02e-45e5-8f4f-2a0ffa439d31-p0-ftb",
+            "width": 714,
+            "height": 332,
+            "zIndex": 0,
+            "content": {
+              "type": "doc",
+              "content": [
+                {
+                  "type": "paragraph",
+                  "attrs": {
+                    "dir": "ltr",
+                    "indent": 0,
+                    "textAlign": null
+                  },
+                  "content": [
+                    {
+                      "text": "Midterm Summary — key topics",
+                      "type": "text"
+                    }
+                  ]
+                },
+                {
+                  "type": "orderedList",
+                  "attrs": {
+                    "dir": "ltr",
+                    "type": null,
+                    "start": 1
+                  },
+                  "content": [
+                    {
+                      "type": "listItem",
+                      "attrs": {
+                        "dir": null
+                      },
+                      "content": [
+                        {
+                          "type": "paragraph",
+                          "attrs": {
+                            "dir": "ltr",
+                            "indent": 0,
+                            "textAlign": null
+                          },
+                          "content": [
+                            {
+                              "text": "Vector spaces: span, basis, dimension",
+                              "type": "text"
+                            }
+                          ]
+                        }
+                      ]
+                    },
+                    {
+                      "type": "listItem",
+                      "attrs": {
+                        "dir": null
+                      },
+                      "content": [
+                        {
+                          "type": "paragraph",
+                          "attrs": {
+                            "dir": "ltr",
+                            "indent": 0,
+                            "textAlign": null
+                          },
+                          "content": [
+                            {
+                              "text": "2. Linear maps and matrices",
+                              "type": "text"
+                            }
+                          ]
+                        }
+                      ]
+                    },
+                    {
+                      "type": "listItem",
+                      "attrs": {
+                        "dir": null
+                      },
+                      "content": [
+                        {
+                          "type": "paragraph",
+                          "attrs": {
+                            "dir": "ltr",
+                            "indent": 0,
+                            "textAlign": null
+                          },
+                          "content": [
+                            {
+                              "text": "3. Determinants and invertibility",
+                              "type": "text"
+                            }
+                          ]
+                        }
+                      ]
+                    },
+                    {
+                      "type": "listItem",
+                      "attrs": {
+                        "dir": null
+                      },
+                      "content": [
+                        {
+                          "type": "paragraph",
+                          "attrs": {
+                            "dir": "ltr",
+                            "indent": 0,
+                            "textAlign": null
+                          },
+                          "content": [
+                            {
+                              "text": "4. Eigenvalues: det(A - lambda I) = 0",
+                              "type": "text"
+                            }
+                          ]
+                        }
+                      ]
+                    },
+                    {
+                      "type": "listItem",
+                      "attrs": {
+                        "dir": null
+                      },
+                      "content": [
+                        {
+                          "type": "paragraph",
+                          "attrs": {
+                            "dir": "ltr",
+                            "indent": 0,
+                            "textAlign": null
+                          }
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "paragraph",
+                  "attrs": {
+                    "dir": null,
+                    "indent": 0,
+                    "textAlign": null
+                  }
+                }
+              ]
+            },
+            "isFullPage": false
+          }
+        ],
+        "flowContent": null
+      }
+    ]
+  }
+}

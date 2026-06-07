@@ -26,9 +26,17 @@ A marketing "sizzle" video is deferred (cut from these scenes later).
 | 5 | `demos/howto/05-ai-chat.demo` | ~75s | Open AI chat in a course → ask about course material → cited markdown+LaTeX answer (mocked) → quota display → conversation persists in list |
 | 6 | `demos/howto/06-your-files.demo` | ~60s | Add your own files to a course (PDF/DOCX upload) → open in inline material viewer side-by-side with notes |
 | 7 | `demos/howto/07-export-share-versions.demo` | ~75s | Export notes to PDF → share a document via link → open version history, restore an earlier version |
+| 8 | `demos/howto/08-courses-folders.demo` | ~65s | Course cards & colors → course page anatomy → create a folder → move a course into it (uses "Calculus 2") |
+| 9 | `demos/howto/09-share-course.demo` | ~80s | Dedicated sharing deep-dive: viewer vs contributor links, members list, then the recipient's perspective — session switches to second persona "Daniel Cohen" (`daniel.demo@typenote.dev`, created by `make-recipient-account.mjs`) who opens the share link and sees the course under "Shared Courses · by Maya Levi" |
 
 Coverage check against the product surface: document features (1, 2, 3, 7),
-course syncing (4), sharing (7), AI usage (3, 5), file import (4, 6).
+course organization (1, 8), course syncing (4), sharing (7, 9), AI usage (3, 5),
+file import (4, 6).
+
+Note (added during production): video 4's Moodle fixture must scrape course
+names that do NOT match Maya's existing courses — `moodle-sync.ts` always
+creates a new Typenote course per synced Moodle course, so colliding names
+produce duplicate course cards.
 
 ## Where things live
 

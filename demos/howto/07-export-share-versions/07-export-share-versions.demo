@@ -1,0 +1,200 @@
+---
+title: Export, share & version history
+description: Turn a document into a PDF, roll back to an earlier version, and share a course with a read-only link.
+url: http://localhost:3000/dashboard
+viewport: { width: 1440, height: 900 }
+auth: { storageState: "../auth.json" }
+tts:
+  voice: en-US-JennyNeural
+  rate: "+0%"
+---
+
+# Export, share & version history
+
+```playwright
+// fx.cursorTo / fx.highlight resolve with document.querySelector, so tag
+// text-matched elements with a data-demo attribute first.
+const tag = (label, match, scope) => page.evaluate(([label, match, scope]) => {
+  const el = [...document.querySelectorAll(scope || "button")]
+    .find((e) => (e.textContent || "").trim().includes(match));
+  if (el) el.setAttribute("data-demo", label);
+}, [label, match, scope]);
+const tagExact = (label, match) => page.evaluate(([label, match]) => {
+  const el = [...document.querySelectorAll("button")]
+    .find((e) => (e.textContent || "").trim() === match);
+  if (el) el.setAttribute("data-demo", label);
+}, [label, match]);
+
+await fx.step("What this video covers");
+// Hide the dev badge IMMEDIATELY — recording starts before the script, so any
+// wait before this line leaves the badge in the opening frames.
+await page.addStyleTag({ content: "nextjs-portal{display:none!important}" });
+// The restore later in this video does a FULL page reload, and the dev badge
+// renders during loading before any addStyleTag can run — so ALSO hide it
+// with an init script (applies to every future document from its first paint).
+await page.addInitScript(() => {
+  const add = () => {
+    const s = document.createElement("style");
+    s.textContent = "nextjs-portal{display:none!important}";
+    (document.head || document.documentElement).appendChild(s);
+  };
+  if (document.documentElement) add();
+  else new MutationObserver((_, o) => {
+    if (document.documentElement) { add(); o.disconnect(); }
+  }).observe(document, { childList: true });
+});
+await page.waitForLoadState("networkidle");
+await page.waitForSelector('[data-testid="document-card"]');
+await fx.pause(0.5);
+await fx.say("Typenote doesn't lock your notes in. Let's export a PDF, roll back a document, and share a course.");
+await fx.pause(0.2);
+
+await fx.step("Open the midterm summary");
+await page.locator('[data-testid="document-card"]:has-text("Midterm Summary")').first().scrollIntoViewIfNeeded();
+await tag("midterm", "Midterm Summary", '[data-testid="document-card"]');
+await fx.cursorTo('[data-demo="midterm"]', "Midterm Summary document card");
+const s1 = fx.say("Here's the midterm summary.");
+await fx.pause(0.4);
+await fx.click('[data-demo="midterm"]', "Open the document");
+await page.waitForSelector('.ProseMirror', { timeout: 30000 });
+await s1;
+await fx.pause(0.5);
+
+await fx.step("Export as PDF");
+// The export flow opens a popup and calls window.print(). A real popup is
+// doubly fatal here: print() would hang headless, and Daymo records via
+// Playwright recordVideo (one video per page), so a short-lived popup page
+// hijacks the saved capture (first attempt produced a 0.96s webm — exactly
+// the popup's lifetime). So window.open returns a MOCK window: document.write
+// and print are no-ops, fonts.ready resolves immediately. The export hook
+// runs to completion in-page and shows its normal success toast, and no
+// second page ever exists. The popup is never on camera anyway.
+await page.evaluate(() => {
+  window.open = () => ({
+    document: {
+      write() {},
+      close() {},
+      fonts: { ready: Promise.resolve() },
+    },
+    addEventListener() {},
+    print() {},
+    close() {},
+  });
+});
+await fx.cursorTo('button[title="Export as PDF"]', "Export as PDF button");
+const s2 = fx.say("Need a copy to print or upload? One click turns the page into a PDF — math, ink and all.");
+await fx.highlight('button[title="Export as PDF"]', "Export as PDF button", { duration: 1.2 });
+await fx.click('button[title="Export as PDF"]', "Export the document as PDF");
+await page.waitForSelector('text=PDF exported successfully', { timeout: 20000 });
+await s2;
+await fx.pause(0.5);
+
+await fx.step("Open version history");
+const s3 = fx.say("Now the time machine: Typenote snapshots your work automatically.");
+await fx.cursorTo('button[title="Version history"]', "Version history button");
+await fx.click('button[title="Version history"]', "Open the version history sidebar");
+await page.waitForSelector('text="Version History"');
+await page.waitForSelector('text=Auto-saved');
+await s3;
+await fx.pause(0.5);
+
+await fx.step("Pick an earlier snapshot");
+// Entries are newest-first, so the OLDEST snapshot is the LAST "Auto-saved"
+// button in the sidebar.
+await page.evaluate(() => {
+  const entries = [...document.querySelectorAll("button")]
+    .filter((b) => (b.textContent || "").includes("Auto-saved"));
+  const oldest = entries[entries.length - 1];
+  if (oldest) oldest.setAttribute("data-demo", "oldest-version");
+});
+await fx.cursorTo('[data-demo="oldest-version"]', "Oldest auto-saved snapshot");
+const s4 = fx.say("Let's open the earliest snapshot — from before the summary was finished.");
+await fx.click('[data-demo="oldest-version"]', "Select the oldest snapshot");
+await page.waitForSelector('button:has-text("Restore this version")');
+await s4;
+await fx.pause(0.3);
+
+await fx.step("Restore it");
+await tag("restore-btn", "Restore this version");
+const s5 = fx.say("Restoring is safe — Typenote snapshots the current state first, so nothing is ever lost.");
+await fx.highlight('[data-demo="restore-btn"]', "Restore this version button", { duration: 1.2 });
+await fx.click('[data-demo="restore-btn"]', "Restore the snapshot");
+// Restore triggers a full reload with ?versionHistory=open (badge handled by
+// the init script above).
+await page.waitForURL(/versionHistory=open/, { timeout: 30000 });
+await page.waitForSelector('.ProseMirror', { timeout: 30000 });
+await page.waitForSelector('text=Before restore', { timeout: 20000 });
+await s5;
+
+await fx.step("Back in time");
+await tag("before-restore", "Before restore");
+await fx.highlight('[data-demo="before-restore"]', "Before restore snapshot", { duration: 1.4 });
+await fx.say("We're back in time — and the newest work is kept right there as a Before-restore snapshot.");
+await fx.pause(0.4);
+
+await fx.step("Go to the course page");
+// Let the post-restore autosave settle so "Saving..." isn't in frame.
+await page.waitForSelector('text="Saved"', { timeout: 20000 }).catch(() => {});
+const s6 = fx.say("Last one: sharing. The course tag takes us straight to the course page.");
+// The green course pill is a client-side Link to the exact course — no full
+// reload, and immune to look-alike course cards on the dashboard.
+await fx.cursorTo('a[href^="/dashboard/courses/"]', "Course tag");
+await fx.click('a[href^="/dashboard/courses/"]', "Open the course page");
+await page.waitForSelector('h1:has-text("Linear Algebra 1")', { timeout: 30000 });
+await s6;
+await fx.pause(0.4);
+
+await fx.step("Open the share dialog");
+await tagExact("share-btn", "Share");
+await fx.cursorTo('[data-demo="share-btn"]', "Share button");
+const s7 = fx.say("Click Share — viewers get the course materials read-only; your own notes stay private.");
+await fx.click('[data-demo="share-btn"]', "Open the share dialog");
+await page.waitForSelector('text="Share course"');
+await s7;
+await fx.pause(0.3);
+
+await fx.step("Create a viewer link");
+// The dev server renders the link on localhost. React re-renders the readOnly
+// input after our one-shot patch (busy-state update), so a single value
+// assignment gets reverted — instead run a requestAnimationFrame loop that
+// rewrites the value BEFORE every paint. Installed BEFORE the link exists, so
+// no painted frame ever shows localhost. Also stub the clipboard so the Copy
+// click can't raise a permission-error toast.
+await page.evaluate(() => {
+  const fix = () => {
+    for (const input of document.querySelectorAll("input[readonly]")) {
+      const v = input.value || "";
+      if (v.includes("/share/")) {
+        if (v.includes("localhost")) {
+          input.value = v.replace("http://localhost:3000", "https://typenote.app");
+        }
+        input.setAttribute("data-demo", "share-link");
+      }
+    }
+    requestAnimationFrame(fix);
+  };
+  requestAnimationFrame(fix);
+  if (navigator.clipboard) {
+    try { navigator.clipboard.writeText = () => Promise.resolve(); } catch {}
+  }
+});
+await tag("create-viewer", "Create viewer link");
+await fx.cursorTo('[data-demo="create-viewer"]', "Create viewer link button");
+const s8 = fx.say("Create a viewer link — one URL your whole study group can use.");
+await fx.click('[data-demo="create-viewer"]', "Generate the viewer link");
+await page.waitForSelector('[data-demo="share-link"]', { timeout: 20000 });
+await s8;
+
+await fx.step("Copy and send it");
+await fx.highlight('[data-demo="share-link"]', "The share link", { duration: 1.6 });
+const s9 = fx.say("Copy it and send it. Contributor links work the same way.");
+await tagExact("copy-btn", "Copy");
+await fx.click('[data-demo="copy-btn"]', "Copy the share link");
+await page.waitForSelector('text=Link copied', { timeout: 10000 });
+await s9;
+await fx.pause(0.3);
+
+await fx.step("Wrap up");
+await fx.say("Export it, roll it back, share it — your notes go wherever you need them.");
+await fx.pause(0.6);
+```
