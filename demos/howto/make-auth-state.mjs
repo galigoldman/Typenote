@@ -70,6 +70,11 @@ await page.getByLabel('Email').fill(DEMO_EMAIL);
 await page.getByLabel('Password').fill(DEMO_PASSWORD);
 await page.getByRole('button', { name: /sign in/i }).click();
 await page.waitForURL('**/dashboard**', { timeout: 20_000 });
+// Pre-dismiss the first-run LaTeX onboarding popover so it never appears
+// mid-video (the flag lives in localStorage and rides along in storageState).
+await page.evaluate(() => {
+  localStorage.setItem('typenote:latex-onboarding-dismissed', 'true');
+});
 await ctx.storageState({ path: AUTH_STATE_PATH });
 await browser.close();
 console.log(`wrote ${AUTH_STATE_PATH}`);
