@@ -75,7 +75,9 @@ const { data: profs, error: profErr } = await admin
 if (profErr) throw new Error(profErr.message);
 const danielId = profs?.[0]?.id;
 if (!danielId) {
-  console.warn(`recipient ${RECIPIENT_EMAIL} not found — run make-recipient-account.mjs`);
+  console.warn(
+    `recipient ${RECIPIENT_EMAIL} not found — run make-recipient-account.mjs`,
+  );
 } else {
   const { data: mems, error: memErr } = await admin
     .from('course_members')
@@ -95,8 +97,11 @@ if (!danielId) {
         .in('course_id', courseIds)
         .select('id');
       if (e) console.warn(`${table}: ${e.message}`);
-      else if (rows?.length) console.log(`${table}: removed ${rows.length} stray Daniel row(s)`);
+      else if (rows?.length)
+        console.log(`${table}: removed ${rows.length} stray Daniel row(s)`);
     }
   }
 }
-console.log('cleanup done — dialog will show "Create viewer link" fresh; Daniel has no shared courses');
+console.log(
+  'cleanup done — dialog will show "Create viewer link" fresh; Daniel has no shared courses',
+);

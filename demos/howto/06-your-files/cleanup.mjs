@@ -52,7 +52,8 @@ for (const f of files ?? []) {
   const { error: stErr } = await db.storage
     .from('personal-files')
     .remove([f.storage_path]);
-  if (stErr) console.warn(`storage remove failed (${f.storage_path}): ${stErr.message}`);
+  if (stErr)
+    console.warn(`storage remove failed (${f.storage_path}): ${stErr.message}`);
 
   const { error: rowErr } = await db
     .from('personal_files')

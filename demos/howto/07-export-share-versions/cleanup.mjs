@@ -32,7 +32,12 @@ import { createClient } from '@supabase/supabase-js';
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { SUPABASE_URL, SUPABASE_ANON_KEY, DEMO_EMAIL, DEMO_PASSWORD } from '../demo-env.mjs';
+import {
+  SUPABASE_URL,
+  SUPABASE_ANON_KEY,
+  DEMO_EMAIL,
+  DEMO_PASSWORD,
+} from '../demo-env.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const DOC_TITLE = 'Midterm Summary';
@@ -48,7 +53,10 @@ if (error) throw new Error(error.message);
 const uid = session.user.id;
 
 // ---- 1. share links --------------------------------------------------------
-const { data: courses } = await db.from('courses').select('id,name').eq('user_id', uid);
+const { data: courses } = await db
+  .from('courses')
+  .select('id,name')
+  .eq('user_id', uid);
 const courseIds = (courses ?? []).map((c) => c.id);
 if (courseIds.length) {
   const { data: links, error: linkErr } = await db
@@ -57,7 +65,9 @@ if (courseIds.length) {
     .in('course_id', courseIds)
     .select('id,role,course_id');
   if (linkErr) {
-    console.warn(`share links: could not delete (${linkErr.message}) — disable manually in the Share dialog`);
+    console.warn(
+      `share links: could not delete (${linkErr.message}) — disable manually in the Share dialog`,
+    );
   } else {
     console.log(`share links: deleted ${links?.length ?? 0}`);
   }
@@ -69,7 +79,10 @@ const { data: docs } = await db
   .select('id')
   .eq('user_id', uid)
   .eq('title', DOC_TITLE);
-if (!docs?.length) throw new Error(`document "${DOC_TITLE}" not found — reseed with seed-demo-content.mjs`);
+if (!docs?.length)
+  throw new Error(
+    `document "${DOC_TITLE}" not found — reseed with seed-demo-content.mjs`,
+  );
 const docId = docs[0].id;
 
 const fixture = JSON.parse(
@@ -93,9 +106,15 @@ if (surplus.length) {
   const { error: delErr } = await db
     .from('document_versions')
     .delete()
-    .in('id', surplus.map((v) => v.id));
+    .in(
+      'id',
+      surplus.map((v) => v.id),
+    );
   if (delErr) console.warn(`versions: could not prune (${delErr.message})`);
-  else console.log(`versions: pruned ${surplus.length} (${surplus.map((v) => v.trigger).join(', ')})`);
+  else
+    console.log(
+      `versions: pruned ${surplus.length} (${surplus.map((v) => v.trigger).join(', ')})`,
+    );
 } else {
   console.log('versions: already at the 2 seeded snapshots');
 }

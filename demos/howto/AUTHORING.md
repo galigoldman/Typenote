@@ -22,7 +22,7 @@ Hard-won rules from videos 01–02. Follow these exactly.
 
 ## .demo structure
 
-- **ONE scene per video** (one `# Heading` + one ```` ```playwright ````
+- **ONE scene per video** (one `# Heading` + one ` ```playwright `
   block). Scenes do NOT share state — each scene capture starts a fresh
   browser at the frontmatter `url`. Structure the scene with `fx.step("…")`.
 - Frontmatter template:
@@ -32,10 +32,10 @@ Hard-won rules from videos 01–02. Follow these exactly.
   description: <one line>
   url: http://localhost:3000/dashboard
   viewport: { width: 1440, height: 900 }
-  auth: { storageState: "../auth.json" }
+  auth: { storageState: '../auth.json' }
   tts:
     voice: en-US-JennyNeural
-    rate: "+0%"
+    rate: '+0%'
   ---
   ```
 - Demo persona: Maya Levi (`maya.demo@typenote.dev`). Seeded courses:
@@ -53,13 +53,18 @@ Hard-won rules from videos 01–02. Follow these exactly.
   `document.querySelector` — **plain CSS only**, no `:has-text()`. For
   text-matched targets, tag them first:
   ```js
-  const tag = (label, match, scope) => page.evaluate(([label, match, scope]) => {
-    const el = [...document.querySelectorAll(scope || "button")]
-      .find((e) => (e.textContent || "").trim().includes(match));
-    if (el) el.setAttribute("data-demo", label);
-  }, [label, match, scope]);
-  await tag("new-course", "New Course");
-  await fx.cursorTo('[data-demo="new-course"]', "New Course button");
+  const tag = (label, match, scope) =>
+    page.evaluate(
+      ([label, match, scope]) => {
+        const el = [...document.querySelectorAll(scope || 'button')].find((e) =>
+          (e.textContent || '').trim().includes(match),
+        );
+        if (el) el.setAttribute('data-demo', label);
+      },
+      [label, match, scope],
+    );
+  await tag('new-course', 'New Course');
+  await fx.cursorTo('[data-demo="new-course"]', 'New Course button');
   ```
 - `fx.click` and `page.*` use the full Playwright engine (`:has-text()` fine).
 - `fx.typeWithDelay(selector, text, cps)`, `fx.pause(seconds)`.
@@ -72,7 +77,7 @@ Hard-won rules from videos 01–02. Follow these exactly.
 
 - **Always at scene start** (after first waitForSelector):
   ```js
-  await page.addStyleTag({ content: "nextjs-portal{display:none!important}" });
+  await page.addStyleTag({ content: 'nextjs-portal{display:none!important}' });
   ```
   (hides the Next.js dev-tools badge — a dev artifact that must never be in frame).
 - Documents open in the **canvas editor** only when `documents.pages` is not
@@ -81,7 +86,7 @@ Hard-won rules from videos 01–02. Follow these exactly.
 - Editor mode buttons ("Draw", "Type") act on pointerdown — `fx.click` /
   `page.click` work; `el.click()` from evaluate does NOT.
 - Typing into the page: `await page.click('button:has-text("Type")').catch(()=>{});
-  await page.click('.ProseMirror'); await page.keyboard.type("…", { delay: 28 });`
+await page.click('.ProseMirror'); await page.keyboard.type("…", { delay: 28 });`
 - Wait for autosave: `await page.waitForSelector('text="Saved"', { timeout: 20000 })`.
 - **Drawing needs pen pointers** (`use-drawing.ts` gates `pointerType === 'pen'`),
   and synthetic pens crash `setPointerCapture` — neutralize it once per scene:
