@@ -55,3 +55,9 @@ public/workbox-*.js
 public/workbox-*.js.map
 public/swe-worker-*.js
 .superpowers/
+
+# How-To demo videos (Daymo) — generated artifacts & session credentials
+demos/howto/auth.json
+demos/howto/.daymo/
+demos/howto/*.mp4
+
