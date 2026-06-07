@@ -58,6 +58,6 @@ public/swe-worker-*.js
 
 # How-To demo videos (Daymo) — generated artifacts & session credentials
 demos/howto/auth.json
-demos/howto/.daymo/
-demos/howto/*.mp4
+demos/howto/**/.daymo/
+demos/howto/**/*.mp4
 
