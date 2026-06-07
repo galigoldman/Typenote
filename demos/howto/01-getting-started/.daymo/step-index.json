@@ -1,0 +1,126 @@
+{
+  "demoId": "01-getting-started",
+  "mp4DurationMs": 83320,
+  "scenes": [
+    {
+      "sceneIndex": 0,
+      "globalStartMs": 0,
+      "globalEndMs": 83320,
+      "recordingOffsetMs": 1790
+    }
+  ],
+  "steps": [
+    {
+      "stepId": "01-getting-started:0:0",
+      "sceneIndex": 0,
+      "stepIndex": 0,
+      "description": "(preamble)",
+      "globalStartMs": 0,
+      "globalEndMs": 0
+    },
+    {
+      "stepId": "01-getting-started:0:1",
+      "sceneIndex": 0,
+      "stepIndex": 1,
+      "description": "Welcome",
+      "globalStartMs": 0,
+      "globalEndMs": 9065
+    },
+    {
+      "stepId": "01-getting-started:0:2",
+      "sceneIndex": 0,
+      "stepIndex": 2,
+      "description": "Open the new-course dialog",
+      "globalStartMs": 9065,
+      "globalEndMs": 13936
+    },
+    {
+      "stepId": "01-getting-started:0:3",
+      "sceneIndex": 0,
+      "stepIndex": 3,
+      "description": "Name the course",
+      "globalStartMs": 13936,
+      "globalEndMs": 16181
+    },
+    {
+      "stepId": "01-getting-started:0:4",
+      "sceneIndex": 0,
+      "stepIndex": 4,
+      "description": "Pick a color",
+      "globalStartMs": 16181,
+      "globalEndMs": 19952
+    },
+    {
+      "stepId": "01-getting-started:0:5",
+      "sceneIndex": 0,
+      "stepIndex": 5,
+      "description": "Create the course",
+      "globalStartMs": 19952,
+      "globalEndMs": 22860
+    },
+    {
+      "stepId": "01-getting-started:0:6",
+      "sceneIndex": 0,
+      "stepIndex": 6,
+      "description": "Open the course",
+      "globalStartMs": 22860,
+      "globalEndMs": 30911
+    },
+    {
+      "stepId": "01-getting-started:0:7",
+      "sceneIndex": 0,
+      "stepIndex": 7,
+      "description": "Open the new-document dialog",
+      "globalStartMs": 30911,
+      "globalEndMs": 34955
+    },
+    {
+      "stepId": "01-getting-started:0:8",
+      "sceneIndex": 0,
+      "stepIndex": 8,
+      "description": "Name the document",
+      "globalStartMs": 34955,
+      "globalEndMs": 38643
+    },
+    {
+      "stepId": "01-getting-started:0:9",
+      "sceneIndex": 0,
+      "stepIndex": 9,
+      "description": "Choose a page style",
+      "globalStartMs": 38643,
+      "globalEndMs": 45953
+    },
+    {
+      "stepId": "01-getting-started:0:10",
+      "sceneIndex": 0,
+      "stepIndex": 10,
+      "description": "Create the document",
+      "globalStartMs": 45953,
+      "globalEndMs": 55912
+    },
+    {
+      "stepId": "01-getting-started:0:11",
+      "sceneIndex": 0,
+      "stepIndex": 11,
+      "description": "Take your first note",
+      "globalStartMs": 55912,
+      "globalEndMs": 67734
+    },
+    {
+      "stepId": "01-getting-started:0:12",
+      "sceneIndex": 0,
+      "stepIndex": 12,
+      "description": "Autosave",
+      "globalStartMs": 67734,
+      "globalEndMs": 75328
+    },
+    {
+      "stepId": "01-getting-started:0:13",
+      "sceneIndex": 0,
+      "stepIndex": 13,
+      "description": "Wrap up",
+      "globalStartMs": 75328,
+      "globalEndMs": 83320
+    }
+  ]
+}
