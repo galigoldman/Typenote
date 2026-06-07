@@ -1,1 +1,0 @@
-file 'C:\projects\Typenote\demos\howto\01-getting-started\.daymo\scene-001.with-audio.webm'
