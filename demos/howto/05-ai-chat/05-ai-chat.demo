@@ -1,0 +1,216 @@
+---
+title: Ask the AI about your course
+description: Chat with an AI tutor that has read your course materials — with citations.
+url: http://localhost:3000/dashboard
+viewport: { width: 1440, height: 900 }
+auth: { storageState: "../auth.json" }
+tts:
+  voice: en-US-JennyNeural
+  rate: "+0%"
+---
+
+# Ask the AI about your course
+
+```playwright
+// fx.cursorTo / fx.highlight measure with document.querySelector, so tag
+// text-matched elements with a data-demo attribute reachable via plain CSS.
+const tag = (label, match, scope) => page.evaluate(([label, match, scope]) => {
+  const el = [...document.querySelectorAll(scope || "button")]
+    .find((e) => (e.textContent || "").trim().includes(match));
+  if (el) el.setAttribute("data-demo", label);
+}, [label, match, scope]);
+
+// ---------------------------------------------------------------------------
+// Mock EVERY /api/ai/* endpoint before any UI interaction — zero real AI
+// calls, zero persisted conversation rows. One route handler dispatches on
+// pathname + method so nothing under /api/ai/ can slip through to the server.
+// ---------------------------------------------------------------------------
+let asked = false; // flips after /api/ai/ask so the history list gains the new thread
+
+const answerChunks = [
+  "An **eigenvector** of a matrix $A$ ",
+  "is a nonzero vector $v$ that only gets scaled: ",
+  "$Av = \\lambda v$.\n\n",
+  "To find eigenvalues:\n\n",
+  "1. Form the characteristic equation $\\det(A - \\lambda I) = 0$\n",
+  "2. Solve for $\\lambda$\n",
+  "3. For each $\\lambda$, solve $(A - \\lambda I)v = 0$ for the eigenvectors\n\n",
+  "In Lecture 3 this is worked through for a 2×2 example ",
+  "with eigenvalues 2 and ½.",
+];
+const fullAnswer = answerChunks.join("");
+
+const sse = (events) => events.map((e) => `data: ${JSON.stringify(e)}\n\n`).join("");
+
+await page.route(/\/api\/ai\//, async (route) => {
+  const req = route.request();
+  const url = new URL(req.url());
+  const path = url.pathname;
+  const method = req.method();
+
+  if (path === "/api/ai/quota" && method === "GET") {
+    return route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        chat: { used: 7, limit: 50, remaining: 43 },
+        latex: { used: 12, limit: 150, remaining: 138 },
+        tier: "free",
+        resetsAt: "2026-07-01T00:00:00.000Z",
+        deepModeAvailable: false,
+      }),
+    });
+  }
+
+  if (path === "/api/ai/ask" && method === "POST") {
+    asked = true;
+    const events = [
+      {
+        type: "sources",
+        sources: [{
+          sourceType: "course_material",
+          sourceId: "m1",
+          sourceName: "Lecture 3 — Eigenvalues.pdf",
+          pageRange: "p. 4–6",
+          signedUrl: null,
+        }],
+        model: "flash",
+        contextFilesUsed: true,
+      },
+      { type: "conversation", conversationId: "conv-demo-1", messageId: "msg-1" },
+      ...answerChunks.map((text) => ({ type: "text", text })),
+      { type: "done" },
+    ];
+    return route.fulfill({
+      status: 200,
+      headers: { "Content-Type": "text/event-stream", "Cache-Control": "no-cache" },
+      body: sse(events),
+    });
+  }
+
+  if (path === "/api/ai/conversations" && method === "GET") {
+    const courseId = url.searchParams.get("courseId") || "course-demo";
+    const conversations = [
+      ...(asked ? [{
+        id: "conv-demo-1",
+        course_id: courseId,
+        title: "How do I find the eigenvalues of a matrix?",
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+        message_count: 2,
+      }] : []),
+      {
+        id: "conv-demo-0",
+        course_id: courseId,
+        title: "Vector space axioms",
+        created_at: "2026-06-01T10:00:00Z",
+        updated_at: "2026-06-02T14:00:00Z",
+        message_count: 4,
+      },
+    ];
+    return route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ conversations }) });
+  }
+
+  const msgMatch = path.match(/^\/api\/ai\/conversations\/([^/]+)\/messages$/);
+  if (msgMatch && method === "GET") {
+    const messages = msgMatch[1] === "conv-demo-1"
+      ? [
+          { role: "user", content: "How do I find the eigenvalues of a matrix?", sources_json: null, model: null },
+          { role: "assistant", content: fullAnswer, sources_json: [{
+            sourceType: "course_material", sourceId: "m1",
+            sourceName: "Lecture 3 — Eigenvalues.pdf", pageRange: "p. 4–6", signedUrl: null,
+          }], model: "flash" },
+        ]
+      : [];
+    return route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ messages }) });
+  }
+
+  // POST/PATCH/DELETE on conversations, or anything else under /api/ai/ —
+  // succeed quietly without touching the server.
+  return route.fulfill({ status: 200, contentType: "application/json", body: "{}" });
+});
+
+await fx.step("Open your course");
+await page.waitForSelector('[data-testid="course-card"]');
+// Hide the Next.js dev-tools badge — it must not appear in any frame.
+await page.addStyleTag({ content: "nextjs-portal{display:none!important}" });
+// Pre-warm every declared webfont (KaTeX math fonts included) so the AI
+// answer's equations don't flash invisible while fonts load mid-scene.
+await page.evaluate(() => { try { for (const f of document.fonts) f.load(); } catch {} });
+await fx.pause(0.6);
+await tag("la-card", "Linear Algebra 1", '[data-testid="course-card"]');
+await fx.cursorTo('[data-demo="la-card"]', "Linear Algebra 1 course card");
+const s1 = fx.say("Every course in Typenote comes with its own AI tutor — one that has actually read your course files. Let's open Linear Algebra.");
+await fx.pause(0.8);
+await fx.click('[data-demo="la-card"]', "Open the course");
+await page.waitForSelector('h1:has-text("Linear Algebra 1")');
+await s1;
+await fx.pause(0.4);
+
+await fx.step("Open the AI chat");
+await page.addStyleTag({ content: "nextjs-portal{display:none!important}" });
+await fx.cursorTo('button[aria-label="Open AI chat"]', "AI chat button");
+const s2 = fx.say("The chat lives in the corner of every course page. Open it up.");
+await fx.pause(0.5);
+await fx.click('button[aria-label="Open AI chat"]', "Open the AI chat panel");
+await page.waitForSelector('text="AI Tutor"');
+await s2;
+await fx.pause(0.5);
+
+await fx.step("Your question balance");
+await page.waitForSelector('text=/of 50 remaining/');
+await tag("quota-line", "of 50 remaining", "p");
+// The quota line sits in the caption band, and stitch stretches video to fit
+// the real narration audio — so keep the outline up for the whole narration
+// PLUS a long silent hold, guaranteeing a caption-free beat with the outline.
+const s3 = fx.say("The free plan includes fifty chat questions a month, and your remaining balance is always visible — right here, above the input.");
+await fx.highlight('[data-demo="quota-line"]', "Chat quota indicator", { duration: 11 });
+await fx.cursorTo('[data-demo="quota-line"]', "Chat quota line");
+await s3;
+await fx.pause(2.4);
+
+await fx.step("Ask a question");
+await fx.cursorTo('input[placeholder^="Ask anything"]', "Chat input");
+await page.click('input[placeholder^="Ask anything"]');
+const s4 = fx.say("Now just ask, in plain language — exactly like you'd ask a teaching assistant after class.");
+await fx.typeWithDelay('input[placeholder^="Ask anything"]', "How do I find the eigenvalues of a matrix?", 12);
+await s4;
+await fx.pause(0.5);
+await page.keyboard.press("Enter");
+
+await fx.step("A real answer, with real math");
+await page.waitForSelector('[data-testid="ai-citation"]', { timeout: 15000 });
+await fx.say("The answer arrives right beside your course — a definition, the steps to follow, and clean math notation you can actually read.");
+await fx.pause(3.4);
+
+await fx.step("Grounded in your files");
+const s6 = fx.say("And it's grounded in your own course materials — this citation points straight to Lecture 3, pages four to six.");
+await fx.highlight('[data-testid="ai-citation"]', "Source citation chip", { duration: 8 });
+await fx.cursorTo('[data-testid="ai-citation"]', "Source citation chip");
+await s6;
+await fx.pause(1.6);
+
+await fx.step("Conversations are saved");
+await fx.cursorTo('button[aria-label="Conversation history"]', "Conversation history button");
+const s7 = fx.say("Every conversation is saved with the course, so you can pick up any thread again before the exam.");
+await fx.pause(0.6);
+await fx.click('button[aria-label="Conversation history"]', "Open the conversation list");
+await page.waitForSelector('text="Vector space axioms"');
+await tag("prev-conv", "Vector space axioms", "li");
+await fx.highlight('[data-demo="prev-conv"]', "A previous conversation", { duration: 6 });
+await s7;
+await fx.pause(1.2);
+
+await fx.step("Start fresh any time");
+await tag("new-conv", "New conversation");
+await fx.cursorTo('[data-demo="new-conv"]', "New conversation button");
+await fx.say("And when you move on to a new topic, a fresh thread is one click away.");
+await fx.pause(1.0);
+
+await fx.step("Wrap up");
+await fx.click('button[aria-label="Conversation history"]', "Back to the chat");
+await page.waitForSelector('[data-testid="ai-citation"]');
+await fx.pause(0.6);
+await fx.say("Your notes, your files, and a tutor that's read them all — that's the Typenote AI.");
+await fx.pause(2.6);
+```
