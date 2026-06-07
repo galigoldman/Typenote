@@ -54,7 +54,10 @@ export async function updateSession(request: NextRequest) {
   // MUST stay reachable while logged out — the Chrome Web Store reviewer (and
   // any visitor who clicks the policy link in the extension listing) hits it
   // unauthenticated, and a redirect to /login would fail store review.
-  const isPublicPage = request.nextUrl.pathname.startsWith('/privacy');
+  // /help is the public help center (how-to videos + AI assistant).
+  const isPublicPage =
+    request.nextUrl.pathname.startsWith('/privacy') ||
+    request.nextUrl.pathname.startsWith('/help');
 
   // Route protection: unauthenticated users can only access auth pages
   const isAuthPage =
