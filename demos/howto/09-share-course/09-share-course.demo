@@ -1,0 +1,190 @@
+---
+title: Share a course with your study group
+description: Create a share link as the course owner, then follow it as a classmate — sign in, auto-join, and see the shared course from the viewer's side.
+url: http://localhost:3000/dashboard
+viewport: { width: 1440, height: 900 }
+auth: { storageState: "../auth.json" }
+tts:
+  voice: en-US-JennyNeural
+  rate: "+0%"
+---
+
+# Share a course with your study group
+
+```playwright
+// fx.cursorTo / fx.highlight resolve with document.querySelector, so tag
+// text-matched elements with a data-demo attribute first.
+const tag = (label, match, scope) => page.evaluate(([label, match, scope]) => {
+  const el = [...document.querySelectorAll(scope || "button")]
+    .find((e) => (e.textContent || "").trim().includes(match));
+  if (el) el.setAttribute("data-demo", label);
+}, [label, match, scope]);
+const tagExact = (label, match) => page.evaluate(([label, match]) => {
+  const el = [...document.querySelectorAll("button")]
+    .find((e) => (e.textContent || "").trim() === match);
+  if (el) el.setAttribute("data-demo", label);
+}, [label, match]);
+
+await fx.step("What this video covers");
+// Hide the dev badge IMMEDIATELY — recording starts before the script runs.
+await page.addStyleTag({ content: "nextjs-portal{display:none!important}" });
+// This video navigates a LOT (share link -> login -> auto-join -> course ->
+// dashboard), and the dev badge renders during every load before addStyleTag
+// could run — so ALSO hide it with an init script, which applies to every
+// future document from its first paint and survives clearCookies + goto.
+await page.addInitScript(() => {
+  const add = () => {
+    const s = document.createElement("style");
+    s.textContent = "nextjs-portal{display:none!important}";
+    (document.head || document.documentElement).appendChild(s);
+  };
+  if (document.documentElement) add();
+  else new MutationObserver((_, o) => {
+    if (document.documentElement) { add(); o.disconnect(); }
+  }).observe(document, { childList: true });
+});
+await page.waitForLoadState("networkidle");
+await page.waitForSelector('[data-testid="course-card"]');
+await fx.pause(0.5);
+await fx.say("Notes are better together. Let's share a course with the study group — and then see exactly what a classmate gets.");
+await fx.pause(0.2);
+
+await fx.step("Open Linear Algebra 1");
+await page.locator('[data-testid="course-card"]:has-text("Linear Algebra 1")').first().scrollIntoViewIfNeeded();
+await tag("la-card", "Linear Algebra 1", '[data-testid="course-card"]');
+await fx.cursorTo('[data-demo="la-card"]', "Linear Algebra 1 course card");
+const s1 = fx.say("Maya wants her group inside this Linear Algebra course, materials and all.");
+await fx.pause(0.3);
+await fx.click('[data-demo="la-card"]', "Open the course");
+await page.waitForSelector('h1:has-text("Linear Algebra 1")', { timeout: 30000 });
+await s1;
+await fx.pause(0.4);
+
+await fx.step("Open the share dialog");
+await tagExact("share-btn", "Share");
+await fx.cursorTo('[data-demo="share-btn"]', "Share button");
+const s2 = fx.say("Every course has a Share button — and it offers two kinds of links: viewer and contributor.");
+await fx.click('[data-demo="share-btn"]', "Open the share dialog");
+await page.waitForSelector('text="Share course"');
+await s2;
+await fx.pause(0.3);
+
+await fx.step("Create a viewer link");
+// The dev server renders the link on localhost. React re-renders the readOnly
+// input after our patch (busy-state update), so a one-shot value assignment
+// gets reverted — instead a requestAnimationFrame loop rewrites the value
+// BEFORE every paint. Installed BEFORE the link exists, so no painted frame
+// ever shows localhost. Also stub the clipboard so Copy can't raise a
+// permission-error toast in headless capture.
+await page.evaluate(() => {
+  const fix = () => {
+    for (const input of document.querySelectorAll("input[readonly]")) {
+      const v = input.value || "";
+      if (v.includes("/share/")) {
+        if (v.includes("localhost")) {
+          input.value = v.replace("http://localhost:3000", "https://typenote.app");
+        }
+        input.setAttribute("data-demo", "share-link");
+      }
+    }
+    requestAnimationFrame(fix);
+  };
+  requestAnimationFrame(fix);
+  if (navigator.clipboard) {
+    try { navigator.clipboard.writeText = () => Promise.resolve(); } catch {}
+  }
+});
+await tag("create-viewer", "Create viewer link");
+await fx.cursorTo('[data-demo="create-viewer"]', "Create viewer link button");
+const s3 = fx.say("Viewer first. Viewers can read everything in the course — and edit nothing.");
+await fx.click('[data-demo="create-viewer"]', "Generate the viewer link");
+await page.waitForSelector('[data-demo="share-link"]', { timeout: 20000 });
+await s3;
+
+await fx.step("Copy the link");
+await fx.highlight('[data-demo="share-link"]', "The share link", { duration: 1.6 });
+const s4 = fx.say("There's the link. Copy it once and drop it in the group chat.");
+await tagExact("copy-btn", "Copy");
+await fx.click('[data-demo="copy-btn"]', "Copy the share link");
+await page.waitForSelector('text=Link copied', { timeout: 10000 });
+await s4;
+await fx.pause(0.3);
+
+await fx.step("Contributor links");
+await tag("create-contrib", "Create contributor link");
+await fx.cursorTo('[data-demo="create-contrib"]', "Create contributor link button");
+const s5 = fx.say("And when you want classmates adding their own files and summaries, that's the contributor link.");
+await fx.highlight('[data-demo="create-contrib"]', "Create contributor link button", { duration: 1.4 });
+await s5;
+await fx.pause(0.3);
+
+await fx.step("The classmate's turn");
+// Grab the REAL token from the input. The rAF loop above only rewrites the
+// ORIGIN for display — the /share/<token> path is untouched, so the patched
+// value still carries the real token.
+const token = await page.evaluate(() => {
+  const input = document.querySelector('[data-demo="share-link"]');
+  const m = ((input && input.value) || "").match(/\/share\/([A-Za-z0-9_-]+)/);
+  return m ? m[1] : null;
+});
+if (!token) throw new Error("could not extract the share token from the dialog");
+const s6 = fx.say("Now let's switch seats and be the classmate. Daniel opens the link from the group chat.");
+await fx.pause(0.8);
+// Become unauthenticated: drop Maya's session cookies, then follow the link
+// like a classmate would. KNOWN APP BUG: the auth middleware redirects a
+// logged-out /share/<token> hit to /login WITHOUT the next param (it only
+// rewrites pathname), so the share page's own next= redirect never runs and
+// the token would be lost after login. The URL bar is never on camera, so we
+// navigate straight to the login-with-next URL the share page MEANT to issue
+// — visually identical, and the post-login auto-join works.
+await page.context().clearCookies();
+await page.goto("http://localhost:3000/login?next=" + encodeURIComponent("/share/" + token));
+await page.waitForSelector("#email", { timeout: 30000 });
+await s6;
+await fx.pause(0.3);
+
+await fx.step("Sign in as Daniel");
+const s7 = fx.say("He isn't signed in, so Typenote asks him to log in first — the link remembers where he was headed.");
+await fx.cursorTo("#email", "Email field");
+await fx.typeWithDelay("#email", "daniel.demo@typenote.dev", 18);
+await fx.cursorTo("#password", "Password field");
+await fx.typeWithDelay("#password", "TypenoteDemo!2026", 18);
+await s7;
+await fx.pause(0.2);
+
+await fx.step("Straight into the course");
+const s8 = fx.say("One click — and he lands straight inside the shared course. No invites to accept, no setup.");
+await fx.click('button[type="submit"]', "Sign in");
+await page.waitForSelector('h1:has-text("Linear Algebra 1")', { timeout: 45000 });
+await s8;
+await fx.pause(0.5);
+
+await fx.step("What a viewer sees");
+// The shared material row has no testid — tag the innermost row div.
+await page.evaluate(() => {
+  const el = [...document.querySelectorAll("div.group")]
+    .find((e) => (e.textContent || "").includes("lecture-3-eigenvalues"));
+  if (el) el.setAttribute("data-demo", "material-row");
+});
+const s9 = fx.say("Daniel can open every material Maya shared. Her own notes stay private — and a viewer can't add files or manage sharing.");
+await fx.highlight('[data-demo="material-row"]', "Shared course material", { duration: 1.8 });
+await s9;
+await fx.pause(0.4);
+
+await fx.step("Daniel's dashboard");
+await tag("back-dash", "Dashboard", "a");
+const s10 = fx.say("Back on his dashboard, the course now sits under Shared with me — by Maya Levi.");
+await fx.click('[data-demo="back-dash"]', "Back to the dashboard");
+// Don't wait on 'text="Shared with me"' — the SIDEBAR's "SHARED WITH ME"
+// label matches it while the main panel still shows a loading spinner, so the
+// tag would run before the card exists. Wait for the owner line on the card.
+await page.waitForSelector('text="by Maya Levi"', { timeout: 30000 });
+await tag("shared-card", "Linear Algebra 1", '[data-testid="course-card"]');
+await fx.highlight('[data-demo="shared-card"]', "Shared course card with owner name", { duration: 2.0 });
+await s10;
+await fx.pause(0.4);
+
+await fx.step("Wrap up");
+await fx.say("One link — and your whole study group works from the same course. That's sharing in Typenote.");
+await fx.pause(0.9);
+```
