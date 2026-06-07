@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import Script from 'next/script';
 import { redirect } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
 import { signOut } from '@/lib/actions/auth';
@@ -6,7 +7,8 @@ import { SidebarFolderTree } from '@/components/dashboard/sidebar-folder-tree';
 import { SidebarLayout } from '@/components/dashboard/sidebar-layout';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
-import { Gauge, LogOut } from 'lucide-react';
+import { Gauge, HelpCircle, LogOut } from 'lucide-react';
+import { HELP_WIDGET_ID, HELP_MANIFEST_URL } from '@/lib/help/config';
 
 export default async function DashboardLayout({
   children,
@@ -58,6 +60,18 @@ export default async function DashboardLayout({
           </Button>
         </div>
       )}
+      <div className="px-2 pt-2">
+        <Button
+          asChild
+          variant="ghost"
+          className="w-full justify-start min-h-[44px] hover:bg-primary/10 hover:text-primary"
+        >
+          <Link href="/help">
+            <HelpCircle className="size-4" />
+            Help
+          </Link>
+        </Button>
+      </div>
       <div className="p-2">
         <form action={signOut}>
           <Button
@@ -73,5 +87,18 @@ export default async function DashboardLayout({
     </>
   );
 
-  return <SidebarLayout sidebar={sidebarContent}>{children}</SidebarLayout>;
+  return (
+    <SidebarLayout sidebar={sidebarContent}>
+      {children}
+      {/* Daymo help widget: floating bubble → chat that answers with clips
+          from the how-to videos. Same chat backend + manifest as /help. */}
+      <Script
+        src="/daymo-widget.js"
+        strategy="afterInteractive"
+        data-widget-id={HELP_WIDGET_ID}
+        data-base-url="/api/help"
+        data-manifest-url={HELP_MANIFEST_URL}
+      />
+    </SidebarLayout>
+  );
 }
