@@ -1,0 +1,77 @@
+[
+  {
+    "word": "Here",
+    "startMs": 100,
+    "endMs": 350
+  },
+  {
+    "word": "it",
+    "startMs": 363,
+    "endMs": 463
+  },
+  {
+    "word": "is",
+    "startMs": 475,
+    "endMs": 900
+  },
+  {
+    "word": "Click",
+    "startMs": 1763,
+    "endMs": 2038
+  },
+  {
+    "word": "in",
+    "startMs": 2050,
+    "endMs": 2225
+  },
+  {
+    "word": "every",
+    "startMs": 2388,
+    "endMs": 2613
+  },
+  {
+    "word": "course",
+    "startMs": 2625,
+    "endMs": 3025
+  },
+  {
+    "word": "gets",
+    "startMs": 3038,
+    "endMs": 3238
+  },
+  {
+    "word": "its",
+    "startMs": 3250,
+    "endMs": 3400
+  },
+  {
+    "word": "own",
+    "startMs": 3413,
+    "endMs": 3613
+  },
+  {
+    "word": "page",
+    "startMs": 3625,
+    "endMs": 3950
+  },
+  {
+    "word": "for",
+    "startMs": 3963,
+    "endMs": 4101
+  },
+  {
+    "word": "documents",
+    "startMs": 4113,
+    "endMs": 4651
+  },
+  {
+    "word": "and",
+    "startMs": 4663,
+    "endMs": 4826
+  },
+  {
+    "word": "materials",
+    "startMs": 4838,
+    "endMs": 5663
+  }
+]

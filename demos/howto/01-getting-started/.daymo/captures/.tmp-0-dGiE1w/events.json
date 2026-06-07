@@ -1,0 +1,535 @@
+[
+  {
+    "kind": "scene_start",
+    "t": 0,
+    "index": 12,
+    "title": "Getting started",
+    "prose": "",
+    "recordingOffsetMs": 2743
+  },
+  {
+    "kind": "step",
+    "t": 1072,
+    "sceneIndex": 0,
+    "stepIndex": 1,
+    "description": "Welcome"
+  },
+  {
+    "kind": "fx",
+    "t": 1688,
+    "method": "pause",
+    "args": [
+      0.8
+    ]
+  },
+  {
+    "kind": "say",
+    "t": 2500,
+    "hash": "ea1cf5c866ea7ee9f6497415082464d0f6a60776701f03cb549970a3cbb65471",
+    "text": "Welcome to Typenote — the notebook built for university courses. This is your dashboard: your courses on top, recent documents below.",
+    "durationMs": 8501,
+    "words": [
+      {
+        "word": "Welcome",
+        "startMs": 100,
+        "endMs": 475
+      },
+      {
+        "word": "to",
+        "startMs": 488,
+        "endMs": 576
+      },
+      {
+        "word": "Typenote",
+        "startMs": 588,
+        "endMs": 1201
+      },
+      {
+        "word": "the",
+        "startMs": 1375,
+        "endMs": 1463
+      },
+      {
+        "word": "notebook",
+        "startMs": 1475,
+        "endMs": 1875
+      },
+      {
+        "word": "built",
+        "startMs": 1888,
+        "endMs": 2138
+      },
+      {
+        "word": "for",
+        "startMs": 2150,
+        "endMs": 2288
+      },
+      {
+        "word": "university",
+        "startMs": 2300,
+        "endMs": 2875
+      },
+      {
+        "word": "courses",
+        "startMs": 2888,
+        "endMs": 3588
+      },
+      {
+        "word": "This",
+        "startMs": 4450,
+        "endMs": 4700
+      },
+      {
+        "word": "is",
+        "startMs": 4713,
+        "endMs": 4826
+      },
+      {
+        "word": "your",
+        "startMs": 4838,
+        "endMs": 4963
+      },
+      {
+        "word": "dashboard",
+        "startMs": 4975,
+        "endMs": 5613
+      },
+      {
+        "word": "your",
+        "startMs": 5788,
+        "endMs": 5976
+      },
+      {
+        "word": "courses",
+        "startMs": 5988,
+        "endMs": 6376
+      },
+      {
+        "word": "on",
+        "startMs": 6388,
+        "endMs": 6526
+      },
+      {
+        "word": "top",
+        "startMs": 6538,
+        "endMs": 6926
+      },
+      {
+        "word": "recent",
+        "startMs": 7100,
+        "endMs": 7413
+      },
+      {
+        "word": "documents",
+        "startMs": 7425,
+        "endMs": 7950
+      },
+      {
+        "word": "below",
+        "startMs": 7963,
+        "endMs": 8501
+      }
+    ]
+  },
+  {
+    "kind": "fx",
+    "t": 11017,
+    "method": "pause",
+    "args": [
+      0.3
+    ]
+  },
+  {
+    "kind": "step",
+    "t": 11323,
+    "sceneIndex": 0,
+    "stepIndex": 2,
+    "description": "Open the new-course dialog"
+  },
+  {
+    "kind": "fx",
+    "t": 11326,
+    "method": "cursorTo",
+    "args": [
+      "[data-demo=\"new-course\"]",
+      "New Course button",
+      null
+    ]
+  },
+  {
+    "kind": "say",
+    "t": 11732,
+    "hash": "0a45a962671c7c69cc74dec3e19fb9ca9385c23291bae4f48158d5cb28ed6ca8",
+    "text": "Everything in Typenote lives inside a course. Let's create one.",
+    "durationMs": 4375,
+    "words": [
+      {
+        "word": "Everything",
+        "startMs": 100,
+        "endMs": 575
+      },
+      {
+        "word": "in",
+        "startMs": 588,
+        "endMs": 688
+      },
+      {
+        "word": "Typenote",
+        "startMs": 700,
+        "endMs": 1200
+      },
+      {
+        "word": "lives",
+        "startMs": 1213,
+        "endMs": 1426
+      },
+      {
+        "word": "inside",
+        "startMs": 1438,
+        "endMs": 1763
+      },
+      {
+        "word": "a",
+        "startMs": 1775,
+        "endMs": 1838
+      },
+      {
+        "word": "course",
+        "startMs": 1850,
+        "endMs": 2425
+      },
+      {
+        "word": "Let's",
+        "startMs": 3288,
+        "endMs": 3601
+      },
+      {
+        "word": "create",
+        "startMs": 3613,
+        "endMs": 3963
+      },
+      {
+        "word": "one",
+        "startMs": 3975,
+        "endMs": 4375
+      }
+    ]
+  },
+  {
+    "kind": "fx",
+    "t": 16122,
+    "method": "click",
+    "args": [
+      "[data-demo=\"new-course\"]",
+      "Open the course dialog",
+      null
+    ]
+  },
+  {
+    "kind": "step",
+    "t": 16258,
+    "sceneIndex": 0,
+    "stepIndex": 3,
+    "description": "Name the course"
+  },
+  {
+    "kind": "fx",
+    "t": 16258,
+    "method": "cursorTo",
+    "args": [
+      "#course-name",
+      "Course name field",
+      null
+    ]
+  },
+  {
+    "kind": "fx",
+    "t": 16678,
+    "method": "typeWithDelay",
+    "args": [
+      "#course-name",
+      "Calculus 2",
+      14
+    ]
+  },
+  {
+    "kind": "say",
+    "t": 17590,
+    "hash": "f5414b8bd7d25de17544ed5ee504e0e5f0a993d9ea542e8159cb4f26e11c6947",
+    "text": "Give it a name.",
+    "durationMs": 925,
+    "words": [
+      {
+        "word": "Give",
+        "startMs": 100,
+        "endMs": 300
+      },
+      {
+        "word": "it",
+        "startMs": 313,
+        "endMs": 401
+      },
+      {
+        "word": "a",
+        "startMs": 413,
+        "endMs": 463
+      },
+      {
+        "word": "name",
+        "startMs": 475,
+        "endMs": 925
+      }
+    ]
+  },
+  {
+    "kind": "step",
+    "t": 18519,
+    "sceneIndex": 0,
+    "stepIndex": 4,
+    "description": "Pick a color"
+  },
+  {
+    "kind": "fx",
+    "t": 18519,
+    "method": "cursorTo",
+    "args": [
+      "button[aria-label=\"Select color #22C55E\"]",
+      "Green color swatch",
+      null
+    ]
+  },
+  {
+    "kind": "fx",
+    "t": 18925,
+    "method": "click",
+    "args": [
+      "button[aria-label=\"Select color #22C55E\"]",
+      "Choose green",
+      null
+    ]
+  },
+  {
+    "kind": "say",
+    "t": 18976,
+    "hash": "4b1d426b6ba0341a08694492c4caef9ec5ec48e2bb0820244df9b7287272d328",
+    "text": "Pick a color — it tags the course everywhere in the app.",
+    "durationMs": 3000,
+    "words": [
+      {
+        "word": "Pick",
+        "startMs": 100,
+        "endMs": 313
+      },
+      {
+        "word": "a",
+        "startMs": 325,
+        "endMs": 400
+      },
+      {
+        "word": "color",
+        "startMs": 413,
+        "endMs": 876
+      },
+      {
+        "word": "it",
+        "startMs": 1088,
+        "endMs": 1188
+      },
+      {
+        "word": "tags",
+        "startMs": 1200,
+        "endMs": 1525
+      },
+      {
+        "word": "the",
+        "startMs": 1538,
+        "endMs": 1638
+      },
+      {
+        "word": "course",
+        "startMs": 1650,
+        "endMs": 1950
+      },
+      {
+        "word": "everywhere",
+        "startMs": 1963,
+        "endMs": 2413
+      },
+      {
+        "word": "in",
+        "startMs": 2425,
+        "endMs": 2513
+      },
+      {
+        "word": "the",
+        "startMs": 2525,
+        "endMs": 2613
+      },
+      {
+        "word": "app.",
+        "startMs": 2625,
+        "endMs": 3000
+      }
+    ]
+  },
+  {
+    "kind": "fx",
+    "t": 21988,
+    "method": "pause",
+    "args": [
+      0.3
+    ]
+  },
+  {
+    "kind": "step",
+    "t": 22299,
+    "sceneIndex": 0,
+    "stepIndex": 5,
+    "description": "Create the course"
+  },
+  {
+    "kind": "fx",
+    "t": 22301,
+    "method": "cursorTo",
+    "args": [
+      "[data-demo=\"create-course\"]",
+      "Create Course button",
+      null
+    ]
+  },
+  {
+    "kind": "fx",
+    "t": 22707,
+    "method": "click",
+    "args": [
+      "[data-demo=\"create-course\"]",
+      "Create the course",
+      null
+    ]
+  },
+  {
+    "kind": "fx",
+    "t": 24620,
+    "method": "pause",
+    "args": [
+      0.6
+    ]
+  },
+  {
+    "kind": "step",
+    "t": 25224,
+    "sceneIndex": 0,
+    "stepIndex": 6,
+    "description": "Open the course"
+  },
+  {
+    "kind": "fx",
+    "t": 25226,
+    "method": "cursorTo",
+    "args": [
+      "[data-demo=\"calc-card\"]",
+      "The new Calculus 2 course card",
+      null
+    ]
+  },
+  {
+    "kind": "say",
+    "t": 25642,
+    "hash": "f61b6bc4439f9b2a4bd085aa8ca497d82e0cb6b75d8a73e3a41b08be893a4775",
+    "text": "Here it is. Click in — every course gets its own page for documents and materials.",
+    "durationMs": 5663,
+    "words": [
+      {
+        "word": "Here",
+        "startMs": 100,
+        "endMs": 350
+      },
+      {
+        "word": "it",
+        "startMs": 363,
+        "endMs": 463
+      },
+      {
+        "word": "is",
+        "startMs": 475,
+        "endMs": 900
+      },
+      {
+        "word": "Click",
+        "startMs": 1763,
+        "endMs": 2038
+      },
+      {
+        "word": "in",
+        "startMs": 2050,
+        "endMs": 2225
+      },
+      {
+        "word": "every",
+        "startMs": 2388,
+        "endMs": 2613
+      },
+      {
+        "word": "course",
+        "startMs": 2625,
+        "endMs": 3025
+      },
+      {
+        "word": "gets",
+        "startMs": 3038,
+        "endMs": 3238
+      },
+      {
+        "word": "its",
+        "startMs": 3250,
+        "endMs": 3400
+      },
+      {
+        "word": "own",
+        "startMs": 3413,
+        "endMs": 3613
+      },
+      {
+        "word": "page",
+        "startMs": 3625,
+        "endMs": 3950
+      },
+      {
+        "word": "for",
+        "startMs": 3963,
+        "endMs": 4101
+      },
+      {
+        "word": "documents",
+        "startMs": 4113,
+        "endMs": 4651
+      },
+      {
+        "word": "and",
+        "startMs": 4663,
+        "endMs": 4826
+      },
+      {
+        "word": "materials",
+        "startMs": 4838,
+        "endMs": 5663
+      }
+    ]
+  },
+  {
+    "kind": "fx",
+    "t": 31316,
+    "method": "click",
+    "args": [
+      "[data-demo=\"calc-card\"]",
+      "Open the course",
+      null
+    ]
+  },
+  {
+    "kind": "error",
+    "t": 61367,
+    "message": "Error in scene \"Getting started\" line 14: page.waitForSelector: Timeout 30000ms exceeded.\nCall log:\n\u001b[2m  - waiting for locator('h1') to be visible\u001b[22m\n\u001b[2m    28 × locator resolved to 2 elements. Proceeding with the first one: <h1 class=\"text-lg font-bold flex-1\">Typenote</h1>\u001b[22m\n\u001b[2m    36 × locator resolved to 3 elements. Proceeding with the first one: <h1 class=\"text-lg font-bold flex-1\">Typenote</h1>\u001b[22m\n",
+    "sceneIndex": 12
+  }
+]
