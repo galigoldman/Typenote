@@ -1,0 +1,118 @@
+---
+title: Getting started with Typenote
+description: Create your first course and document, and take your first note.
+url: http://localhost:3000/dashboard
+viewport: { width: 1440, height: 900 }
+auth: { storageState: "../auth.json" }
+tts:
+  voice: en-US-JennyNeural
+  rate: "+0%"
+---
+
+# Getting started
+
+```playwright
+// fx.cursorTo / fx.highlight measure with document.querySelector, so tag
+// text-matched elements with a data-demo attribute reachable via plain CSS.
+const tag = (label, match, scope) => page.evaluate(([label, match, scope]) => {
+  const el = [...document.querySelectorAll(scope || "button")]
+    .find((e) => (e.textContent || "").trim().includes(match));
+  if (el) el.setAttribute("data-demo", label);
+}, [label, match, scope]);
+
+await fx.step("Welcome");
+await page.waitForLoadState("networkidle");
+await page.waitForSelector('text="New Course"');
+await fx.pause(0.8);
+await fx.say("Welcome to Typenote — the notebook built for university courses. This is your dashboard: your courses on top, recent documents below.");
+await fx.pause(0.3);
+
+await fx.step("Open the new-course dialog");
+await tag("new-course", "New Course");
+await fx.cursorTo('[data-demo="new-course"]', "New Course button");
+await fx.say("Everything in Typenote lives inside a course. Let's create one.");
+await fx.click('[data-demo="new-course"]', "Open the course dialog");
+await page.waitForSelector('#course-name');
+
+await fx.step("Name the course");
+await fx.cursorTo('#course-name', "Course name field");
+await fx.typeWithDelay('#course-name', "Calculus 2", 14);
+await fx.say("Give it a name.");
+
+await fx.step("Pick a color");
+await fx.cursorTo('button[aria-label="Select color #22C55E"]', "Green color swatch");
+await fx.click('button[aria-label="Select color #22C55E"]', "Choose green");
+await fx.say("Pick a color — it tags the course everywhere in the app.");
+await fx.pause(0.3);
+
+await fx.step("Create the course");
+await tag("create-course", "Create Course");
+await fx.cursorTo('[data-demo="create-course"]', "Create Course button");
+await fx.click('[data-demo="create-course"]', "Create the course");
+await page.waitForSelector('[data-testid="course-card"]:has-text("Calculus 2")');
+await fx.pause(0.6);
+
+await fx.step("Open the course");
+await tag("calc-card", "Calculus 2", '[data-testid="course-card"]');
+await fx.cursorTo('[data-demo="calc-card"]', "The new Calculus 2 course card");
+await fx.say("Here it is. Click in — every course gets its own page for documents and materials.");
+await fx.click('[data-demo="calc-card"]', "Open the course");
+await page.waitForSelector('h1:has-text("Calculus 2")');
+await fx.pause(0.6);
+
+await fx.step("Open the new-document dialog");
+await tag("new-doc", "New Document");
+await fx.cursorTo('[data-demo="new-doc"]', "New Document button");
+await fx.say("Now the first document. Click New Document.");
+await fx.click('[data-demo="new-doc"]', "Open the document dialog");
+await page.waitForSelector('#title');
+
+await fx.step("Name the document");
+await fx.cursorTo('#title', "Document title field");
+await page.fill('#title', "");
+await fx.typeWithDelay('#title', "Lecture 1 — Limits", 14);
+await fx.say("Name it after the lecture.");
+
+await fx.step("Choose a page style");
+await tag("style-lined", "Lined");
+await fx.cursorTo('[data-demo="style-lined"]', "Lined page style");
+await fx.click('[data-demo="style-lined"]', "Choose lined paper");
+await fx.say("And choose a page style — blank, lined, grid, or dotted. Lined feels like a real notebook.");
+await fx.pause(0.3);
+
+await fx.step("Create the document");
+await page.evaluate(() => {
+  const el = [...document.querySelectorAll("button")]
+    .find((e) => (e.textContent || "").trim() === "Create");
+  if (el) el.setAttribute("data-demo", "create-doc");
+});
+await fx.cursorTo('[data-demo="create-doc"]', "Create button");
+await fx.click('[data-demo="create-doc"]', "Create the document");
+await page.waitForURL(/\/dashboard\/documents\//, { timeout: 20000 });
+await page.waitForSelector('.ProseMirror', { timeout: 30000 });
+await fx.pause(0.8);
+
+await fx.step("Take your first note");
+await page.click('button:has-text("Type")').catch(() => {});
+await page.click('.ProseMirror');
+const n = fx.say("And you're in. Just start typing.");
+await page.keyboard.type("Limits — the foundation of calculus", { delay: 45 });
+await page.keyboard.press("Enter");
+await page.keyboard.type("A limit describes the value a function approaches as the input approaches a point.", { delay: 28 });
+await n;
+
+await fx.step("Autosave");
+await page.waitForSelector('text="Saved"', { timeout: 20000 });
+await page.evaluate(() => {
+  const el = [...document.querySelectorAll("span,div,p")]
+    .find((e) => e.children.length === 0 && (e.textContent || "").trim() === "Saved");
+  if (el) el.setAttribute("data-demo", "saved");
+});
+await fx.highlight('[data-demo="saved"]', "Autosave indicator", { duration: 1.6 });
+await fx.say("Notice the corner — Typenote saves automatically as you write. No save button, ever.");
+await fx.pause(0.4);
+
+await fx.step("Wrap up");
+await fx.say("That's the foundation: courses, documents, and notes — organized from day one.");
+await fx.pause(0.6);
+```

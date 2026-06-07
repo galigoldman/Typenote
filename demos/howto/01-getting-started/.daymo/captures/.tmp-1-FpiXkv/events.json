@@ -1,0 +1,33 @@
+[
+  {
+    "kind": "scene_start",
+    "t": 0,
+    "index": 23,
+    "title": "Create a course",
+    "prose": "",
+    "recordingOffsetMs": 1818
+  },
+  {
+    "kind": "step",
+    "t": 1176,
+    "sceneIndex": 1,
+    "stepIndex": 1,
+    "description": "Open the new-course dialog"
+  },
+  {
+    "kind": "fx",
+    "t": 1176,
+    "method": "cursorTo",
+    "args": [
+      "button:has-text(\"New Course\")",
+      "New Course button",
+      null
+    ]
+  },
+  {
+    "kind": "error",
+    "t": 1186,
+    "message": "Error in scene \"Create a course\" line 25: page.evaluate: SyntaxError: Failed to execute 'querySelector' on 'Document': 'button:has-text(\"New Course\")' is not a valid selector.\n    at Object.measure (<anonymous>:149:25)\n    at eval (eval at evaluate (:302:30), <anonymous>:1:23)\n    at UtilityScript.evaluate (<anonymous>:304:16)\n    at UtilityScript.<anonymous> (<anonymous>:1:44)",
+    "sceneIndex": 23
+  }
+]

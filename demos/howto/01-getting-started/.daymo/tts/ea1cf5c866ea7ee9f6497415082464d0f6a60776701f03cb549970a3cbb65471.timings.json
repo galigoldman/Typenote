@@ -1,0 +1,102 @@
+[
+  {
+    "word": "Welcome",
+    "startMs": 100,
+    "endMs": 475
+  },
+  {
+    "word": "to",
+    "startMs": 488,
+    "endMs": 576
+  },
+  {
+    "word": "Typenote",
+    "startMs": 588,
+    "endMs": 1201
+  },
+  {
+    "word": "the",
+    "startMs": 1375,
+    "endMs": 1463
+  },
+  {
+    "word": "notebook",
+    "startMs": 1475,
+    "endMs": 1875
+  },
+  {
+    "word": "built",
+    "startMs": 1888,
+    "endMs": 2138
+  },
+  {
+    "word": "for",
+    "startMs": 2150,
+    "endMs": 2288
+  },
+  {
+    "word": "university",
+    "startMs": 2300,
+    "endMs": 2875
+  },
+  {
+    "word": "courses",
+    "startMs": 2888,
+    "endMs": 3588
+  },
+  {
+    "word": "This",
+    "startMs": 4450,
+    "endMs": 4700
+  },
+  {
+    "word": "is",
+    "startMs": 4713,
+    "endMs": 4826
+  },
+  {
+    "word": "your",
+    "startMs": 4838,
+    "endMs": 4963
+  },
+  {
+    "word": "dashboard",
+    "startMs": 4975,
+    "endMs": 5613
+  },
+  {
+    "word": "your",
+    "startMs": 5788,
+    "endMs": 5976
+  },
+  {
+    "word": "courses",
+    "startMs": 5988,
+    "endMs": 6376
+  },
+  {
+    "word": "on",
+    "startMs": 6388,
+    "endMs": 6526
+  },
+  {
+    "word": "top",
+    "startMs": 6538,
+    "endMs": 6926
+  },
+  {
+    "word": "recent",
+    "startMs": 7100,
+    "endMs": 7413
+  },
+  {
+    "word": "documents",
+    "startMs": 7425,
+    "endMs": 7950
+  },
+  {
+    "word": "below",
+    "startMs": 7963,
+    "endMs": 8501
+  }
+]

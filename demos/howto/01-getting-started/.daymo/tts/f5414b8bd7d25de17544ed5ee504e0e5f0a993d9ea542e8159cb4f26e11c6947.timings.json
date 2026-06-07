@@ -1,0 +1,22 @@
+[
+  {
+    "word": "Give",
+    "startMs": 100,
+    "endMs": 300
+  },
+  {
+    "word": "it",
+    "startMs": 313,
+    "endMs": 401
+  },
+  {
+    "word": "a",
+    "startMs": 413,
+    "endMs": 463
+  },
+  {
+    "word": "name",
+    "startMs": 475,
+    "endMs": 925
+  }
+]
