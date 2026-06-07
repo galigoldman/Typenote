@@ -1,0 +1,561 @@
+{
+  "version": "v1",
+  "videoBaseUrl": "https://ffjlffoznifduxfsjyuq.supabase.co/storage/v1/object/public/help-videos",
+  "demos": [
+    {
+      "demoId": "01-getting-started",
+      "title": "Getting started with Typenote",
+      "description": "Create your first course and document, and take your first note.",
+      "durationMs": 85120,
+      "videoUrl": "https://ffjlffoznifduxfsjyuq.supabase.co/storage/v1/object/public/help-videos/01-getting-started/output.mp4",
+      "posterUrl": "/help/posters/01-getting-started.jpg",
+      "steps": [
+        {
+          "stepId": "01-getting-started:0:1",
+          "label": "Welcome to Typenote — the notebook built for university courses. This is your dashboard: your courses on top, recent documents below.",
+          "startMs": 0
+        },
+        {
+          "stepId": "01-getting-started:0:2",
+          "label": "Everything in Typenote lives inside a course. Let's create one.",
+          "startMs": 5835
+        },
+        {
+          "stepId": "01-getting-started:0:3",
+          "label": "Give it a name.",
+          "startMs": 10782
+        },
+        {
+          "stepId": "01-getting-started:0:4",
+          "label": "Pick a color — it tags the course everywhere in the app.",
+          "startMs": 13067
+        },
+        {
+          "stepId": "01-getting-started:0:6",
+          "label": "Here it is. Click in — every course gets its own page for documents and materials.",
+          "startMs": 20305
+        },
+        {
+          "stepId": "01-getting-started:0:7",
+          "label": "Now the first document. Click New Document.",
+          "startMs": 28851
+        },
+        {
+          "stepId": "01-getting-started:0:8",
+          "label": "Name it after the lecture.",
+          "startMs": 32913
+        },
+        {
+          "stepId": "01-getting-started:0:9",
+          "label": "And choose a page style — blank, lined, grid, or dotted. Lined feels like a real notebook.",
+          "startMs": 36720
+        },
+        {
+          "stepId": "01-getting-started:0:11",
+          "label": "And you're in. Just start typing.",
+          "startMs": 53384
+        },
+        {
+          "stepId": "01-getting-started:0:12",
+          "label": "Notice the corner — Typenote saves automatically as you write. No save button, ever.",
+          "startMs": 65805
+        },
+        {
+          "stepId": "01-getting-started:0:13",
+          "label": "That's the foundation: courses, documents, and notes — organized from day one.",
+          "startMs": 73415
+        }
+      ]
+    },
+    {
+      "demoId": "02-taking-notes",
+      "title": "Taking notes in Typenote",
+      "description": "Type, handwrite, sketch shapes, paste images and zoom — all on one page.",
+      "durationMs": 57472,
+      "videoUrl": "https://ffjlffoznifduxfsjyuq.supabase.co/storage/v1/object/public/help-videos/02-taking-notes/output.mp4",
+      "posterUrl": "/help/posters/02-taking-notes.jpg",
+      "steps": [
+        {
+          "stepId": "02-taking-notes:0:1",
+          "label": "A Typenote page mixes typed text, handwriting, and images. Let's open today's lecture notes.",
+          "startMs": 0
+        },
+        {
+          "stepId": "02-taking-notes:0:2",
+          "label": "Start in Type mode — a full rich-text editor.",
+          "startMs": 9212
+        },
+        {
+          "stepId": "02-taking-notes:0:3",
+          "label": "Formatting works like you'd expect — control B for bold.",
+          "startMs": 17412
+        },
+        {
+          "stepId": "02-taking-notes:0:4",
+          "label": "Now switch to Draw, and the same page becomes paper.",
+          "startMs": 21100
+        },
+        {
+          "stepId": "02-taking-notes:0:5",
+          "label": "Handwrite anywhere — underline, annotate, sketch.",
+          "startMs": 25452
+        },
+        {
+          "stepId": "02-taking-notes:0:6",
+          "label": "Draw a rough circle and hold still for a beat — Typenote snaps it into a perfect shape.",
+          "startMs": 29164
+        },
+        {
+          "stepId": "02-taking-notes:0:7",
+          "label": "Got a diagram from the slides? Just paste it. The image lands on the page, ready to move and resize.",
+          "startMs": 34488
+        },
+        {
+          "stepId": "02-taking-notes:0:8",
+          "label": "Drag it under your notes.",
+          "startMs": 42059
+        },
+        {
+          "stepId": "02-taking-notes:0:9",
+          "label": "And when the details matter, zoom — control and scroll, or pinch on a tablet.",
+          "startMs": 44039
+        },
+        {
+          "stepId": "02-taking-notes:0:10",
+          "label": "Typed text, ink, shapes, and images — one page, saved automatically.",
+          "startMs": 49315
+        }
+      ]
+    },
+    {
+      "demoId": "03-writing-math",
+      "title": "Writing math in Typenote",
+      "description": "Describe math in plain English — Typenote writes the LaTeX, renders it, and lets you edit or copy it.",
+      "durationMs": 70880,
+      "videoUrl": "https://ffjlffoznifduxfsjyuq.supabase.co/storage/v1/object/public/help-videos/03-writing-math/output.mp4",
+      "posterUrl": "/help/posters/03-writing-math.jpg",
+      "steps": [
+        {
+          "stepId": "03-writing-math:0:1",
+          "label": "Math is first-class in Typenote. Let's open a problem set and write some.",
+          "startMs": 0
+        },
+        {
+          "stepId": "03-writing-math:0:2",
+          "label": "Start typing your working like in any note.",
+          "startMs": 8511
+        },
+        {
+          "stepId": "03-writing-math:0:3",
+          "label": "When you need an equation, type a colon, then an open curly brace — and a math box appears.",
+          "startMs": 29651
+        },
+        {
+          "stepId": "03-writing-math:0:4",
+          "label": "Now describe the math in plain words — and Typenote writes the LaTeX for you.",
+          "startMs": 35016
+        },
+        {
+          "stepId": "03-writing-math:0:5",
+          "label": "There it is — a properly rendered equation, sitting right in your notes.",
+          "startMs": 40594
+        },
+        {
+          "stepId": "03-writing-math:0:6",
+          "label": "Need fine control? Click the equation, hit Edit — power users can edit the LaTeX directly.",
+          "startMs": 44877
+        },
+        {
+          "stepId": "03-writing-math:0:7",
+          "label": "Copy gives you the LaTeX to paste anywhere — and pasted back into Typenote, it stays an editable equation.",
+          "startMs": 52375
+        },
+        {
+          "stepId": "03-writing-math:0:8",
+          "label": "Describe it in plain words, get real math — saved automatically with the rest of your notes.",
+          "startMs": 58934
+        }
+      ]
+    },
+    {
+      "demoId": "04-moodle-import",
+      "title": "Import from Moodle",
+      "description": "Connect your university's Moodle and pull course materials into Typenote with one sync.",
+      "durationMs": 79080,
+      "videoUrl": "https://ffjlffoznifduxfsjyuq.supabase.co/storage/v1/object/public/help-videos/04-moodle-import/output.mp4",
+      "posterUrl": "/help/posters/04-moodle-import.jpg",
+      "steps": [
+        {
+          "stepId": "04-moodle-import:0:1",
+          "label": "Here's your dashboard. Your notes live in Typenote — but the lecture files you need are still sitting on Moodle.",
+          "startMs": 0
+        },
+        {
+          "stepId": "04-moodle-import:0:2",
+          "label": "Lecture slides, problem sets, past exams — Typenote can pull them all straight into your workspace.",
+          "startMs": 4006
+        },
+        {
+          "stepId": "04-moodle-import:0:3",
+          "label": "First, tell Typenote where your Moodle lives. Paste your university's address and hit Connect — Typenote remembers it from now on.",
+          "startMs": 10338
+        },
+        {
+          "stepId": "04-moodle-import:0:4",
+          "label": "Connected. Now one click scans Moodle for everything you're enrolled in.",
+          "startMs": 19260
+        },
+        {
+          "stepId": "04-moodle-import:0:5",
+          "label": "There they are — every course from my Moodle account. I only want Linear Algebra for now, so I'll leave the other one out.",
+          "startMs": 24598
+        },
+        {
+          "stepId": "04-moodle-import:0:6",
+          "label": "Next, Typenote peeks inside the course and lists every file it can import.",
+          "startMs": 31979
+        },
+        {
+          "stepId": "04-moodle-import:0:7",
+          "label": "Everything is organized by week, just like on Moodle — lectures and problem sets, already selected. Untick anything you don't need, and sync the rest.",
+          "startMs": 36769
+        },
+        {
+          "stepId": "04-moodle-import:0:8",
+          "label": "Hit sync, and Typenote downloads each file from Moodle and stores it with your course.",
+          "startMs": 47242
+        },
+        {
+          "stepId": "04-moodle-import:0:9",
+          "label": "It saves the course structure first, then pulls the files down one by one.",
+          "startMs": 51781
+        },
+        {
+          "stepId": "04-moodle-import:0:10",
+          "label": "And that's it — your Moodle course, inside Typenote, ready to read and annotate. When new files appear next week, one click re-syncs just what's new. No more hunting through Moodle tabs the night before an exam — it's all in one place.",
+          "startMs": 57334
+        }
+      ]
+    },
+    {
+      "demoId": "05-ai-chat",
+      "title": "Ask the AI about your course",
+      "description": "Chat with an AI tutor that has read your course materials — with citations.",
+      "durationMs": 71560,
+      "videoUrl": "https://ffjlffoznifduxfsjyuq.supabase.co/storage/v1/object/public/help-videos/05-ai-chat/output.mp4",
+      "posterUrl": "/help/posters/05-ai-chat.jpg",
+      "steps": [
+        {
+          "stepId": "05-ai-chat:0:1",
+          "label": "Every course in Typenote comes with its own AI tutor — one that has actually read your course files. Let's open Linear Algebra.",
+          "startMs": 0
+        },
+        {
+          "stepId": "05-ai-chat:0:2",
+          "label": "The chat lives in the corner of every course page. Open it up.",
+          "startMs": 3836
+        },
+        {
+          "stepId": "05-ai-chat:0:3",
+          "label": "The free plan includes fifty chat questions a month, and your remaining balance is always visible — right here, above the input.",
+          "startMs": 8876
+        },
+        {
+          "stepId": "05-ai-chat:0:4",
+          "label": "Now just ask, in plain language — exactly like you'd ask a teaching assistant after class.",
+          "startMs": 18661
+        },
+        {
+          "stepId": "05-ai-chat:0:5",
+          "label": "The answer arrives right beside your course — a definition, the steps to follow, and clean math notation you can actually read.",
+          "startMs": 25194
+        },
+        {
+          "stepId": "05-ai-chat:0:6",
+          "label": "And it's grounded in your own course materials — this citation points straight to Lecture 3, pages four to six.",
+          "startMs": 35950
+        },
+        {
+          "stepId": "05-ai-chat:0:7",
+          "label": "Every conversation is saved with the course, so you can pick up any thread again before the exam.",
+          "startMs": 44125
+        },
+        {
+          "stepId": "05-ai-chat:0:8",
+          "label": "And when you move on to a new topic, a fresh thread is one click away.",
+          "startMs": 50885
+        },
+        {
+          "stepId": "05-ai-chat:0:9",
+          "label": "Your notes, your files, and a tutor that's read them all — that's the Typenote AI.",
+          "startMs": 56113
+        }
+      ]
+    },
+    {
+      "demoId": "06-your-files",
+      "title": "Bring in your own files",
+      "description": "Import lecture PDFs into a course and read them side by side with your notes.",
+      "durationMs": 60960,
+      "videoUrl": "https://ffjlffoznifduxfsjyuq.supabase.co/storage/v1/object/public/help-videos/06-your-files/output.mp4",
+      "posterUrl": "/help/posters/06-your-files.jpg",
+      "steps": [
+        {
+          "stepId": "06-your-files:0:1",
+          "label": "Slides and PDFs belong right next to your notes. Let's bring one into Linear Algebra.",
+          "startMs": 0
+        },
+        {
+          "stepId": "06-your-files:0:2",
+          "label": "Click Import File and pick any PDF or Word document.",
+          "startMs": 5110
+        },
+        {
+          "stepId": "06-your-files:0:3",
+          "label": "It lands under Materials — and the AI has already read it.",
+          "startMs": 15159
+        },
+        {
+          "stepId": "06-your-files:0:4",
+          "label": "Now open your lecture notes, and click Focus files.",
+          "startMs": 21972
+        },
+        {
+          "stepId": "06-your-files:0:5",
+          "label": "Add the file you just imported.",
+          "startMs": 31681
+        },
+        {
+          "stepId": "06-your-files:0:6",
+          "label": "Click it — the PDF opens right beside your notes, and the AI focuses on exactly these files.",
+          "startMs": 37344
+        },
+        {
+          "stepId": "06-your-files:0:7",
+          "label": "Scroll, and zoom in when the details matter.",
+          "startMs": 44043
+        },
+        {
+          "stepId": "06-your-files:0:9",
+          "label": "Your files, your notes, and the AI — all on one screen.",
+          "startMs": 48216
+        }
+      ]
+    },
+    {
+      "demoId": "07-export-share-versions",
+      "title": "Export, share & version history",
+      "description": "Turn a document into a PDF, roll back to an earlier version, and share a course with a read-only link.",
+      "durationMs": 69440,
+      "videoUrl": "https://ffjlffoznifduxfsjyuq.supabase.co/storage/v1/object/public/help-videos/07-export-share-versions/output.mp4",
+      "posterUrl": "/help/posters/07-export-share-versions.jpg",
+      "steps": [
+        {
+          "stepId": "07-export-share-versions:0:1",
+          "label": "Typenote doesn't lock your notes in. Let's export a PDF, roll back a document, and share a course.",
+          "startMs": 0
+        },
+        {
+          "stepId": "07-export-share-versions:0:2",
+          "label": "Here's the midterm summary.",
+          "startMs": 6167
+        },
+        {
+          "stepId": "07-export-share-versions:0:3",
+          "label": "Need a copy to print or upload? One click turns the page into a PDF — math, ink and all.",
+          "startMs": 14452
+        },
+        {
+          "stepId": "07-export-share-versions:0:4",
+          "label": "Now the time machine: Typenote snapshots your work automatically.",
+          "startMs": 21827
+        },
+        {
+          "stepId": "07-export-share-versions:0:5",
+          "label": "Let's open the earliest snapshot — from before the summary was finished.",
+          "startMs": 25977
+        },
+        {
+          "stepId": "07-export-share-versions:0:6",
+          "label": "Restoring is safe — Typenote snapshots the current state first, so nothing is ever lost.",
+          "startMs": 30582
+        },
+        {
+          "stepId": "07-export-share-versions:0:7",
+          "label": "We're back in time — and the newest work is kept right there as a Before-restore snapshot.",
+          "startMs": 35987
+        },
+        {
+          "stepId": "07-export-share-versions:0:8",
+          "label": "Last one: sharing. The course tag takes us straight to the course page.",
+          "startMs": 41047
+        },
+        {
+          "stepId": "07-export-share-versions:0:9",
+          "label": "Click Share — viewers get the course materials read-only; your own notes stay private.",
+          "startMs": 47832
+        },
+        {
+          "stepId": "07-export-share-versions:0:10",
+          "label": "Create a viewer link — one URL your whole study group can use.",
+          "startMs": 53429
+        },
+        {
+          "stepId": "07-export-share-versions:0:11",
+          "label": "Copy it and send it. Contributor links work the same way.",
+          "startMs": 57596
+        },
+        {
+          "stepId": "07-export-share-versions:0:12",
+          "label": "Export it, roll it back, share it — your notes go wherever you need them.",
+          "startMs": 62046
+        }
+      ]
+    },
+    {
+      "demoId": "08-courses-folders",
+      "title": "Organize with courses & folders",
+      "description": "Course pages, color tags, folders, and moving notes — keep a whole degree tidy.",
+      "durationMs": 65504,
+      "videoUrl": "https://ffjlffoznifduxfsjyuq.supabase.co/storage/v1/object/public/help-videos/08-courses-folders/output.mp4",
+      "posterUrl": "/help/posters/08-courses-folders.jpg",
+      "steps": [
+        {
+          "stepId": "08-courses-folders:0:1",
+          "label": "Courses are how Typenote organizes your degree — one card per course, each tagged with its own color.",
+          "startMs": 0
+        },
+        {
+          "stepId": "08-courses-folders:0:2",
+          "label": "That color follows the course everywhere — on its tags, its links, and its dialogs.",
+          "startMs": 4993
+        },
+        {
+          "stepId": "08-courses-folders:0:3",
+          "label": "Let's step inside Linear Algebra.",
+          "startMs": 10707
+        },
+        {
+          "stepId": "08-courses-folders:0:4",
+          "label": "Everything for the course lives on this one page. Your notes sit in the Documents grid.",
+          "startMs": 13229
+        },
+        {
+          "stepId": "08-courses-folders:0:5",
+          "label": "Below them, Materials — the slides and files you import. The course A.I. reads these when you ask it questions.",
+          "startMs": 18432
+        },
+        {
+          "stepId": "08-courses-folders:0:6",
+          "label": "And up top — create a new document, import a file, or share the whole course with your study group.",
+          "startMs": 25549
+        },
+        {
+          "stepId": "08-courses-folders:0:7",
+          "label": "The Dashboard button takes us back.",
+          "startMs": 31398
+        },
+        {
+          "stepId": "08-courses-folders:0:8",
+          "label": "As the semesters pile up, folders keep things tidy. Let's make one.",
+          "startMs": 34131
+        },
+        {
+          "stepId": "08-courses-folders:0:9",
+          "label": "Call it Semester B, give it a color, and create it.",
+          "startMs": 39031
+        },
+        {
+          "stepId": "08-courses-folders:0:10",
+          "label": "Notes can move right in. The Calculus lecture has a Move option in its menu.",
+          "startMs": 44162
+        },
+        {
+          "stepId": "08-courses-folders:0:11",
+          "label": "Pick Semester B — and move it here.",
+          "startMs": 49590
+        },
+        {
+          "stepId": "08-courses-folders:0:12",
+          "label": "Open the folder — and there it is, filed away.",
+          "startMs": 52236
+        },
+        {
+          "stepId": "08-courses-folders:0:13",
+          "label": "Courses, colors, folders — your dashboard stays clean as your degree grows.",
+          "startMs": 57491
+        }
+      ]
+    },
+    {
+      "demoId": "09-share-course",
+      "title": "Share a course with your study group",
+      "description": "Create a share link as the course owner, then follow it as a classmate — sign in, auto-join, and see the shared course from the viewer's side.",
+      "durationMs": 73066,
+      "videoUrl": "https://ffjlffoznifduxfsjyuq.supabase.co/storage/v1/object/public/help-videos/09-share-course/output.mp4",
+      "posterUrl": "/help/posters/09-share-course.jpg",
+      "steps": [
+        {
+          "stepId": "09-share-course:0:1",
+          "label": "Notes are better together. Let's share a course with the study group — and then see exactly what a classmate gets.",
+          "startMs": 0
+        },
+        {
+          "stepId": "09-share-course:0:2",
+          "label": "Maya wants her group inside this Linear Algebra course, materials and all.",
+          "startMs": 6367
+        },
+        {
+          "stepId": "09-share-course:0:3",
+          "label": "Every course has a Share button — and it offers two kinds of links: viewer and contributor.",
+          "startMs": 12436
+        },
+        {
+          "stepId": "09-share-course:0:4",
+          "label": "Viewer first. Viewers can read everything in the course — and edit nothing.",
+          "startMs": 18181
+        },
+        {
+          "stepId": "09-share-course:0:5",
+          "label": "There's the link. Copy it once and drop it in the group chat.",
+          "startMs": 23656
+        },
+        {
+          "stepId": "09-share-course:0:6",
+          "label": "And when you want classmates adding their own files and summaries, that's the contributor link.",
+          "startMs": 28054
+        },
+        {
+          "stepId": "09-share-course:0:7",
+          "label": "Now let's switch seats and be the classmate. Daniel opens the link from the group chat.",
+          "startMs": 33712
+        },
+        {
+          "stepId": "09-share-course:0:8",
+          "label": "He isn't signed in, so Typenote asks him to log in first — the link remembers where he was headed.",
+          "startMs": 39343
+        },
+        {
+          "stepId": "09-share-course:0:9",
+          "label": "One click — and he lands straight inside the shared course. No invites to accept, no setup.",
+          "startMs": 45025
+        },
+        {
+          "stepId": "09-share-course:0:10",
+          "label": "Daniel can open every material Maya shared. Her own notes stay private — and a viewer can't add files or manage sharing.",
+          "startMs": 51673
+        },
+        {
+          "stepId": "09-share-course:0:11",
+          "label": "Back on his dashboard, the course now sits under Shared with me — by Maya Levi.",
+          "startMs": 59640
+        },
+        {
+          "stepId": "09-share-course:0:12",
+          "label": "One link — and your whole study group works from the same course. That's sharing in Typenote.",
+          "startMs": 64521
+        }
+      ]
+    }
+  ]
+}
