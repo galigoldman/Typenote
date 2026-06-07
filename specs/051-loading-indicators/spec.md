@@ -48,7 +48,7 @@ async flow with a single boolean, instead of modeling the full flow.
   - `processing` — `createPersonalFile()` (extraction + embedding) in
     progress: spinner + "Processing file…"
 - Phase state lives in `PersonalFileUpload` (`idle → uploading → processing →
-  idle`); `useFileUpload` keeps validation/upload but drops the dead
+idle`); `useFileUpload` keeps validation/upload but drops the dead
   `progress` number.
 - The upload button remains replaced by the indicator until the flow finishes;
   errors at either phase show the existing toast and restore the button.
