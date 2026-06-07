@@ -1,0 +1,205 @@
+---
+title: Import from Moodle
+description: Connect your university's Moodle and pull course materials into Typenote with one sync.
+url: http://localhost:3000/dashboard
+viewport: { width: 1440, height: 900 }
+auth: { storageState: "../auth.json" }
+tts:
+  voice: en-US-JennyNeural
+  rate: "+0%"
+---
+
+# Import from Moodle
+
+```playwright
+const tag = (label, match, scope) => page.evaluate(([label, match, scope]) => {
+  const el = [...document.querySelectorAll(scope || "button")]
+    .find((e) => (e.textContent || "").trim().includes(match));
+  if (el) el.setAttribute("data-demo", label);
+}, [label, match, scope]);
+
+await fx.step("Stub the extension and reload");
+// Hide the Next.js dev-tools badge on the ALREADY-LOADED page immediately —
+// the scene records from the first frame, before the stubbed reload below.
+await page.addStyleTag({ content: "nextjs-portal{display:none!important}" }).catch(() => {});
+// The Typenote Chrome extension is NOT installed in the capture browser.
+// Install a stub for chrome.runtime.sendMessage that answers the extension
+// message protocol (PING / permissions / course + content scraping / file
+// downloads) with canned demo data. Registered as an init script so it runs
+// before any app code on every navigation, then re-navigate so the
+// already-loaded dashboard picks it up.
+await page.addInitScript(() => {
+  const COURSES = [
+    { moodleCourseId: "4821", name: "Linear Algebra 1", url: "https://moodle.tau.ac.il/course/view.php?id=4821" },
+    { moodleCourseId: "4822", name: "Introduction to Computer Science", url: "https://moodle.tau.ac.il/course/view.php?id=4822" },
+  ];
+  const SECTIONS = [
+    {
+      moodleSectionId: "1", title: "Week 1 — Vector Spaces", position: 1,
+      items: [
+        { type: "file", name: "Lecture 1 — Vector Spaces.pdf", moodleUrl: "https://moodle.tau.ac.il/pluginfile.php/100001/mod_resource/content/1/lecture1.pdf", fileSize: 2048576, mimeType: "application/pdf" },
+        { type: "file", name: "Problem Set 1.pdf", moodleUrl: "https://moodle.tau.ac.il/pluginfile.php/100002/mod_resource/content/1/ps1.pdf", fileSize: 512000, mimeType: "application/pdf" },
+      ],
+    },
+    {
+      moodleSectionId: "2", title: "Week 2 — Linear Maps", position: 2,
+      items: [
+        { type: "file", name: "Lecture 2 — Linear Maps.pdf", moodleUrl: "https://moodle.tau.ac.il/pluginfile.php/100003/mod_resource/content/1/lecture2.pdf", fileSize: 1843200, mimeType: "application/pdf" },
+        { type: "file", name: "Lecture 3 — Eigenvalues.pdf", moodleUrl: "https://moodle.tau.ac.il/pluginfile.php/100004/mod_resource/content/1/lecture3.pdf", fileSize: 1536000, mimeType: "application/pdf" },
+      ],
+    },
+  ];
+  // Deterministic fake 64-hex content hash, unique per file URL.
+  const fakeHash = (s) => {
+    let h1 = 0x811c9dc5, h2 = 0x01000193;
+    for (let i = 0; i < s.length; i++) {
+      h1 = ((h1 ^ s.charCodeAt(i)) * 0x01000193) >>> 0;
+      h2 = ((h2 * 31) + s.charCodeAt(i) + 7) >>> 0;
+    }
+    return (h1.toString(16).padStart(8, "0") + h2.toString(16).padStart(8, "0")).repeat(4);
+  };
+  const respond = (msg) => {
+    switch (msg && msg.type) {
+      case "PING":
+        return { delay: 60, res: { success: true, data: { version: "0.2.1" } } };
+      case "CHECK_LOGIN":
+        return { delay: 60, res: { success: true, data: { loggedIn: true } } };
+      case "CHECK_PERMISSION":
+        return { delay: 60, res: { success: true, data: { granted: true } } };
+      case "REQUEST_PERMISSION":
+        return { delay: 60, res: { success: true } };
+      case "SCRAPE_COURSES":
+        return { delay: 1600, res: { success: true, data: { courses: COURSES } } };
+      case "SCRAPE_COURSE_CONTENT":
+        return { delay: 2000, res: { success: true, data: { sections: SECTIONS } } };
+      case "DOWNLOAD_AND_UPLOAD": {
+        const url = (msg.payload && msg.payload.moodleFileUrl) || "";
+        // Stagger per-file delays (urls end ...10000N) so the progress
+        // counter visibly ticks 1/4 -> 4/4 over ~3.5 seconds.
+        const m = url.match(/1000(\d{2})/);
+        const n = m ? parseInt(m[1], 10) : 1;
+        return {
+          delay: 800 + n * 700,
+          res: { success: true, data: { contentHash: fakeHash(url), fileSize: 1536000, mimeType: "application/pdf", deduplicated: false } },
+        };
+      }
+      default:
+        return { delay: 60, res: { success: false, error: "Unknown message type" } };
+    }
+  };
+  const w = window;
+  if (!w.chrome) w.chrome = {};
+  // ExtensionGate sniffs the Chromium family via chrome.app/loadTimes/csi.
+  try { if (!w.chrome.app) w.chrome.app = {}; } catch {}
+  const runtime = w.chrome.runtime || {};
+  runtime.lastError = undefined;
+  runtime.sendMessage = (_extId, message, cb) => {
+    const { delay, res } = respond(message);
+    setTimeout(() => {
+      runtime.lastError = undefined;
+      if (typeof cb === "function") cb(res);
+    }, delay);
+  };
+  try { w.chrome.runtime = runtime; } catch {}
+  // Hide the Next.js dev-tools badge from the first paint of every
+  // navigation (style tags added via Playwright don't survive page loads).
+  document.addEventListener("DOMContentLoaded", () => {
+    const style = document.createElement("style");
+    style.textContent = "nextjs-portal{display:none!important}";
+    document.documentElement.appendChild(style);
+  });
+});
+// Start the opening narration in parallel with the reload so the brief
+// route-loading spinner is never silent dead air.
+const nav = page.goto("http://localhost:3000/dashboard");
+const s0 = fx.say("Here's your dashboard. Your notes live in Typenote — but the lecture files you need are still sitting on Moodle.");
+await nav;
+await page.addStyleTag({ content: "nextjs-portal{display:none!important}" }).catch(() => {});
+// With the stub answering PING, the Moodle card shows the connect state.
+await page.waitForSelector("#moodle-url", { timeout: 30000 });
+await s0;
+await fx.pause(0.5);
+
+await fx.step("Meet the Moodle integration");
+await page.evaluate(() => {
+  const card = [...document.querySelectorAll('[data-slot="card"]')]
+    .find((c) => (c.textContent || "").includes("Moodle Integration"));
+  if (card) card.setAttribute("data-demo", "moodle-card");
+});
+const s1 = fx.say("Lecture slides, problem sets, past exams — Typenote can pull them all straight into your workspace.");
+await fx.highlight('[data-demo="moodle-card"]', "Moodle Integration card", { duration: 2.6 });
+await s1;
+await fx.pause(0.3);
+
+await fx.step("Connect your Moodle");
+await fx.cursorTo("#moodle-url", "Moodle URL input");
+const s2 = fx.say("First, tell Typenote where your Moodle lives. Paste your university's address and hit Connect — Typenote remembers it from now on.");
+await fx.typeWithDelay("#moodle-url", "https://moodle.tau.ac.il", 14);
+await fx.pause(0.5);
+await tag("connect-btn", "Connect");
+await fx.click('[data-demo="connect-btn"]', "Connect button");
+await s2;
+// The server action saves the connection and re-renders the card.
+await page.waitForSelector('button:has-text("Sync with Moodle")', { timeout: 30000 });
+await fx.pause(0.6);
+
+await fx.step("Scan for your courses");
+await tag("sync-btn", "Sync with Moodle");
+await fx.cursorTo('[data-demo="sync-btn"]', "Sync with Moodle button");
+const s3 = fx.say("Connected. Now one click scans Moodle for everything you're enrolled in.");
+await fx.click('[data-demo="sync-btn"]', "Start a Moodle sync");
+await page.waitForSelector('[aria-label="Select Linear Algebra 1"]', { timeout: 30000 });
+await s3;
+await fx.pause(0.5);
+
+await fx.step("Pick the course to import");
+const s4 = fx.say("There they are — every course from my Moodle account. I only want Linear Algebra for now, so I'll leave the other one out.");
+await fx.cursorTo('[aria-label="Select Introduction to Computer Science"]', "Intro to CS checkbox");
+await fx.pause(0.8);
+await fx.click('[aria-label="Select Introduction to Computer Science"]', "Deselect Introduction to Computer Science");
+await s4;
+await fx.pause(0.5);
+
+await fx.step("Preview the course content");
+const s5 = fx.say("Next, Typenote peeks inside the course and lists every file it can import.");
+await tag("preview-btn", "Preview Content");
+await fx.cursorTo('[data-demo="preview-btn"]', "Preview Content button");
+await fx.click('[data-demo="preview-btn"]', "Preview course content");
+await page.waitForSelector('[aria-label="Select section Week 1 — Vector Spaces"]', { timeout: 30000 });
+await s5;
+await fx.pause(0.4);
+
+await fx.step("Choose what to sync");
+const s6 = fx.say("Everything is organized by week, just like on Moodle — lectures and problem sets, already selected. Untick anything you don't need, and sync the rest.");
+await page.evaluate(() => {
+  for (const b of document.querySelectorAll('[role="dialog"] button')) {
+    const t = (b.textContent || "").trim();
+    if (t.startsWith("Week 1")) b.parentElement?.setAttribute("data-demo", "week1");
+    if (t.startsWith("Week 2")) b.parentElement?.setAttribute("data-demo", "week2");
+  }
+});
+await fx.highlight('[data-demo="week1"]', "Week 1 section", { duration: 1.6 });
+await fx.highlight('[data-demo="week2"]', "Week 2 section", { duration: 1.6 });
+await s6;
+await fx.pause(1.0);
+
+await fx.step("Sync it");
+const s7 = fx.say("Hit sync, and Typenote downloads each file from Moodle and stores it with your course.");
+await tag("sync-selected-btn", "Sync Selected");
+await fx.cursorTo('[data-demo="sync-selected-btn"]', "Sync Selected button");
+await fx.click('[data-demo="sync-selected-btn"]', "Sync the selected files");
+await s7;
+
+await fx.step("Watch it work");
+// The registry save is a real server action against the hosted database and
+// can take ~10s — keep narrating over it so there's no silent dead air.
+const s7b = fx.say("It saves the course structure first, then pulls the files down one by one.");
+// Registry save + four stubbed downloads, then the completion state.
+await page.waitForSelector("text=Successfully synced", { timeout: 90000 });
+await s7b;
+await fx.pause(1.4);
+
+await fx.step("Wrap up");
+await fx.say("And that's it — your Moodle course, inside Typenote, ready to read and annotate. When new files appear next week, one click re-syncs just what's new. No more hunting through Moodle tabs the night before an exam — it's all in one place.");
+await fx.pause(1.2);
+```
