@@ -23,6 +23,8 @@ const tag = (label, match, scope) => page.evaluate(([label, match, scope]) => {
 await fx.step("Welcome");
 await page.waitForLoadState("networkidle");
 await page.waitForSelector('text="New Course"');
+// Hide the Next.js dev-tools badge — it must not appear in any frame.
+await page.addStyleTag({ content: "nextjs-portal{display:none!important}" });
 await fx.pause(0.8);
 await fx.say("Welcome to Typenote — the notebook built for university courses. This is your dashboard: your courses on top, recent documents below.");
 await fx.pause(0.3);
