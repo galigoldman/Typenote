@@ -346,3 +346,15 @@ fail any PR that drifts from the committed baselines — which is the whole poin
 - [x] First-time user sees onboarding popover with "Got it" button
 - [x] Clicking "Got it" dismisses the popover and persists dismissal across reloads
 - [x] Returning user can click LaTeX icon to see help without "Got it" button
+
+---
+
+## Help Center & Widget (`e2e/help-center.spec.ts`) — IMPLEMENTED
+
+- [x] `/help` is public — loads logged out with hero, ask bar and popular questions
+- [x] Gallery lists all 9 video guides (driven by committed `public/help/manifest.json`)
+- [x] Clicking a card opens the player modal with a step timeline; Escape closes it
+- [x] Shared bundle integrity: manifest has 9 demos and every poster is served same-origin
+- [x] Dashboard embeds the Daymo widget (host element, `/api/help/widget-config/typenote`, `/daymo-widget.js` all live)
+- [x] Sidebar Help link navigates to `/help`
+- [ ] Ask flow (AI answer with clip citations) — needs `GOOGLE_GENERATIVE_AI_API_KEY`; covered by unit tests on the route config + manual verification, not E2E
