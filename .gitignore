@@ -61,3 +61,5 @@ demos/howto/auth.json
 demos/howto/**/.daymo/
 demos/howto/**/*.mp4
 
+demos/howto/.publish/
+demos/howto/**/poster.jpg
