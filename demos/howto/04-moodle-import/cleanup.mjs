@@ -47,15 +47,22 @@ try {
     .select('id, course_id')
     .eq('user_id', userId);
   if (error) throw error;
-  syncCourseIds = [...new Set((syncs ?? []).map((s) => s.course_id).filter(Boolean))];
-  console.log(`found ${syncs?.length ?? 0} user_course_syncs (linked courses: ${syncCourseIds.length})`);
+  syncCourseIds = [
+    ...new Set((syncs ?? []).map((s) => s.course_id).filter(Boolean)),
+  ];
+  console.log(
+    `found ${syncs?.length ?? 0} user_course_syncs (linked courses: ${syncCourseIds.length})`,
+  );
 } catch (e) {
   console.warn('reading user_course_syncs failed:', e.message);
 }
 
 // 2. user_file_imports (FK -> user_course_syncs, delete first)
 try {
-  const { error } = await maya.from('user_file_imports').delete().eq('user_id', userId);
+  const { error } = await maya
+    .from('user_file_imports')
+    .delete()
+    .eq('user_id', userId);
   if (error) throw error;
   console.log('deleted user_file_imports');
 } catch (e) {
@@ -64,7 +71,10 @@ try {
 
 // 3. user_course_syncs
 try {
-  const { error } = await maya.from('user_course_syncs').delete().eq('user_id', userId);
+  const { error } = await maya
+    .from('user_course_syncs')
+    .delete()
+    .eq('user_id', userId);
   if (error) throw error;
   console.log('deleted user_course_syncs');
 } catch (e) {
@@ -76,7 +86,11 @@ try {
 for (const courseId of syncCourseIds) {
   try {
     await maya.from('documents').delete().eq('course_id', courseId);
-    const { error } = await maya.from('courses').delete().eq('id', courseId).eq('user_id', userId);
+    const { error } = await maya
+      .from('courses')
+      .delete()
+      .eq('id', courseId)
+      .eq('user_id', userId);
     if (error) throw error;
     console.log(`deleted sync-created course ${courseId}`);
   } catch (e) {
@@ -87,7 +101,10 @@ for (const courseId of syncCourseIds) {
 // 5. Maya's Moodle connection — this is what flips the dashboard card back
 //    to the "Enter your Moodle URL" connect state.
 try {
-  const { error } = await maya.from('user_moodle_connections').delete().eq('user_id', userId);
+  const { error } = await maya
+    .from('user_moodle_connections')
+    .delete()
+    .eq('user_id', userId);
   if (error) throw error;
   console.log('deleted user_moodle_connections');
 } catch (e) {
@@ -107,7 +124,10 @@ try {
     .maybeSingle();
   if (findError) throw findError;
   if (instance) {
-    const { error } = await maya.from('moodle_instances').delete().eq('id', instance.id);
+    const { error } = await maya
+      .from('moodle_instances')
+      .delete()
+      .eq('id', instance.id);
     if (error) throw error;
     // RLS silently filters rows it won't delete — verify.
     const { data: still } = await maya
@@ -116,15 +136,22 @@ try {
       .eq('id', instance.id)
       .maybeSingle();
     if (still) {
-      console.warn('registry rows remain (RLS blocks user deletes) — harmless for retakes');
+      console.warn(
+        'registry rows remain (RLS blocks user deletes) — harmless for retakes',
+      );
     } else {
-      console.log(`deleted moodle_instances row for ${DEMO_DOMAIN} (cascades registry)`);
+      console.log(
+        `deleted moodle_instances row for ${DEMO_DOMAIN} (cascades registry)`,
+      );
     }
   } else {
     console.log(`no moodle_instances row for ${DEMO_DOMAIN}`);
   }
 } catch (e) {
-  console.warn('deleting shared registry failed (expected under RLS):', e.message);
+  console.warn(
+    'deleting shared registry failed (expected under RLS):',
+    e.message,
+  );
 }
 
 // 7. Verify the connect state is restored.

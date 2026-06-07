@@ -2,7 +2,12 @@
 // live, so re-captures don't accumulate duplicates. Run between takes:
 //   node demos/howto/cleanup-video01.mjs
 import { createClient } from '@supabase/supabase-js';
-import { SUPABASE_URL, SUPABASE_ANON_KEY, DEMO_EMAIL, DEMO_PASSWORD } from './demo-env.mjs';
+import {
+  SUPABASE_URL,
+  SUPABASE_ANON_KEY,
+  DEMO_EMAIL,
+  DEMO_PASSWORD,
+} from './demo-env.mjs';
 
 const db = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
   auth: { autoRefreshToken: false, persistSession: false },

@@ -23,7 +23,10 @@ const admin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
 async function findUserByEmail(email) {
   let page = 1;
   for (;;) {
-    const { data, error } = await admin.auth.admin.listUsers({ page, perPage: 1000 });
+    const { data, error } = await admin.auth.admin.listUsers({
+      page,
+      perPage: 1000,
+    });
     if (error) throw new Error(error.message);
     const hit = data.users.find((u) => u.email === email);
     if (hit) return hit;
@@ -59,11 +62,14 @@ const { error: profileError } = await admin
   .from('profiles')
   .update({ display_name: DEMO_NAME })
   .eq('id', user.id);
-if (profileError) console.warn(`profiles update skipped: ${profileError.message}`);
+if (profileError)
+  console.warn(`profiles update skipped: ${profileError.message}`);
 
 // Bake the storageState by logging in through the real UI.
 const browser = await chromium.launch();
-const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 } });
+const ctx = await browser.newContext({
+  viewport: { width: 1440, height: 900 },
+});
 const page = await ctx.newPage();
 await page.goto(`${APP_URL}/login`);
 await page.getByLabel('Email').fill(DEMO_EMAIL);

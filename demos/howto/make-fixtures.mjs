@@ -15,7 +15,10 @@ const outDir = path.join(HOWTO_DIR, 'fixtures');
 mkdirSync(outDir, { recursive: true });
 
 const browser = await chromium.launch();
-const page = await browser.newPage({ viewport: { width: 560, height: 420 }, deviceScaleFactor: 2 });
+const page = await browser.newPage({
+  viewport: { width: 560, height: 420 },
+  deviceScaleFactor: 2,
+});
 
 // --- eigen-diagram.png: a hand-drawn-style eigenvector diagram ---------------
 await page.setContent(`<!doctype html><html><head><meta charset="utf-8"><style>
@@ -42,7 +45,10 @@ await page.setContent(`<!doctype html><html><head><meta charset="utf-8"><style>
     <text x="96" y="345" font-size="17" fill="#b91c1c" font-style="italic">Av&#8322; = &#189;v&#8322;</text>
   </svg>
 </div></body></html>`);
-await page.screenshot({ path: path.join(outDir, 'eigen-diagram.png'), clip: { x: 0, y: 0, width: 560, height: 420 } });
+await page.screenshot({
+  path: path.join(outDir, 'eigen-diagram.png'),
+  clip: { x: 0, y: 0, width: 560, height: 420 },
+});
 console.log('wrote fixtures/eigen-diagram.png');
 
 // --- lecture PDFs -------------------------------------------------------------
@@ -61,30 +67,67 @@ function lectureHtml({ title, course, sections }) {
   </body></html>`;
 }
 
-await page.setContent(lectureHtml({
-  course: 'Linear Algebra 1 · Spring 2026',
-  title: 'Lecture 3 — Eigenvalues and Eigenvectors',
-  sections: [
-    ['1. Motivation', 'Many linear transformations have privileged directions: vectors that the map merely stretches. Understanding these directions reduces a complicated matrix to a handful of scalars, and underpins diagonalization, stability analysis, and spectral methods.'],
-    ['2. Definitions', 'Let A be an n×n matrix. A nonzero vector v is an eigenvector of A with eigenvalue λ when:', 'A v = λ v'],
-    ['3. The characteristic polynomial', 'Eigenvalues are exactly the roots of the characteristic polynomial, obtained by requiring that A − λI be singular:', 'det(A − λI) = 0'],
-    ['4. Worked example', 'For the 2×2 shear-and-stretch matrix discussed in class, the characteristic polynomial factors as (λ − 2)(λ − ½), giving eigenvalues 2 and ½ with independent eigenvectors v₁ and v₂. See Figure 4.2 in the lecture notes.'],
-    ['5. Exercises', 'Compute the spectrum of the rotation matrix R(θ) and explain geometrically why no real eigenvectors exist for θ ∉ {0, π}. Then show that symmetric matrices always admit an orthonormal eigenbasis.'],
-  ],
-}));
-await page.pdf({ path: path.join(outDir, 'lecture-3-eigenvalues.pdf'), format: 'A4' });
+await page.setContent(
+  lectureHtml({
+    course: 'Linear Algebra 1 · Spring 2026',
+    title: 'Lecture 3 — Eigenvalues and Eigenvectors',
+    sections: [
+      [
+        '1. Motivation',
+        'Many linear transformations have privileged directions: vectors that the map merely stretches. Understanding these directions reduces a complicated matrix to a handful of scalars, and underpins diagonalization, stability analysis, and spectral methods.',
+      ],
+      [
+        '2. Definitions',
+        'Let A be an n×n matrix. A nonzero vector v is an eigenvector of A with eigenvalue λ when:',
+        'A v = λ v',
+      ],
+      [
+        '3. The characteristic polynomial',
+        'Eigenvalues are exactly the roots of the characteristic polynomial, obtained by requiring that A − λI be singular:',
+        'det(A − λI) = 0',
+      ],
+      [
+        '4. Worked example',
+        'For the 2×2 shear-and-stretch matrix discussed in class, the characteristic polynomial factors as (λ − 2)(λ − ½), giving eigenvalues 2 and ½ with independent eigenvectors v₁ and v₂. See Figure 4.2 in the lecture notes.',
+      ],
+      [
+        '5. Exercises',
+        'Compute the spectrum of the rotation matrix R(θ) and explain geometrically why no real eigenvectors exist for θ ∉ {0, π}. Then show that symmetric matrices always admit an orthonormal eigenbasis.',
+      ],
+    ],
+  }),
+);
+await page.pdf({
+  path: path.join(outDir, 'lecture-3-eigenvalues.pdf'),
+  format: 'A4',
+});
 console.log('wrote fixtures/lecture-3-eigenvalues.pdf');
 
-await page.setContent(lectureHtml({
-  course: 'Linear Algebra 1 · Spring 2026',
-  title: 'Problem Set 2 — Linear Maps',
-  sections: [
-    ['Problem 1', 'Let T : ℝ³ → ℝ³ be the projection onto the plane x + y + z = 0. Write the matrix of T in the standard basis and verify T² = T.'],
-    ['Problem 2', 'Determine whether the following maps are linear, and for each linear map compute its kernel and image: (a) f(x, y) = (x + 2y, 0); (b) g(x, y) = (xy, x − y).'],
-    ['Problem 3', 'Suppose A is invertible and v is an eigenvector of A with eigenvalue λ. Show that v is an eigenvector of A⁻¹ and find its eigenvalue.', 'A⁻¹ v = λ⁻¹ v'],
-    ['Problem 4 (bonus)', 'Find a 2×2 matrix that has no real eigenvalues, and explain how this is consistent with the fundamental theorem of algebra.'],
-  ],
-}));
+await page.setContent(
+  lectureHtml({
+    course: 'Linear Algebra 1 · Spring 2026',
+    title: 'Problem Set 2 — Linear Maps',
+    sections: [
+      [
+        'Problem 1',
+        'Let T : ℝ³ → ℝ³ be the projection onto the plane x + y + z = 0. Write the matrix of T in the standard basis and verify T² = T.',
+      ],
+      [
+        'Problem 2',
+        'Determine whether the following maps are linear, and for each linear map compute its kernel and image: (a) f(x, y) = (x + 2y, 0); (b) g(x, y) = (xy, x − y).',
+      ],
+      [
+        'Problem 3',
+        'Suppose A is invertible and v is an eigenvector of A with eigenvalue λ. Show that v is an eigenvector of A⁻¹ and find its eigenvalue.',
+        'A⁻¹ v = λ⁻¹ v',
+      ],
+      [
+        'Problem 4 (bonus)',
+        'Find a 2×2 matrix that has no real eigenvalues, and explain how this is consistent with the fundamental theorem of algebra.',
+      ],
+    ],
+  }),
+);
 await page.pdf({ path: path.join(outDir, 'problem-set-2.pdf'), format: 'A4' });
 console.log('wrote fixtures/problem-set-2.pdf');
 
