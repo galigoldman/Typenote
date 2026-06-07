@@ -1,5 +1,6 @@
 'use client';
 
+import { useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   MoreHorizontal,
@@ -86,7 +87,18 @@ export function DocumentCard({
   onDelete,
 }: DocumentCardProps) {
   const router = useRouter();
+  // Tracks the App Router navigation after a click — isPending stays true
+  // until the document route actually renders, so the card can show feedback
+  // during the otherwise-silent server fetch.
+  const [isNavigating, startNavigation] = useTransition();
   const { exportPdf, isExporting } = useExportPdf();
+
+  function handleOpen() {
+    if (isNavigating) return;
+    startNavigation(() => {
+      router.push(`/dashboard/documents/${document.id}`);
+    });
+  }
 
   const subjectLabel =
     document.subject === 'other' && document.subject_custom
@@ -110,12 +122,21 @@ export function DocumentCard({
   return (
     <Card
       className={cn(
-        'cursor-pointer overflow-hidden border-t-4 transition-shadow hover:shadow-md',
+        'relative cursor-pointer overflow-hidden border-t-4 transition-shadow hover:shadow-md',
         subjectBorderColor,
       )}
-      onClick={() => router.push(`/dashboard/documents/${document.id}`)}
+      onClick={handleOpen}
+      aria-busy={isNavigating}
       data-testid="document-card"
     >
+      {isNavigating && (
+        <div
+          data-testid="document-card-loading"
+          className="absolute inset-0 z-10 flex items-center justify-center bg-background/60"
+        >
+          <Loader2 className="size-5 animate-spin text-muted-foreground" />
+        </div>
+      )}
       <CardHeader>
         <CardTitle className="truncate text-base">{document.title}</CardTitle>
         <CardAction>

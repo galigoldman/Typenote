@@ -1,9 +1,13 @@
 import { render, screen } from '@testing-library/react';
-import { describe, it, expect, vi } from 'vitest';
+import userEvent from '@testing-library/user-event';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { CreateDocumentDialog } from './create-document-dialog';
+import { createDocument } from '@/lib/actions/documents';
+
+const mockPush = vi.fn();
 
 vi.mock('next/navigation', () => ({
-  useRouter: () => ({ push: vi.fn() }),
+  useRouter: () => ({ push: mockPush }),
 }));
 
 vi.mock('@/lib/actions/documents', () => ({
@@ -53,5 +57,50 @@ describe('CreateDocumentDialog', () => {
   it('does not show custom subject input by default', () => {
     renderDialog();
     expect(screen.queryByLabelText(/custom subject/i)).not.toBeInTheDocument();
+  });
+
+  describe('loading state during create + navigation', () => {
+    beforeEach(() => {
+      mockPush.mockClear();
+      vi.mocked(createDocument).mockResolvedValue({
+        id: 'new-doc-1',
+      } as Awaited<ReturnType<typeof createDocument>>);
+    });
+
+    it('keeps the dialog open with a disabled "Creating..." button after a successful create, until navigation unmounts it', async () => {
+      renderDialog();
+      await userEvent.click(screen.getByRole('button', { name: /^create$/i }));
+
+      expect(mockPush).toHaveBeenCalledWith('/dashboard/documents/new-doc-1');
+      // Dialog must still be visible — navigation to the editor is in flight
+      expect(screen.getByLabelText(/title/i)).toBeInTheDocument();
+      const submit = screen.getByRole('button', { name: /creating/i });
+      expect(submit).toBeDisabled();
+    });
+
+    it('disables Cancel while the document is being created', async () => {
+      let resolveCreate: (v: { id: string }) => void;
+      vi.mocked(createDocument).mockImplementation(
+        () =>
+          new Promise((res) => {
+            resolveCreate = res;
+          }) as ReturnType<typeof createDocument>,
+      );
+      renderDialog();
+      await userEvent.click(screen.getByRole('button', { name: /^create$/i }));
+
+      expect(screen.getByRole('button', { name: /cancel/i })).toBeDisabled();
+      resolveCreate!({ id: 'new-doc-1' });
+    });
+
+    it('re-enables the form and shows the error when creation fails', async () => {
+      vi.mocked(createDocument).mockRejectedValue(new Error('boom'));
+      renderDialog();
+      await userEvent.click(screen.getByRole('button', { name: /^create$/i }));
+
+      expect(screen.getByRole('alert')).toHaveTextContent('boom');
+      expect(screen.getByRole('button', { name: /^create$/i })).toBeEnabled();
+      expect(mockPush).not.toHaveBeenCalled();
+    });
   });
 });
