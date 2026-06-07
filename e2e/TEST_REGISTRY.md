@@ -236,13 +236,16 @@ Test lives in `src/__tests__/integration/storage-rls.integration.test.ts`. Verif
 
 ## Admin AI Usage Dashboard (`e2e/admin-dashboard.spec.ts`) — IMPLEMENTED
 
-Covers the admin-only `/admin` AI usage dashboard (token-ledger aggregation + cost estimate). The route is in the `(admin)` group whose layout calls `requireAdmin()`, which `notFound()`s for non-admins. Uses the seeded admin user (`admin@typenote.dev`) and the deterministic month `2099-01` (test user: chat=12, latex=30, flash 1M/0.5M tokens, embedding 2M tokens → estimated cost `$1.95`). The dashboard lists the **full user roster** (every profile), not just active users — zero-activity users appear with zeroed columns, sorted below active ones.
+Covers the admin-only `/admin` AI usage dashboard (event-ledger aggregation + cost estimate). The route is in the `(admin)` group whose layout calls `requireAdmin()`, which `notFound()`s for non-admins. Uses the seeded admin user (`admin@typenote.dev`) and the deterministic month `2099-01` (test user usage on `2099-01-05` and `2099-01-06` → full-month estimated cost `$1.95`; the `2099-01-06` slice is `$1.02`). The dashboard lists the **full user roster** (from `auth.users`), not just active users — zero-activity users appear with zeroed columns. It also shows richer KPIs (active users, total queries, chat/latex/embedding counts, tokens, cost), a **month-wide daily-totals trend**, an optional **day picker** that scopes the roster to a single UTC day, and a **client-side sortable + filterable** per-user table.
 
 - [x] Admin logs in and views the dashboard for `/admin?month=2099-01` — asserts the "AI Usage" heading, the seeded test user's email row, the zero-activity admin user's email row (full-roster behavior), the "Chat queries"/"LaTeX queries" summary cards, and the seeded `$1.95` cost
 - [x] Admin sees the "AI Usage" sidebar nav link and reaches the dashboard by clicking it
 - [x] Non-admin (`test@typenote.dev`) is blocked from `/admin` — HTTP 404, and the admin-only "AI Usage" nav link does not render
 - [x] Admin user drill-down — roster email link → `/admin/users/<id>` heading; by-month row `2099-01` drills to `?month=2099-01`; by-day row `2099-01-06` (2 events) drills to `?day=2099-01-06`; per-query table shows the `embedding` type row; "Questions by document" section is present
 - [x] Non-admin receives HTTP 404 when navigating directly to `/admin/users/<id>`
+- [x] Richer KPIs + daily trend — asserts the new "Active users", "Total queries", "Embeddings" KPI cards, the "Daily totals — 2099-01" section heading, and month-wide trend links for both seeded days (`2099-01-05`, `2099-01-06`)
+- [x] Day scoping — clicking the `2099-01-06` daily-trend link sets `?day=2099-01-06`; the test user's roster row switches from the full-month `$1.95` to that day's `$1.02` slice; the day picker (`Usage day`) reflects the selection
+- [x] Roster sorting + filter — default sort is cost-desc (active test user on top); clicking the "Est. cost" header toggles `aria-sort="ascending"` and surfaces a `$0.00` user; the "Filter users" box narrows the roster to the matching user
 
 ---
 
@@ -266,7 +269,7 @@ Covers the admin-only `/admin` AI usage dashboard (token-ledger aggregation + co
 | Extension Real Load   | Implemented | `e2e/extension-real.spec.ts`             | 3/3         |
 | Version History       | Planned     | `e2e/version-history.spec.ts`            | 0/5         |
 | PDF Visual Regression | Implemented | `e2e/pdf-visual-regression.spec.ts`      | 8/8         |
-| Admin AI Usage        | Implemented | `e2e/admin-dashboard.spec.ts`            | 5/5         |
+| Admin AI Usage        | Implemented | `e2e/admin-dashboard.spec.ts`            | 8/8         |
 | **Total**             |             |                                          | **104/114** |
 
 ---
