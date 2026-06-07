@@ -108,6 +108,40 @@ test.describe('In-app help widget', () => {
     expect(scriptRes.ok()).toBe(true);
   });
 
+  test('widget is hidden on the document editor (Ask AI panel owns that corner)', async ({
+    page,
+  }) => {
+    // The host div has no box of its own (the bubble is position:fixed
+    // inside a closed shadow root), so visibility is asserted via the
+    // host's computed display, which our route-aware style toggles.
+    const hostDisplay = () =>
+      page
+        .locator('#daymo-widget-root')
+        .evaluate((el) => getComputedStyle(el).display);
+
+    await login(page);
+    await expect(page.locator('#daymo-widget-root')).toBeAttached();
+    expect(await hostDisplay()).not.toBe('none');
+
+    // Open a document — the editor's own Ask AI panel lives bottom-right,
+    // so the help bubble must not cover it (regression: the bubble
+    // intercepted clicks on the AI panel's citation buttons).
+    await page.getByRole('button', { name: 'New Document' }).click();
+    const titleInput = page.getByLabel('Title');
+    await titleInput.clear();
+    await titleInput.fill(`Widget overlap check ${Date.now()}`);
+    await page.getByRole('button', { name: 'Create', exact: true }).click();
+    await expect(page).toHaveURL(/\/dashboard\/documents\//, {
+      timeout: 10_000,
+    });
+
+    await expect.poll(hostDisplay, { timeout: 10_000 }).toBe('none');
+
+    // Back on the dashboard the bubble returns.
+    await page.goto('/dashboard');
+    await expect.poll(hostDisplay, { timeout: 10_000 }).not.toBe('none');
+  });
+
   test('sidebar Help link navigates to the help center', async ({ page }) => {
     await login(page);
 
