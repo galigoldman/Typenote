@@ -356,5 +356,6 @@ fail any PR that drifts from the committed baselines — which is the whole poin
 - [x] Clicking a card opens the player modal with a step timeline; Escape closes it
 - [x] Shared bundle integrity: manifest has 9 demos and every poster is served same-origin
 - [x] Dashboard embeds the Daymo widget (host element, `/api/help/widget-config/typenote`, `/daymo-widget.js` all live)
+- [x] Widget is hidden on the document editor (would cover the Ask AI panel's send/citation buttons) and returns on the dashboard
 - [x] Sidebar Help link navigates to `/help`
 - [ ] Ask flow (AI answer with clip citations) — needs `GOOGLE_GENERATIVE_AI_API_KEY`; covered by unit tests on the route config + manual verification, not E2E
