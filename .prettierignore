@@ -6,3 +6,5 @@ public/pdf.worker.min.mjs
 .chrome-debug-moodle
 .claude/worktrees
 extension/dist
+public/daymo-widget.js
+public/help/manifest.json
