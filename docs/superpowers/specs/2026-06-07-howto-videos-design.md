@@ -1,20 +1,21 @@
-# How-To Videos (Batch 1) — Design
+# How-To Videos — Full Feature Coverage — Design
 
-**Date:** 2026-06-07
+**Date:** 2026-06-07 (expanded same day from 4 to 7 videos for full feature coverage)
 **Status:** Approved
 **Tooling:** [Daymo](../../../../Daymo) (`.demo` markdown → narrated MP4, Playwright-driven)
 
 ## Goal
 
-Produce four polished, narrated How-To videos for Typenote, usable both as in-app/docs
+Produce seven polished, narrated How-To videos covering Typenote's full feature
+surface — document features (text, ink, images, math), course syncing (Moodle),
+sharing, AI usage, file import, export, and versioning. Usable both as in-app/docs
 help videos and on the landing page. English narration. Recorded against local dev
 (`pnpm dev` + local Supabase) but with all on-screen content mocked/seeded to look
 exactly like production — no test data, no dev artifacts, realistic university content.
 
-A fifth marketing "sizzle" video and How-Tos for AI chat, file import, and
-export/share are explicitly deferred to a later batch.
+A marketing "sizzle" video is deferred (cut from these scenes later).
 
-## The four videos
+## The seven videos
 
 | # | File | Length | Flow |
 |---|------|--------|------|
@@ -22,6 +23,12 @@ export/share are explicitly deferred to a later batch.
 | 2 | `demos/howto/02-taking-notes.demo` | ~85s | Open seeded document → write/format text → pen: handwrite + shape-snap a circle → paste image, drag/resize → zoom into detail |
 | 3 | `demos/howto/03-writing-math.demo` | ~55s | Trigger inline math → type LaTeX → KaTeX renders → AI-assisted LaTeX from plain English (mocked response) → edit/copy a rendered equation |
 | 4 | `demos/howto/04-moodle-import.demo` | ~85s | Course page → Moodle sync card → connect `moodle.tau.ac.il` course → extension reads course (stubbed) → file picker with realistic lecture PDFs → import → materials appear → open one in inline viewer |
+| 5 | `demos/howto/05-ai-chat.demo` | ~75s | Open AI chat in a course → ask about course material → cited markdown+LaTeX answer (mocked) → quota display → conversation persists in list |
+| 6 | `demos/howto/06-your-files.demo` | ~60s | Add your own files to a course (PDF/DOCX upload) → open in inline material viewer side-by-side with notes |
+| 7 | `demos/howto/07-export-share-versions.demo` | ~75s | Export notes to PDF → share a document via link → open version history, restore an earlier version |
+
+Coverage check against the product surface: document features (1, 2, 3, 7),
+course syncing (4), sharing (7), AI usage (3, 5), file import (4, 6).
 
 ## Where things live
 
@@ -50,8 +57,10 @@ export/share are explicitly deferred to a later batch.
    The script supports `--reset` (delete the persona's content and re-seed) so video 1
    retakes don't accumulate duplicate "Calculus 2" courses. Nothing on screen may
    read as test data.
-3. **AI calls mocked** — the AI-LaTeX endpoint used in video 3 is mocked via Daymo
-   frontmatter `mocks` routes: deterministic, instant, zero quota usage.
+3. **AI calls mocked** — the AI-LaTeX endpoint (video 3) and the AI chat ask/quota/
+   conversations endpoints (video 5) are mocked via Daymo frontmatter `mocks` routes
+   or in-scene `page.route`: deterministic, instant, zero quota usage. Mocked chat
+   answers must look real — markdown + LaTeX, course-grounded content.
 4. **Moodle fully mocked** (video 4) — an init script stubs `chrome.runtime.sendMessage`
    so the app believes the extension is installed and returns a fixture Moodle course:
    realistic host (`moodle.tau.ac.il`), realistic files ("Lecture 3 — Eigenvalues.pdf",
