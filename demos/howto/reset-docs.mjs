@@ -2,7 +2,12 @@
 // videos can be re-captured from a clean page.
 //   node demos/howto/reset-docs.mjs "Lecture 4 — Eigenvalues & Eigenvectors" [...]
 import { createClient } from '@supabase/supabase-js';
-import { SUPABASE_URL, SUPABASE_ANON_KEY, DEMO_EMAIL, DEMO_PASSWORD } from './demo-env.mjs';
+import {
+  SUPABASE_URL,
+  SUPABASE_ANON_KEY,
+  DEMO_EMAIL,
+  DEMO_PASSWORD,
+} from './demo-env.mjs';
 
 const titles = process.argv.slice(2);
 if (!titles.length) {

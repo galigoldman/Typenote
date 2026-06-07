@@ -34,7 +34,14 @@ console.log(`signed in as ${DEMO_EMAIL}`);
 
 if (RESET) {
   // FK order: documents reference courses/folders.
-  for (const table of ['documents', 'ai_conversations', 'course_materials', 'personal_files', 'courses', 'folders']) {
+  for (const table of [
+    'documents',
+    'ai_conversations',
+    'course_materials',
+    'personal_files',
+    'courses',
+    'folders',
+  ]) {
     const { error } = await db.from(table).delete().eq('user_id', uid);
     if (error && !/does not exist|column/.test(error.message)) {
       console.warn(`reset ${table}: ${error.message}`);
@@ -44,7 +51,10 @@ if (RESET) {
   }
 }
 
-const { data: existing } = await db.from('courses').select('id,name').eq('user_id', uid);
+const { data: existing } = await db
+  .from('courses')
+  .select('id,name')
+  .eq('user_id', uid);
 if ((existing ?? []).some((c) => c.name === 'Linear Algebra 1')) {
   console.log('content already seeded — run with --reset to rebuild');
   process.exit(0);
@@ -64,7 +74,14 @@ async function insertCourse(name, color, position) {
 async function insertDoc(course_id, title, canvas_type) {
   const { data, error } = await db
     .from('documents')
-    .insert({ user_id: uid, title, subject: 'other', canvas_type, folder_id: null, course_id })
+    .insert({
+      user_id: uid,
+      title,
+      subject: 'other',
+      canvas_type,
+      folder_id: null,
+      course_id,
+    })
     .select()
     .single();
   if (error) throw new Error(`document ${title}: ${error.message}`);
@@ -73,7 +90,11 @@ async function insertDoc(course_id, title, canvas_type) {
 }
 
 const linalg = await insertCourse('Linear Algebra 1', '#3B82F6', 0);
-const introcs = await insertCourse('Introduction to Computer Science', '#8B5CF6', 1);
+const introcs = await insertCourse(
+  'Introduction to Computer Science',
+  '#8B5CF6',
+  1,
+);
 
 await insertDoc(linalg.id, 'Lecture 4 — Eigenvalues & Eigenvectors', 'lined');
 await insertDoc(linalg.id, 'Problem Set 3', 'blank');
@@ -97,13 +118,19 @@ const page = await ctx.newPage();
 async function typeAndSave(text) {
   await page.keyboard.type(text, { delay: 10 });
   // Autosave debounces; wait for the Saved indicator to settle.
-  await page.getByText('Saving...').waitFor({ timeout: 10_000 }).catch(() => {});
+  await page
+    .getByText('Saving...')
+    .waitFor({ timeout: 10_000 })
+    .catch(() => {});
   await page.getByText('Saved', { exact: true }).waitFor({ timeout: 20_000 });
 }
 
 await page.goto(`${APP_URL}/dashboard/documents/${midterm.id}`);
 await page.locator('.ProseMirror').first().waitFor({ timeout: 30_000 });
-await page.getByRole('button', { name: 'Type' }).click().catch(() => {});
+await page
+  .getByRole('button', { name: 'Type' })
+  .click()
+  .catch(() => {});
 await page.locator('.ProseMirror').first().click();
 
 await typeAndSave('Midterm Summary — key topics\n');
@@ -113,14 +140,18 @@ let { error: v1err } = await db.rpc('create_document_version', {
 });
 if (v1err) console.warn(`snapshot 1: ${v1err.message}`);
 
-await typeAndSave('1. Vector spaces: span, basis, dimension\n2. Linear maps and matrices\n');
+await typeAndSave(
+  '1. Vector spaces: span, basis, dimension\n2. Linear maps and matrices\n',
+);
 let { error: v2err } = await db.rpc('create_document_version', {
   p_document_id: midterm.id,
   p_trigger: 'periodic',
 });
 if (v2err) console.warn(`snapshot 2: ${v2err.message}`);
 
-await typeAndSave('3. Determinants and invertibility\n4. Eigenvalues: det(A - lambda I) = 0\n');
+await typeAndSave(
+  '3. Determinants and invertibility\n4. Eigenvalues: det(A - lambda I) = 0\n',
+);
 
 await browser.close();
 console.log('done — demo content seeded');
