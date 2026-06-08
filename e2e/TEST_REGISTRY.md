@@ -56,6 +56,7 @@ When adding or modifying a feature, update this registry and write the correspon
 - [x] Add new page manually — ⚠️ SKIPPED IN CI
 - [x] Type mode — multi-paragraph input overflows to new pages (`e2e/canvas-type-mode-flow.spec.ts`)
 - [x] Type mode — long URL wraps at the right edge instead of clipping (`e2e/canvas-type-mode-flow.spec.ts`)
+- [x] Type mode — page text layer clips overflow so spilled/pasted text never renders past the page edge (regression guard for abbe925 overflow-visible) (`e2e/canvas-type-mode-flow.spec.ts`)
 
 ---
 
