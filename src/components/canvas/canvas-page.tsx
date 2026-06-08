@@ -766,10 +766,17 @@ export function CanvasPage({
         />
       ))}
 
-      {/* Layer 4: Text content layer — only interactive in text mode */}
+      {/* Layer 4: Text content layer — only interactive in text mode.
+          MUST clip (overflow-hidden): this is the page-level guard that hides
+          any text spilling past the page edge before the overflow handler
+          reflows it to the next page. LaTeX bubble menus / edit panels and the
+          Read-mode Ask AI bar escape this clip via React portals to
+          document.body (see math-node-view.tsx), so clipping here does not
+          re-introduce the menu-clipping issue that abbe925 was fixing. */}
       <div
         ref={textLayerRef}
-        className="absolute inset-0 overflow-visible"
+        data-text-layer
+        className="absolute inset-0 overflow-hidden"
         style={{
           pointerEvents:
             isInteractionMode ||

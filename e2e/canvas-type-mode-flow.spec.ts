@@ -115,6 +115,28 @@ test.describe('Canvas Editor — Type mode text reflow (issue #118)', () => {
     ).toBeVisible();
   });
 
+  test('the page text layer clips overflow so spilled/pasted text never renders past the page edge', async ({
+    page,
+  }) => {
+    // Regression guard for the abbe925 change that flipped this layer from
+    // overflow-hidden to overflow-visible (to un-clip LaTeX menus, which are
+    // now portaled to document.body instead). With overflow-visible, content
+    // that overflows the fixed-height page — e.g. a large paste before the
+    // reflow settles, or a single un-splittable block — paints OUTSIDE the
+    // page boundary. The text layer must clip.
+    const textLayer = page
+      .locator('[data-page-id]')
+      .first()
+      .locator('[data-text-layer]');
+    await expect(textLayer).toBeAttached();
+
+    const overflow = await textLayer.evaluate(
+      (el) => getComputedStyle(el).overflow,
+    );
+    // 'hidden' or 'clip' both clip; 'visible' is the regression.
+    expect(overflow).not.toBe('visible');
+  });
+
   test('a long URL with no word boundaries wraps inside the page instead of being clipped', async ({
     page,
   }) => {
