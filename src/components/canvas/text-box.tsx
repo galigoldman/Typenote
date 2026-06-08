@@ -14,6 +14,7 @@ import { AutoDirection } from '@/lib/editor/rtl-extension';
 import { Indent } from '@/lib/editor/indent-extension';
 import { FontSize } from '@/lib/editor/font-size-extension';
 import { MathExpression } from '@/lib/editor/math-extension';
+import { shouldInterceptBackspaceAtStart } from '@/lib/canvas/cross-page-backspace';
 import type { TextBox as TextBoxData } from '@/types/canvas';
 import type { Editor } from '@tiptap/core';
 
@@ -106,10 +107,12 @@ export function TextBox({
       // the parent (canvas-editor) for cross-page merge.
       handleKeyDown: (view, event) => {
         if (event.key === 'Backspace' && !event.shiftKey) {
-          const { from } = view.state.selection;
-          // Position 1 = start of first block's text content.
-          // Also handle position 0 (before the first block).
-          if (from <= 1) {
+          const { from, empty } = view.state.selection;
+          // Only intercept a COLLAPSED cursor at the very start (position 1 =
+          // offset 0 inside the first block; position 0 = before it). A
+          // non-empty selection that merely starts here — e.g. Ctrl+A
+          // select-all — must fall through to ProseMirror's native delete.
+          if (shouldInterceptBackspaceAtStart({ from, empty })) {
             const cb = onBackspaceAtStartRef.current;
             if (cb) {
               event.preventDefault();
