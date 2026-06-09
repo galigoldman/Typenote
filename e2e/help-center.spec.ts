@@ -185,11 +185,18 @@ test.describe('In-app help widget', () => {
     await titleInput.clear();
     await titleInput.fill(`Widget overlap check ${Date.now()}`);
     await page.getByRole('button', { name: 'Create', exact: true }).click();
+    // Generous timeout: reaching the editor here means the createDocument
+    // server action round-trips AND the heavy /dashboard/documents/[docId]
+    // route (TipTap + KaTeX) compiles on demand. Under the local suite's
+    // parallel workers (and hosted-Supabase latency) that first cold compile
+    // can take well over 10s. CI runs workers=1 + retries, so it never sees
+    // this — but locally the tight timeout flaked. We're not asserting speed
+    // here; this is just setup to reach the editor.
     await expect(page).toHaveURL(/\/dashboard\/documents\//, {
-      timeout: 10_000,
+      timeout: 30_000,
     });
 
-    await expect.poll(hostDisplay, { timeout: 10_000 }).toBe('none');
+    await expect.poll(hostDisplay, { timeout: 20_000 }).toBe('none');
 
     // Back on the dashboard the bubble returns.
     await page.goto('/dashboard');
