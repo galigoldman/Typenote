@@ -33,18 +33,24 @@ test.describe('Help center page', () => {
   test('gallery lists all 9 video guides with durations', async ({ page }) => {
     await page.goto('/help');
 
+    // The sidebar library lists one row per guide, labelled "Video guides".
+    await expect(page.locator('.daymo-help-side-grp-tx')).toHaveText(
+      'Video guides',
+    );
+    const rows = page.locator('.daymo-help-lib-row');
+    await expect(rows).toHaveCount(9);
+    // Each row carries a duration (m:ss) in its label.
+    await expect(rows.first()).toContainText(/\d+:\d{2}/);
+
     await expect(
-      page.getByRole('heading', { name: 'Video guides' }),
+      page
+        .getByRole('button', { name: /Getting started with Typenote/ })
+        .first(),
     ).toBeVisible();
-    const cards = page.locator('.daymo-help-card');
-    await expect(cards).toHaveCount(9);
     await expect(
-      page.getByRole('button', { name: /Getting started with Typenote/ }),
-    ).toBeVisible();
-    await expect(
-      page.getByRole('button', {
-        name: /Share a course with your study group/,
-      }),
+      page
+        .getByRole('button', { name: /Share a course with your study group/ })
+        .first(),
     ).toBeVisible();
   });
 
@@ -66,6 +72,34 @@ test.describe('Help center page', () => {
 
     await page.keyboard.press('Escape');
     await expect(dialog).not.toBeVisible();
+  });
+
+  test('sidebar collapses and can be reopened on desktop (regression)', async ({
+    page,
+  }) => {
+    await page.goto('/help');
+
+    const shell = page.locator('.daymo-help');
+    const collapse = page.locator('.daymo-help-side-collapse');
+    const reopen = page.locator('.daymo-help-topbar-menu');
+
+    // Sidebar starts open; its own collapse toggle is the visible control.
+    await expect(shell).toHaveAttribute('data-sidebar', 'open');
+    await expect(collapse).toBeVisible();
+
+    // Collapse it — the in-sidebar toggle is now clipped to zero width.
+    await collapse.click();
+    await expect(shell).toHaveAttribute('data-sidebar', 'closed');
+
+    // Regression: a reopen control MUST remain visible on desktop. The only
+    // reopen button used to be mobile-only (display:none above 760px), so once
+    // collapsed there was no way back.
+    await expect(reopen).toBeVisible();
+
+    // And it actually restores the sidebar.
+    await reopen.click();
+    await expect(shell).toHaveAttribute('data-sidebar', 'open');
+    await expect(collapse).toBeVisible();
   });
 
   test('serves the shared bundle: manifest + posters are same-origin', async ({
