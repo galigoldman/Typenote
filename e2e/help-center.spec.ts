@@ -156,7 +156,8 @@ test.describe('In-app help widget', () => {
     await expect(host).toBeAttached();
     await expect
       .poll(
-        () => host.evaluate((el) => el.style.getPropertyValue('--dw-bubble-bg')),
+        () =>
+          host.evaluate((el) => el.style.getPropertyValue('--dw-bubble-bg')),
         { timeout: 10_000 },
       )
       .toBe('#0f766e');
