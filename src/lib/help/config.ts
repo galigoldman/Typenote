@@ -17,6 +17,15 @@ export const HELP_BRAND_NAME = 'Typenote';
 /** Typenote's --primary (oklch(0.46 0.2 280)) as hex for non-Tailwind consumers. */
 export const HELP_BRAND_COLOR = '#4a3cc2';
 
+/**
+ * Launcher-bubble identity for the help widget. The in-editor AI assistant is a
+ * purple chat-bubble (#6355C0, MessageCircle), so the help bubble deliberately
+ * differs: a "?" help icon on a distinct teal, while the panel stays on-brand
+ * via HELP_BRAND_COLOR. Both are passed through the widget-config endpoint.
+ */
+export const HELP_BUBBLE_ICON = 'help';
+export const HELP_BUBBLE_COLOR = '#0f766e';
+
 /** Same-origin manifest copy — used by the help page gallery and the widget. */
 export const HELP_MANIFEST_URL = '/help/manifest.json';
 
