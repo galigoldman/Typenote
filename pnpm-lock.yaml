@@ -3856,7 +3856,7 @@ packages:
     engines: {node: '>= 0.4'}
 
   daymo@file:vendor/daymo-0.1.0.tgz:
-    resolution: {integrity: sha512-F4umG8R5vUCq7iiqdiLjjpOp24ZSDzthIVcFV3meqL4uZe9KSMhLuE1wQogL8lZG7dtOFSE/hmszgpee4MUaRw==, tarball: file:vendor/daymo-0.1.0.tgz}
+    resolution: {integrity: sha512-Og93l4DrJ3fK42IpJ2S7+2OXME2cfwOkV2Xio4lahxiNFuIAieGIAXG+2PmJAgPzQBaysJgWlsqjS0AVAyjbkw==, tarball: file:vendor/daymo-0.1.0.tgz}
     version: 0.1.0
     engines: {node: '>=20.10'}
     hasBin: true
