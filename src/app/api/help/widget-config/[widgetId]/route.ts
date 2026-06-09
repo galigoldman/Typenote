@@ -3,6 +3,8 @@ import {
   HELP_WIDGET_ID,
   HELP_BRAND_NAME,
   HELP_BRAND_COLOR,
+  HELP_BUBBLE_ICON,
+  HELP_BUBBLE_COLOR,
   HELP_MANIFEST_URL,
   HELP_SUGGESTED_QUESTIONS,
 } from '@/lib/help/config';
@@ -24,6 +26,8 @@ export async function GET(
     widgetId: HELP_WIDGET_ID,
     name: HELP_BRAND_NAME,
     brandColor: HELP_BRAND_COLOR,
+    bubbleIcon: HELP_BUBBLE_ICON,
+    bubbleColor: HELP_BUBBLE_COLOR,
     locale: 'en',
     suggestedQuestions: HELP_SUGGESTED_QUESTIONS,
     manifestUrl: HELP_MANIFEST_URL,

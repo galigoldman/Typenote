@@ -142,6 +142,26 @@ test.describe('In-app help widget', () => {
     expect(scriptRes.ok()).toBe(true);
   });
 
+  test('help bubble gets its distinct color from the widget config', async ({
+    page,
+  }) => {
+    await login(page);
+
+    // The bubble lives in a closed shadow root (unreachable by locators), but
+    // the widget applies bubbleColor as an inline CSS var on the host element
+    // in the light DOM — so the config→render seam is assertable. The bubble
+    // icon (help "?") is verified at the config endpoint (route.test.ts) since
+    // it only exists inside the closed root.
+    const host = page.locator('#daymo-widget-root');
+    await expect(host).toBeAttached();
+    await expect
+      .poll(
+        () => host.evaluate((el) => el.style.getPropertyValue('--dw-bubble-bg')),
+        { timeout: 10_000 },
+      )
+      .toBe('#0f766e');
+  });
+
   test('widget is hidden on the document editor (Ask AI panel owns that corner)', async ({
     page,
   }) => {
