@@ -6,7 +6,7 @@
  *   - validateFile rejects files >50 MB
  *   - validateFile accepts allowed types under the cap
  *   - upload short-circuits when validation fails (no network, error state set)
- *   - upload sets uploading state, then sets progress=100 on success
+ *   - upload sets uploading state, then clears it on success
  *   - upload exposes Supabase errors to callers and updates state
  *   - reset clears state
  */
@@ -117,7 +117,7 @@ describe('useFileUpload — upload flow', () => {
     expect(String(result.current.error)).toMatch(/Accepted file types/i);
   });
 
-  it('calls storage.upload and sets progress=100 on success', async () => {
+  it('calls storage.upload and clears uploading state on success', async () => {
     mockUpload.mockResolvedValue({ error: null });
 
     const { result } = renderHook(() => useFileUpload('test-bucket'));
@@ -135,7 +135,6 @@ describe('useFileUpload — upload flow', () => {
     expect(mockUpload).toHaveBeenCalledTimes(1);
     expect(mockUpload.mock.calls[0][0]).toBe('docs/ok.pdf');
     expect(returnedPath).toBe('docs/ok.pdf');
-    expect(result.current.progress).toBe(100);
     expect(result.current.uploading).toBe(false);
     expect(result.current.error).toBeNull();
   });
@@ -167,7 +166,7 @@ describe('useFileUpload — upload flow', () => {
     expect(String(result.current.error)).toMatch(/duplicate key/);
   });
 
-  it('reset clears error and progress', async () => {
+  it('reset clears error and uploading state', async () => {
     const { result } = renderHook(() => useFileUpload('test-bucket'));
     const badFile = makeFile({
       name: 'note.txt',
@@ -190,7 +189,6 @@ describe('useFileUpload — upload flow', () => {
     });
 
     expect(result.current.error).toBeNull();
-    expect(result.current.progress).toBe(0);
     expect(result.current.uploading).toBe(false);
   });
 });

@@ -29,6 +29,8 @@ When adding or modifying a feature, update this registry and write the correspon
 ## Documents (`e2e/documents.spec.ts`) — IMPLEMENTED
 
 - [x] Create new document from dashboard
+- [x] Create dialog stays open with disabled "Creating..." button until the editor renders (feature 051)
+- [x] Document card shows a loading spinner while the editor route is loading (feature 051)
 - [x] Open existing document navigates to editor
 - [x] Rename document from editor title input (auto-saves on blur)
 - [x] Delete document with confirmation dialog
@@ -118,6 +120,7 @@ Follow-up to issue #118. Guards against cursor jumps when a multi-page overflow 
 ## File Upload (`e2e/file-upload.spec.ts`) — IMPLEMENTED
 
 - [x] Import file into course (PDF upload)
+- [x] Upload shows "Uploading..." then "Processing file..." phases before completing (feature 051)
 - [x] Open imported file (creates document)
 - [x] Delete imported file
 
@@ -255,12 +258,12 @@ Covers the admin-only `/admin` AI usage dashboard (event-ledger aggregation + co
 | Feature               | Status      | Spec File                                | Tests       |
 | --------------------- | ----------- | ---------------------------------------- | ----------- |
 | Auth                  | Implemented | `e2e/auth.spec.ts`                       | 9/9         |
-| Documents             | Implemented | `e2e/documents.spec.ts`                  | 6/6         |
+| Documents             | Implemented | `e2e/documents.spec.ts`                  | 8/8         |
 | Canvas Editor         | Implemented | `e2e/canvas-editor.spec.ts`              | 15/15       |
 | Text Editor Toolbar   | Implemented | `e2e/editor-toolbar.spec.ts`             | 12/12       |
 | LaTeX Math            | Implemented | `e2e/latex-math.spec.ts`                 | 5/5         |
 | Courses               | Implemented | `e2e/courses.spec.ts`                    | 5/6         |
-| File Upload           | Implemented | `e2e/file-upload.spec.ts`                | 3/4         |
+| File Upload           | Implemented | `e2e/file-upload.spec.ts`                | 4/5         |
 | AI Chat               | Implemented | `e2e/ai-chat.spec.ts`                    | 6/6         |
 | AI Chat — Per-user    | Planned     | `e2e/ai-chat-per-user-materials.spec.ts` | 0/2         |
 | PDF Export            | Implemented | `e2e/export-pdf-*.spec.ts`               | 6/7         |

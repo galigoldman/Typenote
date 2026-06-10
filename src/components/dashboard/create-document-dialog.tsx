@@ -60,14 +60,15 @@ export function CreateDocumentDialog({
         document_type: canvasType,
         purpose: null,
       });
-      setOpen(false);
-      resetForm();
+      // Keep the dialog open and the button in its "Creating..." state while
+      // navigation to the new editor page is in flight — the dialog unmounts
+      // together with this page when the route renders. Closing it here would
+      // leave the user staring at the dashboard with no feedback.
       router.push(`/dashboard/documents/${doc.id}`);
     } catch (err) {
       setError(
         err instanceof Error ? err.message : 'Failed to create document',
       );
-    } finally {
       setIsSubmitting(false);
     }
   }
@@ -82,6 +83,9 @@ export function CreateDocumentDialog({
     <Dialog
       open={open}
       onOpenChange={(value) => {
+        // Ignore close attempts while creating — the document is already
+        // being created server-side and navigation is about to happen.
+        if (!value && isSubmitting) return;
         setOpen(value);
         if (!value) resetForm();
       }}
@@ -139,6 +143,7 @@ export function CreateDocumentDialog({
             <Button
               type="button"
               variant="outline"
+              disabled={isSubmitting}
               onClick={() => setOpen(false)}
             >
               Cancel

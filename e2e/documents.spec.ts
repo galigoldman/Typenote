@@ -50,6 +50,62 @@ test.describe('Documents', () => {
     });
   });
 
+  test('create dialog stays open with a disabled Creating button until the editor renders', async ({
+    page,
+  }) => {
+    // Delay server-action POSTs so the pending state is reliably observable
+    // (locally the create action + navigation can finish in milliseconds).
+    await page.route('**/*', async (route) => {
+      const req = route.request();
+      if (req.method() === 'POST' && req.headers()['next-action']) {
+        await new Promise((r) => setTimeout(r, 800));
+      }
+      await route.continue();
+    });
+
+    await page.getByRole('button', { name: 'New Document' }).click();
+    await expect(page.getByText('Create New Document')).toBeVisible();
+    const titleInput = page.getByLabel('Title');
+    await titleInput.clear();
+    await titleInput.fill(`Loading State ${Date.now()}`);
+    await page.getByRole('button', { name: 'Create', exact: true }).click();
+
+    // While the document is being created, the dialog must stay open and the
+    // submit button must show the in-progress state.
+    const creating = page.getByRole('button', { name: 'Creating...' });
+    await expect(creating).toBeVisible();
+    await expect(creating).toBeDisabled();
+    await expect(page.getByRole('button', { name: 'Cancel' })).toBeDisabled();
+    await expect(page.getByText('Create New Document')).toBeVisible();
+
+    // The dialog disappears only because navigation lands in the editor.
+    await expect(page).toHaveURL(/\/dashboard\/documents\//, {
+      timeout: 15_000,
+    });
+  });
+
+  test('document card shows a spinner while the editor is loading', async ({
+    page,
+  }) => {
+    // Delay the editor route fetch so the card's pending spinner is visible.
+    await page.route('**/dashboard/documents/**', async (route) => {
+      await new Promise((r) => setTimeout(r, 800));
+      await route.continue();
+    });
+
+    const firstDoc = page.locator('[data-testid="document-card"]').first();
+    await expect(firstDoc).toBeVisible({ timeout: 10_000 });
+    await firstDoc.click();
+
+    await expect(
+      page.getByTestId('document-card-loading').first(),
+    ).toBeVisible();
+
+    await expect(page).toHaveURL(/\/dashboard\/documents\//, {
+      timeout: 15_000,
+    });
+  });
+
   test('open existing document navigates to editor', async ({ page }) => {
     // Click the first document card on the dashboard
     const firstDoc = page.locator('[data-testid="document-card"]').first();

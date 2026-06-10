@@ -1,6 +1,6 @@
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { DocumentCard } from './document-card';
 import type { Document } from '@/types/database';
 
@@ -9,6 +9,19 @@ const mockPush = vi.fn();
 vi.mock('next/navigation', () => ({
   useRouter: () => ({ push: mockPush }),
 }));
+
+// Controls React's useTransition so tests can render the pending state
+// deterministically (jsdom has no real App Router navigation to track).
+const transitionState = vi.hoisted(() => ({ isPending: false }));
+
+vi.mock('react', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('react')>();
+  return {
+    ...actual,
+    useTransition: () =>
+      [transitionState.isPending, (cb: () => void) => cb()] as const,
+  };
+});
 
 const mockDocument: Document = {
   id: 'doc-1',
@@ -101,5 +114,42 @@ describe('DocumentCard', () => {
     await user.click(screen.getByText('Delete'));
 
     expect(onDelete).toHaveBeenCalledWith('doc-1');
+  });
+
+  describe('navigation loading state', () => {
+    beforeEach(() => {
+      mockPush.mockClear();
+      transitionState.isPending = false;
+    });
+
+    it('navigates to the document page when the card is clicked', async () => {
+      const user = userEvent.setup();
+      render(<DocumentCard document={mockDocument} />);
+
+      await user.click(screen.getByTestId('document-card'));
+
+      expect(mockPush).toHaveBeenCalledWith('/dashboard/documents/doc-1');
+    });
+
+    it('shows a loading spinner on the card while navigation is pending', () => {
+      transitionState.isPending = true;
+      render(<DocumentCard document={mockDocument} />);
+
+      expect(screen.getByTestId('document-card-loading')).toBeInTheDocument();
+      expect(screen.getByTestId('document-card')).toHaveAttribute(
+        'aria-busy',
+        'true',
+      );
+    });
+
+    it('ignores clicks while navigation is already pending', async () => {
+      transitionState.isPending = true;
+      const user = userEvent.setup();
+      render(<DocumentCard document={mockDocument} />);
+
+      await user.click(screen.getByTestId('document-card'));
+
+      expect(mockPush).not.toHaveBeenCalled();
+    });
   });
 });

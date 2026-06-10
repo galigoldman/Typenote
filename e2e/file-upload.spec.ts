@@ -30,6 +30,51 @@ test.describe('File Upload', () => {
     });
   });
 
+  test('upload shows Uploading then Processing phases before completing', async ({
+    page,
+  }) => {
+    test.setTimeout(45_000);
+    await goToSeededCourse(page);
+    await expect(page.getByRole('button', { name: 'Import File' })).toBeVisible(
+      { timeout: 15_000 },
+    );
+
+    // Delay the storage upload and the server-action POST so both loading
+    // phases are reliably observable (tiny fixture files finish in ms).
+    await page.route('**/*', async (route) => {
+      const req = route.request();
+      const isAction =
+        req.method() === 'POST' && !!req.headers()['next-action'];
+      const isStorageUpload =
+        req.method() === 'POST' && req.url().includes('/storage/v1/object/');
+      if (isAction || isStorageUpload) {
+        await new Promise((r) => setTimeout(r, 800));
+      }
+      await route.continue();
+    });
+
+    const fileInput = page.locator('input[type="file"]').first();
+    await fileInput.setInputFiles({
+      name: `test-phases-${Date.now()}.pdf`,
+      mimeType: 'application/pdf',
+      buffer: Buffer.from('%PDF-1.4 fake pdf content for testing'),
+    });
+
+    // Phase 1: storage upload
+    await expect(page.getByText('Uploading...')).toBeVisible();
+    // Phase 2: server-side extraction + indexing (previously silent)
+    await expect(page.getByText('Processing file...')).toBeVisible({
+      timeout: 15_000,
+    });
+    // Completion: toast + button restored
+    await expect(page.getByText('File imported')).toBeVisible({
+      timeout: 15_000,
+    });
+    await expect(
+      page.getByRole('button', { name: 'Import File' }),
+    ).toBeVisible();
+  });
+
   test('open imported file creates a document', async ({ page }) => {
     // File conversion (PDF → document) is a complex server-side operation
     // that's unreliable in CI's local Supabase environment.

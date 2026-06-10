@@ -8,7 +8,6 @@ const DEFAULT_ALLOWED_MIME_TYPES = ['application/pdf'];
 
 interface UploadState {
   uploading: boolean;
-  progress: number;
   error: string | null;
 }
 
@@ -16,9 +15,10 @@ export function useFileUpload(
   bucketName: string,
   allowedMimeTypes: string[] = DEFAULT_ALLOWED_MIME_TYPES,
 ) {
+  // Note: supabase-js's standard upload exposes no byte-level progress, so
+  // the hook reports a binary uploading flag rather than a fake percentage.
   const [state, setState] = useState<UploadState>({
     uploading: false,
-    progress: 0,
     error: null,
   });
 
@@ -42,11 +42,11 @@ export function useFileUpload(
     async (file: File, path: string): Promise<string> => {
       const validationError = validateFile(file);
       if (validationError) {
-        setState({ uploading: false, progress: 0, error: validationError });
+        setState({ uploading: false, error: validationError });
         throw new Error(validationError);
       }
 
-      setState({ uploading: true, progress: 0, error: null });
+      setState({ uploading: true, error: null });
 
       try {
         const supabase = createClient();
@@ -59,11 +59,11 @@ export function useFileUpload(
 
         if (error) throw error;
 
-        setState({ uploading: false, progress: 100, error: null });
+        setState({ uploading: false, error: null });
         return path;
       } catch (err) {
         const message = err instanceof Error ? err.message : 'Upload failed';
-        setState({ uploading: false, progress: 0, error: message });
+        setState({ uploading: false, error: message });
         throw new Error(message);
       }
     },
@@ -71,7 +71,7 @@ export function useFileUpload(
   );
 
   const reset = useCallback(() => {
-    setState({ uploading: false, progress: 0, error: null });
+    setState({ uploading: false, error: null });
   }, []);
 
   return {

@@ -1,7 +1,7 @@
 'use client';
 
-import { useRef } from 'react';
-import { Upload } from 'lucide-react';
+import { useRef, useState } from 'react';
+import { Loader2, Upload } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useFileUpload } from '@/hooks/use-file-upload';
 import { createPersonalFile } from '@/lib/actions/personal-files';
@@ -15,6 +15,19 @@ interface PersonalFileUploadProps {
   label?: string;
 }
 
+/**
+ * The import flow has two long-running steps the user must see:
+ * storage upload, then server-side processing (text extraction + embedding,
+ * which can take 10-30s for large PDFs). A single boolean hid the second
+ * phase entirely — model the flow as explicit phases instead.
+ */
+type UploadPhase = 'idle' | 'uploading' | 'processing';
+
+const PHASE_LABELS: Record<Exclude<UploadPhase, 'idle'>, string> = {
+  uploading: 'Uploading...',
+  processing: 'Processing file...',
+};
+
 export function PersonalFileUpload({
   courseId,
   userId,
@@ -22,19 +35,20 @@ export function PersonalFileUpload({
   label,
 }: PersonalFileUploadProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const { uploading, progress, error, upload, reset } = useFileUpload(
-    'personal-files',
-    [
-      'application/pdf',
-      'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-    ],
-  );
+  const [phase, setPhase] = useState<UploadPhase>('idle');
+  const { error, upload } = useFileUpload('personal-files', [
+    'application/pdf',
+    'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  ]);
 
   async function handleFile(file: File) {
     const path = `${userId}/${courseId}/${file.name}`;
 
     try {
+      setPhase('uploading');
       await upload(file, path);
+
+      setPhase('processing');
       await createPersonalFile({
         courseId,
         category,
@@ -43,7 +57,7 @@ export function PersonalFileUpload({
         fileSize: file.size,
         storagePath: path,
       });
-      reset();
+
       trackEvent('personal_file_uploaded', {
         file_size: file.size,
         mime_type: file.type,
@@ -52,6 +66,8 @@ export function PersonalFileUpload({
       toast.success('File imported');
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Upload failed');
+    } finally {
+      setPhase('idle');
     }
   }
 
@@ -66,15 +82,13 @@ export function PersonalFileUpload({
 
   return (
     <div>
-      {uploading ? (
-        <div className="flex items-center gap-2 text-sm text-muted-foreground">
-          <div className="h-1.5 w-24 overflow-hidden rounded-full bg-muted">
-            <div
-              className="h-full rounded-full bg-primary transition-all"
-              style={{ width: `${progress}%` }}
-            />
-          </div>
-          Uploading...
+      {phase !== 'idle' ? (
+        <div
+          className="flex h-8 items-center gap-2 px-3 text-sm text-muted-foreground"
+          aria-live="polite"
+        >
+          <Loader2 className="size-4 animate-spin" />
+          {PHASE_LABELS[phase]}
         </div>
       ) : (
         <Button
