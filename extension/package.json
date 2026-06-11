@@ -1,6 +1,6 @@
 {
   "name": "typenote-moodle-extension",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "private": true,
   "scripts": {
     "dev": "esbuild src/background/service-worker.ts src/content/moodle-scraper.ts src/popup/popup.ts --bundle --outdir=dist --sourcemap --watch",
