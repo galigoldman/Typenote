@@ -14,3 +14,32 @@ export function isDrawTool(tool: CanvasTool): boolean {
     tool === 'select'
   );
 }
+
+/**
+ * Whether undo is available for the active tool.
+ *
+ * Draw tools and `select` share the canvas history stack (`canUndoDraw`) —
+ * selection-mode edits (delete/move/resize/paste) push to the same stack and
+ * must be undoable. Text mode delegates to the TipTap editor (`canUndoText`).
+ * Read/crop have no editing path, so undo is unavailable.
+ */
+export function canUndoForTool(
+  tool: CanvasTool,
+  canUndoDraw: boolean,
+  canUndoText: boolean,
+): boolean {
+  if (tool === 'text') return canUndoText;
+  if (isDrawTool(tool)) return canUndoDraw;
+  return false;
+}
+
+/** Whether redo is available for the active tool. Mirrors {@link canUndoForTool}. */
+export function canRedoForTool(
+  tool: CanvasTool,
+  canRedoDraw: boolean,
+  canRedoText: boolean,
+): boolean {
+  if (tool === 'text') return canRedoText;
+  if (isDrawTool(tool)) return canRedoDraw;
+  return false;
+}

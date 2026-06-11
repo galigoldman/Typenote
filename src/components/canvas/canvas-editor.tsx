@@ -26,7 +26,15 @@ import { decideCursorTarget } from '@/lib/canvas/cursor-target';
 import type { Document } from '@/types/database';
 import type { SaveStatus } from '@/hooks/use-auto-save';
 import { pageHasContent, stripTrailingEmptyPages } from './page-utils';
-import { isDrawTool } from './canvas-tool-helpers';
+import {
+  isDrawTool,
+  canUndoForTool,
+  canRedoForTool,
+} from './canvas-tool-helpers';
+import {
+  classifyUndoRedo,
+  isEditableTarget,
+} from '@/lib/canvas/keyboard-shortcuts';
 import type { ConnectionStatus } from '@/hooks/use-realtime-sync';
 import {
   ArrowLeft,
@@ -1958,6 +1966,7 @@ export function CanvasEditor({
     resizeBBox: selectionResizeBBox,
     clearSelection,
     deleteSelected,
+    selectAll,
     copySelection,
     hasClipboardData,
     pasteAtPosition,
@@ -2524,29 +2533,48 @@ export function CanvasEditor({
   );
 
   // Combined: undo is enabled when the current mode has something to undo.
-  // - Draw modes (pen/highlighter/eraser) → use canvas action stack
-  // - Text mode → use active TipTap editor history
-  // - Read mode → no undo path, disable button
-  const canUndo = isDrawTool(activeTool)
-    ? canUndoDraw
-    : activeTool === 'text'
-      ? canUndoText
-      : false;
-  const canRedo = isDrawTool(activeTool)
-    ? canRedoDraw
-    : activeTool === 'text'
-      ? canRedoText
-      : false;
+  // - Draw modes + select → canvas action stack (selection edits push there too)
+  // - Text mode → active TipTap editor history
+  // - Read/crop → no undo path, disable button
+  const canUndo = canUndoForTool(activeTool, canUndoDraw, canUndoText);
+  const canRedo = canRedoForTool(activeTool, canRedoDraw, canRedoText);
 
-  // Keyboard shortcuts for select mode (delete, copy, paste, escape)
+  // The id of the page nearest the viewport vertical center — used to scope
+  // page-level shortcuts (paste, select-all) to whatever the user is looking at.
+  const getViewportCenterPageId = useCallback((): string | null => {
+    const container = globalThis.document.querySelector(
+      '[data-canvas-scroll]',
+    ) as HTMLElement | null;
+    if (!container) return null;
+    const containerRect = container.getBoundingClientRect();
+    const centerClientY = containerRect.top + container.clientHeight / 2;
+    const pageEls = container.querySelectorAll('[data-page-id]');
+    for (const pageEl of pageEls) {
+      const rect = pageEl.getBoundingClientRect();
+      if (rect.top <= centerClientY && rect.bottom >= centerClientY) {
+        return pageEl.getAttribute('data-page-id');
+      }
+    }
+    return null;
+  }, []);
+
+  // Keyboard shortcuts for select mode (delete, copy, paste, escape, select-all)
   useEffect(() => {
     if (activeTool !== 'select') return;
     const handler = (e: KeyboardEvent) => {
+      // Let inputs / contenteditable handle their own keys (e.g. a focused field)
+      if (isEditableTarget(e.target)) return;
       if (e.key === 'Delete' || e.key === 'Backspace') {
         deleteSelected();
       }
       if (e.key === 'Escape') {
         clearSelection();
+      }
+      // Select all: Cmd/Ctrl+A
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'a') {
+        e.preventDefault();
+        const pageId = selectionPageId ?? getViewportCenterPageId();
+        if (pageId) selectAll(pageId);
       }
       // Copy: Cmd/Ctrl+C
       if ((e.metaKey || e.ctrlKey) && e.key === 'c') {
@@ -2655,10 +2683,33 @@ export function CanvasEditor({
     copySelection,
     hasClipboardData,
     pasteAtPosition,
+    selectAll,
+    selectionPageId,
+    getViewportCenterPageId,
     selectedStrokeIds,
     selectedTextBoxIds,
     selectedImageIds,
   ]);
+
+  // Global undo/redo keyboard shortcuts (Ctrl/Cmd+Z, Ctrl/Cmd+Shift+Z, Ctrl+Y).
+  // Runs in every mode. When focus is inside a text box / input we stand down so
+  // the editable element's own history (ProseMirror's keymap) owns the shortcut
+  // and we don't undo twice.
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      const intent = classifyUndoRedo(e);
+      if (!intent) return;
+      if (isEditableTarget(e.target)) return;
+      e.preventDefault();
+      if (intent === 'undo') {
+        handleUndo();
+      } else {
+        handleRedo();
+      }
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [handleUndo, handleRedo]);
 
   // System clipboard paste — intercept image data from Ctrl/Cmd+V
   // This runs in ALL modes (draw, text, select) so users can paste images anytime.

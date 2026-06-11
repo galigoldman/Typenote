@@ -131,7 +131,7 @@ function BoundingBox({
   const bh = highlightBBox.maxY - highlightBBox.minY;
 
   return (
-    <g>
+    <g data-testid="canvas-selection">
       <rect
         x={bx}
         y={by}

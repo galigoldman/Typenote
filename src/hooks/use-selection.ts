@@ -115,6 +115,8 @@ interface UseSelectionReturn {
   resizeBBox: BBox | null;
   clearSelection: () => void;
   deleteSelected: () => void;
+  /** Select every stroke, text box, and image on the given page (Ctrl+A). */
+  selectAll: (pageId: string) => void;
   copySelection: () => void;
   hasClipboardData: boolean;
   pasteAtPosition: (x: number, y: number, pageId: string) => void;
@@ -632,6 +634,42 @@ export function useSelection({
       maxY: Math.max(...bboxes.map((b) => b.maxY)),
     };
   };
+
+  const selectAll = useCallback(
+    (pageId: string) => {
+      const strokes = getPageStrokes(pageId);
+      const textBoxes = getPageTextBoxes(pageId);
+      const images = getPageImages?.(pageId) ?? [];
+      if (
+        strokes.length === 0 &&
+        textBoxes.length === 0 &&
+        images.length === 0
+      ) {
+        return;
+      }
+
+      stateRef.current = 'selected';
+      activePageIdRef.current = pageId;
+      setSelectionPageId(pageId);
+
+      const strokeIds = new Set(strokes.map((s) => s.id));
+      setSelectedStrokeIds(strokeIds);
+      selectedStrokesRef.current = strokes;
+
+      const tbIds = new Set(textBoxes.map((tb) => tb.id));
+      setSelectedTextBoxIds(tbIds);
+      selectedTextBoxIdsRef.current = tbIds;
+
+      const imgIds = new Set(images.map((img) => img.id));
+      setSelectedImageIds(imgIds);
+      selectedImageIdsRef.current = imgIds;
+
+      setSelectionBBox(computeUnionBBox(strokes, textBoxes, images));
+      setTightSelectionBBox(computeTightUnionBBox(strokes, textBoxes, images));
+      setSelectionPath(null);
+    },
+    [getPageStrokes, getPageTextBoxes, getPageImages],
+  );
 
   const handlePointerDown = useCallback(
     (e: React.PointerEvent, pageId: string) => {
@@ -1392,6 +1430,7 @@ export function useSelection({
     resizeBBox,
     clearSelection,
     deleteSelected,
+    selectAll,
     copySelection,
     hasClipboardData,
     pasteAtPosition,

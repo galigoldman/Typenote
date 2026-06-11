@@ -77,6 +77,20 @@ Follow-up to issue #118. Guards against cursor jumps when a multi-page overflow 
 
 ---
 
+## Canvas Editor — Keyboard Shortcuts (`e2e/canvas-editor-keyboard.spec.ts`) — IMPLEMENTED (local only)
+
+Tier 1 editor-parity fixes: keyboard undo/redo wired to the canvas history stack
+(the canvas has no native browser undo), and Ctrl/Cmd+A select-all in select mode.
+Undo availability is asserted via the toolbar Undo/Redo button enabled/disabled
+state; select-all via the `canvas-selection` bounding-box overlay.
+
+- [x] `Ctrl+Z` undoes a stroke from the keyboard in draw mode — ⚠️ SKIPPED IN CI
+- [x] `Ctrl+Shift+Z` redoes after a keyboard undo — ⚠️ SKIPPED IN CI
+- [x] `Ctrl+Y` also redoes (Windows convention) — ⚠️ SKIPPED IN CI
+- [x] `Ctrl+A` selects all objects in select mode, then `Delete` removes them; the delete is keyboard-undoable — ⚠️ SKIPPED IN CI
+
+---
+
 ## Text Editor Toolbar (`e2e/editor-toolbar.spec.ts`) — IMPLEMENTED
 
 - [x] Bold/italic/underline/strikethrough formatting
