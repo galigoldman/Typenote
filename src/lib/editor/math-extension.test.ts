@@ -26,18 +26,14 @@ describe('MathExpression Node', () => {
   });
 
   it('should define latex attribute with empty string default', () => {
-    const attrs = MathExpression.config.addAttributes?.call(
-      MathExpression
-    );
+    const attrs = MathExpression.config.addAttributes?.call(MathExpression);
     expect(attrs).toBeDefined();
     expect(attrs?.latex).toBeDefined();
     expect(attrs?.latex.default).toBe('');
   });
 
   it('should parse HTML from span with data-type math-expression', () => {
-    const parseRules = MathExpression.config.parseHTML?.call(
-      MathExpression
-    );
+    const parseRules = MathExpression.config.parseHTML?.call(MathExpression);
     expect(parseRules).toBeDefined();
     expect(parseRules).toHaveLength(1);
     expect(parseRules?.[0].tag).toBe('span[data-type="math-expression"]');
